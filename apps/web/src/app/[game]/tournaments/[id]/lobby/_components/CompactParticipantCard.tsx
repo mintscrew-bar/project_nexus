@@ -89,7 +89,11 @@ export function CompactParticipantCard({
           )}
           {pubg && (
             <span className="flex-shrink-0 rounded bg-accent-primary/10 px-1 py-0.5 text-[9px] font-bold text-accent-primary">
-              {pubg.platform === "STEAM" ? "스팀" : "카배"}
+              {pubg.lastMatchShard === "STEAM"
+                ? "스배"
+                : pubg.lastMatchShard === "KAKAO"
+                  ? "카배"
+                  : "미확인"}
             </span>
           )}
         </div>
@@ -104,7 +108,7 @@ export function CompactParticipantCard({
           )}
           {pubg && (
             <span className="truncate text-[10px] text-text-tertiary">
-              {pubg.verificationStatus === "VERIFIED" ? "검증됨" : "미검증"}
+              미검증
               {pubg.nexusTier ? ` · NEXUS ${pubg.nexusTier}` : ""}
             </span>
           )}

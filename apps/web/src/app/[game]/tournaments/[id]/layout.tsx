@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { GAMES } from "@nexus/types";
 import { absoluteUrl } from "@/lib/seo";
 
 // 서버에서 API를 직접 호출하므로 NEXT_PUBLIC_API_URL 사용 (sitemap.ts와 동일 패턴)
@@ -10,6 +11,9 @@ const SHARE_IMAGE = absoluteUrl("/images/nexus2.png");
 type RoomShareInfo = {
   id: string;
   name: string;
+  /** 서버가 붙인 표시 제목 — 배그 방이면 `[스배]` 같은 플랫폼 태그가 들어 있다 */
+  displayName?: string;
+  gameTitle?: "LOL" | "PUBG";
   teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   status: string;
   isPrivate: boolean;
@@ -37,14 +41,14 @@ const NOINDEX = { index: false, follow: false } as const;
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ game: string; id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
+  const { game: gameSlug, id } = await params;
 
   // 방 정보를 못 가져오면(삭제·종료 등) 일반 내전 메타데이터로 폴백
   const fallback: Metadata = {
-    title: "롤 내전 방",
-    description: "Nexus에서 롤 내전 방에 참여하세요.",
+    title: "내전 방",
+    description: "Nexus에서 내전 방에 참여하세요.",
     robots: NOINDEX,
   };
 
@@ -60,12 +64,17 @@ export async function generateMetadata({
 
     const label = modeLabel(room.teamMode);
     const headcount = `${room.participantCount}/${room.maxParticipants}명`;
-    const title = `${room.name} · ${label}`;
+    // 공유 카드에는 배지를 그릴 수 없어 제목에 플랫폼 태그가 담겨 온다.
+    const roomName = room.displayName ?? room.name;
+    const gameLabel =
+      (room.gameTitle && GAMES[room.gameTitle]?.label) ?? "롤";
+    const title = `${roomName} · ${label}`;
     const description = `${headcount} · ${label}${
       room.hostName ? ` · 방장 ${room.hostName}` : ""
-    } — 지금 Nexus에서 롤 내전에 참여하세요.`;
-    const url = absoluteUrl(`/tournaments/${id}/lobby`);
-    const cardTitle = `[${label}] ${room.name}`;
+    } — 지금 Nexus에서 ${gameLabel} 내전에 참여하세요.`;
+    // 링크는 실제 서비스 경로여야 한다. 옛 경로를 쓰면 공유할 때마다 308을 한 번 더 탄다.
+    const url = absoluteUrl(`/${gameSlug}/tournaments/${id}/lobby`);
+    const cardTitle = `[${label}] ${roomName}`;
 
     return {
       title,

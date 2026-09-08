@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { CheckCircle2, DoorOpen, Play, Users } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { guideUrl } from "@/lib/guide-links";
 import {
   Bullet,
   BulletList,
@@ -13,7 +13,7 @@ import {
 export const metadata: Metadata = {
   title: "빠른 시작 가이드 — Nexus",
   description: "내전 방 생성부터 참가 확인, 준비 완료, 시작까지 필요한 순서를 안내합니다.",
-  alternates: { canonical: absoluteUrl("/guide/start") },
+  alternates: { canonical: guideUrl("/guide/start") },
 };
 
 export default function StartGuidePage() {

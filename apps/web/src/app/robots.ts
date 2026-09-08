@@ -1,8 +1,16 @@
 import type { MetadataRoute } from "next";
+import { GAMES, GAME_TITLES } from "@nexus/types";
 import { getSiteUrl } from "@/lib/seo";
 
 export default function robots(): MetadataRoute.Robots {
   const siteUrl = getSiteUrl().toString().replace(/\/$/, "");
+
+  // 게임별 경로 아래로 옮겨간 비공개 화면. `/auction` 만 막으면
+  // 실제로 서비스되는 `/lol/auction` `/pubg/auction` 은 그대로 열려 있다.
+  const gameScopedPrivate = ["profile", "auction", "draft", "role-selection"];
+  const gamePrivateDisallow = GAME_TITLES.flatMap((title) =>
+    gameScopedPrivate.map((path) => `/${GAMES[title].slug}/${path}`),
+  );
 
   // 로그인 없이 접근 불가한 라우트 — 검색 로봇에게 수집 금지 요청
   const privateDisallow = [
@@ -10,16 +18,13 @@ export default function robots(): MetadataRoute.Robots {
     "/api",
     "/auth",
     "/dashboard",
-    "/profile",
     "/settings",
     "/rooms",
-    "/auction",
-    "/draft",
-    "/role-selection",
     "/dm",
     "/community/write",
     "/community/bookmarks",
     "/clans/create",
+    ...gamePrivateDisallow,
   ];
 
   return {

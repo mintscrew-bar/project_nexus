@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { StreamerPlatform } from "@nexus/database";
+import { GameTitle, StreamerPlatform } from "@nexus/database";
 import { PrismaService } from "../prisma/prisma.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
@@ -70,6 +70,25 @@ export class UserService {
         riotAccounts: {
           include: { championPreferences: true, roleTiers: true },
           orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+        },
+        // 프로필은 게임별 탭으로 갈린다. 연동하지 않은 게임의 탭은 띄우지 않는다.
+        pubgAccounts: {
+          orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            playerName: true,
+            lastMatchShard: true,
+            isPrimary: true,
+            pubgTier: true,
+            nexusTier: true,
+            nexusScore: true,
+            // 점수의 근거를 함께 보여준다. 산식이 바뀌었거나 표본이 적으면
+            // 화면에서 그렇게 밝혀야 숫자를 곧이곧대로 믿지 않는다.
+            nexusTierSource: true,
+            balanceVersion: true,
+            balanceSampleSize: true,
+            balanceComputedAt: true,
+          },
         },
         clanMemberships: {
           include: {
@@ -157,6 +176,18 @@ export class UserService {
     return {
       ...safeUser,
       stats,
+      /**
+       * 이 사람이 연동한 게임.
+       *
+       * 프로필 화면이 어느 게임 탭을 띄울지, `/profile/:id` 가 어디로 보낼지가
+       * 여기서 갈린다. 배그를 안 하는 사람 프로필에 빈 배그 탭이 뜨면 안 된다.
+       */
+      linkedGames: {
+        // 공개 설정으로 가려진 뒤(safeUser)가 아니라 원본으로 판단한다.
+        // 계정을 숨겼다고 "이 게임을 안 한다"가 되면 프로필이 엉뚱한 탭으로 열린다.
+        LOL: user.riotAccounts.length > 0,
+        PUBG: user.pubgAccounts.length > 0,
+      },
     };
   }
 
@@ -202,7 +233,13 @@ export class UserService {
     };
   }
 
-  async getHoverProfile(userId: string) {
+  /**
+   * 호버 프로필.
+   *
+   * `game` 은 보고 있는 화면의 게임이다. 배그 로비에서 이름 위에 올렸는데
+   * 솔로랭크 티어와 라인이 뜨면 안 된다 — 해당 게임 데이터만 내보낸다.
+   */
+  async getHoverProfile(userId: string, game: GameTitle = GameTitle.LOL) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -231,6 +268,17 @@ export class UserService {
               orderBy: { order: "asc" },
               select: { role: true, championId: true, order: true },
             },
+          },
+        },
+        pubgAccounts: {
+          where: { isPrimary: true },
+          select: {
+            playerName: true,
+            lastMatchShard: true,
+            pubgTier: true,
+            nexusTier: true,
+            nexusScore: true,
+            nexusTierSource: true,
           },
         },
         clanMemberships: {
@@ -275,7 +323,8 @@ export class UserService {
       }),
     ]);
 
-    const rawRiot = user.riotAccounts[0] ?? null;
+    const isPubg = game === GameTitle.PUBG;
+    const rawRiot = isPubg ? null : (user.riotAccounts[0] ?? null);
     const riot = rawRiot
       ? {
           ...rawRiot,
@@ -283,9 +332,11 @@ export class UserService {
           balanceScoreVersion: undefined,
         }
       : null;
+    const pubgAccount = isPubg ? (user.pubgAccounts[0] ?? null) : null;
     const clan = user.clanMemberships[0]?.clan ?? null;
 
-    const kdaGames = kdaAgg._count.id;
+    // KDA 는 롤 개념이다. 배그 로비에서 보여줄 값이 아니다.
+    const kdaGames = isPubg ? 0 : kdaAgg._count.id;
     const kda =
       kdaGames > 0
         ? {
@@ -301,6 +352,7 @@ export class UserService {
       avatar: user.avatar,
       profileBanner: user.profileBanner,
       riotAccount: riot,
+      pubgAccount,
       clan,
       streamerProfiles: (user.streamerProfiles ?? []).filter(
         (p: any) => p.isActive,

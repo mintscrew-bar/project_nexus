@@ -16,3 +16,13 @@ export function getSiteUrl(): URL {
 export function absoluteUrl(path = "/"): string {
   return new URL(path, getSiteUrl()).toString();
 }
+
+/**
+ * 게임별 화면의 정규 URL.
+ *
+ * 라우트가 `/lol/*` `/pubg/*` 로 갈린 뒤에도 canonical 이 옛 경로(`/matches`)를
+ * 가리키고 있었다. canonical 이 308 로 튕기는 URL 을 가리키면 색인이 엉킨다.
+ */
+export function gameCanonical(gameSlug: string, path = ""): string {
+  return absoluteUrl(`/${gameSlug}${path}`);
+}

@@ -583,8 +583,15 @@ export const userApi = {
     return response.data;
   },
 
+  /**
+   * 호버 프로필.
+   *
+   * `game` 은 보고 있는 화면의 게임이다. 배그 로비에서 이름 위에 올렸는데
+   * 솔로랭크 티어·라인·챔피언이 뜨면 안 되므로 서버가 해당 게임 데이터만 준다.
+   */
   getHoverProfile: async (
     userId: string,
+    game: "LOL" | "PUBG" = "LOL",
   ): Promise<{
     username: string;
     avatar: string | null;
@@ -612,6 +619,14 @@ export const userApi = {
         order: number;
       }[];
     } | null;
+    pubgAccount: {
+      playerName: string;
+      lastMatchShard: "STEAM" | "KAKAO" | null;
+      pubgTier: string | null;
+      nexusTier: string | null;
+      nexusScore: number | null;
+      nexusTierSource: "NONE" | "SELF" | "ADMIN" | "AUTO";
+    } | null;
     clan: { name: string; tag: string | null } | null;
     streamerProfiles: Pick<
       StreamerProfile,
@@ -630,7 +645,9 @@ export const userApi = {
     } | null;
     reputation: { overallAverage: number; totalRatings: number };
   }> => {
-    const response = await apiClient.get(`/users/${userId}/hover-profile`);
+    const response = await apiClient.get(`/users/${userId}/hover-profile`, {
+      params: { game },
+    });
     return response.data;
   },
 
@@ -811,6 +828,7 @@ export const roomApi = {
   getRooms: async (params?: {
     gameTitle?: "LOL" | "PUBG";
     pubgPlatform?: "STEAM" | "KAKAO";
+    pubgGameMode?: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH";
     status?: string;
     teamMode?: string;
     search?: string;
@@ -1174,23 +1192,115 @@ export const riotApi = {
   },
 };
 
+/** 닉네임 조회 결과. 못 찾았을 때와 찾았을 때의 모양이 다르다. */
+export type PubgPlayerLookupResult =
+  | { found: false; message: string }
+  | {
+      found: true;
+      playerId: string;
+      playerName: string;
+      /** 매치가 나온 샤드. null 이면 최근 2주 매치가 없어 확인되지 않았다. */
+      matchShard: "STEAM" | "KAKAO" | null;
+      recentMatchCount: number;
+      alreadyRegistered: boolean;
+      /** PUBG API 에는 소유권 인증이 없다. 항상 false 다. */
+      ownershipVerified: false;
+    };
+
+export interface PubgHistoryItem {
+  /** 배틀로얄인지 킬내기인지. 같은 스크림 모델을 쓰지만 읽는 법이 다르다. */
+  mode: "BATTLE_ROYALE" | "KILL_MATCH" | "FREE_MATCH";
+  roomId: string;
+  roomName: string;
+  pubgPlatform: "STEAM" | "KAKAO" | null;
+  teamName: string;
+  finalRank: number | null;
+  totalTeams: number;
+  totalPoints: number;
+  totalKills: number;
+  totalDeaths: number;
+  rounds: number;
+  completedAt: string | null;
+}
+
+export interface PubgHistoryResponse {
+  items: PubgHistoryItem[];
+  summary: {
+    scrimCount: number;
+    killMatchCount: number;
+    averageScrimRank: number | null;
+    averageKillsPerRound: number | null;
+    killMatchWins: number;
+  };
+}
+
 export const pubgApi = {
   getAccounts: async () => {
     const response = await apiClient.get("/pubg/accounts");
     return response.data;
   },
 
-  registerAccount: async (data: {
-    platform: "STEAM" | "KAKAO";
-    playerName: string;
-    playerId?: string;
-  }) => {
+  /**
+   * 등록 전 닉네임 확인. 계정 존재·플레이 플랫폼·중복 등록 여부를 돌려준다.
+   * PUBG 전역 예산(10 req/분)을 쓰므로 타이핑마다 부르지 않는다.
+   */
+  lookupPlayer: async (playerName: string) => {
+    const response = await apiClient.post("/pubg/accounts/lookup", {
+      playerName,
+    });
+    return response.data as PubgPlayerLookupResult;
+  },
+
+  registerAccount: async (data: { playerName: string }) => {
     const response = await apiClient.post("/pubg/accounts", data);
     return response.data;
   },
 
   deleteAccount: async (accountId: string) => {
     await apiClient.delete(`/pubg/accounts/${accountId}`);
+  },
+
+  /** 배그 전적 — 스크림 참가 이력 + 킬내기 결과 */
+  getHistory: async (userId: string) => {
+    const response = await apiClient.get(`/pubg/history/${userId}`);
+    return response.data as PubgHistoryResponse;
+  },
+
+  /** 공식 PUBG 랭크 스냅샷 갱신. NEXUS 편성 등급과 다른 값이다. */
+  syncRank: async (accountId: string) => {
+    const response = await apiClient.post(
+      `/pubg/accounts/${accountId}/rank-sync`,
+    );
+    return response.data;
+  },
+
+  /** 편성 점수 자동 산정. 본인이 넣은 점수는 덮지 않는다. */
+  recomputeBalance: async (accountId: string) => {
+    const response = await apiClient.post(
+      `/pubg/accounts/${accountId}/recompute-balance`,
+    );
+    return response.data;
+  },
+
+  getTierHistory: async (accountId: string) => {
+    const response = await apiClient.get(
+      `/pubg/accounts/${accountId}/tier-history`,
+    );
+    return response.data as {
+      id: string;
+      previousTier: string | null;
+      newTier: string | null;
+      source: "NONE" | "SELF" | "ADMIN" | "AUTO";
+      note: string | null;
+      createdAt: string;
+    }[];
+  },
+
+  setPrimary: async (accountId: string) => {
+    const response = await apiClient.patch(
+      `/pubg/accounts/${accountId}/primary`,
+    );
+    return response.data;
   },
 
   updateScore: async (
@@ -1207,6 +1317,100 @@ export const pubgApi = {
       `/pubg/accounts/${accountId}/score`,
       data,
     );
+    return response.data;
+  },
+};
+
+/** 배틀로얄 스크림 — 라운드 진행·결과 입력·누적 리더보드 */
+export const scrimApi = {
+  getScrim: async (roomId: string) => {
+    const response = await apiClient.get(`/rooms/${roomId}/scrim`);
+    return response.data;
+  },
+
+  createScrim: async (
+    roomId: string,
+    data: {
+      totalRounds?: number;
+      pointRule?: {
+        placementPoints: number[];
+        killPoints: number;
+        deathPoints?: number;
+      };
+    },
+  ) => {
+    const response = await apiClient.post(`/rooms/${roomId}/scrim`, data);
+    return response.data;
+  },
+
+  /** 자동 수집을 쓸 수 있는 상태인지. 버튼을 띄울지 판단한다. */
+  getCollectorState: async (roomId: string) => {
+    const response = await apiClient.get(`/rooms/${roomId}/scrim/collector`);
+    return response.data as { enabled: boolean };
+  },
+
+  /**
+   * 라운드 결과를 인게임 기록에서 찾아 채운다.
+   * 못 찾으면 아무것도 쓰지 않고 이유를 돌려준다.
+   */
+  collectRound: async (roomId: string, roundNumber: number) => {
+    const response = await apiClient.post(
+      `/rooms/${roomId}/scrim/rounds/${roundNumber}/collect`,
+    );
+    return response.data as
+      | { matched: true; matchId: string; teamsFilled: number }
+      | { matched: false; reason: string; message: string };
+  },
+
+  startRound: async (roomId: string, roundNumber: number) => {
+    const response = await apiClient.post(
+      `/rooms/${roomId}/scrim/rounds/${roundNumber}/start`,
+    );
+    return response.data;
+  },
+
+  /**
+   * 라운드 결과 입력. 자동 매칭이 붙기 전에는 유일한 경로이고,
+   * 붙은 뒤에도 실패했을 때의 보험으로 남는다(커스텀 매치 기록은 2주 보존).
+   */
+  submitRoundResult: async (
+    roomId: string,
+    roundNumber: number,
+    data: {
+      pubgMatchId?: string;
+      results: {
+        teamId: string;
+        placement: number;
+        kills: number;
+        /** 죽은 팀원 수. 킬내기는 감점이라 점수에 들어간다. */
+        deaths?: number;
+      }[];
+    },
+  ) => {
+    const response = await apiClient.post(
+      `/rooms/${roomId}/scrim/rounds/${roundNumber}/result`,
+      data,
+    );
+    return response.data;
+  },
+
+  updatePointRule: async (
+    roomId: string,
+    rule: {
+      placementPoints: number[];
+      killPoints: number;
+      deathPoints?: number;
+    },
+  ) => {
+    const response = await apiClient.patch(
+      `/rooms/${roomId}/scrim/point-rule`,
+      rule,
+    );
+    return response.data;
+  },
+
+  completeScrim: async (roomId: string) => {
+    const response = await apiClient.post(`/rooms/${roomId}/scrim/complete`);
     return response.data;
   },
 };
@@ -2544,7 +2748,13 @@ export interface StreamerListItem extends StreamerChannelItem {
   username: string;
   avatar: string | null;
   channels: StreamerChannelItem[];
-  activeRoom: { id: string; name: string; status: string } | null;
+  activeRoom: {
+    id: string;
+    name: string;
+    status: string;
+    // 방 링크가 게임별 경로라 방마다 게임이 실려 온다
+    gameTitle?: "LOL" | "PUBG";
+  } | null;
   isFollowing: boolean;
 }
 

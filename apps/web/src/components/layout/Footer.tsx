@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DEFAULT_GAME_PREFIX } from "@/lib/game-links";
 
 export function Footer() {
   return (
@@ -11,7 +12,7 @@ export function Footer() {
             <Link href="/about" className="hover:text-text-secondary transition-colors duration-150">
               서비스 소개
             </Link>
-            <Link href="/lol/guide" className="hover:text-text-secondary transition-colors duration-150">
+            <Link href={`${DEFAULT_GAME_PREFIX}/guide`} className="hover:text-text-secondary transition-colors duration-150">
               가이드 · 자료
             </Link>
             <Link href="/community" className="hover:text-text-secondary transition-colors duration-150">

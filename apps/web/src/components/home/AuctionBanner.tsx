@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AUCTION_COLORS, bannerBadgeStyle, bannerGlowGradient } from "./banner-constants";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 상수 정의
@@ -79,6 +80,7 @@ const BID_COUNT_STEPS = [150, 200, 250, 300, 350];
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
+  const gamePrefix = useGamePrefix();
   const [isHovered, setIsHovered] = useState(false);
 
   // 현재 표시 중인 입찰 이벤트 인덱스 (순차 등장)
@@ -103,7 +105,7 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
 
   return (
     <Link
-      href="/lol/tournaments"
+      href={`${gamePrefix}/tournaments`}
       aria-label="경매 드래프트 시스템 — 내전방 목록으로 이동"
       className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
       onMouseEnter={() => setIsHovered(true)}

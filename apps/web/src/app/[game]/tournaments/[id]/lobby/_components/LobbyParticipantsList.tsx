@@ -2,7 +2,17 @@
 
 import Image from "next/image";
 import { Users } from "lucide-react";
+import { useState } from "react";
+import { teamSizeForRoom } from "@nexus/types";
 import { CompactParticipantCard } from "./CompactParticipantCard";
+
+/**
+ * 대기석에 한 번에 그리는 인원.
+ *
+ * 롤은 10~40명이라 전부 펼쳐도 됐지만 배그는 64~100명이다.
+ * 카드마다 호버 프로필 조회가 걸려 있어 전부 펼치면 스크롤만으로도 부하가 크다.
+ */
+const WAITING_LIST_CHUNK = 40;
 
 interface LobbyParticipantsListProps {
   room: any;
@@ -51,6 +61,26 @@ export function LobbyParticipantsList({
   selectTeam,
   addToast,
 }: LobbyParticipantsListProps) {
+  const [expandedWaiting, setExpandedWaiting] = useState(false);
+  // 팀이 많으면(배그 16팀) 카드가 세로로 끝없이 늘어난다. 접었다 펼 수 있게 둔다.
+  const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const toggleTeam = (teamId: string) =>
+    setCollapsedTeams((current) => {
+      const next = new Set(current);
+      if (next.has(teamId)) next.delete(teamId);
+      else next.add(teamId);
+      return next;
+    });
+  // 팀 정원은 게임과 모드마다 다르다 — 롤 5인, 배그 배틀로얄 4인 스쿼드,
+  // 킬내기는 정원을 반으로 나눈 값(3대3~8대8).
+  // 게임 기본값만 보면 8대8 깐부킬내기가 팀당 4명에서 "가득 참"으로 잠긴다.
+  const teamSize = teamSizeForRoom({
+    gameTitle: room.gameTitle,
+    pubgGameMode: room.pubgGameMode,
+    maxParticipants: room.maxParticipants,
+  });
   const manualTeams = room.teamMode === "MANUAL_TEAM" ? room.teams ?? [] : [];
   const isManualTeamMode = manualTeams.length > 0 && room.status === "WAITING";
   const waitingPlayers = isManualTeamMode
@@ -98,11 +128,20 @@ export function LobbyParticipantsList({
               팀을 이동하면 준비가 해제됩니다. 선택한 팀 카드에서 「팀 나가기」로 대기석으로 돌아올 수 있어요.
             </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
+          {/* 팀이 많아지면 2열로는 카드가 세로로 끝없이 늘어난다(배그 16팀). */}
+          <div
+            className={
+              manualTeams.length > 8
+                ? "grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                : manualTeams.length > 4
+                  ? "grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+                  : "grid gap-2 sm:grid-cols-2"
+            }
+          >
             {manualTeams.map((team: any) => {
               const members = players.filter((player: any) => player.teamId === team.id);
               const selected = currentUserParticipant?.teamId === team.id;
-              const full = members.length >= 5;
+              const full = members.length >= teamSize;
               return (
                 <div
                   key={team.id}
@@ -112,7 +151,12 @@ export function LobbyParticipantsList({
                       : "border-bg-elevated bg-bg-secondary"
                   }`}
                 >
-                  <div className="mb-2 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => toggleTeam(team.id)}
+                    className="mb-2 flex w-full items-center justify-between"
+                    aria-expanded={!collapsedTeams.has(team.id)}
+                  >
                     <span className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
                       <span
                         className="h-2.5 w-2.5 rounded-full"
@@ -120,16 +164,20 @@ export function LobbyParticipantsList({
                       />
                       {team.name}
                     </span>
-                    <span className="text-xs text-text-tertiary">{members.length}/5</span>
-                  </div>
-                  <div className="mb-2 grid gap-1.5">
-                    {members.map(participantCard)}
-                    {members.length === 0 && (
-                      <div className="rounded-md border border-dashed border-bg-elevated/60 py-2 text-center text-xs text-text-muted">
-                        비어 있음
-                      </div>
-                    )}
-                  </div>
+                    <span className="text-xs text-text-tertiary">
+                      {members.length}/{teamSize}
+                    </span>
+                  </button>
+                  {!collapsedTeams.has(team.id) && (
+                    <div className="mb-2 grid gap-1.5">
+                      {members.map(participantCard)}
+                      {members.length === 0 && (
+                        <div className="rounded-md border border-dashed border-bg-elevated/60 py-2 text-center text-xs text-text-muted">
+                          비어 있음
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <button
                     type="button"
                     // 선택된 팀이면 '팀 나가기'로 동작 → 이동/나가기 동선을 카드 한 곳에 통일
@@ -180,8 +228,20 @@ export function LobbyParticipantsList({
 
       {/* 플레이어 목록 또는 자유 팀 편성 대기석 */}
       <div className="grid grid-cols-2 gap-1.5">
-        {waitingPlayers.map(participantCard)}
+        {(expandedWaiting
+          ? waitingPlayers
+          : waitingPlayers.slice(0, WAITING_LIST_CHUNK)
+        ).map(participantCard)}
       </div>
+      {!expandedWaiting && waitingPlayers.length > WAITING_LIST_CHUNK && (
+        <button
+          type="button"
+          onClick={() => setExpandedWaiting(true)}
+          className="mt-2 w-full rounded-lg border border-dashed border-bg-elevated/60 py-2 text-sm text-text-secondary transition-colors hover:text-text-primary"
+        >
+          {waitingPlayers.length - WAITING_LIST_CHUNK}명 더 보기
+        </button>
+      )}
       {isManualTeamMode && waitingPlayers.length === 0 && (
         <div className="mt-2 text-center py-2 rounded-lg border border-dashed border-bg-elevated/60 text-sm text-text-muted">
           대기석이 비어 있습니다

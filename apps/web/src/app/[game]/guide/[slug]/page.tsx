@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CalendarDays, Clock3 } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { guideUrl } from "@/lib/guide-links";
 import { getResourceArticle, RESOURCE_ARTICLES } from "@/app/resources/articles";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 
@@ -22,11 +22,11 @@ export async function generateMetadata({
   return {
     title: article.title,
     description: article.description,
-    alternates: { canonical: absoluteUrl(`/guide/${article.slug}`) },
+    alternates: { canonical: guideUrl(`/guide/${article.slug}`) },
     openGraph: {
       title: article.title,
       description: article.description,
-      url: absoluteUrl(`/guide/${article.slug}`),
+      url: guideUrl(`/guide/${article.slug}`),
       type: "article",
     },
   };

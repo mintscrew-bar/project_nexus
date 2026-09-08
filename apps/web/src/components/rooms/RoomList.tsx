@@ -11,7 +11,12 @@ import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { RoomCard } from "@/components/domain";
 import { EmptyState, RoomCardSkeleton } from "@/components/ui";
 import { RefreshCcw, Home, Search, Gavel, ListOrdered, Scale, ArrowLeftRight, LayoutGrid } from "lucide-react";
-import { GAMES } from "@nexus/types";
+import {
+  GAMES,
+  PUBG_PLATFORMS,
+  PUBG_PLATFORM_LABELS,
+  type PubgPlatform,
+} from "@nexus/types";
 
 export type StatusFilter = "ALL" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
 type ModeFilter = "ALL" | "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
@@ -104,6 +109,10 @@ export function RoomList({
   const [error, setError] = useState<string | null>(null);
 
   const [modeFilter, setModeFilter] = useState<ModeFilter>("ALL");
+  // 스배와 카배는 같이 못 하므로 목록에서 갈라 볼 수 있어야 한다.
+  const [platformFilter, setPlatformFilter] = useState<PubgPlatform | "ALL">(
+    "ALL",
+  );
 
   // Debounce search query to improve performance
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -112,10 +121,14 @@ export function RoomList({
     gameTitle,
     status: statusFilter === "ALL" ? undefined : statusFilter,
     teamMode: modeFilter === "ALL" ? undefined : modeFilter,
+    pubgPlatform:
+      gameTitle === "PUBG" && platformFilter !== "ALL"
+        ? platformFilter
+        : undefined,
     search: debouncedSearchQuery || undefined,
     sort: sortBy,
     limit: 24,
-  }), [gameTitle, statusFilter, modeFilter, debouncedSearchQuery, sortBy]);
+  }), [gameTitle, statusFilter, modeFilter, platformFilter, debouncedSearchQuery, sortBy]);
 
   const loadRooms = useCallback(async (append = false) => {
     const cursor = nextCursorRef.current;
@@ -180,7 +193,9 @@ export function RoomList({
 
   const handleRoomClick = (roomId: string) => {
     if (!isAuthenticated) {
-      const redirect = encodeURIComponent(`/tournaments/${roomId}/lobby`);
+      const redirect = encodeURIComponent(
+        `/${GAMES[gameTitle].slug}/tournaments/${roomId}/lobby`,
+      );
       router.push(`/auth/login?redirect=${redirect}`);
       return;
     }
@@ -190,10 +205,32 @@ export function RoomList({
   return (
     <div className="space-y-8">
       <section aria-labelledby="room-mode-heading">
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 id="room-mode-heading" className="text-sm font-bold text-text-primary">
             모드 선택
           </h2>
+          {gameTitle === "PUBG" && (
+            <div className="flex items-center gap-1.5">
+              {(["ALL", ...PUBG_PLATFORMS] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setPlatformFilter(value)}
+                  aria-pressed={platformFilter === value}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-bold transition-colors",
+                    platformFilter === value
+                      ? "bg-accent-primary text-white"
+                      : "bg-bg-tertiary/60 text-text-secondary hover:text-text-primary",
+                  )}
+                >
+                  {value === "ALL"
+                    ? "전체"
+                    : PUBG_PLATFORM_LABELS[value].short}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

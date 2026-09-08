@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { rankingApi } from "@/lib/api-client";
 import { Skeleton, Button, EmptyState } from "@/components/ui";
 import { Trophy, Crown, ChevronLeft, ChevronRight, Users } from "lucide-react";
@@ -13,6 +14,7 @@ import { RankingTour } from "@/components/onboarding/PrimaryPageTours";
 
 export default function RankingPage() {
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<"global" | "clan">("global");
   const limit = 50;
@@ -125,7 +127,7 @@ export default function RankingPage() {
                 description="내전 기록이 10경기 쌓이면 승률과 전적을 기준으로 랭킹에 등록됩니다. 첫 기록을 만들어보세요."
                 action={{
                   label: "내전 방 둘러보기",
-                  onClick: () => router.push("/lol/tournaments"),
+                  onClick: () => router.push(`${gamePrefix}/tournaments`),
                 }}
               />
             ) : (
@@ -138,7 +140,7 @@ export default function RankingPage() {
                     return (
                       <Link
                         key={entry.id}
-                        href={`/lol/matches/user/${entry.userId}`}
+                        href={`${gamePrefix}/matches/user/${entry.userId}`}
                         className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4 flex items-center gap-4 hover:bg-bg-tertiary/50 transition-colors"
                       >
                         {/* Rank */}

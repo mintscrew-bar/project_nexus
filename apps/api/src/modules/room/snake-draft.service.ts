@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -14,10 +15,26 @@ import {
   calculateCaptainScore,
   calculateTierScore,
 } from "../common/tier-score.util";
+import {
+  buildLadderDraw,
+  minDraftParticipants,
+  resolveLadderOrder,
+  teamCountForRoster,
+  teamSizeForRoom,
+  type LadderDraw,
+} from "@nexus/types";
 
 export interface SnakeDraftState {
   roomId: string;
   numTeams: number;
+  /**
+   * 픽 순서 추첨 사다리.
+   *
+   * 순서 자체는 아래 `pickOrder` 가 이미 정한 값이고, 이건 그 결과를 화면에서
+   * 보여주기 위한 연출이다. 서버가 만들어 모두에게 같은 사다리를 보낸다 —
+   * 화면에서 각자 뽑으면 사람마다 다른 결과를 본다.
+   */
+  ladder?: LadderDraw;
   currentTeamIndex: number;
   currentRound: number;
   pickOrder: string[]; // Team IDs in pick order
@@ -28,6 +45,8 @@ export interface SnakeDraftState {
 
 @Injectable()
 export class SnakeDraftService {
+  private readonly logger = new Logger(SnakeDraftService.name);
+
   private draftStates = new Map<string, SnakeDraftState>();
   private discordVoiceService: any; // DiscordVoiceService (optional dependency)
 
@@ -82,10 +101,17 @@ export class SnakeDraftService {
       throw new BadRequestException("Room is not in snake draft mode");
     }
 
-    const numTeams = Math.floor(room.participants.length / 5);
-    if (numTeams < 2) {
-      throw new BadRequestException("Need at least 10 players for draft");
+    // 팀 인원은 게임별로 다르다(롤 5인, 배그 4인). 2팀이 안 나오면 드래프트를 못 연다.
+    const minPlayers = minDraftParticipants(room.gameTitle);
+    if (room.participants.length < minPlayers) {
+      throw new BadRequestException(
+        `Need at least ${minPlayers} players for draft`,
+      );
     }
+    const numTeams = teamCountForRoster(
+      { gameTitle: room.gameTitle, pubgGameMode: room.pubgGameMode },
+      room.participants.length,
+    );
 
     const captains = await this.selectCaptains(
       room.participants,
@@ -177,14 +203,43 @@ export class SnakeDraftService {
       console.warn("Failed to assign Discord captain roles:", error);
     }
 
+    // 픽 순서는 주장 선발과 **따로** 뽑는다.
+    //
+    // 팀 목록은 주장이 정해진 순서 그대로다. 티어 우선으로 주장을 뽑으면
+    // 가장 센 주장이 첫 픽까지 가져가 이점이 두 번 쌓인다.
+    const teamIds = teams.map((t: (typeof teams)[number]) => t.id);
+    const drawnOrder = this.shuffle(teamIds);
+
+    // 추첨 결과를 사다리로 옮긴다. 사다리로 순서를 뽑는 게 아니라,
+    // 이미 뽑힌 순서가 나오도록 사다리를 구성한다 — 사다리 모양으로 뽑으면
+    // 가로줄 개수에 따라 분포가 쏠려 균등하지 않다.
+    const ladder = buildLadderDraw(teamIds, drawnOrder, (max) =>
+      randomInt(max),
+    );
+    // 연출이 결과와 어긋나면 "사다리는 3번인데 실제로는 1번 픽"이 된다.
+    // 내보내기 전에 한 번 검증하고, 어긋나면 사다리 없이 진행한다.
+    const ladderMatches =
+      resolveLadderOrder(ladder).join(",") === drawnOrder.join(",");
+    if (!ladderMatches) {
+      this.logger.error(
+        `사다리 추첨이 실제 순서와 달라 연출을 생략합니다 (room ${roomId})`,
+      );
+    }
+
     const pickOrder = this.generatePickOrder(
-      teams.map((t: (typeof teams)[number]) => t.id),
+      drawnOrder,
       numTeams,
+      teamSizeForRoom({
+        gameTitle: room.gameTitle,
+        pubgGameMode: room.pubgGameMode,
+        maxParticipants: room.maxParticipants,
+      }),
     );
 
     const draftState: SnakeDraftState = {
       roomId,
       numTeams: teams.length,
+      ladder: ladderMatches ? ladder : undefined,
       currentTeamIndex: 0,
       currentRound: 1,
       pickOrder,
@@ -243,12 +298,7 @@ export class SnakeDraftService {
     }
 
     // Default to RANDOM — 암호학적 난수로 Fisher-Yates 셔플(예측 불가능성 보장)
-    const shuffled = [...participants];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = randomInt(i + 1);
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled.slice(0, numTeams);
+    return this.shuffle(participants).slice(0, numTeams);
   }
 
   // ========================================
@@ -257,10 +307,24 @@ export class SnakeDraftService {
 
   // ... (rest of the file is unchanged)
 
-  private generatePickOrder(teamIds: string[], numTeams: number): string[] {
+  /** 암호학적 난수 Fisher-Yates. 픽 순서 추첨과 랜덤 주장 선발이 같이 쓴다. */
+  private shuffle<T>(items: T[]): T[] {
+    const shuffled = [...items];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = randomInt(i + 1);
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  private generatePickOrder(
+    teamIds: string[],
+    numTeams: number,
+    playersPerTeam: number,
+  ): string[] {
     const order: string[] = [];
-    const playersPerTeam = 5;
-    const picksNeededPerTeam = playersPerTeam - 1; // 캡틴 제외 4명
+    // 팀 인원은 게임마다 다르다(롤 5인 / 배그 4인 스쿼드).
+    const picksNeededPerTeam = playersPerTeam - 1; // 캡틴 제외
     const totalPicksNeeded = picksNeededPerTeam * numTeams;
 
     // 공정성 강화: 순환형 스네이크(Rotating Snake)

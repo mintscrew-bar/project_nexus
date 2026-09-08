@@ -16,6 +16,7 @@ import {
   calculateCaptainScore,
   calculateTierScore,
 } from "../common/tier-score.util";
+import { teamCountForRoster } from "@nexus/types";
 
 const BONUS_GOLD = 500;
 const DEFAULT_BID_TIME_SECONDS = 30;
@@ -24,6 +25,8 @@ const MAX_EXTENDED_BID_TIME_SECONDS = 30;
 const MIN_BID_TIME_SECONDS = 5;
 const MAX_BID_TIME_SECONDS = 120;
 const DEFAULT_BID_INCREMENT = 50;
+/** 경매를 돌릴 수 있는 최소 인원. 정원 미달 테스트 로비를 허용하는 하한값. */
+const MIN_AUCTION_PLAYERS = 4;
 
 export interface AuctionState {
   roomId: string;
@@ -390,11 +393,17 @@ export class AuctionService implements OnModuleInit {
       throw new BadRequestException("Room is not in auction mode");
     }
 
-    // Calculate number of teams. Keep at least 2 teams for small test lobbies.
-    if (room.participants.length < 4) {
-      throw new BadRequestException("Auction mode requires at least 4 players");
+    // 팀 수는 게임별 팀 인원으로 나눈다(롤 5인, 배그 4인).
+    // 최소 인원은 게임과 무관한 하한값 — 정원이 덜 차도 돌려볼 수 있게 둔다.
+    if (room.participants.length < MIN_AUCTION_PLAYERS) {
+      throw new BadRequestException(
+        `Auction mode requires at least ${MIN_AUCTION_PLAYERS} players`,
+      );
     }
-    const numTeams = Math.max(2, Math.floor(room.participants.length / 5));
+    const numTeams = teamCountForRoster(
+      { gameTitle: room.gameTitle, pubgGameMode: room.pubgGameMode },
+      room.participants.length,
+    );
 
     const captainMode = room.captainSelection ?? TeamCaptainSelection.TIER;
 
@@ -497,7 +506,10 @@ export class AuctionService implements OnModuleInit {
     roomId: string,
     room: any,
   ) {
-    const numTeams = Math.max(2, Math.floor(room.participants.length / 5));
+    const numTeams = teamCountForRoster(
+      { gameTitle: room.gameTitle, pubgGameMode: room.pubgGameMode },
+      room.participants.length,
+    );
 
     const sortedPlayers = this._sortAuctionParticipants(room.participants);
 
@@ -852,7 +864,10 @@ export class AuctionService implements OnModuleInit {
     if (room.hostId !== hostId)
       throw new ForbiddenException("Only host can select captains");
 
-    const numTeams = Math.max(2, Math.floor(room.participants.length / 5));
+    const numTeams = teamCountForRoster(
+      { gameTitle: room.gameTitle, pubgGameMode: room.pubgGameMode },
+      room.participants.length,
+    );
     if (userIds.length !== numTeams) {
       throw new BadRequestException(`Need exactly ${numTeams} captains`);
     }

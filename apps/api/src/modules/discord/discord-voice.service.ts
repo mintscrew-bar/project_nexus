@@ -288,10 +288,48 @@ export class DiscordVoiceService {
   // Channel Creation
   // ========================================
 
+  /**
+   * 한 방에 만들 팀(스쿼드) 음성채널 상한.
+   *
+   * 100명 배틀로얄은 25스쿼드라 25개가 필요하고, 스쿼드끼리 통화가 갈려야
+   * 경기가 된다. 카테고리 하나에 27개(카테고리+대기실+25)면 디스코드 한도
+   * (카테고리당 50, 서버당 500) 안에 들어가고, 방이 끝나면 통째로 지워진다.
+   *
+   * 상한은 실수 방어용이다 — 정원표에 없는 값이 들어와도 서버 채널이
+   * 무한정 늘어나지 않게 막는다.
+   */
+  private static readonly MAX_TEAM_VOICE_CHANNELS = 30;
+
+  /**
+   * 채널을 연달아 만들 때 사이에 두는 간격.
+   *
+   * 25개를 한 번에 몰아치면 디스코드 레이트에 걸려 discord.js 가 큐에
+   * 쌓아두고 기다린다. 조금씩 띄우는 편이 전체적으로 더 빠르고 실패도 적다.
+   */
+  private static readonly CHANNEL_CREATE_DELAY_MS = 350;
+
   async createRoomChannels(
     roomId: string,
     roomName: string,
     numTeams: number,
+    /**
+     * 채널 정원을 정하는 값.
+     *
+     * 넘기지 않으면 롤 기준(팀 5인)으로 둔다. 배그는 팀 인원이 모드마다 달라
+     * (배틀로얄 4인 스쿼드, 킬내기 3~8인) 고정값을 쓰면 8대8 깐부킬내기에서
+     * 8명이 5인 채널에 못 들어간다.
+     */
+    shape?: {
+      teamSize?: number;
+      maxParticipants?: number;
+      /**
+       * 한 팀이 인게임에서 갈라지는 스쿼드 수.
+       *
+       * 깐부킬내기 8대8은 한 팀이 4인 스쿼드 둘로 들어가므로 채널도 팀당
+       * 두 개가 필요하다. 팀당 하나(8인)로 만들면 인게임 파티와 어긋난다.
+       */
+      squadsPerTeam?: number;
+    },
   ): Promise<{
     categoryId: string;
     teamChannels: Array<{ teamName: string; channelId: string }>;
@@ -350,11 +388,14 @@ export class DiscordVoiceService {
       }
 
       // Create lobby channel first (생성 순서로 맨 위 고정)
+      // 대기실은 방 전원이 들어갈 수 있어야 한다. 50 고정이면 100명 방의
+      // 절반이 못 들어간다. 디스코드 상한이 99라 그 이상은 제한 없음(0)으로 둔다.
+      const roomCapacity = shape?.maxParticipants ?? 50;
       const lobbyChannel = await guild.channels.create({
         name: "── 대기실 ──",
         type: ChannelType.GuildVoice,
         parent: category.id,
-        userLimit: 50,
+        userLimit: roomCapacity > 99 ? 0 : roomCapacity,
       });
 
       await this.prisma.roomDiscordChannel.create({
@@ -370,27 +411,54 @@ export class DiscordVoiceService {
       // displayName: Discord 채널 표시명, dbTeamName: snake-draft의 team.name과 매칟용 (Team 1, Team 2...)
       const teamChannels: Array<{ teamName: string; channelId: string }> = [];
 
-      for (let i = 0; i < numTeams; i++) {
-        const displayName = `┊ ${i + 1}팀`;
-        const dbTeamName = `Team ${i + 1}`;
+      // 한 팀이 인게임 스쿼드 여러 개로 갈라지면 채널도 그만큼 필요하다.
+      const squadsPerTeam = Math.max(1, shape?.squadsPerTeam ?? 1);
+      const teamSize = Math.max(1, shape?.teamSize ?? 5);
+      // 채널 정원은 스쿼드 하나 크기다. 7대7이면 4+3으로 갈리므로 큰 쪽에 맞춘다.
+      const squadLimit = Math.min(99, Math.ceil(teamSize / squadsPerTeam));
 
-        const channel = await guild.channels.create({
-          name: displayName,
-          type: ChannelType.GuildVoice,
-          parent: category.id,
-          userLimit: 5,
-        });
+      // 채널이 너무 많으면 팀 채널을 만들지 않는다. 대기실은 그대로 둔다.
+      const totalTeamChannels = numTeams * squadsPerTeam;
+      const createTeamChannels =
+        totalTeamChannels <= DiscordVoiceService.MAX_TEAM_VOICE_CHANNELS;
+      if (!createTeamChannels && numTeams > 0) {
+        this.logger.log(
+          `[DiscordVoice] 채널 ${totalTeamChannels}개는 만들지 않습니다 (상한 ${DiscordVoiceService.MAX_TEAM_VOICE_CHANNELS}). 대기실만 생성합니다.`,
+        );
+      }
 
-        teamChannels.push({ teamName: dbTeamName, channelId: channel.id });
+      for (let i = 0; createTeamChannels && i < numTeams; i++) {
+        for (let squad = 0; squad < squadsPerTeam; squad++) {
+          // 스쿼드가 하나면 예전처럼 "1팀", 갈라지면 "1팀 A" / "1팀 B".
+          const suffix =
+            squadsPerTeam > 1 ? ` ${String.fromCharCode(65 + squad)}` : "";
+          const displayName = `┊ ${i + 1}팀${suffix}`;
+          const dbTeamName = `Team ${i + 1}${suffix}`;
 
-        await this.prisma.roomDiscordChannel.create({
-          data: {
-            roomId,
-            channelId: channel.id,
-            channelType: "VOICE",
-            teamName: dbTeamName, // "Team 1" 형식으로 저장 → team.name과 매칭
-          },
-        });
+          const channel = await guild.channels.create({
+            name: displayName,
+            type: ChannelType.GuildVoice,
+            parent: category.id,
+            userLimit: squadLimit,
+          });
+
+          teamChannels.push({ teamName: dbTeamName, channelId: channel.id });
+
+          await this.prisma.roomDiscordChannel.create({
+            data: {
+              roomId,
+              channelId: channel.id,
+              channelType: "VOICE",
+              teamName: dbTeamName, // 생성 순서와 함께 팀 매칭 키로 쓴다
+            },
+          });
+
+          // 마지막 채널 뒤에는 기다리지 않는다.
+          const isLast = i === numTeams - 1 && squad === squadsPerTeam - 1;
+          if (!isLast) {
+            await this.delay(DiscordVoiceService.CHANNEL_CREATE_DELAY_MS);
+          }
+        }
       }
 
       this.logger.log(
@@ -481,9 +549,16 @@ export class DiscordVoiceService {
     }
   }
 
+  /**
+   * 팀원을 음성 채널로 옮긴다.
+   *
+   * `channelIds` 를 여럿 주면 인원을 순서대로 나눠 담는다 —
+   * 깐부킬내기 8대8은 한 팀이 인게임에서 4인 스쿼드 둘로 갈라져 들어가므로
+   * 음성도 스쿼드마다 따로 모여야 한다.
+   */
   async moveTeamToChannel(
     teamId: string,
-    channelId: string,
+    channelId: string | string[],
   ): Promise<{ success: number; failed: number }> {
     // Get team members with Discord IDs
     const team = await this.prisma.team.findUnique({
@@ -507,6 +582,10 @@ export class DiscordVoiceService {
       throw new BadRequestException("Team not found");
     }
 
+    const channelIds = Array.isArray(channelId) ? channelId : [channelId];
+    // 스쿼드마다 몇 명씩 들어가는지. 7명을 2개로 나누면 4 + 3 이다.
+    const perChannel = Math.ceil(team.members.length / channelIds.length);
+
     let success = 0;
     let failed = 0;
 
@@ -529,9 +608,13 @@ export class DiscordVoiceService {
         continue;
       }
 
+      const target =
+        channelIds[
+          Math.min(channelIds.length - 1, Math.floor(index / perChannel))
+        ];
       const moved = await this.moveUserToTeamChannel(
         discordProvider.providerId,
-        channelId,
+        target,
       );
 
       if (moved) {
@@ -693,7 +776,21 @@ export class DiscordVoiceService {
   // Channel Update (방 설정 변경 시 팀 채널 동기화)
   // ========================================
 
-  async updateRoomChannels(roomId: string, newNumTeams: number): Promise<void> {
+  async updateRoomChannels(
+    roomId: string,
+    newNumTeams: number,
+    shape?: {
+      teamSize?: number;
+      /**
+       * 한 팀이 인게임에서 갈라지는 스쿼드 수.
+       *
+       * 생성(`createRoomChannels`)과 같은 값이어야 한다. 여기서만 1로 보면
+       * 깐부킬내기(팀당 채널 2개)에서 채널 수를 팀 수로 착각해
+       * 멀쩡한 팀 채널을 지운다.
+       */
+      squadsPerTeam?: number;
+    },
+  ): Promise<void> {
     const guildId = await this.resolveRoomGuildId(roomId);
     if (!guildId) return;
 
@@ -726,37 +823,115 @@ export class DiscordVoiceService {
           );
         },
       );
-    const currentNumTeams = existingTeamChannels.length;
+    // 채널은 팀당 스쿼드 수만큼 있다. 채널 개수를 그대로 팀 수로 쓰면
+    // 깐부킬내기(팀당 2채널)에서 2팀짜리 방을 4팀으로 착각한다.
+    const squadsPerTeam = Math.max(1, shape?.squadsPerTeam ?? 1);
+    const teamSize = Math.max(1, shape?.teamSize ?? 5);
+    // 채널 정원은 스쿼드 하나 크기다. 생성 때와 같은 기준을 쓴다.
+    const squadLimit = Math.min(99, Math.ceil(teamSize / squadsPerTeam));
+
+    /**
+     * 지금 있는 채널이 팀당 몇 개로 만들어졌는가.
+     *
+     * 넘어온 `squadsPerTeam` 은 **바뀐 뒤** 값이라 기존 채널을 세는 데 쓰면
+     * 안 된다. 킬내기 정원을 8→16 으로 올리면 팀당 스쿼드가 1→2 로 바뀌는데,
+     * 새 값으로 기존 채널을 세면 2팀을 1팀으로 읽고 엉뚱한 채널을 만든다.
+     * 이름 접미사(" A" · " B")가 만들어질 때의 배치를 그대로 담고 있다.
+     */
+    const existingSquadsPerTeam = existingTeamChannels.reduce(
+      (max: number, ch: (typeof existingTeamChannels)[number]) => {
+        const suffix = /\s([A-Z])$/.exec(ch.teamName ?? "");
+        if (!suffix) return max;
+        return Math.max(max, suffix[1].charCodeAt(0) - 64);
+      },
+      1,
+    );
+
+    /**
+     * 배치 자체가 바뀌면 갈아엎는다.
+     *
+     * 팀당 채널 수가 달라지면 기존 채널을 새 배치에 하나씩 대응시킬 방법이
+     * 없다 — 남겨두면 "1팀 A · 1팀 B" 두 개가 서로 다른 팀 것이 되거나,
+     * 접미사 없는 채널과 있는 채널이 섞인다. 정원 변경은 방이 WAITING 일
+     * 때만 되고 그때 팀 채널은 대개 비어 있으므로 지웠다 다시 만드는 편이
+     * 안전하다(대기실은 건드리지 않는다).
+     */
+    const layoutChanged =
+      existingTeamChannels.length > 0 &&
+      existingSquadsPerTeam !== squadsPerTeam;
+    if (layoutChanged) {
+      this.logger.log(
+        `[DiscordVoice] 팀당 채널 수가 ${existingSquadsPerTeam}→${squadsPerTeam} 로 바뀌어 팀 채널을 다시 만듭니다 (room ${roomId}).`,
+      );
+      for (const ch of existingTeamChannels) {
+        try {
+          const channel = await guild.channels
+            .fetch(ch.channelId)
+            .catch(() => null);
+          if (channel) await channel.delete();
+        } catch {
+          // Already deleted
+        }
+        await this.prisma.roomDiscordChannel.delete({ where: { id: ch.id } });
+      }
+    }
+
+    const currentNumTeams = layoutChanged
+      ? 0
+      : Math.floor(existingTeamChannels.length / squadsPerTeam);
 
     if (newNumTeams > currentNumTeams) {
+      // 생성 때와 같은 상한을 건다. 정원표에 없는 값이 들어와도 서버 채널이
+      // 무한정 늘어나지 않아야 한다.
+      if (
+        newNumTeams * squadsPerTeam >
+        DiscordVoiceService.MAX_TEAM_VOICE_CHANNELS
+      ) {
+        this.logger.log(
+          `[DiscordVoice] 채널 ${newNumTeams * squadsPerTeam}개는 만들지 않습니다 (상한 ${DiscordVoiceService.MAX_TEAM_VOICE_CHANNELS}).`,
+        );
+        return;
+      }
+
       // Add missing team channels
       for (let i = currentNumTeams; i < newNumTeams; i++) {
-        const displayName = `┊ ${i + 1}팀`;
-        const dbTeamName = `Team ${i + 1}`;
+        for (let squad = 0; squad < squadsPerTeam; squad++) {
+          // 이름 규칙도 생성 때와 같다 — "1팀" 또는 "1팀 A" / "1팀 B".
+          const suffix =
+            squadsPerTeam > 1 ? ` ${String.fromCharCode(65 + squad)}` : "";
+          const displayName = `┊ ${i + 1}팀${suffix}`;
+          const dbTeamName = `Team ${i + 1}${suffix}`;
 
-        const channel = await guild.channels.create({
-          name: displayName,
-          type: ChannelType.GuildVoice,
-          parent: room.discordCategoryId,
-          userLimit: 5,
-        });
+          const channel = await guild.channels.create({
+            name: displayName,
+            type: ChannelType.GuildVoice,
+            parent: room.discordCategoryId,
+            userLimit: squadLimit,
+          });
 
-        await this.prisma.roomDiscordChannel.create({
-          data: {
-            roomId,
-            channelId: channel.id,
-            channelType: "VOICE",
-            teamName: dbTeamName,
-          },
-        });
+          await this.prisma.roomDiscordChannel.create({
+            data: {
+              roomId,
+              channelId: channel.id,
+              channelType: "VOICE",
+              teamName: dbTeamName,
+            },
+          });
 
-        this.logger.log(
-          `Added team channel "${displayName}" for room ${roomId}`,
-        );
+          this.logger.log(
+            `Added team channel "${displayName}" for room ${roomId}`,
+          );
+
+          const isLast = i === newNumTeams - 1 && squad === squadsPerTeam - 1;
+          if (!isLast) {
+            await this.delay(DiscordVoiceService.CHANNEL_CREATE_DELAY_MS);
+          }
+        }
       }
     } else if (newNumTeams < currentNumTeams) {
       // Remove extra team channels (from the end)
-      const toRemove = existingTeamChannels.slice(newNumTeams);
+      // 스쿼드 단위로 잘라야 팀 하나가 반만 남는 일이 없다.
+      const toRemove = existingTeamChannels.slice(newNumTeams * squadsPerTeam);
 
       for (const ch of toRemove) {
         try {
@@ -801,10 +976,22 @@ export class DiscordVoiceService {
     try {
       const guild = await this.client.guilds.fetch(guildId);
 
-      for (let i = 0; i < Math.min(teams.length, discordChannels.length); i++) {
-        const team = teams[i];
+      // 한 팀이 스쿼드 여러 개로 갈라지면 채널도 그만큼이다.
+      // 채널은 팀 순서 → 스쿼드 순서로 만들어져 있다(1팀 A, 1팀 B, 2팀 A …).
+      const squadsPerTeam =
+        teams.length > 0
+          ? Math.max(1, Math.floor(discordChannels.length / teams.length))
+          : 1;
+
+      for (let i = 0; i < discordChannels.length; i++) {
+        const team = teams[Math.floor(i / squadsPerTeam)];
+        if (!team) break;
         const ch = discordChannels[i];
-        const newDisplayName = `┊ ${team.name}`;
+        const suffix =
+          squadsPerTeam > 1
+            ? ` ${String.fromCharCode(65 + (i % squadsPerTeam))}`
+            : "";
+        const newDisplayName = `┊ ${team.name}${suffix}`;
 
         // Discord 채널명 변경
         const channel = await guild.channels
@@ -814,10 +1001,10 @@ export class DiscordVoiceService {
           await channel.setName(newDisplayName);
         }
 
-        // DB teamName을 team.name으로 업데이트 (매칭 키 동기화)
+        // DB teamName 동기화. 스쿼드가 갈리면 접미사까지 포함해야 채널이 겹치지 않는다.
         await this.prisma.roomDiscordChannel.update({
           where: { id: ch.id },
-          data: { teamName: team.name },
+          data: { teamName: `${team.name}${suffix}` },
         });
       }
 
@@ -1067,29 +1254,33 @@ export class DiscordVoiceService {
     let success = 0;
     let failed = 0;
 
-    for (const [index, team] of orderedTeams.entries()) {
-      const matchedTeamChannel = orderedTeamChannels.find(
-        (ch: (typeof room.discordChannels)[number]) =>
-          ch.teamName === team.name,
-      );
-      const teamChannel = matchedTeamChannel ?? orderedTeamChannels[index];
+    // 한 팀이 스쿼드 여러 개로 갈라지면 채널도 그만큼 잡아야 한다.
+    // 채널은 팀 순서 → 스쿼드 순서로 만들어져 있다(1팀 A, 1팀 B, 2팀 A …).
+    const squadsPerTeam =
+      orderedTeams.length > 0
+        ? Math.max(
+            1,
+            Math.floor(orderedTeamChannels.length / orderedTeams.length),
+          )
+        : 1;
 
-      if (!teamChannel) {
+    for (const [index, team] of orderedTeams.entries()) {
+      const slotStart = index * squadsPerTeam;
+      const teamChannels = orderedTeamChannels.slice(
+        slotStart,
+        slotStart + squadsPerTeam,
+      );
+
+      if (teamChannels.length === 0) {
         this.logger.warn(`No Discord channel found for team ${team.name}`);
         failed += team.members.length;
         continue;
       }
 
-      if (!matchedTeamChannel) {
-        this.logger.warn(
-          `Discord channel name mismatch for team ${team.name}; using channel slot ${index + 1}`,
-        );
-      }
-
       try {
         const result = await this.moveTeamToChannel(
           team.id,
-          teamChannel.channelId,
+          teamChannels.map((ch) => ch.channelId),
         );
         success += result.success;
         failed += result.failed;

@@ -1,11 +1,13 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { useEffect, useRef, useState } from "react";
 import { useSnakeDraftStore } from "@/stores/snake-draft-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
 import { DraftBoard } from "@/components/domain/DraftBoard";
+import { LadderDrawBoard } from "@/components/domain/LadderDrawBoard";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
 import { LoadingSpinner, Badge, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
@@ -14,10 +16,15 @@ import { TeamModeHelp } from "@/components/rooms/TeamModeHelp";
 export default function SnakeDraftPage() {
   const params = useParams();
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const draftId = params.id as string;
   const { addToast } = useToast();
   const hasRedirected = useRef(false);
   const [isAborting, setIsAborting] = useState(false);
+  // 추첨 연출은 시작 직후 한 번만 띄운다. 새로고침해도 다시 뜨지 않게
+  // 화면 상태로만 들고 있는다.
+  const [showLadder, setShowLadder] = useState(true);
+  const ladderDoneRef = useRef(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
 
   const { user } = useAuthStore();
@@ -48,9 +55,9 @@ export default function SnakeDraftPage() {
     if (hasRedirected.current) return;
     if (draftState?.status === "COMPLETED") {
       hasRedirected.current = true;
-      router.push(`/lol/role-selection/${draftId}`);
+      router.push(`${gamePrefix}/role-selection/${draftId}`);
     }
-  }, [draftState?.status, draftId, router]);
+  }, [draftState?.status, draftId, router, gamePrefix]);
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
@@ -60,7 +67,7 @@ export default function SnakeDraftPage() {
     );
     clearSessionAbort();
     const timer = setTimeout(
-      () => router.push(`/lol/tournaments/${draftId}/lobby`),
+      () => router.push(`${gamePrefix}/tournaments/${draftId}/lobby`),
       1500,
     );
     return () => clearTimeout(timer);
@@ -71,6 +78,7 @@ export default function SnakeDraftPage() {
     addToast,
     router,
     draftId,
+    gamePrefix,
   ]);
 
   const handleAbortToLobby = () => setIsAbortConfirmOpen(true);
@@ -81,7 +89,7 @@ export default function SnakeDraftPage() {
     try {
       await roomApi.abortToLobby(draftId);
       addToast("내전을 종료하고 대기실로 복귀합니다.", "success");
-      router.push(`/lol/tournaments/${draftId}/lobby`);
+      router.push(`${gamePrefix}/tournaments/${draftId}/lobby`);
     } catch (err: any) {
       addToast(
         err?.response?.data?.message || "내전 종료에 실패했습니다.",
@@ -128,7 +136,7 @@ export default function SnakeDraftPage() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => router.push(`/lol/tournaments/${draftId}/lobby`)}
+              onClick={() => router.push(`${gamePrefix}/tournaments/${draftId}/lobby`)}
             >
               로비로 돌아가기
             </Button>
@@ -189,6 +197,45 @@ export default function SnakeDraftPage() {
             </Button>
           </div>
         </div>
+
+        {/*
+          픽 순서 추첨 사다리.
+
+          드래프트가 시작되면 한 번 보여주고 넘어간다. 순서는 서버가 이미
+          정했고 이건 그 결과를 보여주는 연출이라, 건너뛰어도 진행에 지장이 없다.
+        */}
+        {draftState.ladder && showLadder && (
+          <div className="mb-5 rounded-2xl border border-bg-tertiary bg-bg-secondary p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-text-primary">
+                  픽 순서 추첨
+                </h2>
+                <p className="mt-0.5 text-xs text-text-tertiary">
+                  주장 선발과 따로 뽑습니다. 사다리를 타고 내려간 자리가 그
+                  팀의 픽 순서입니다.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowLadder(false)}
+              >
+                건너뛰기
+              </Button>
+            </div>
+            <LadderDrawBoard
+              draw={draftState.ladder}
+              teams={draftState.teams}
+              // 다 보여준 뒤 잠깐 두었다가 접는다 — 결과를 읽을 시간은 준다.
+              onFinished={() => {
+                if (ladderDoneRef.current) return;
+                ladderDoneRef.current = true;
+                setTimeout(() => setShowLadder(false), 2500);
+              }}
+            />
+          </div>
+        )}
 
         <DraftBoard
           draftState={draftState}

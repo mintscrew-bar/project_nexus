@@ -41,6 +41,7 @@ import { Avatar, StatusIndicator } from "@/components/ui";
 import { useDmStore } from "@/stores/dm-store";
 import { connectDmSocket, dmSocketHelpers } from "@/lib/socket-client";
 import { Shield } from "lucide-react";
+import { roomPath } from "@/lib/room-links";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ModalState =
@@ -49,7 +50,14 @@ type ModalState =
   | { type: "category"; friendship: Friendship }
   | { type: "addCategory" }
   | { type: "addFriend" }
-  | { type: "joinRoom"; roomId: string; roomName: string; isPrivate: boolean };
+  | {
+      type: "joinRoom";
+      roomId: string;
+      roomName: string;
+      isPrivate: boolean;
+      // 로비 경로가 게임별로 갈린다. 프레즌스가 게임을 안 실어 보내면 기본 게임으로 떨어진다.
+      gameTitle?: "LOL" | "PUBG";
+    };
 
 interface CtxState {
   x: number;
@@ -779,7 +787,7 @@ function ConfirmModal({
   );
 }
 
-function JoinRoomModal({ roomId, roomName, isPrivate, onClose }: { roomId: string; roomName: string; isPrivate: boolean; onClose: () => void }) {
+function JoinRoomModal({ roomId, roomName, isPrivate, gameTitle, onClose }: { roomId: string; roomName: string; isPrivate: boolean; gameTitle?: "LOL" | "PUBG"; onClose: () => void }) {
   const router = useRouter();
   const { addToast } = useToast();
   const [password, setPassword] = useState("");
@@ -789,7 +797,7 @@ function JoinRoomModal({ roomId, roomName, isPrivate, onClose }: { roomId: strin
       addToast("비밀번호를 입력해주세요.", "error");
       return;
     }
-    const url = `/tournaments/${roomId}/lobby${isPrivate && password ? `?password=${encodeURIComponent(password)}` : ""}`;
+    const url = `${roomPath({ id: roomId, gameTitle })}${isPrivate && password ? `?password=${encodeURIComponent(password)}` : ""}`;
     router.push(url);
     onClose();
   };
@@ -1156,7 +1164,7 @@ export function FriendsPanel() {
 
   const handleInviteToRoom = () => {
     if (!room) return;
-    const url = `${window.location.origin}/tournaments/${room.id}/lobby`;
+    const url = `${window.location.origin}${roomPath(room)}`;
     navigator.clipboard.writeText(url);
     addToast("내전 초대 링크가 복사되었습니다!", "success");
   };
@@ -1437,6 +1445,7 @@ export function FriendsPanel() {
               roomId: status.currentRoomId,
               roomName: status.currentRoomName ?? "친구의 방",
               isPrivate: status.currentRoomIsPrivate ?? false,
+              gameTitle: status.currentRoomGameTitle,
             });
           })()}
         />
@@ -1475,6 +1484,7 @@ export function FriendsPanel() {
           roomId={modal.roomId}
           roomName={modal.roomName}
           isPrivate={modal.isPrivate}
+          gameTitle={modal.gameTitle}
           onClose={() => setModal(null)}
         />
       )}

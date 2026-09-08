@@ -1,3 +1,4 @@
+import { GUIDE_BASE } from "@/lib/guide-links";
 import { permanentRedirect } from "next/navigation";
 
 export default async function LegacyResourceArticlePage({
@@ -6,5 +7,5 @@ export default async function LegacyResourceArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  permanentRedirect(`/guide/${slug}`);
+  permanentRedirect(`${GUIDE_BASE}/guide/${slug}`);
 }

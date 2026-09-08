@@ -12,9 +12,11 @@ import { FloatingClanChatPanel } from '@/components/domain/FloatingClanChatPanel
 import { CreatorPromoStrip } from './CreatorPromoStrip';
 import { ActiveRoomBanner } from './ActiveRoomBanner';
 import { useLobbyStore } from '@/stores/lobby-store';
+import { useCurrentGame } from '@/hooks/useCurrentGame';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const currentGame = useCurrentGame();
   const { isAuthenticated } = useAuthStore();
 
   // ---------------------------------------------------------------
@@ -34,6 +36,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       useLobbyStore.getState().disconnect();
     }
   }, [mounted, isAuthenticated]);
+
+  // ---------------------------------------------------------------
+  // 게임 테마.
+  //
+  // 토큰은 래퍼와 body 양쪽에 건다. 모달·툴팁은 createPortal로
+  // document.body에 그려져 래퍼 밖에 있어서, 래퍼에만 걸면 배그 화면에서
+  // 모달만 롤 색으로 뜬다.
+  // 질감(.game-pubg-surface)은 래퍼 한 곳에만 — 두 겹으로 깔리면 안 된다.
+  // ---------------------------------------------------------------
+  const themeClass = currentGame === 'PUBG' ? 'game-pubg' : null;
+  useEffect(() => {
+    if (!themeClass) return;
+    document.body.classList.add(themeClass);
+    return () => document.body.classList.remove(themeClass);
+  }, [themeClass]);
 
   // /auth/* 라우트 → 풀스크린 (셸 없음)
   const isAuthRoute = pathname.startsWith('/auth');
@@ -62,10 +79,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // 인증된 앱 셸 (또는 마운트 전 기본 셸)
   return (
-    <>
+    <div className={cn(
+      "flex h-full min-h-0 flex-col",
+      themeClass,
+      themeClass && "game-pubg-surface",
+    )}>
       <Header />
       <main className="flex min-h-0 min-w-0 flex-grow">
-        <div className="flex min-h-0 min-w-0 flex-grow flex-col overflow-hidden bg-bg-primary">
+        {/*
+          배그 테마에서는 바탕을 비운다. 여기에 불투명한 배경을 깔면
+          래퍼(.game-pubg-surface)의 격자·노이즈가 통째로 가려진다 —
+          질감은 콘텐츠 뒤에 있어야 하고, 카드들이 그 위를 덮는 게 맞다.
+        */}
+        <div className={cn(
+          "flex min-h-0 min-w-0 flex-grow flex-col overflow-hidden",
+          themeClass ? "bg-transparent" : "bg-bg-primary",
+        )}>
           {showCreatorPromo && <CreatorPromoStrip />}
           <ActiveRoomBanner />
           {/*
@@ -89,6 +118,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* 플로팅 DM/클랜 채팅 창 — FriendsPanel 왼쪽에 렌더링 */}
       <FloatingDmPanel />
       <FloatingClanChatPanel />
-    </>
+    </div>
   );
 }

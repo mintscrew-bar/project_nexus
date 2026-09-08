@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { PubgMatchesPage } from "./_PubgMatchesPage";
 import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -91,8 +93,9 @@ function formatRecentTime(timestamp: number) {
   return new Date(timestamp).toLocaleDateString("ko-KR");
 }
 
-export default function StatsPage() {
+function LolMatchesPage() {
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const { addToast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [searchType, setSearchType] = useState<"summoner" | "user">("summoner");
@@ -187,7 +190,7 @@ export default function StatsPage() {
             timestamp: Date.now(),
           });
           router.push(
-            `/matches/summoner/${encodeURIComponent(gameName.trim())}/${encodeURIComponent(tagLine.trim())}`,
+            `${gamePrefix}/matches/summoner/${encodeURIComponent(gameName.trim())}/${encodeURIComponent(tagLine.trim())}`,
           );
         }
       } else {
@@ -214,16 +217,16 @@ export default function StatsPage() {
       timestamp: Date.now(),
     });
     setShowDropdown(false);
-    router.push(`/lol/matches/user/${user.id}`);
+    router.push(`${gamePrefix}/matches/user/${user.id}`);
   };
 
   const handleRecentSearchClick = (search: RecentSearch) => {
     if (search.type === "summoner" && search.gameName && search.tagLine) {
       router.push(
-        `/matches/summoner/${encodeURIComponent(search.gameName)}/${encodeURIComponent(search.tagLine)}`,
+        `${gamePrefix}/matches/summoner/${encodeURIComponent(search.gameName)}/${encodeURIComponent(search.tagLine)}`,
       );
     } else if (search.type === "user" && search.userId) {
-      router.push(`/lol/matches/user/${search.userId}`);
+      router.push(`${gamePrefix}/matches/user/${search.userId}`);
     }
   };
 
@@ -523,5 +526,20 @@ export default function StatsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * 게임별 전적 화면.
+ *
+ * 롤은 소환사 검색 중심, 배그는 Nexus 내전 기록 중심이라 화면이 아예 다르다.
+ * 같은 컴포넌트에 조건문을 뿌리는 대신 통째로 갈아끼운다.
+ */
+export default function MatchesPage() {
+  const pathname = usePathname();
+  return pathname.startsWith("/pubg/") ? (
+    <PubgMatchesPage />
+  ) : (
+    <LolMatchesPage />
   );
 }

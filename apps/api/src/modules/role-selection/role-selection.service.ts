@@ -7,8 +7,9 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { Prisma, RoomStatus, Role, TeamMode } from "@nexus/database";
+import { GameTitle, Prisma, RoomStatus, Role, TeamMode } from "@nexus/database";
 import { MatchService } from "../match/match.service";
+import { getGame } from "@nexus/types";
 // 클라이언트와 값이 어긋나지 않도록 공용 패키지에서 가져온다.
 import {
   ROLE_SELECTION_TIME_MS,
@@ -87,6 +88,14 @@ export class RoleSelectionService {
 
     if (!room) {
       throw new NotFoundException("Room not found");
+    }
+
+    // 포지션이 없는 게임에는 역할 선택 단계 자체가 없다(배그).
+    // 여기서 막지 않으면 라인 5개짜리 화면이 배그 방에 열린다.
+    if (!getGame(room.gameTitle).hasPositions) {
+      throw new BadRequestException(
+        `${getGame(room.gameTitle).label}에는 역할 선택 단계가 없습니다.`,
+      );
     }
 
     if (room.status !== RoomStatus.DRAFT_COMPLETED) {
@@ -389,6 +398,8 @@ export class RoleSelectionService {
     });
 
     if (!room) return;
+    // 포지션이 없는 게임(배그)에 라인을 배정하면 없는 개념이 데이터에 남는다.
+    if (!getGame(room.gameTitle).hasPositions) return;
 
     const ALL_ROLES: Role[] = [
       Role.TOP,
@@ -429,13 +440,29 @@ export class RoleSelectionService {
     }
   }
 
+  /**
+   * 팀 편성 확정.
+   *
+   * 이름은 "역할 선택 완료"지만 자동 밸런스 확정 경로도 여기로 들어온다.
+   * 게임에 따라 하는 일이 갈린다 —
+   *   롤: 라인이 전부 정해졌는지 확인하고 대진표를 만든다
+   *   배그: 라인이 없고 대진표도 만들지 않는다. 배틀로얄·킬내기는 스크림이,
+   *        자유 매치는 방이 알아서 진행을 맡는다
+   */
   async completeRoleSelection(roomId: string) {
-    const allSelected = await this.checkAllRolesSelected(roomId);
+    const gameOfRoom = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { gameTitle: true, pubgGameMode: true },
+    });
+    const game = getGame(gameOfRoom?.gameTitle ?? GameTitle.LOL);
 
-    if (!allSelected) {
-      throw new BadRequestException(
-        "Not all team members have selected their roles",
-      );
+    if (game.hasPositions) {
+      const allSelected = await this.checkAllRolesSelected(roomId);
+      if (!allSelected) {
+        throw new BadRequestException(
+          "Not all team members have selected their roles",
+        );
+      }
     }
 
     // Get room data first
@@ -458,20 +485,38 @@ export class RoleSelectionService {
       throw new NotFoundException("Room not found");
     }
 
-    // Generate bracket (this will also update room status to IN_PROGRESS)
-    // If bracket generation fails, we should not proceed to IN_PROGRESS status
-    try {
-      await this.matchService.generateBracket(room.hostId, roomId);
-      // Bracket generation successful - room status is already updated to IN_PROGRESS
-    } catch (error: any) {
-      // Log error with more details
-      console.error("Error generating bracket:", error);
+    /**
+     * 배그 방은 대진표를 만들지 않는다.
+     *
+     * 대진표는 2~8팀만 만들 수 있는데 배그는 25팀까지 간다. 배틀로얄·킬내기는
+     * 라운드 누적(`Scrim`)이 진행을 맡고, 자유 매치는 애초에 결과를 남기지
+     * 않는 방이라 만들 대진표가 없다. 모드로 가르면 자유 매치가 롤 경로로
+     * 새어 들어가 12팀부터 "Unsupported team count" 로 시작 자체가 막힌다.
+     */
+    const skipBracket =
+      (gameOfRoom?.gameTitle ?? GameTitle.LOL) === GameTitle.PUBG;
 
-      // If bracket generation fails, throw error instead of silently continuing
-      // This prevents room from being in IN_PROGRESS state without a bracket
-      throw new BadRequestException(
-        `Failed to generate bracket: ${error.message || "Unknown error"}. Please try again or generate bracket manually.`,
-      );
+    if (skipBracket) {
+      await this.prisma.room.update({
+        where: { id: roomId },
+        data: { status: RoomStatus.IN_PROGRESS },
+      });
+    } else {
+      // Generate bracket (this will also update room status to IN_PROGRESS)
+      // If bracket generation fails, we should not proceed to IN_PROGRESS status
+      try {
+        await this.matchService.generateBracket(room.hostId, roomId);
+        // Bracket generation successful - room status is already updated to IN_PROGRESS
+      } catch (error: any) {
+        // Log error with more details
+        console.error("Error generating bracket:", error);
+
+        // If bracket generation fails, throw error instead of silently continuing
+        // This prevents room from being in IN_PROGRESS state without a bracket
+        throw new BadRequestException(
+          `Failed to generate bracket: ${error.message || "Unknown error"}. Please try again or generate bracket manually.`,
+        );
+      }
     }
 
     // Fetch updated room (status already updated by generateBracket)

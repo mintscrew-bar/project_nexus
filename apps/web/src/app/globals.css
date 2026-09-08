@@ -99,8 +99,89 @@
     --color-tier-challenger: 244 196 48; /* #f4c430 */
   }
 
+  /* 배그 테마 — 먼지 낀 밀리터리 그린 배경에 앰버 강조.
+     `.game-pubg` 가 붙은 요소 아래에서만 토큰을 갈아끼우므로 /lol/* 과
+     게임과 무관한 화면(클랜·커뮤니티)의 기존 색은 그대로다.
+
+     `.dark` 는 <html> 에 붙고 이 클래스는 그 자손에 붙는다. 커스텀 속성은
+     가까운 조상이 이기므로 `.dark .game-pubg` 를 따로 쓸 필요가 없다. */
+  .game-pubg {
+    --color-bg-primary: 20 22 18;
+    --color-bg-secondary: 28 32 25;
+    --color-bg-tertiary: 43 48 38;
+    --color-bg-elevated: 52 58 45;
+
+    --color-text-primary: 235 232 216;
+    --color-text-secondary: 181 183 161;
+    --color-text-tertiary: 154 158 136;
+    /* 롤 팔레트와 같은 눈높이로 맞춘다. 배그 배경(bg-tertiary)이 더 밝아
+       같은 회색을 쓰면 대비가 4.5:1 아래로 떨어진다. */
+    --color-text-muted: 152 157 134;
+
+    /* accent 는 흰 글자를 얹는 자리다 — `bg-accent-primary text-white` 조합이
+       버튼 기본 변형을 포함해 87곳에서 쓰인다. 밝은 앰버(#CF9E41)를 그대로
+       쓰면 흰 글자가 2.44:1 로 안 보여서, 앰버 계열을 유지하되 글자가 읽히는
+       농도까지 어둡게 잡았다. 밝은 앰버는 accent-gold 로 남아 하이라이트·
+       테두리에 계속 나온다. */
+    --color-accent-primary: 138 90 30; /* #8A5A1E 흰 글자 5.90:1 */
+    --color-accent-hover: 158 103 34; /* #9E6722 흰 글자 4.75:1 */
+    --color-accent-active: 110 71 22; /* #6E4716 */
+    --color-accent-purple: 119 126 91; /* 그라디언트 끝색 — 마른 풀색 */
+    --color-accent-info: 104 163 161;
+    --color-accent-gold: 219 169 66; /* #DBA942 밝은 앰버는 여기 남긴다 */
+  }
+
   body {
     @apply antialiased bg-bg-primary text-text-primary; /* Use new semantic colors */
+  }
+
+  /* 표면 질감은 토큰과 분리한다.
+     토큰(`.game-pubg`)은 포털로 body 에 그려지는 모달까지 덮으려고 body 에도
+     붙는데, 질감까지 같이 붙으면 격자와 노이즈가 두 겹으로 깔린다.
+     질감은 앱 셸 래퍼 한 곳에만 준다.
+
+     가상 요소(::before/::after)에 z-index: -1 로 깔지 않는다. 그러려면
+     래퍼에 쌓임 맥락을 만들어야 하는데(isolation), 그러면 셸 안의
+     `fixed` 요소가 그 맥락에 갇힌다 — 친구 패널이 z-[9998] 로 모달 위에
+     뜨도록 잡혀 있는 것이 배그 화면에서만 모달 아래로 내려간다.
+     배경 레이어로 겹치면 쌓임 맥락 없이 같은 그림이 나온다.
+
+     래퍼 자체는 스크롤하지 않으므로(스크롤은 안쪽 overflow-auto 가 맡는다)
+     background-attachment 없이도 화면에 고정된 것처럼 보인다. */
+  .game-pubg-surface {
+    background-color: rgb(var(--color-bg-primary));
+    background-image:
+      /* 스캔라인 */
+      repeating-linear-gradient(
+        0deg,
+        transparent 0,
+        transparent 3px,
+        rgb(255 255 255 / 0.011) 4px
+      ),
+      /* 필름 그레인 */
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E"),
+      /* 격자 */ linear-gradient(rgb(255 255 255 / 0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(255 255 255 / 0.012) 1px, transparent 1px);
+    background-size:
+      auto,
+      180px 180px,
+      6px 6px,
+      9px 9px;
+  }
+
+  /* 움직임을 줄여 달라고 한 사용자에게는 스캔라인을 걷는다.
+     스크롤할 때 어른거려 멀미를 유발할 수 있다. */
+  @media (prefers-reduced-motion: reduce) {
+    .game-pubg-surface {
+      background-image:
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E"),
+        linear-gradient(rgb(255 255 255 / 0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(255 255 255 / 0.012) 1px, transparent 1px);
+      background-size:
+        180px 180px,
+        6px 6px,
+        9px 9px;
+    }
   }
 
   /* 모바일에서도 브라우저 기본 16px을 유지한다.
@@ -715,15 +796,18 @@
 
 /* 랜딩 자동 밸런스 데모: 카드 고스트가 실제 드래그 경로를 안내 */
 @keyframes demo-drag-card {
-  0%, 14% {
+  0%,
+  14% {
     opacity: 0;
     transform: translateX(0) translateY(4px);
   }
-  24%, 68% {
+  24%,
+  68% {
     opacity: 1;
     transform: translateX(220px) translateY(0) rotate(1deg);
   }
-  78%, 100% {
+  78%,
+  100% {
     opacity: 0;
     transform: translateX(250px) translateY(4px) rotate(1deg);
   }

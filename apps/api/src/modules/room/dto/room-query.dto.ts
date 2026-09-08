@@ -10,7 +10,12 @@ import {
   Min,
 } from "class-validator";
 import { Transform } from "class-transformer";
-import { GameTitle, TeamMode } from "@nexus/database";
+import {
+  GameTitle,
+  PubgGameMode,
+  PubgPlatform,
+  TeamMode,
+} from "@nexus/database";
 
 /** 방 목록 조회 쿼리 DTO */
 export class ListRoomsQueryDto {
@@ -25,6 +30,16 @@ export class ListRoomsQueryDto {
   @IsOptional()
   @IsEnum(TeamMode)
   teamMode?: TeamMode;
+
+  /** 스배/카배 필터. 배그 방 목록에서만 의미가 있다. */
+  @IsOptional()
+  @IsEnum(PubgPlatform)
+  pubgPlatform?: PubgPlatform;
+
+  /** 킬내기/배틀로얄/자유 매치 필터 */
+  @IsOptional()
+  @IsEnum(PubgGameMode)
+  pubgGameMode?: PubgGameMode;
 
   @IsOptional()
   @IsBoolean({ message: "includePrivate는 boolean이어야 합니다." })

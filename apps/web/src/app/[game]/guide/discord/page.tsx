@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { Bot, Link2, MessageSquareText, ShieldCheck } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { guideUrl } from "@/lib/guide-links";
 import { GuidePageLayout, GuideSection, GuideStep, InfoCard } from "../_components/GuidePageLayout";
 
 export const metadata: Metadata = {
   title: "Discord 연동 가이드 — Nexus",
   description: "Nexus Discord 봇 추가, 서버 승인, 음성 채널 이동과 주요 명령어를 안내합니다.",
-  alternates: { canonical: absoluteUrl("/guide/discord") },
+  alternates: { canonical: guideUrl("/guide/discord") },
 };
 
 const commands = [

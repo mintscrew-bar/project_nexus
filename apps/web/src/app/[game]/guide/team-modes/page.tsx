@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ArrowLeftRight, Gavel, ListOrdered, Scale } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { guideUrl } from "@/lib/guide-links";
 import {
   Bullet,
   BulletList,
@@ -13,7 +13,7 @@ import {
 export const metadata: Metadata = {
   title: "팀 구성 모드 가이드 — Nexus",
   description: "경매, 스네이크, 자동 밸런스, 자유 팀 선택의 차이와 진행 방법을 비교합니다.",
-  alternates: { canonical: absoluteUrl("/guide/team-modes") },
+  alternates: { canonical: guideUrl("/guide/team-modes") },
 };
 
 export default function TeamModesGuidePage() {

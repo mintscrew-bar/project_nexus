@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ConfirmModal, Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -28,11 +28,19 @@ import {
   type TeamMode,
 } from "@/components/rooms/TeamModeHelp";
 import {
+  DEFAULT_PUBG_GAME_MODE,
   DEFAULT_SERIES_PRESET,
+  isValidPubgRoomSize,
   normalizeSeriesPreset,
-  teamCountForRoomSize,
+  teamCountForRoom,
   type SeriesPreset,
+  type GameTitle,
+  type PubgGameMode,
 } from "@nexus/types";
+import {
+  killMatchSizeOptions,
+  roomSizeOptions,
+} from "@/lib/room-size-options";
 
 type TeamCaptainSelection = "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
 type AuctionCaptainSelection = "TIER" | "MANUAL" | "VOLUNTEER";
@@ -55,6 +63,10 @@ interface RoomSettingsModalProps {
     captainSelection?: TeamCaptainSelection;
     bracketFormat?: string;
     seriesPreset?: string | null;
+    /** 방이 속한 게임. 팀 인원·정원 선택지가 여기서 갈린다. */
+    gameTitle?: GameTitle;
+    /** 배그 방에서만 — 킬내기는 정원 선택지와 팀 수가 아예 다르다. */
+    pubgGameMode?: PubgGameMode | null;
   };
 }
 
@@ -90,48 +102,6 @@ const TEAM_MODES: {
   },
 ];
 
-const PLAYER_OPTIONS = [
-  {
-    value: 10,
-    label: "10명",
-    description: "5 vs 5",
-    teams: 2,
-    format: "단판",
-    supportsDE: false,
-  },
-  {
-    value: 15,
-    label: "15명",
-    description: "3팀 리그전",
-    teams: 3,
-    format: "리그전",
-    supportsDE: false,
-  },
-  {
-    value: 20,
-    label: "20명",
-    description: "4팀 토너먼트",
-    teams: 4,
-    format: "준결승+결승",
-    supportsDE: true,
-  },
-  {
-    value: 30,
-    label: "30명",
-    description: "6팀 리그전",
-    teams: 6,
-    format: "리그전",
-    supportsDE: false,
-  },
-  {
-    value: 40,
-    label: "40명",
-    description: "8팀 토너먼트",
-    teams: 8,
-    format: "8강+4강+결승",
-    supportsDE: true,
-  },
-];
 
 const toAuctionCaptainSelection = (
   value?: TeamCaptainSelection,
@@ -150,6 +120,29 @@ export function RoomSettingsModal({
   room,
 }: RoomSettingsModalProps) {
   const { updateRoomSettings } = useLobbyStore();
+  // 팀 인원과 정원 선택지는 게임뿐 아니라 배그 모드에 따라서도 갈린다.
+  // 킬내기는 항상 2팀이라 정원이 곧 팀 인원 × 2다(3대3~8대8).
+  const gameTitle: GameTitle = room.gameTitle ?? "LOL";
+  // 팀 인원·팀 수 계산에는 방의 값을 그대로 쓴다. 없는 모드를 채워 넣으면
+  // 모드가 비어 있는 배그 방의 팀 수가 조용히 달라진다
+  // (모드 없음 → 4인 스쿼드, 킬내기로 채우면 → 정원의 절반이 한 팀).
+  const pubgGameMode: PubgGameMode | null = room.pubgGameMode ?? null;
+  // 정원 선택지만은 모드를 하나 골라야 만들 수 있다. `roomSizeOptions("PUBG")`
+  // 는 모드 전체의 합집합이라 그대로 쓰면 배틀로얄 방에 킬내기 정원
+  // (6·8·14·16)이 섞여 나오고, 고르면 서버가 되돌려보낸다.
+  const playerOptions = useMemo(() => {
+    if (gameTitle !== "PUBG") return roomSizeOptions(gameTitle);
+    const mode = pubgGameMode ?? DEFAULT_PUBG_GAME_MODE;
+    if (mode === "KILL_MATCH") return killMatchSizeOptions();
+    return roomSizeOptions(gameTitle).filter((option) =>
+      isValidPubgRoomSize(option.value, mode),
+    );
+  }, [gameTitle, pubgGameMode]);
+  // 매 렌더 새 객체가 되면 effect deps 에 못 넣는다. 값 두 개로 들고 다닌다.
+  const teamShape = useMemo(
+    () => ({ gameTitle, pubgGameMode }),
+    [gameTitle, pubgGameMode],
+  );
 
   // Basic settings
   const [name, setName] = useState(room.name);
@@ -189,14 +182,14 @@ export function RoomSettingsModal({
   const [seriesPreset, setSeriesPreset] = useState<SeriesPreset>(
     normalizeSeriesPreset(
       room.seriesPreset,
-      teamCountForRoomSize(room.maxParticipants),
+      teamCountForRoom({ ...teamShape, maxParticipants: room.maxParticipants }),
     ),
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
-  const selectedPlayerOption = PLAYER_OPTIONS.find(
+  const selectedPlayerOption = playerOptions.find(
     (option) => option.value === maxParticipants,
   );
   const resetsManualTeamSetup =
@@ -223,7 +216,7 @@ export function RoomSettingsModal({
     useDoubleElim !== (room.bracketFormat === "DOUBLE_ELIMINATION") ||
     seriesPreset !== normalizeSeriesPreset(
       room.seriesPreset,
-      teamCountForRoomSize(room.maxParticipants),
+      teamCountForRoom({ ...teamShape, maxParticipants: room.maxParticipants }),
     ) ||
     password.length > 0;
 
@@ -256,18 +249,18 @@ export function RoomSettingsModal({
       setSeriesPreset(
         normalizeSeriesPreset(
           room.seriesPreset,
-          teamCountForRoomSize(room.maxParticipants),
+          teamCountForRoom({ ...teamShape, maxParticipants: room.maxParticipants }),
         ),
       );
       setError(null);
     }
-  }, [isOpen, room]);
+  }, [isOpen, room, gameTitle, pubgGameMode, teamShape]);
 
   // 인원(=팀 수)이 바뀌면 고를 수 있는 프리셋 목록도 갈아끼워진다.
   const handleParticipantChange = (value: number) => {
     setMaxParticipants(value);
     setSeriesPreset(
-      normalizeSeriesPreset(seriesPreset, teamCountForRoomSize(value)),
+      normalizeSeriesPreset(seriesPreset, teamCountForRoom({ ...teamShape, maxParticipants: value })),
     );
   };
 
@@ -358,7 +351,7 @@ export function RoomSettingsModal({
             참가 인원
           </h3>
           <div className="grid grid-cols-3 gap-2">
-            {PLAYER_OPTIONS.map((option) => (
+            {playerOptions.map((option) => (
               <button
                 key={option.value}
                 type="button"

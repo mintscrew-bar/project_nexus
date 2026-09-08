@@ -22,6 +22,8 @@ interface FriendStatus {
   lastSeenAt: string | null;
   // Room info — populated by presence socket when available
   currentRoomId?: string | null;
+  /** 친구가 있는 방의 게임. 로비 경로가 게임별로 갈려 필요하다. */
+  currentRoomGameTitle?: "LOL" | "PUBG" | null;
   currentRoomName?: string | null;
   currentRoomIsPrivate?: boolean;
 }
@@ -65,7 +67,7 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
 
     // Listen for friend status changes
     presenceSocketHelpers.onFriendStatusChanged((data) => {
-      const { userId, status, lastSeenAt, currentRoomId, currentRoomName, currentRoomIsPrivate } = data as any;
+      const { userId, status, lastSeenAt, currentRoomId, currentRoomName, currentRoomIsPrivate, currentRoomGameTitle } = data as any;
       const currentStatuses = get().friendStatuses;
       const existing = currentStatuses.get(userId);
 
@@ -75,7 +77,7 @@ export const usePresenceStore = create<PresenceStoreState>((set, get) => ({
           ...existing,
           status: status as UserStatus,
           lastSeenAt,
-          ...(currentRoomId !== undefined && { currentRoomId, currentRoomName, currentRoomIsPrivate }),
+          ...(currentRoomId !== undefined && { currentRoomId, currentRoomName, currentRoomIsPrivate, currentRoomGameTitle }),
         });
         set({ friendStatuses: newStatuses });
       }

@@ -7,6 +7,7 @@ import { Bell, BellOff, Eye, Radio, Swords } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StreamerChannelItem, StreamerListItem } from "@/lib/api-client";
 import { StreamerPlatformBadge } from "@/components/domain/StreamerPlatformBadge";
+import { roomPath } from "@/lib/room-links";
 
 const PLATFORM_LABELS: Record<string, string> = {
   CHZZK: "치지직",
@@ -154,7 +155,7 @@ export function LiveStreamerCard({
       <div className="flex items-center gap-2 border-t border-bg-tertiary px-4 py-3">
         {streamer.activeRoom && (
           <Link
-            href={`/lol/tournaments/${streamer.activeRoom.id}`}
+            href={roomPath(streamer.activeRoom, "")}
             className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-accent-primary"
           >
             <Swords className="h-4 w-4 flex-shrink-0" />

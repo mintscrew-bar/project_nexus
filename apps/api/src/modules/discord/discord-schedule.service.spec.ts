@@ -126,10 +126,12 @@ describe("DiscordScheduleService.processScheduledRooms", () => {
 
     await service.processScheduledRooms();
 
+    // 채널 정원은 게임·모드를 따라간다. 롤은 팀 5인이고 대기실은 방 정원만큼.
     expect(voiceService.createRoomChannels).toHaveBeenCalledWith(
       "room-1",
       "9월 1일 내전",
       2,
+      { teamSize: 5, squadsPerTeam: 1, maxParticipants: 10 },
     );
     expect(prisma.room.update).toHaveBeenCalledWith({
       where: { id: "room-1" },
@@ -188,7 +190,9 @@ describe("DiscordScheduleService.processScheduledRooms", () => {
     const [recipients, content] = botService.sendDirectMessages.mock.calls[0];
     expect(recipients).toEqual(["discord-1"]);
     expect(content).toContain("9월 1일 내전");
-    expect(content).toContain("https://nexus.test/tournaments/room-1/lobby");
+    expect(content).toContain(
+      "https://nexus.test/lol/tournaments/room-1/lobby",
+    );
     expect(content).toContain(
       "https://discord.com/channels/guild-1/lobby-voice",
     );
@@ -262,7 +266,9 @@ describe("DiscordScheduleService.closeStaleRecruitments", () => {
     expect(content).toContain("9월 1일 내전");
     expect(content).toContain("/nexus schedule");
     // 방은 남는다 — 로비 링크를 함께 준다.
-    expect(content).toContain("https://nexus.test/tournaments/room-1/lobby");
+    expect(content).toContain(
+      "https://nexus.test/lol/tournaments/room-1/lobby",
+    );
   });
 
   it("정원을 채운 방은 건드리지 않는다", async () => {

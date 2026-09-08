@@ -12,8 +12,16 @@ import {
   MatchStatus,
   BracketType,
   TeamMode,
+  GameTitle,
 } from "@nexus/database";
-import { normalizeSeriesPreset, resolveSeriesBestOf } from "@nexus/types";
+import {
+  DEFAULT_PUBG_GAME_MODE,
+  getGame,
+  getPubgGameMode,
+  normalizeSeriesPreset,
+  resolveSeriesBestOf,
+  teamSizeForRoom,
+} from "@nexus/types";
 import { randomInt } from "crypto";
 
 export interface BracketMatch {
@@ -63,6 +71,10 @@ export class MatchBracketService {
         hostId: true,
         status: true,
         teamMode: true,
+        // 팀 인원·역할 선택 유무가 게임과 모드마다 다르다
+        gameTitle: true,
+        pubgGameMode: true,
+        maxParticipants: true,
         bracketFormat: true,
         seriesPreset: true,
         teams: {
@@ -81,10 +93,38 @@ export class MatchBracketService {
       throw new ForbiddenException("Only host can generate bracket");
     }
 
+    const game = getGame(room.gameTitle ?? GameTitle.LOL);
+
+    /**
+     * 결과를 대진표로 가리지 않는 방은 여기서 막는다.
+     *
+     * 편성 확정 경로는 이미 배그를 건너뛰지만 이 메서드는 수동 엔드포인트
+     * (`POST /matches/rooms/:roomId/bracket`)로도 열려 있다. 그대로 두면
+     * 배틀로얄은 팀 수 제한에 걸려 알 수 없는 400 이 나고, 킬내기는
+     * 아무도 안 보는 대진표가 만들어져 Match 기록만 남는다.
+     * 모드의 결과 방식으로 가른다 — 게임으로 가르면 나중에 대진표를 쓰는
+     * 배그 모드가 생겼을 때 다시 막힌다.
+     */
+    const resultShape =
+      room.gameTitle === GameTitle.PUBG
+        ? getPubgGameMode(room.pubgGameMode ?? DEFAULT_PUBG_GAME_MODE)
+            .resultShape
+        : game.resultShape;
+    if (resultShape !== "BRACKET") {
+      throw new BadRequestException(
+        "이 경기 방식은 대진표를 쓰지 않습니다. 라운드 결과로 순위를 매깁니다.",
+      );
+    }
+
+    // 역할 선택이 없는 게임(배그)은 편성이 끝나면 곧바로 대진표로 온다.
+    // ROLE_SELECTION 만 통과시키면 배그 킬내기는 대진표를 아예 못 만든다.
     const canGenerateFromCurrentStatus =
       room.status === RoomStatus.ROLE_SELECTION ||
       (room.teamMode === TeamMode.AUTO_BALANCE &&
-        room.status === RoomStatus.DRAFT_COMPLETED);
+        room.status === RoomStatus.DRAFT_COMPLETED) ||
+      (!game.hasPositions &&
+        (room.status === RoomStatus.DRAFT_COMPLETED ||
+          room.status === RoomStatus.TEAM_SELECTION));
 
     if (!canGenerateFromCurrentStatus) {
       // Check if bracket already exists (room might be in IN_PROGRESS)
@@ -123,11 +163,17 @@ export class MatchBracketService {
 
     const teamCount = room.teams.length;
 
-    // Validate all teams have 5 players
+    // 팀 정원은 게임과 모드마다 다르다 — 롤 5인, 배그 4인 스쿼드,
+    // 킬내기는 정원을 반으로 나눈 값(3대3~8대8).
+    const expectedTeamSize = teamSizeForRoom({
+      gameTitle: room.gameTitle ?? GameTitle.LOL,
+      pubgGameMode: room.pubgGameMode,
+      maxParticipants: room.maxParticipants,
+    });
     for (const team of room.teams) {
-      if (team.members.length !== 5) {
+      if (team.members.length !== expectedTeamSize) {
         throw new BadRequestException(
-          `Team ${team.name} does not have 5 players`,
+          `${team.name} 팀 인원이 ${expectedTeamSize}명이 아닙니다.`,
         );
       }
     }

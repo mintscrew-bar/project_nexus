@@ -13,7 +13,9 @@ import {
   BadRequestException,
   HttpCode,
   HttpStatus,
+  Query,
 } from "@nestjs/common";
+import { GameTitle } from "@nexus/database";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Throttle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -247,8 +249,15 @@ export class UserController {
   // ========================================
 
   @Get(":id/hover-profile")
-  async getHoverProfile(@Param("id") id: string) {
-    return this.userService.getHoverProfile(id);
+  async getHoverProfile(
+    @Param("id") id: string,
+    // 보고 있는 화면의 게임. 배그 로비에서 솔로랭크 티어가 뜨면 안 된다.
+    @Query("game") game?: string,
+  ) {
+    return this.userService.getHoverProfile(
+      id,
+      game === "PUBG" ? GameTitle.PUBG : GameTitle.LOL,
+    );
   }
 
   @Get(":id/stats")

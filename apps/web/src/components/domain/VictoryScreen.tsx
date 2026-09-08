@@ -10,6 +10,7 @@ import { TierBadge } from "@/components/domain/TierBadge";
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PositionIcon } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { roomApi } from "@/lib/api-client";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 interface TeamMember {
   id: string;
@@ -126,6 +127,7 @@ export function VictoryScreen({
   preloadedMembers,
 }: VictoryScreenProps) {
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const [countdown, setCountdown] = useState(autoRedirectSeconds);
   const [isReturning, setIsReturning] = useState(false);
   const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>(preloadedMembers ?? {});
@@ -196,14 +198,14 @@ export function VictoryScreen({
     setIsReturning(true);
     try { await roomApi.returnToLobby(roomId); } catch { /* 이미 복귀 처리됐거나 방 상태가 바뀐 경우에도 이동은 계속 */ }
     onClose?.();
-    router.push(`/lol/tournaments/${roomId}/lobby`);
+    router.push(`${gamePrefix}/tournaments/${roomId}/lobby`);
   };
 
   const handleExit = async () => {
     if (hasNavigated.current) return;
     hasNavigated.current = true;
     try { await roomApi.leaveRoom(roomId); } catch { /* 무시 */ }
-    router.push("/lol/tournaments");
+    router.push(`${gamePrefix}/tournaments`);
   };
 
   useEffect(() => {

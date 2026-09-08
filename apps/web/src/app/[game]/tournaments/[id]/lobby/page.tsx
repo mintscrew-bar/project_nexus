@@ -1,6 +1,14 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
+import {
+  DEFAULT_GAME,
+  GAMES,
+  getRoomStagePath,
+  getTeamModeStagePath,
+  type GameTitle,
+} from "@nexus/types";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -57,54 +65,11 @@ const STAGE_HANDOFF_LOBBY_CLEANUP_DELAY_MS = 15 * 1000;
 // 소켓 연결이 이 시간 내에 성립하지 않으면 무한 스피너 대신 복구 화면으로 전환한다.
 const LOBBY_CONNECT_TIMEOUT_MS = 10 * 1000;
 
-const getTeamModeStagePath = (room: {
-  id: string;
-  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
-}) => {
-  if (room.teamMode === "AUCTION") return `/auction/${room.id}`;
-  if (room.teamMode === "SNAKE_DRAFT") return `/draft/${room.id}`;
-  if (room.teamMode === "AUTO_BALANCE") {
-    return `/tournaments/${room.id}/bracket`;
-  }
-  return `/role-selection/${room.id}`;
-};
-
-const getRoomStagePath = (room: {
-  id: string;
-  status?: string;
-  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
-}) => {
-  if (room.status === "IN_PROGRESS") {
-    return `/tournaments/${room.id}/bracket`;
-  }
-
-  // Auto balance stays in the lobby while teams are generated and reviewed.
-  // The server emits game-starting only after confirmation and bracket creation.
-  if (room.teamMode === "AUTO_BALANCE") {
-    return null;
-  }
-
-  if (room.status === "ROLE_SELECTION" || room.status === "DRAFT_COMPLETED") {
-    // 자동 밸런스는 편성 직후 대진표로 넘기지 않는다. 팀 점수 차나 비선호 라인이
-    // 나올 수 있어서 방장이 로비에서 결과를 확인하고 다시 돌리거나 확정한다.
-    return `/role-selection/${room.id}`;
-  }
-
-  if (room.status === "DRAFT" || room.status === "TEAM_SELECTION") {
-    return getTeamModeStagePath(room);
-  }
-
-  if (!room.status) {
-    return getTeamModeStagePath(room);
-  }
-
-  return null;
-};
-
 /* ─── Main Page ─── */
 export default function TournamentLobbyPage() {
   const params = useParams();
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const roomId = params.id as string;
 
   // Zustand Selector Optimization
@@ -225,8 +190,8 @@ export default function TournamentLobbyPage() {
       return;
     hasRedirected.current = true;
     addToast(message || "진행 중인 내전으로 돌아갑니다.", "warning");
-    router.replace(`/lol/tournaments/${activeRoomId}/lobby`);
-  }, [error, roomId, router, addToast]);
+    router.replace(`${gamePrefix}/tournaments/${activeRoomId}/lobby`);
+  }, [error, roomId, router, addToast, gamePrefix]);
 
   // 내전 방 링크 공유 — 로비 URL을 클립보드에 복사 (붙여넣으면 OG 카드로 표시됨)
   const handleShare = useCallback(async () => {
@@ -249,7 +214,27 @@ export default function TournamentLobbyPage() {
     }
   }, [roomId, room?.name, addToast]);
 
+  /**
+   * 호버 프로필 열기를 살짝 미룬다.
+   *
+   * 배그 방은 참가자가 64명까지 간다. 마우스가 카드 위를 스쳐 지나갈 때마다
+   * 프로필을 조회하면 한 번 훑는 것만으로 수십 건이 나간다.
+   */
+  const openHoverTimer = useRef<NodeJS.Timeout | null>(null);
+  const scheduleHoverOpen = useCallback(
+    (next: { id: string; rect: DOMRect; participant: any } | null) => {
+      if (openHoverTimer.current) clearTimeout(openHoverTimer.current);
+      if (!next) {
+        setHoveredPlayer(null);
+        return;
+      }
+      openHoverTimer.current = setTimeout(() => setHoveredPlayer(next), 180);
+    },
+    [],
+  );
+
   const scheduleHoverClose = useCallback(() => {
+    if (openHoverTimer.current) clearTimeout(openHoverTimer.current);
     if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current);
     hoverCloseTimer.current = setTimeout(() => setHoveredPlayer(null), 80);
   }, []);
@@ -443,16 +428,16 @@ export default function TournamentLobbyPage() {
   useEffect(() => {
     if (hasRedirected.current || !room) return;
     if (gameStarting) {
-      navigateToGameStage(getTeamModeStagePath(room));
+      navigateToGameStage(getTeamModeStagePath(room, gamePrefix));
       return;
     }
     // IN_PROGRESS인 경우에만 bracket으로 리다이렉트.
     // COMPLETED는 returnToLobby API 호출 후 WAITING으로 리셋되어 오기 때문에
     // 여기서 리다이렉트하면 무한 루프가 발생한다.
     if (room.status === "COMPLETED" || room.status === "WAITING") return;
-    const target = getRoomStagePath(room);
+    const target = getRoomStagePath(room, gamePrefix);
     if (target) navigateToGameStage(target);
-  }, [gameStarting, room, navigateToGameStage]);
+  }, [gameStarting, room, navigateToGameStage, gamePrefix]);
 
   /* ─── Loading / Error States ─── */
   const connectingSpinner = (
@@ -473,8 +458,8 @@ export default function TournamentLobbyPage() {
       <LobbyErrorState
         error="NOT_AUTHENTICATED::내전 방에 입장하려면 로그인이 필요합니다. 로그인하면 이 방으로 다시 돌아옵니다."
         onGoSettings={() => router.push("/settings")}
-        onGoProfile={() => router.push("/lol/profile")}
-        loginHref={`/auth/login?redirect=${encodeURIComponent(`/tournaments/${roomId}/lobby`)}`}
+        onGoProfile={() => router.push(`${gamePrefix}/profile`)}
+        loginHref={`/auth/login?redirect=${encodeURIComponent(`${gamePrefix}/tournaments/${roomId}/lobby`)}`}
       />
     );
   }
@@ -484,7 +469,7 @@ export default function TournamentLobbyPage() {
       <LobbyErrorState
         error={error}
         onGoSettings={() => router.push("/settings")}
-        onGoProfile={() => router.push("/lol/profile")}
+        onGoProfile={() => router.push(`${gamePrefix}/profile`)}
       />
     );
   }
@@ -494,7 +479,7 @@ export default function TournamentLobbyPage() {
       <LobbyErrorState
         error="CONNECT_TIMEOUT::방이 삭제되었거나 네트워크 연결이 불안정할 수 있습니다. 다시 시도하거나 내전 목록에서 방을 확인해 주세요."
         onGoSettings={() => router.push("/settings")}
-        onGoProfile={() => router.push("/lol/profile")}
+        onGoProfile={() => router.push(`${gamePrefix}/profile`)}
         onRetry={handleRetryConnect}
       />
     );
@@ -651,7 +636,7 @@ export default function TournamentLobbyPage() {
   const handleLeaveLobby = async () => {
     if (!room?.id) {
       disconnect();
-      router.push("/lol/tournaments");
+      router.push(`${gamePrefix}/tournaments`);
       return;
     }
 
@@ -661,7 +646,7 @@ export default function TournamentLobbyPage() {
     } catch {
       disconnect();
     }
-    router.push("/lol/tournaments");
+    router.push(`${gamePrefix}/tournaments`);
   };
 
   const requestLeaveLobby = () => {
@@ -676,6 +661,8 @@ export default function TournamentLobbyPage() {
 
   const autoBalanceReview = isAutoBalanceReviewStage ? (
     <AutoBalanceReview
+      // 배그에는 라인이 없다. 빈 라인 칸과 "선호 라인 충족"을 띄우지 않는다.
+      showRoles={GAMES[(room?.gameTitle as GameTitle) ?? DEFAULT_GAME].hasPositions}
       isHost={isCurrentUserHost}
       teams={(room.teams ?? []).map((team: any) => ({
         id: team.id,
@@ -765,7 +752,7 @@ export default function TournamentLobbyPage() {
       friendUserIds={friendUserIds}
       sentFriendIds={sentFriendIds}
       addingFriend={addingFriend}
-      setHoveredPlayer={setHoveredPlayer}
+      setHoveredPlayer={scheduleHoverOpen}
       scheduleHoverClose={scheduleHoverClose}
       cancelHoverClose={cancelHoverClose}
       handleAddFriend={handleAddFriend}
@@ -1241,7 +1228,7 @@ export default function TournamentLobbyPage() {
                 {room.status === "DRAFT_COMPLETED" &&
                   room.teamMode !== "AUTO_BALANCE" && (
                     <Link
-                      href={`/lol/tournaments/${room.id}/bracket`}
+                      href={`${gamePrefix}/tournaments/${room.id}/bracket`}
                       className="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent-success px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-success/90"
                     >
                       대진표 보기

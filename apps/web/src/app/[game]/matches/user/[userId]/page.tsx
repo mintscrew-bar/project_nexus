@@ -1,6 +1,8 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { useRequireGame } from "@/components/games/RequireGame";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
@@ -26,8 +28,11 @@ interface UserData {
 }
 
 export default function UserStatsPage() {
+  // 소환사 검색·챔피언 기록은 롤 전용 개념이다. `/pubg/...` 에서는 404.
+  useRequireGame("LOL");
   const params = useParams();
   const router = useRouter();
+  const gamePrefix = useGamePrefix();
   const userId = params.userId as string;
   const { addToast } = useToast();
 
@@ -82,7 +87,7 @@ export default function UserStatsPage() {
 
   const navigateToSummoner = (gameName: string, tagLine: string) => {
     if (gameName && tagLine) {
-      router.push(`/lol/matches/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`);
+      router.push(`${gamePrefix}/matches/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`);
     }
   };
 
@@ -201,7 +206,7 @@ export default function UserStatsPage() {
       <div className="flex-grow flex items-center justify-center">
         <div className="text-center max-w-md">
           <p className="text-accent-danger mb-4">{error || "유저를 찾을 수 없습니다."}</p>
-          <Button onClick={() => router.push("/lol/matches")}>
+          <Button onClick={() => router.push(`${gamePrefix}/matches`)}>
             전적 검색으로 돌아가기
           </Button>
         </div>
@@ -217,7 +222,7 @@ export default function UserStatsPage() {
       <div className="border-b border-bg-tertiary">
         <div className="container mx-auto px-4 py-4">
           <Link
-            href="/lol/matches"
+            href={`${gamePrefix}/matches`}
             className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -255,7 +260,7 @@ export default function UserStatsPage() {
                 </h1>
                 {primaryAccount && (
                   <Link
-                    href={`/lol/matches/summoner/${encodeURIComponent(primaryAccount.gameName)}/${encodeURIComponent(primaryAccount.tagLine)}`}
+                    href={`${gamePrefix}/matches/summoner/${encodeURIComponent(primaryAccount.gameName)}/${encodeURIComponent(primaryAccount.tagLine)}`}
                     className="text-sm text-accent-primary hover:text-accent-hover flex items-center gap-1"
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -325,7 +330,7 @@ export default function UserStatsPage() {
               {riotAccounts.map((account) => (
                 <Link
                   key={account.id}
-                  href={`/lol/matches/summoner/${encodeURIComponent(account.gameName)}/${encodeURIComponent(account.tagLine)}`}
+                  href={`${gamePrefix}/matches/summoner/${encodeURIComponent(account.gameName)}/${encodeURIComponent(account.tagLine)}`}
                   className="flex items-center justify-between p-4 bg-bg-tertiary rounded-lg hover:bg-bg-elevated transition-colors"
                 >
                   <div>
@@ -406,7 +411,7 @@ export default function UserStatsPage() {
                   {matchHistory.map((match) => (
                     <Link
                       key={match.matchId}
-                      href={`/lol/matches/match/${match.matchId}`}
+                      href={`${gamePrefix}/matches/match/${match.matchId}`}
                       className={`flex items-center justify-between p-4 rounded-lg transition-colors ${
                         match.participant.win
                           ? "bg-accent-success/10 border border-accent-success/30 hover:bg-accent-success/20"

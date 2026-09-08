@@ -16,6 +16,7 @@ import {
   TeamCaptainSelection,
   BracketType,
   GameTitle,
+  PubgGameMode,
   PubgPlatform,
 } from "@nexus/database";
 import { stripAllHtml } from "@/common/utils/sanitize";
@@ -44,14 +45,24 @@ export class CreateRoomDto {
   @IsEnum(GameTitle, { message: "지원하지 않는 게임입니다." })
   gameTitle?: GameTitle;
 
+  /** 배그 방에서만 쓰인다. 이번 경기를 스팀에서 하는지 카카오에서 하는지. */
   @IsOptional()
   @IsEnum(PubgPlatform)
-  /** PUBG 방 제목 접두사와 계정 플랫폼을 맞추기 위한 선택값 */
   pubgPlatform?: PubgPlatform;
 
+  /** 배그 방에서만 쓰인다. 정원·팀 편성 선택지·결과 처리가 여기서 갈린다. */
+  @IsOptional()
+  @IsEnum(PubgGameMode)
+  pubgGameMode?: PubgGameMode;
+
   @IsInt()
-  @Min(10, { message: "최소 10명 이상이어야 합니다." })
-  @Max(64, { message: "정원이 너무 많습니다." })
+  // 게임·모드마다 정원이 다르다. 실제 검증은 정원표(`isValidRoomSize` /
+  // `isValidPubgRoomSize`)가 하고 여기서는 범위만 막는다.
+  // 가장 작은 방은 배그 킬내기 3대3(6명), 가장 큰 방은 배틀로얄 100명이다.
+  @Min(6, { message: "최소 6명 이상이어야 합니다." })
+  // 인게임 커스텀 매치 정원 한계가 100명이다. 실제 검증은 게임·모드별
+  // 정원표가 하고, 여기서는 상한만 막는다.
+  @Max(100, { message: "정원이 너무 많습니다." })
   maxParticipants: number;
 
   @IsEnum(TeamMode, { message: "유효한 팀 모드를 선택해주세요." })

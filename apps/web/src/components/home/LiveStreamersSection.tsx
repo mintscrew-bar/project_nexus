@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Eye, Radio, Swords } from "lucide-react";
 import { streamerApi, type StreamerListItem } from "@/lib/api-client";
+import { roomPath } from "@/lib/room-links";
 
 const PLATFORM_LABELS: Record<string, string> = {
   CHZZK: "치지직",
@@ -134,7 +135,7 @@ function LiveStreamerTile({ streamer }: { streamer: StreamerListItem }) {
 
       {streamer.activeRoom && (
         <Link
-          href={`/lol/tournaments/${streamer.activeRoom.id}`}
+          href={roomPath(streamer.activeRoom, "")}
           className="flex items-center gap-1.5 border-t border-white/[0.06] bg-accent-primary/10 px-3 py-2 text-xs font-medium text-accent-primary transition-colors hover:bg-accent-primary/20"
         >
           <Swords className="h-3.5 w-3.5 flex-shrink-0" />

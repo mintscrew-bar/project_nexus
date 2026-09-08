@@ -261,14 +261,103 @@ export {
   gameFromSlug,
   enabledGames,
   teamCountForRoomSize,
+  teamCountForParticipants,
+  teamSizeForGame,
+  minDraftParticipants,
   isValidRoomSize,
+  isSectionReady,
 } from './games';
+
+export {
+  PUBG_PLATFORMS,
+  PUBG_PLATFORM_LABELS,
+  PUBG_GAME_MODES,
+  DEFAULT_PUBG_GAME_MODE,
+  getPubgGameMode,
+  pubgGameModes,
+  allPubgGameModes,
+  isSelectablePubgGameMode,
+  isValidPubgRoomSize,
+  pubgRoomTitle,
+  stripPubgTitlePrefix,
+  teamSizeForRoom,
+  teamCountForRoom,
+  teamCountForRoster,
+  isSplitSquadTeam,
+  squadCountForRoom,
+  squadSizeForRoom,
+} from './pubg';
+
+export type {
+  PubgPlatform,
+  PubgGameMode,
+  PubgGameModeDefinition,
+  RoomTeamShape,
+} from './pubg';
+
+export {
+  DEFAULT_PUBG_POINT_RULE,
+  KILL_ONLY_POINT_RULE,
+  KILL_MATCH_POINT_RULE,
+  PUBG_POINT_RULE_PRESETS,
+  calculateScrimPoints,
+  defaultPointRuleForMode,
+  defaultPresetKeyForMode,
+  isValidPointRule,
+  sortScrimLeaderboard,
+} from './pubg-scrim';
+
+export type {
+  PubgPointRule,
+  PubgPointRulePreset,
+  ScrimLeaderboardRow,
+} from './pubg-scrim';
+
+export {
+  PUBG_BALANCE_VERSION,
+  MIN_ROUNDS_FOR_BALANCE,
+  calculateAutoBalanceScore,
+} from './pubg-balance';
+
+export type {
+  PubgBalanceInput,
+  PubgBalanceResult,
+} from './pubg-balance';
+
+export {
+  afterTeamsPath,
+  getTeamModeStagePath,
+  getRoomStagePath,
+} from './lobby-stage-path';
+
+export type { StageRoom } from './lobby-stage-path';
+
+export {
+  traceLadder,
+  buildRandomRungs,
+  buildLadderDraw,
+  resolveLadderOrder,
+} from './ladder';
+
+export type { LadderRung, LadderDraw } from './ladder';
+
+export {
+  identifyRoundMatch,
+  rosterOverlap,
+} from './pubg-match-identify';
+
+export type {
+  MatchCandidate,
+  IdentifyOptions,
+  IdentifyResult,
+} from './pubg-match-identify';
 
 export type {
   GameTitle,
   GameDefinition,
   GameTeamMode,
   GameResultShape,
+  GameSection,
 } from './games';
 
 export type { SeriesPreset, SeriesPresetInfo } from './series-preset';

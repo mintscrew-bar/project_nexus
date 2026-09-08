@@ -4,8 +4,10 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { AuthButton } from "@/components/AuthButton";
 import { NotificationBell } from "@/components/NotificationBell";
+import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 export function NavBar() {
+  const gamePrefix = useGamePrefix();
   return (
     <header className="border-b border-bg-tertiary bg-bg-secondary/50 backdrop-blur-sm sticky top-0 z-50">
       <nav className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -26,7 +28,7 @@ export function NavBar() {
             옥션
           </Link>
           <Link
-            href="/lol/matches"
+            href={`${gamePrefix}/matches`}
             className="text-text-secondary hover:text-accent-primary transition-colors"
           >
             경기

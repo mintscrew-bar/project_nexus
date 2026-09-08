@@ -18,6 +18,7 @@ interface Room {
   teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   gameTitle?: "LOL" | "PUBG";
   pubgPlatform?: "STEAM" | "KAKAO";
+  pubgGameMode?: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH";
   createdAt: string;
   participants?: any[];
 }
@@ -42,6 +43,10 @@ interface LeaveRoomResponse {
 
 interface RoomCreationData {
   gameTitle?: "LOL" | "PUBG";
+  /** 배그 방에서만 — 스팀(스배) / 카카오(카배) */
+  pubgPlatform?: "STEAM" | "KAKAO";
+  /** 배그 방에서만 — 킬내기 / 배틀로얄 / 자유 매치 */
+  pubgGameMode?: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH";
   name: string;
   maxParticipants: number;
   teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";

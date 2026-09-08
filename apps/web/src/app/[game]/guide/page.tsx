@@ -11,7 +11,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { guideUrl, GUIDE_BASE } from "@/lib/guide-links";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { RESOURCE_ARTICLES } from "@/app/resources/articles";
 import { GuideCarousel } from "./_components/GuideCarousel";
@@ -20,53 +20,53 @@ export const metadata: Metadata = {
   title: "롤 내전 가이드와 운영 자료 — Nexus",
   description:
     "Nexus의 방 생성, 팀 구성, 역할 선택, 대진표, Discord 연동 사용법과 실제 내전 운영 자료를 주제별로 확인하세요.",
-  alternates: { canonical: absoluteUrl("/guide") },
+  alternates: { canonical: guideUrl("/guide") },
   openGraph: {
     title: "롤 내전 가이드와 운영 자료 — Nexus",
     description: "기능 사용법과 실제 운영 자료를 주제별 페이지에서 확인하세요.",
-    url: absoluteUrl("/guide"),
+    url: guideUrl("/guide"),
   },
 };
 
 const categories = [
   {
-    href: "/guide/start",
+    href: `${GUIDE_BASE}/guide/start`,
     visual: "start",
     title: "빠른 시작",
     description: "방 생성부터 참가, 준비 완료, 내전 시작까지 처음 필요한 흐름을 확인합니다.",
   },
   {
-    href: "/guide/team-modes",
+    href: `${GUIDE_BASE}/guide/team-modes`,
     visual: "teams",
     title: "팀 구성",
     description: "경매, 스네이크, 자동 밸런스, 자유 팀 선택의 차이와 진행법을 비교합니다.",
   },
   {
-    href: "/guide/match-flow",
+    href: `${GUIDE_BASE}/guide/match-flow`,
     visual: "match",
     title: "경기 진행",
     description: "역할 선택부터 대진표, 경기 결과 입력까지 이어지는 순서를 안내합니다.",
   },
   {
-    href: "/guide/discord",
+    href: `${GUIDE_BASE}/guide/discord`,
     visual: "discord",
     title: "Discord 연동",
     description: "봇 추가, 서버 승인, 음성 채널 이동과 주요 명령어를 정리했습니다.",
   },
   {
-    href: "/guide/records",
+    href: `${GUIDE_BASE}/guide/records`,
     visual: "records",
     title: "기록과 커뮤니티",
     description: "내전 전적, 랭킹, 클랜을 다음 내전 준비에 활용하는 방법을 확인합니다.",
   },
   {
-    href: "/guide/resources",
+    href: `${GUIDE_BASE}/guide/resources`,
     visual: "resources",
     title: "운영 자료",
     description: "실제 운영 체크리스트와 기능 개선 기록을 문서별로 찾아볼 수 있습니다.",
   },
   {
-    href: "/guide/faq",
+    href: `${GUIDE_BASE}/guide/faq`,
     visual: "faq",
     title: "자주 묻는 질문",
     description: "시작 조건, 팀 편성, 대진표와 Discord 연동에 관한 답변을 모았습니다.",

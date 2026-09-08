@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { GUIDE_BASE } from "@/lib/guide-links";
 
 export function GuidePageLayout({
   icon: Icon,
@@ -18,7 +19,7 @@ export function GuidePageLayout({
     <main className="flex-grow bg-bg-primary">
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6 md:py-16">
         <Link
-          href="/lol/guide"
+          href={`${GUIDE_BASE}/guide`}
           className="inline-flex items-center gap-2 text-sm font-semibold text-text-tertiary transition-colors hover:text-accent-primary"
         >
           <ArrowLeft className="h-4 w-4" /> 가이드 홈
