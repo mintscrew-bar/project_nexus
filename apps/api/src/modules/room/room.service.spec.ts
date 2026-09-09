@@ -632,6 +632,98 @@ describe("RoomService", () => {
         expect.objectContaining({ isolationLevel: "Serializable" }),
       );
     });
+
+    // 팀 정원이 5로 박혀 있어 배그 방은 어떻게 채워도 시작이 안 됐다.
+    // 배그 슬롯은 4인인데 5명을 요구하니 조건이 성립할 수 없었다.
+    it("배그 방은 팀마다 4명이면 확정된다", async () => {
+      const participants = Array.from({ length: 16 }, (_, index) => ({
+        id: `participant-${index}`,
+        userId: `user-${index}`,
+        teamId: `team-${Math.floor(index / 4) + 1}`,
+      }));
+      prisma.room.findUnique
+        .mockResolvedValueOnce({
+          id: "room-1",
+          hostId: "user-0",
+          gameTitle: "PUBG",
+          pubgGameMode: "KILL_MATCH",
+          maxParticipants: 16,
+          status: RoomStatus.WAITING,
+          teamMode: TeamMode.MANUAL_TEAM,
+          participants,
+          teams: [
+            { id: "team-1" },
+            { id: "team-2" },
+            { id: "team-3" },
+            { id: "team-4" },
+          ],
+        })
+        .mockResolvedValueOnce({ gameTitle: "PUBG" })
+        .mockResolvedValueOnce({
+          id: "room-1",
+          hostId: "user-0",
+          participants: [],
+          teams: [],
+        });
+
+      await service.finalizeManualTeams("user-0", "room-1");
+
+      expect(prisma.teamMember.createMany).toHaveBeenCalledTimes(4);
+    });
+
+    it("배그 방에 5명이 든 팀이 있으면 확정되지 않는다", async () => {
+      // 롤 정원(5인)으로 채운 배그 방. 4인 스쿼드가 아니라 시작할 수 없다.
+      const participants = Array.from({ length: 16 }, (_, index) => ({
+        id: `participant-${index}`,
+        userId: `user-${index}`,
+        teamId: index < 5 ? "team-1" : `team-${Math.floor(index / 4) + 1}`,
+      }));
+      prisma.room.findUnique.mockResolvedValueOnce({
+        id: "room-1",
+        hostId: "user-0",
+        gameTitle: "PUBG",
+        pubgGameMode: "KILL_MATCH",
+        maxParticipants: 16,
+        status: RoomStatus.WAITING,
+        teamMode: TeamMode.MANUAL_TEAM,
+        participants,
+        teams: [
+          { id: "team-1" },
+          { id: "team-2" },
+          { id: "team-3" },
+          { id: "team-4" },
+        ],
+      });
+
+      await expect(
+        service.finalizeManualTeams("user-0", "room-1"),
+      ).rejects.toThrow("모든 팀에 플레이어 4명씩 배정한 뒤 시작해주세요.");
+    });
+
+    it("배그 팀은 4명이 차면 더 들어갈 수 없다", async () => {
+      prisma.room.findUnique.mockResolvedValueOnce({
+        id: "room-1",
+        gameTitle: "PUBG",
+        pubgGameMode: "KILL_MATCH",
+        maxParticipants: 16,
+        teamMode: TeamMode.MANUAL_TEAM,
+        status: RoomStatus.WAITING,
+        teams: [{ id: "team-1" }],
+      });
+      prisma.roomParticipant.findFirst.mockResolvedValue({
+        id: "participant-1",
+        role: "PLAYER",
+        teamId: null,
+      });
+      // 롤이라면 아직 한 자리 남은 인원이다.
+      prisma.roomParticipant.count.mockResolvedValue(4);
+
+      await expect(
+        service.selectManualTeam("user-1", "room-1", "team-1"),
+      ).rejects.toThrow("선택한 팀은 이미 가득 찼습니다.");
+
+      expect(prisma.roomParticipant.update).not.toHaveBeenCalled();
+    });
   });
 
   describe("자동 밸런스 확정", () => {

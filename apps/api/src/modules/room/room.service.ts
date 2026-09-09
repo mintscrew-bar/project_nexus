@@ -2647,7 +2647,9 @@ export class RoomService {
           const memberCount = await tx.roomParticipant.count({
             where: { roomId, teamId, role: "PLAYER" },
           });
-          if (memberCount >= 5) {
+          // 팀 정원도 게임을 따라간다. 5로 박아 두면 배그 4인 스쿼드에
+          // 다섯 번째 사람이 들어가고, 그러면 다른 팀이 3명으로 남는다.
+          if (memberCount >= teamSizeForRoom(room)) {
             throw new BadRequestException("선택한 팀은 이미 가득 찼습니다.");
           }
         }
@@ -3433,12 +3435,17 @@ export class RoomService {
           ),
         }))
         .filter((entry) => entry.players.length > 0);
+      // 팀 인원은 게임마다 다르다(롤 5인 / 배그 4인 스쿼드). 5로 박아 두면
+      // 배그 방은 팀 슬롯이 4인인데 5명을 요구해 어떻게 채워도 시작이 안 된다.
+      const requiredTeamSize = teamSizeForRoom(room);
       if (
         teamsWithPlayers.length !== room.teams.length ||
-        teamsWithPlayers.some((entry) => entry.players.length !== 5)
+        teamsWithPlayers.some(
+          (entry) => entry.players.length !== requiredTeamSize,
+        )
       ) {
         throw new BadRequestException(
-          "모든 팀에 플레이어 5명씩 배정한 뒤 시작해주세요.",
+          `모든 팀에 플레이어 ${requiredTeamSize}명씩 배정한 뒤 시작해주세요.`,
         );
       }
 
