@@ -1,4 +1,10 @@
-import { DEFAULT_GAME, GAMES, type GameTitle } from "@nexus/types";
+import { DEFAULT_GAME, GAMES, gameFromSlug, type GameTitle } from "@nexus/types";
+
+/** 공통 화면 판별용 경로. 등록된 게임 접두사만 제거한다. */
+export function withoutGamePrefix(pathname: string): string {
+  const slug = pathname.split("/")[1];
+  return gameFromSlug(slug) ? pathname.slice(slug.length + 1) || "/" : pathname;
+}
 
 /**
  * 게임별 경로 조립. 훅이 아니라 순수 함수라 서버 컴포넌트에서도 쓸 수 있다.

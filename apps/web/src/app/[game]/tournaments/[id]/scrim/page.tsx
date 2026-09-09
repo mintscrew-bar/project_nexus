@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -447,6 +448,9 @@ export default function ScrimPage() {
         )}
 
         {!scrim.ready && (
+          <FinalResultSummary scrim={scrim} />
+        )}
+        {!scrim.ready && (
           <Leaderboard scrim={scrim} lastRoundIndex={lastRoundIndex} />
         )}
         {scrim.cutoffAt && (
@@ -525,6 +529,56 @@ export default function ScrimPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+/** 확정된 스크림의 결과를 경기 종료 화면처럼 먼저 보여준다. */
+function FinalResultSummary({ scrim }: { scrim: Scrim }) {
+  if (scrim.status !== "COMPLETED" || scrim.leaderboard.length === 0) {
+    return null;
+  }
+  const podium = scrim.leaderboard.slice(0, 3);
+  const modeLabel = scrim.cutoffAt ? "킬내기 최종 결과" : "배틀로얄 최종 결과";
+  return (
+    <Card className="overflow-hidden border-accent-primary/30 bg-gradient-to-br from-accent-primary/[0.12] via-bg-secondary to-bg-secondary">
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-accent-warning" />
+            {modeLabel}
+          </CardTitle>
+          <Badge variant="success">집계 확정</Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {podium.map((row, index) => (
+            <motion.div
+              key={row.teamId ?? row.teamName}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.08 }}
+              className={`rounded-xl border p-4 ${
+                index === 0
+                  ? "border-accent-warning/50 bg-accent-warning/10"
+                  : "border-bg-tertiary bg-bg-primary/40"
+              }`}
+            >
+              <p className="text-xs font-bold text-text-tertiary">{index + 1}위</p>
+              <p className="mt-1 truncate text-lg font-black text-text-primary">
+                {row.teamName}
+              </p>
+              <p className="mt-1 text-sm font-bold text-accent-primary">
+                {row.totalPoints}점
+              </p>
+            </motion.div>
+          ))}
+        </div>
+        <p className="mt-4 text-xs text-text-secondary">
+          전체 {scrim.leaderboard.length}팀의 라운드별 기록과 순위 변동은 아래에서 확인할 수 있습니다.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -815,8 +869,12 @@ function Leaderboard({
             </thead>
             <tbody>
               {scrim.leaderboard.map((row, index) => (
-                <tr
+                <motion.tr
                   key={row.teamId ?? row.teamName}
+                  layout
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.25, delay: Math.min(index * 0.015, 0.35) }}
                   className="border-b border-bg-tertiary/50 last:border-0"
                 >
                   <td className="whitespace-nowrap py-2.5 pr-3 font-bold text-text-tertiary">
@@ -863,7 +921,7 @@ function Leaderboard({
                   <td className="py-2.5 text-right font-black text-text-primary">
                     {row.totalPoints}
                   </td>
-                </tr>
+                </motion.tr>
               ))}
             </tbody>
           </table>

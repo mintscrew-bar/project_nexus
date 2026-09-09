@@ -15,6 +15,7 @@ import { useLobbyStore } from '@/stores/lobby-store';
 import { useCurrentGame } from '@/hooks/useCurrentGame';
 import { gameFromSlug } from '@nexus/types';
 import { rememberGame } from '@/lib/last-game';
+import { withoutGamePrefix } from '@/lib/game-links';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -74,13 +75,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isLandingFullscreen = pathname === '/' && (!mounted || !isAuthenticated);
 
   // 푸터 숨김 라우트 (대시보드성 페이지들: 자체적인 액션바나 스크롤 관리가 필요한 경우)
-  const isTournamentLobbyRoute = /^\/tournaments\/[^/]+\/lobby(?:\/|$)/.test(pathname);
+  // 게임 접두사를 제외한 경로로 판별해야 로비의 고정 높이와 내부 스크롤이 유지된다.
+  const gamePathname = withoutGamePrefix(pathname);
+  const isTournamentLobbyRoute = /^\/tournaments\/[^/]+\/lobby(?:\/|$)/.test(gamePathname);
   const isDashboardRoute =
     isTournamentLobbyRoute ||
-    pathname.startsWith('/auction/') ||
-    pathname.startsWith('/draft/') ||
-    pathname.startsWith('/role-selection/') ||
-    pathname.endsWith('/bracket');
+    gamePathname.startsWith('/auction/') ||
+    gamePathname.startsWith('/draft/') ||
+    gamePathname.startsWith('/role-selection/') ||
+    gamePathname.endsWith('/bracket');
   const showCreatorPromo = pathname !== '/' && !isDashboardRoute;
 
   if (isAuthRoute || isLandingFullscreen || isBroadcastRoute) {

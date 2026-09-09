@@ -19,11 +19,12 @@ export function ActiveRoomBanner() {
   const roomRoutes = [
     `${prefix}/tournaments/${room?.id}/lobby`,
     `${prefix}/tournaments/${room?.id}/bracket`,
+    `${prefix}/tournaments/${room?.id}/scrim`,
     `${prefix}/auction/${room?.id}`,
     `${prefix}/draft/${room?.id}`,
     `${prefix}/role-selection/${room?.id}`,
   ];
-  if (!room || roomRoutes.some((route) => pathname.startsWith(route))) return null;
+  if (!room || roomRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) return null;
 
   return (
     <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-accent-primary/25 bg-accent-primary/10 px-4 py-2.5 text-sm md:px-6">

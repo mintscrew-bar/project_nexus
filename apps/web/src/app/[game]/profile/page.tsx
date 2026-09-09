@@ -800,7 +800,8 @@ function ProfileOverviewStat({
 function PubgProfilePage() {
   const router = useRouter();
   const gamePrefix = useGamePrefix();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading, fetchUser } = useAuthStore();
+  const { myStatus, setStatus } = usePresence();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [playerName, setPlayerName] = useState("");
   // 등록은 두 단계다 — 닉네임으로 계정을 찾아 보여주고, 확인한 뒤에 등록한다.
@@ -840,6 +841,57 @@ function PubgProfilePage() {
   // 전적은 계정 목록과 따로 받는다. 전적을 못 받아도 계정 카드는 떠야 한다.
   const [history, setHistory] = useState<PubgHistoryResponse | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [editUsername, setEditUsername] = useState("");
+  const [editBio, setEditBio] = useState("");
+  const [profileDirty, setProfileDirty] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState<"avatar" | "banner" | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    setEditUsername(user.username ?? "");
+    setEditBio(user.bio ?? "");
+  }, [user]);
+
+  const saveCommonProfile = async () => {
+    if (!editUsername.trim()) return;
+    setProfileSaving(true);
+    try {
+      await userApi.updateProfile({ username: editUsername.trim(), bio: editBio.trim() });
+      await fetchUser();
+      setProfileDirty(false);
+    } catch {
+      setError("프로필 저장에 실패했습니다.");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const uploadCommonImage = async (file: File, kind: "avatar" | "banner") => {
+    if (!/^image\/(jpeg|jpg|png|gif|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024) {
+      setError("이미지는 jpg, png, gif, webp 형식의 5MB 이하 파일만 사용할 수 있습니다.");
+      return;
+    }
+    setUploadingImage(kind);
+    try {
+      if (kind === "avatar") {
+        const response = await userApi.uploadAvatar(file);
+        setAvatarPreview(response.avatarUrl ?? null);
+      } else {
+        const response = await userApi.uploadProfileBanner(file);
+        setBannerPreview(response.profileBannerUrl ?? null);
+      }
+      await fetchUser();
+    } catch {
+      setError("이미지 업로드에 실패했습니다.");
+    } finally {
+      setUploadingImage(null);
+    }
+  };
 
   const loadAccounts = useCallback(async () => {
     try {
@@ -1020,6 +1072,32 @@ function PubgProfilePage() {
   return (
     <div className="flex-grow p-4 md:p-8 animate-fade-in">
       <div className="container mx-auto max-w-6xl space-y-6">
+        <Card className="overflow-hidden p-0">
+          <div className="relative h-40 bg-accent-primary/15 md:h-56">
+            {(bannerPreview || user?.profileBanner) && (
+              <Image src={bannerPreview || user!.profileBanner!} alt="프로필 배경" fill unoptimized className="object-cover" />
+            )}
+            <Button size="sm" variant="secondary" className="absolute right-3 top-3 bg-bg-secondary/90" onClick={() => bannerInputRef.current?.click()} disabled={uploadingImage === "banner"}>
+              <Camera className="mr-1.5 h-4 w-4" /> 배경 변경
+            </Button>
+            <input ref={bannerInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadCommonImage(file, "banner"); e.currentTarget.value = ""; }} />
+          </div>
+          <CardContent className="p-5">
+            <div className="-mt-16 flex flex-col gap-4 sm:flex-row sm:items-end">
+              <button type="button" className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-full border-4 border-bg-secondary bg-bg-tertiary" onClick={() => avatarInputRef.current?.click()}>
+                {(avatarPreview || user?.avatar) ? <Image src={avatarPreview || user!.avatar!} alt={user?.username ?? "프로필"} fill unoptimized className="object-cover" /> : <User className="mx-auto mt-5 h-10 w-10 text-text-tertiary" />}
+                <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">변경</span>
+              </button>
+              <input ref={avatarInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadCommonImage(file, "avatar"); e.currentTarget.value = ""; }} />
+              <div className="min-w-0 flex-1">
+                <input value={editUsername} onChange={(e) => { setEditUsername(e.target.value); setProfileDirty(true); }} className="w-full max-w-md border-b border-transparent bg-transparent text-2xl font-black text-text-primary outline-none focus:border-accent-primary" placeholder="닉네임" />
+                <textarea value={editBio} onChange={(e) => { setEditBio(e.target.value); setProfileDirty(true); }} rows={1} className="mt-2 w-full max-w-xl resize-none border-b border-transparent bg-transparent text-sm text-text-secondary outline-none focus:border-accent-primary" placeholder="상태메시지를 입력하세요" />
+                <div className="mt-3"><StatusSelector currentStatus={myStatus} onStatusChange={setStatus} /></div>
+              </div>
+              {profileDirty && <Button size="sm" onClick={saveCommonProfile} disabled={profileSaving}>{profileSaving ? "저장 중..." : "프로필 저장"}</Button>}
+            </div>
+          </CardContent>
+        </Card>
         <header>
           <h1 className="flex items-center gap-2 text-3xl font-bold text-text-primary">
             <Gamepad2 className="h-7 w-7 text-accent-primary" />

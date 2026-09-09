@@ -5,8 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRiotStore } from '@/stores/riot-store';
 import { AddAccountModal } from '@/components/domain/AddAccountModal';
-
-const SKIP_PATHS = ['/auth', '/'];
+import { gameFromSlug } from '@nexus/types';
 
 export function RiotAccountChecker({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -16,7 +15,8 @@ export function RiotAccountChecker({ children }: { children: React.ReactNode }) 
   const [showModal, setShowModal] = useState(false);
   const [checked, setChecked] = useState(false);
 
-  const shouldSkip = SKIP_PATHS.some(path => pathname.startsWith(path));
+  // Riot 계정 안내는 롤 화면에서만 표시한다. 배그와 공통 화면은 제외한다.
+  const shouldSkip = gameFromSlug(pathname.split('/')[1]) !== 'LOL';
 
   useEffect(() => {
     const checkRiotAccount = async () => {
@@ -51,7 +51,7 @@ export function RiotAccountChecker({ children }: { children: React.ReactNode }) 
       {children}
 
       <AddAccountModal
-        isOpen={showModal}
+        isOpen={showModal && !shouldSkip && isAuthenticated}
         onClose={() => {
           setShowModal(false);
           if (user?.id) {

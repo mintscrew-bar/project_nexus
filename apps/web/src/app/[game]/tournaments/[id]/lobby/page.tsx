@@ -195,7 +195,7 @@ export default function TournamentLobbyPage() {
 
   // 내전 방 링크 공유 — 로비 URL을 클립보드에 복사 (붙여넣으면 OG 카드로 표시됨)
   const handleShare = useCallback(async () => {
-    const shareUrl = `${window.location.origin}/tournaments/${roomId}/lobby`;
+    const shareUrl = `${window.location.origin}${gamePrefix}/tournaments/${roomId}/lobby`;
     try {
       // 모바일 등 네이티브 공유 시트 우선 사용, 미지원 시 클립보드 복사
       if (navigator.share) {
@@ -212,7 +212,7 @@ export default function TournamentLobbyPage() {
       if (e?.name === "AbortError") return;
       addToast("링크 복사에 실패했습니다.", "error");
     }
-  }, [roomId, room?.name, addToast]);
+  }, [roomId, room?.name, addToast, gamePrefix]);
 
   /**
    * 호버 프로필 열기를 살짝 미룬다.

@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCurrentGame, useGamePrefix } from "@/hooks/useCurrentGame";
+import { afterTeamsPath } from "@nexus/types";
 import { GAMES } from "@nexus/types";
 import React, {
   useEffect,
@@ -623,6 +624,7 @@ export default function AuctionRoomPage() {
   const params = useParams();
   const router = useRouter();
   const gamePrefix = useGamePrefix();
+  const game = useCurrentGame();
   const auctionId = params.id as string;
   const { user } = useAuthStore();
   const { addToast } = useToast();
@@ -693,7 +695,12 @@ export default function AuctionRoomPage() {
           clearInterval(interval);
           if (!hasRedirected.current) {
             hasRedirected.current = true;
-            router.push(`${gamePrefix}/role-selection/${auctionId}`);
+            router.push(
+              afterTeamsPath(
+                { id: auctionId, gameTitle: game, teamMode: "AUCTION" },
+                gamePrefix,
+              ),
+            );
           }
           return 0;
         }
@@ -701,7 +708,7 @@ export default function AuctionRoomPage() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [auctionState?.status, auctionId, router, gamePrefix]);
+  }, [auctionState?.status, auctionId, router, gamePrefix, game]);
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
@@ -1366,10 +1373,15 @@ export default function AuctionRoomPage() {
               onClick={() => {
                 hasRedirected.current = true;
                 setCompleteCountdown(0);
-                router.push(`${gamePrefix}/role-selection/${auctionId}`);
+                router.push(
+                  afterTeamsPath(
+                    { id: auctionId, gameTitle: game, teamMode: "AUCTION" },
+                    gamePrefix,
+                  ),
+                );
               }}
             >
-              역할 선택으로 이동
+              {game === "PUBG" ? "경기 화면으로 이동" : "역할 선택으로 이동"}
             </Button>
           </div>
         </div>

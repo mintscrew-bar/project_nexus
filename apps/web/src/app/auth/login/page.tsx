@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { Logo } from "@/components/Logo";
 import { AlertCircle, X, CornerDownLeft } from "lucide-react";
 import Link from "next/link";
+import { withoutGamePrefix } from "@/lib/game-links";
 
 const POST_LOGIN_REDIRECT_KEY = "nexus_post_login_redirect";
 
@@ -22,6 +23,7 @@ function sanitizeRedirect(value: string | null) {
  */
 function getRedirectNotice(redirect: string | null) {
   if (!redirect) return null;
+  redirect = withoutGamePrefix(redirect);
   if (/^\/tournaments\/[^/]+\/lobby/.test(redirect)) {
     return "로그인하면 참여하려던 내전 방으로 다시 돌아갑니다.";
   }

@@ -7,6 +7,7 @@ import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { AdSenseScript } from "@/components/ads/AdSenseScript";
 import { GAMES, GAME_TITLES } from "@nexus/types";
+import { withoutGamePrefix } from "@/lib/game-links";
 
 /** 게임 프리픽스 아래로 옮겨간 비공개 화면 (`/lol/auction`, `/pubg/draft` …) */
 const GAME_SCOPED_PRIVATE = ["profile", "role-selection", "draft", "auction"];
@@ -42,7 +43,7 @@ export function ThirdPartyScripts() {
   const pathname = usePathname();
   const isPrivateRoute =
     matchesRoutePrefix(pathname, PRIVATE_ROUTE_PREFIXES) ||
-    PRIVATE_ROUTE_PATTERNS.some((pattern) => pattern.test(pathname));
+    PRIVATE_ROUTE_PATTERNS.some((pattern) => pattern.test(withoutGamePrefix(pathname)));
 
   if (isPrivateRoute) return null;
 

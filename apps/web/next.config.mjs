@@ -196,6 +196,19 @@ const nextConfig = {
         source: "/tournaments/:id/lobby(.*)",
         headers: denyFramingHeaders,
       },
+      {
+        // 게임별 주소에서도 기존 개인 화면의 캐시·프레임 정책을 유지한다.
+        source: "/:game(lol|pubg)/:path(profile|role-selection|draft|auction)(.*)",
+        headers: [
+          ...denyFramingHeaders,
+          { key: "Cache-Control", value: "private, no-store, max-age=0, must-revalidate" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        ],
+      },
+      {
+        source: "/:game(lol|pubg)/tournaments/:id/lobby(.*)",
+        headers: denyFramingHeaders,
+      },
     ];
   },
   async redirects() {
