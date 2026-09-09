@@ -16,7 +16,7 @@ import {
   calculateCaptainScore,
   calculateTierScore,
 } from "../common/tier-score.util";
-import { teamCountForRoster } from "@nexus/types";
+import { DEFAULT_GAME, getGame, teamCountForRoster } from "@nexus/types";
 
 const BONUS_GOLD = 500;
 const DEFAULT_BID_TIME_SECONDS = 30;
@@ -443,6 +443,17 @@ export class AuctionService implements OnModuleInit {
     if (room.participants.length < MIN_AUCTION_PLAYERS) {
       throw new BadRequestException(
         `Auction mode requires at least ${MIN_AUCTION_PLAYERS} players`,
+      );
+    }
+    // 배그는 정원이 차야 편성을 시작한다. 자동 밸런스·자유 팀 선택과 같은 규칙이다.
+    // 덜 찬 채로 경매를 돌리면 팀이 실제 인원으로 만들어져 스크림 생성에서
+    // 막히는데, 그 시점엔 편성이 이미 끝나 되돌릴 수도 없다.
+    if (
+      getGame(room.gameTitle ?? DEFAULT_GAME).requiresFullRoomForTeams &&
+      room.participants.length !== room.maxParticipants
+    ) {
+      throw new BadRequestException(
+        `모든 팀 자리가 채워져야 경매를 시작할 수 있습니다. (현재 ${room.participants.length}/${room.maxParticipants}명)`,
       );
     }
     const numTeams = teamCountForRoster(

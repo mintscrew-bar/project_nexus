@@ -52,6 +52,15 @@ export interface GameDefinition {
   /** 이 게임에서 고를 수 있는 팀 편성 방식 */
   teamModes: readonly GameTeamMode[];
   resultShape: GameResultShape;
+  /**
+   * 팀 편성(경매·스네이크)을 시작하려면 정원이 다 차야 하는가.
+   *
+   * 배그는 결과 수집이 "전 팀이 4인 스쿼드"를 전제한다. 정원이 덜 찬 채로
+   * 편성하면 팀이 실제 인원 기준으로 만들어져(`teamCountForRoster`) 스크림
+   * 생성에서 막히는데, 그때는 편성이 이미 끝나 되돌릴 수도 없다.
+   * 롤은 정원이 덜 차도 대진표를 만들 수 있어 테스트 로비를 허용한다.
+   */
+  requiresFullRoomForTeams: boolean;
   /** 사이트에 노출할지. 준비 중인 게임은 false로 두고 UI에서 "준비 중"으로 표시한다. */
   enabled: boolean;
   /**
@@ -74,6 +83,8 @@ const LOL: GameDefinition = {
   hasPositions: true,
   teamModes: ["AUCTION", "SNAKE_DRAFT", "AUTO_BALANCE", "MANUAL_TEAM"],
   resultShape: "BRACKET",
+  // 정원이 덜 차도 대진표는 만들어진다. 테스트 로비를 막을 이유가 없다.
+  requiresFullRoomForTeams: false,
   enabled: true,
   comingSoonSections: [],
 };
@@ -92,6 +103,9 @@ const PUBG: GameDefinition = {
   // 자동 밸런스는 라인별 점수가 아니라 NEXUS 편성 점수로 돈다(뱀 순서 분배).
   teamModes: ["AUCTION", "SNAKE_DRAFT", "AUTO_BALANCE", "MANUAL_TEAM"],
   resultShape: "POINT_LEADERBOARD",
+  // 스크림이 전 팀 4인 스쿼드를 요구한다. 정원 미달로 편성하면 편성만 끝난
+  // 채 스크림을 못 열어 방이 막다른 길에 들어간다.
+  requiresFullRoomForTeams: true,
   // 계정 식별자 등록과 방 생성 틀을 사용할 수 있다. 외부 전적 검증은 별도 상태다.
   enabled: true,
   // 화면을 전부 열었다. 랭킹은 기록이 쌓이기 전까지 빈 상태로 보이는데,

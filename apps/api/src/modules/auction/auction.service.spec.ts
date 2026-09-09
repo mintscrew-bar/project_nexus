@@ -7,6 +7,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from "@nestjs/common";
+import { RoomStatus, TeamMode } from "@nexus/database";
 
 describe("AuctionService", () => {
   let service: AuctionService;
@@ -97,6 +98,70 @@ describe("AuctionService", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  describe("startAuction — 정원 충족", () => {
+    const hostId = "host-1";
+    const roomId = "room-1";
+
+    const participants = (count: number) =>
+      new Array(count).fill(0).map((_, i) => ({
+        id: `p${i}`,
+        userId: `u${i}`,
+        role: "PLAYER",
+        user: { username: `user${i}`, riotAccounts: [], pubgAccounts: [] },
+      }));
+
+    /**
+     * 배그는 정원이 차야 편성을 시작한다.
+     *
+     * 덜 찬 채로 경매를 돌리면 팀이 실제 인원으로 만들어지는데, 스크림은
+     * "전 팀 4인 스쿼드"를 요구해 생성이 거부된다. 그 시점엔 편성이 이미
+     * 끝나 되돌릴 수도 없어 방이 막다른 길에 들어간다.
+     */
+    it("배그 방은 정원이 덜 차면 경매를 시작하지 않는다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        hostId,
+        gameTitle: "PUBG",
+        pubgGameMode: "KILL_MATCH",
+        maxParticipants: 16,
+        status: RoomStatus.WAITING,
+        teamMode: TeamMode.AUCTION,
+        participants: participants(12),
+        teams: [],
+        captainSelection: "TIER",
+      });
+
+      await expect(service.startAuction(hostId, roomId)).rejects.toThrow(
+        "모든 팀 자리가 채워져야 경매를 시작할 수 있습니다. (현재 12/16명)",
+      );
+    });
+
+    it("롤 방은 정원이 덜 차도 경매를 시작할 수 있다", async () => {
+      // 정원 미달 테스트 로비는 롤에서 계속 허용한다.
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        hostId,
+        gameTitle: "LOL",
+        maxParticipants: 20,
+        status: RoomStatus.WAITING,
+        teamMode: TeamMode.AUCTION,
+        participants: participants(10),
+        teams: [],
+        captainSelection: "TIER",
+      });
+
+      // 정원 게이트를 지나 다음 단계로 넘어간다. 그 뒤 어디서 멈추는지는
+      // 이 테스트의 관심이 아니라, "정원 때문에 막히지 않는다"만 본다.
+      const error = await service
+        .startAuction(hostId, roomId)
+        .then(() => null)
+        .catch((e: Error) => e);
+      expect(String(error?.message ?? "")).not.toContain(
+        "모든 팀 자리가 채워져야",
+      );
+    });
   });
 
   describe("placeBid", () => {

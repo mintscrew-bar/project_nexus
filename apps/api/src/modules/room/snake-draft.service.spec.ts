@@ -179,6 +179,99 @@ describe("SnakeDraftService", () => {
         result.teams.map((team: any) => ({ id: team.id, name: team.name })),
       );
     });
+
+    /**
+     * 배그는 정원이 차야 편성을 시작한다.
+     *
+     * 덜 찬 채로 드래프트를 돌리면 팀이 실제 인원으로 만들어지는데,
+     * 스크림은 "전 팀 4인 스쿼드"를 요구해 생성이 거부된다. 그 시점엔
+     * 편성이 이미 끝나 되돌릴 수도 없어 방이 막다른 길에 들어간다.
+     */
+    const pubgPlayers = (count: number) =>
+      new Array(count).fill(0).map((_, i) => ({
+        id: `p${i}`,
+        userId: `u${i}`,
+        role: "PLAYER",
+        user: { username: `user${i}`, riotAccounts: [] },
+      }));
+
+    it("배그 방은 정원이 덜 차면 드래프트를 시작하지 않는다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        hostId,
+        gameTitle: "PUBG",
+        pubgGameMode: "KILL_MATCH",
+        maxParticipants: 16,
+        status: RoomStatus.WAITING,
+        teamMode: TeamMode.SNAKE_DRAFT,
+        participants: pubgPlayers(12),
+        teams: [],
+        captainSelection: "RANDOM",
+      });
+
+      await expect(service.startSnakeDraft(hostId, roomId)).rejects.toThrow(
+        "모든 팀 자리가 채워져야 드래프트를 시작할 수 있습니다. (현재 12/16명)",
+      );
+      expect(prisma.team.create).not.toHaveBeenCalled();
+    });
+
+    it("배그 방도 정원이 차면 4인 스쿼드로 시작한다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        hostId,
+        gameTitle: "PUBG",
+        pubgGameMode: "KILL_MATCH",
+        maxParticipants: 16,
+        status: RoomStatus.WAITING,
+        teamMode: TeamMode.SNAKE_DRAFT,
+        participants: pubgPlayers(16),
+        teams: [],
+        captainSelection: "RANDOM",
+      });
+      prisma.team.create.mockImplementation((args: any) => ({
+        id: `team-${args.data.captainId}`,
+        captainId: args.data.captainId,
+        name: args.data.name,
+      }));
+
+      const result = await service.startSnakeDraft(hostId, roomId);
+
+      // 16명 / 4인 스쿼드 = 4팀, 팀장 제외 팀당 3픽.
+      expect(result.teams).toHaveLength(4);
+      expect(result.pickOrder).toHaveLength(12);
+    });
+
+    it("롤 방은 정원이 덜 차도 드래프트를 돌릴 수 있다", async () => {
+      // 정원 미달 테스트 로비는 롤에서 계속 허용한다 — 대진표는 만들어진다.
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        hostId,
+        gameTitle: "LOL",
+        maxParticipants: 20,
+        status: RoomStatus.WAITING,
+        teamMode: TeamMode.SNAKE_DRAFT,
+        participants: new Array(10).fill(0).map((_, i) => ({
+          id: `p${i}`,
+          userId: `u${i}`,
+          role: "PLAYER",
+          user: {
+            username: `user${i}`,
+            riotAccounts: [{ isPrimary: true, mainRole: "TOP" }],
+          },
+        })),
+        teams: [],
+        captainSelection: "RANDOM",
+      });
+      prisma.team.create.mockImplementation((args: any) => ({
+        id: `team-${args.data.captainId}`,
+        captainId: args.data.captainId,
+        name: args.data.name,
+      }));
+
+      const result = await service.startSnakeDraft(hostId, roomId);
+
+      expect(result.teams).toHaveLength(2);
+    });
   });
 });
 

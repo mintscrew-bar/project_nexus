@@ -555,8 +555,15 @@ export default function TournamentLobbyPage() {
   const allPlayersAssigned =
     room.teamMode !== "MANUAL_TEAM" ||
     players.every((p: any) => Boolean(p.teamId));
+  // 팀 정원·정원 충족 규칙은 게임을 따라간다. 5로 박아 두면 배그 4인 스쿼드는
+  // 조건이 성립할 수 없어 시작 버튼이 영영 안 켜진다.
+  const roomGame = GAMES[(room.gameTitle as GameTitle) ?? DEFAULT_GAME];
   const requiresFullTeams =
-    room.teamMode === "AUTO_BALANCE" || room.teamMode === "MANUAL_TEAM";
+    room.teamMode === "AUTO_BALANCE" ||
+    room.teamMode === "MANUAL_TEAM" ||
+    // 배그는 경매·스네이크도 정원이 차야 시작한다 — 덜 찬 채로 편성하면
+    // 스크림이 안 열려 방이 막다른 길에 들어간다(서버도 같은 기준으로 막는다).
+    roomGame.requiresFullRoomForTeams;
   const hasFullRoster =
     !requiresFullTeams || totalPlayers === room.maxParticipants;
   const manualTeamsFilled =
@@ -565,7 +572,7 @@ export default function TournamentLobbyPage() {
       room.teams!.every(
         (team: any) =>
           players.filter((player: any) => player.teamId === team.id).length ===
-          5,
+          roomGame.teamSize,
       ));
   const minStartPlayers = room.teamMode === "AUCTION" ? 4 : 2;
   const hasMinimumPlayers = totalPlayers >= minStartPlayers;
@@ -589,7 +596,10 @@ export default function TournamentLobbyPage() {
     ...(room.teamMode === "MANUAL_TEAM"
       ? [
           { label: "전원 팀 선택", complete: allPlayersAssigned },
-          { label: "팀당 5명", complete: manualTeamsFilled },
+          {
+            label: `팀당 ${roomGame.teamSize}명`,
+            complete: manualTeamsFilled,
+          },
         ]
       : []),
     {
@@ -604,7 +614,7 @@ export default function TournamentLobbyPage() {
       : !allPlayersAssigned
         ? "모든 플레이어가 팀을 선택해야 합니다."
         : !manualTeamsFilled
-          ? "각 팀에 5명씩 배정해야 합니다."
+          ? `각 팀에 ${roomGame.teamSize}명씩 배정해야 합니다.`
           : !allPlayersReady
             ? "모든 플레이어가 준비해야 합니다."
             : hasDiscordVoice && !allInVoice
@@ -662,7 +672,7 @@ export default function TournamentLobbyPage() {
   const autoBalanceReview = isAutoBalanceReviewStage ? (
     <AutoBalanceReview
       // 배그에는 라인이 없다. 빈 라인 칸과 "선호 라인 충족"을 띄우지 않는다.
-      showRoles={GAMES[(room?.gameTitle as GameTitle) ?? DEFAULT_GAME].hasPositions}
+      showRoles={roomGame.hasPositions}
       isHost={isCurrentUserHost}
       teams={(room.teams ?? []).map((team: any) => ({
         id: team.id,

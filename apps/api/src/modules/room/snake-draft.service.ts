@@ -16,7 +16,9 @@ import {
   calculateTierScore,
 } from "../common/tier-score.util";
 import {
+  DEFAULT_GAME,
   buildLadderDraw,
+  getGame,
   minDraftParticipants,
   resolveLadderOrder,
   teamCountForRoster,
@@ -106,6 +108,17 @@ export class SnakeDraftService {
     if (room.participants.length < minPlayers) {
       throw new BadRequestException(
         `Need at least ${minPlayers} players for draft`,
+      );
+    }
+    // 배그는 정원이 차야 편성을 시작한다. 자동 밸런스·자유 팀 선택과 같은 규칙이다.
+    // 덜 찬 채로 드래프트를 돌리면 팀이 실제 인원으로 만들어져 스크림 생성에서
+    // 막히는데, 그 시점엔 편성이 이미 끝나 되돌릴 수도 없다.
+    if (
+      getGame(room.gameTitle ?? DEFAULT_GAME).requiresFullRoomForTeams &&
+      room.participants.length !== room.maxParticipants
+    ) {
+      throw new BadRequestException(
+        `모든 팀 자리가 채워져야 드래프트를 시작할 수 있습니다. (현재 ${room.participants.length}/${room.maxParticipants}명)`,
       );
     }
     const numTeams = teamCountForRoster(
