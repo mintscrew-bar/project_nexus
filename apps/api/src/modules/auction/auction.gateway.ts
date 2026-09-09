@@ -706,7 +706,8 @@ export class AuctionGateway
     const minBid = state.currentHighestBid + state.bidIncrement;
 
     for (const bot of candidates) {
-      if (bot.memberCount >= 5) continue;
+      // 만석 기준은 방의 팀 정원이다(롤 5인 / 배그 4인 스쿼드).
+      if (bot.memberCount >= bot.teamSize) continue;
       // Skip if this bot team is already leading.
       if (state.currentHighestBidder === bot.teamId) continue;
       if (minBid > bot.availableToBid) continue;
@@ -752,7 +753,7 @@ export class AuctionGateway
     const bidIncrement = state.bidIncrement;
     const minBid = state.currentHighestBid + bidIncrement;
 
-    if (bot.memberCount >= 5) return;
+    if (bot.memberCount >= bot.teamSize) return;
     if (minBid > bot.availableToBid) return;
 
     try {

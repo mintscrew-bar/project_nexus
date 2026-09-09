@@ -292,6 +292,103 @@ describe("AuctionService", () => {
       expect(result.timerEnd).toBe(now + 20000);
     });
 
+    /**
+     * 팀 정원이 5로 박혀 있어 배그 경매가 두 군데서 어긋났다.
+     *
+     * 하나는 예비금이다. 배그 팀은 4인인데 다섯 번째 자리 몫까지 남겨,
+     * 화면이 계산한 입찰 가능액을 서버가 예산 부족으로 거부했다.
+     * 다른 하나는 만석 판정이다. 4명이 찬 배그 팀이 다섯 번째 선수를
+     * 낙찰받을 수 있어, 그러면 다른 팀이 3명으로 남아 스크림이 안 열린다.
+     */
+    describe("배그 4인 스쿼드", () => {
+      const pubgState = (now: number): AuctionState => ({
+        roomId,
+        currentPlayerIndex: 0,
+        currentHighestBid: 0,
+        currentHighestBidder: null,
+        timerEnd: now + 10000,
+        yuchalCount: 0,
+        maxYuchalCycles: 1,
+        bidIncrement: 100,
+        botCaptainIds: [],
+      });
+
+      const mockPubgRoom = () =>
+        prisma.room.findUnique.mockImplementation(({ include }: any) => {
+          if (include?.participants) {
+            return Promise.resolve({
+              id: roomId,
+              gameTitle: "PUBG",
+              participants: [
+                { id: "p1", userId: "user-p1", user: { username: "Player1" } },
+              ],
+            });
+          }
+          return Promise.resolve({
+            id: roomId,
+            gameTitle: "PUBG",
+            pubgGameMode: "KILL_MATCH",
+            maxParticipants: 16,
+            minBidIncrement: 100,
+            bidTimeLimit: 30,
+          });
+        });
+
+      it("팀장만 있는 팀의 예비금은 남은 세 자리 몫이다", async () => {
+        const now = 1_700_000_000_000;
+        jest.spyOn(Date, "now").mockReturnValue(now);
+        (service as any).auctionStates.set(roomId, pubgState(now));
+        mockPubgRoom();
+        prisma.team.findFirst.mockResolvedValue({
+          id: teamId,
+          remainingBudget: 1000,
+          _count: { members: 1 },
+          captain: { username: "Captain1" },
+        });
+        prisma.team.findUnique.mockResolvedValue({ remainingBudget: 1000 });
+        prisma.teamMember.count.mockResolvedValue(1);
+
+        // 남은 자리 3개 → 예비금 200 → 입찰 가능 800.
+        // 롤 기준(5인)이면 예비금 300 이라 800 이 거부됐다.
+        const result = await service.placeBid(userId, roomId, 800);
+        expect(result.currentHighestBid).toBe(800);
+      });
+
+      it("예비금을 넘는 입찰은 여전히 막는다", async () => {
+        const now = 1_700_000_000_000;
+        jest.spyOn(Date, "now").mockReturnValue(now);
+        (service as any).auctionStates.set(roomId, pubgState(now));
+        mockPubgRoom();
+        prisma.team.findFirst.mockResolvedValue({
+          id: teamId,
+          remainingBudget: 1000,
+          _count: { members: 1 },
+          captain: { username: "Captain1" },
+        });
+
+        await expect(service.placeBid(userId, roomId, 900)).rejects.toThrow(
+          BadRequestException,
+        );
+      });
+
+      it("4명이 찬 배그 팀은 더 입찰할 수 없다", async () => {
+        const now = 1_700_000_000_000;
+        jest.spyOn(Date, "now").mockReturnValue(now);
+        (service as any).auctionStates.set(roomId, pubgState(now));
+        mockPubgRoom();
+        prisma.team.findFirst.mockResolvedValue({
+          id: teamId,
+          remainingBudget: 1000,
+          _count: { members: 4 },
+          captain: { username: "Captain1" },
+        });
+
+        await expect(service.placeBid(userId, roomId, 100)).rejects.toThrow(
+          "Team is already full",
+        );
+      });
+    });
+
     it("입찰하면 기존 종료 시각에 10초를 더한다", async () => {
       const now = 1_700_000_000_000;
       jest.spyOn(Date, "now").mockReturnValue(now);

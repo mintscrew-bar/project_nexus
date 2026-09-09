@@ -16,7 +16,12 @@ import {
   calculateCaptainScore,
   calculateTierScore,
 } from "../common/tier-score.util";
-import { DEFAULT_GAME, getGame, teamCountForRoster } from "@nexus/types";
+import {
+  DEFAULT_GAME,
+  getGame,
+  teamCountForRoster,
+  teamSizeForRoom,
+} from "@nexus/types";
 
 const BONUS_GOLD = 500;
 const DEFAULT_BID_TIME_SECONDS = 30;
@@ -1115,8 +1120,13 @@ export class AuctionService implements OnModuleInit {
       );
     }
 
+    // 팀 정원은 게임마다 다르다(롤 5인 / 배그 4인 스쿼드). 5로 박아 두면
+    // 배그는 있지도 않은 다섯 번째 자리 몫까지 예비금으로 잡아, 화면이 계산한
+    // 입찰 가능액을 서버가 예산 부족으로 거부한다.
+    const maxTeamSize = teamSizeForRoom(room);
+
     // Keep reserve budget for remaining roster slots.
-    const slotsNeeded = Math.max(0, 5 - team._count.members);
+    const slotsNeeded = Math.max(0, maxTeamSize - team._count.members);
     const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
     const availableToBid = Math.max(0, team.remainingBudget - reserveAmount);
     if (amount > availableToBid) {
@@ -1125,7 +1135,6 @@ export class AuctionService implements OnModuleInit {
       );
     }
 
-    const maxTeamSize = 5;
     if (team._count.members >= maxTeamSize) {
       throw new BadRequestException("Team is already full");
     }
@@ -1181,7 +1190,7 @@ export class AuctionService implements OnModuleInit {
         const freshMemberCount = await tx.teamMember.count({
           where: { teamId: team.id },
         });
-        const freshSlots = Math.max(0, 5 - freshMemberCount);
+        const freshSlots = Math.max(0, maxTeamSize - freshMemberCount);
         const freshReserve = Math.max(0, (freshSlots - 1) * bidIncrement);
         const freshAvailable = Math.max(
           0,
@@ -1294,10 +1303,12 @@ export class AuctionService implements OnModuleInit {
       throw new BadRequestException("현재 최고 입찰자는 포기할 수 없습니다.");
     }
 
-    // 만석 팀은 입찰 불가라 정족수에서 뺀다.
+    // 만석 팀은 입찰 불가라 정족수에서 뺀다. 만석 기준은 게임별 팀 정원이다 —
+    // 5로 두면 이미 찬 배그 팀이 정족수에 남아 마감이 오지 않는다.
+    const foldTeamSize = teamSizeForRoom(room);
     const eligibleTeamIds = new Set(
       room.teams
-        .filter((team: any) => (team._count?.members ?? 0) < 5)
+        .filter((team: any) => (team._count?.members ?? 0) < foldTeamSize)
         .map((team: any) => team.id),
     );
 
@@ -1469,7 +1480,9 @@ export class AuctionService implements OnModuleInit {
         state.yuchalCountsByPlayer?.[currentPlayer.id] ?? state.yuchalCount;
       const nextYuchalCount = prevYuchalCount + 1;
       const bidIncrement = room.minBidIncrement || DEFAULT_BID_INCREMENT;
-      const maxTeamSize = 5;
+      // 만석 기준은 게임별 팀 정원이다. 5로 두면 이미 찬 배그 팀이 계속
+      // "입찰 가능"으로 세어져 유찰 처리가 매물을 무한히 미룬다.
+      const maxTeamSize = teamSizeForRoom(room);
       const incompleteTeams = room.teams.filter(
         (t: any) => t._count.members < maxTeamSize,
       );
@@ -1621,7 +1634,9 @@ export class AuctionService implements OnModuleInit {
     });
     if (!room) return [];
 
-    const maxTeamSize = 5;
+    // 만석 기준은 게임별 팀 정원이다. 5로 두면 다 찬 배그 팀도 미완성으로
+    // 세어져 잔여 인원 자동 배정이 영영 돌지 않는다.
+    const maxTeamSize = teamSizeForRoom(room);
     const incompleteTeams = room.teams.filter(
       (t: any) => t._count.members < maxTeamSize,
     );
@@ -1982,6 +1997,8 @@ export class AuctionService implements OnModuleInit {
       remainingBudget: number;
       memberCount: number;
       availableToBid: number;
+      /** 이 방의 팀 정원. 봇이 만석 팀에 더 입찰하지 않도록 게이트웨이가 쓴다. */
+      teamSize: number;
     }[]
   > {
     const state = this.auctionStates.get(roomId);
@@ -1989,9 +2006,11 @@ export class AuctionService implements OnModuleInit {
 
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
-      select: { minBidIncrement: true },
+      // 팀 정원이 게임별로 갈리므로 게임도 함께 읽는다.
+      select: { minBidIncrement: true, gameTitle: true, maxParticipants: true },
     });
     const bidIncrement = room?.minBidIncrement || DEFAULT_BID_INCREMENT;
+    const maxTeamSize = teamSizeForRoom(room ?? {});
 
     const teams = await this.prisma.team.findMany({
       where: { roomId, captainId: { in: state.botCaptainIds } },
@@ -2007,7 +2026,7 @@ export class AuctionService implements OnModuleInit {
 
     return teams.map((t: any) => {
       const memberCount = t._count.members;
-      const slotsNeeded = Math.max(0, 5 - memberCount);
+      const slotsNeeded = Math.max(0, maxTeamSize - memberCount);
       const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
       const availableToBid = Math.max(0, t.remainingBudget - reserveAmount);
       return {
@@ -2017,6 +2036,7 @@ export class AuctionService implements OnModuleInit {
         remainingBudget: t.remainingBudget,
         memberCount,
         availableToBid,
+        teamSize: maxTeamSize,
       };
     });
   }

@@ -1561,6 +1561,7 @@ export default function AuctionRoomPage() {
               className="min-h-full"
               onVoteItemSkip={requestFold}
               isVotingItemSkip={isVotingItemSkip}
+              teamSize={GAMES[game].teamSize}
             />
           </div>
 
@@ -1583,6 +1584,7 @@ export default function AuctionRoomPage() {
               disabled={!isConnected}
               bidHistory={bidHistory}
               hideBidPanel
+              teamSize={GAMES[game].teamSize}
             />
           )}
           {mobileTab === "players" && (

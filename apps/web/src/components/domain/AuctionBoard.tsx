@@ -20,6 +20,7 @@ import {
   SkipForward,
 } from "lucide-react";
 import { getRoleIcon } from "@/lib/role-icon";
+import { DEFAULT_GAME, GAMES } from "@nexus/types";
 
 interface Player {
   id: string;
@@ -85,6 +86,14 @@ interface AuctionBoardProps {
   /** 매물 스킵 투표 — 입찰 패널 안에서 팀장이 누른다 */
   onVoteItemSkip?: () => void | Promise<void>;
   isVotingItemSkip?: boolean;
+  /**
+   * 한 팀의 정원. 롤 5인 / 배그 4인 스쿼드.
+   *
+   * 5로 박아 두면 배그 팀 카드에 빈 자리가 하나 더 보이고, 4명이 차도
+   * 만석으로 표시되지 않으며, 예비금을 없는 자리 몫까지 남겨 서버가
+   * 허용하는 입찰을 화면이 막는다.
+   */
+  teamSize?: number;
 }
 
 const POSITION_LABELS: Record<string, string> = {
@@ -139,6 +148,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   hideTeams = false,
   onVoteItemSkip,
   isVotingItemSkip = false,
+  teamSize = GAMES[DEFAULT_GAME].teamSize,
 }) => {
   const sortedTeams = useMemo(
     () =>
@@ -170,7 +180,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const bidSteps = [bidIncrement, bidIncrement * 2, bidIncrement * 5];
   // 서버와 동일한 예비금 계산: 남은 빈자리당 최소 입찰 단위를 확보
   const memberCount = currentTeam?.members?.length ?? 0;
-  const slotsNeeded = Math.max(0, 5 - memberCount);
+  const slotsNeeded = Math.max(0, teamSize - memberCount);
   const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
   const availableBudget = Math.max(0, myBudget - reserveAmount);
   const totalBid = auctionState.currentHighestBid + accumulatedBid;
@@ -893,7 +903,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
           {sortedTeams.map((team) => {
             const members = team.members ?? [];
             const teamBudget = getTeamBudget(team);
-            const isFull = members.length >= 5;
+            const isFull = members.length >= teamSize;
             return (
               <Card
                 key={team.id}
@@ -990,7 +1000,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                       })
                     )}
                     {Array.from({
-                      length: Math.max(0, 5 - members.length),
+                      length: Math.max(0, teamSize - members.length),
                     }).map((_, idx) => (
                       <div
                         key={`empty-${idx}`}
@@ -1036,7 +1046,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
             const members = team.members ?? [];
             const teamBudget = getTeamBudget(team);
             const isExpanded = expandedTeamIds.has(team.id);
-            const isFull = members.length >= 5;
+            const isFull = members.length >= teamSize;
             return (
               <div
                 key={team.id}
@@ -1136,7 +1146,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                       })
                     )}
                     {Array.from({
-                      length: Math.max(0, 5 - members.length),
+                      length: Math.max(0, teamSize - members.length),
                     }).map((_, idx) => (
                       <div
                         key={`empty-${idx}`}
