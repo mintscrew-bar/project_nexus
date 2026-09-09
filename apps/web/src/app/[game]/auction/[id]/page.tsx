@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import { useCurrentGame, useGamePrefix } from "@/hooks/useCurrentGame";
 import { afterTeamsPath } from "@nexus/types";
 import { GAMES } from "@nexus/types";
@@ -55,11 +56,13 @@ function RoleIcon({ role, dim }: { role?: string; dim?: boolean }) {
   if (!role) return null;
   const url = getRoleIcon(role.toUpperCase());
   if (!url) return null;
-  // eslint-disable-next-line @next/next/no-img-element
   return (
-    <img
+    <Image
       src={url}
       alt={role}
+      width={14}
+      height={14}
+      unoptimized
       className="h-3.5 w-3.5 shrink-0 brightness-0 invert"
       style={{ opacity: dim ? 0.35 : 0.8 }}
     />

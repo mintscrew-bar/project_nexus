@@ -66,7 +66,7 @@ export default function SnakeDraftPage() {
         ),
       );
     }
-  }, [draftState?.status, draftId, router, gamePrefix]);
+  }, [draftState?.status, draftId, router, gamePrefix, game]);
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
