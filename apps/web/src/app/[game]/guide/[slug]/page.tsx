@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CalendarDays, Clock3 } from "lucide-react";
-import { guideUrl } from "@/lib/guide-links";
+import { guideBase, guideGame, guideUrl } from "@/lib/guide-links";
 import { getResourceArticle, RESOURCE_ARTICLES } from "@/app/resources/articles";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 
@@ -22,6 +22,8 @@ export async function generateMetadata({
   return {
     title: article.title,
     description: article.description,
+    // 운영 자료는 게임 공통 문안이라 canonical 은 기본 게임 하나로 모은다.
+    // 같은 글이 `/lol` `/pubg` 두 URL 로 중복 색인되지 않게 한다.
     alternates: { canonical: guideUrl(`/guide/${article.slug}`) },
     openGraph: {
       title: article.title,
@@ -35,17 +37,21 @@ export async function generateMetadata({
 export default async function GuideArticlePage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ game: string; slug: string }>;
 }) {
-  const { slug } = await params;
+  const { game, slug } = await params;
   const article = getResourceArticle(slug);
   if (!article) notFound();
+
+  // 돌아가기 링크는 지금 보고 있는 게임을 따라간다. `/lol` 로 박아 두면
+  // 배그 가이드에서 글을 읽고 나올 때 롤 화면으로 튕긴다.
+  const base = guideBase(guideGame(game));
 
   return (
     <main className="flex-grow bg-bg-primary">
       <article className="mx-auto max-w-3xl px-4 py-10 md:px-6 md:py-16">
         <Link
-          href="/lol/guide/resources"
+          href={`${base}/guide/resources`}
           className="inline-flex items-center gap-2 text-sm font-medium text-accent-primary hover:underline"
         >
           <ArrowLeft className="h-4 w-4" /> 가이드 · 운영 자료
@@ -98,7 +104,7 @@ export default async function GuideArticlePage({
             {RESOURCE_ARTICLES.filter((item) => item.slug !== article.slug).map((item) => (
               <Link
                 key={item.slug}
-                href={`/lol/guide/${item.slug}`}
+                href={`${base}/guide/${item.slug}`}
                 className="text-sm text-accent-primary hover:underline"
               >
                 {item.title}

@@ -331,8 +331,14 @@ export class ScrimService {
       select: { killMatchDurationMinutes: true },
     });
     const startsAt = new Date();
-    await this.prisma.scrim.update({
-      where: { id: scrim.id },
+    // 아직 PENDING 인 경우에만 시작한다.
+    //
+    // 위의 상태 확인과 여기 사이에 `loadCaptains` 를 기다리므로, 마지막 두
+    // 팀장이 거의 동시에 누르면 양쪽 다 "전원 준비"로 판정될 수 있다. 조건
+    // 없이 갱신하면 나중 요청이 startsAt·cutoffAt 을 다시 써서 제한시간이
+    // 슬쩍 밀린다.
+    const started = await this.prisma.scrim.updateMany({
+      where: { id: scrim.id, status: ScrimStatus.PENDING },
       data: {
         status: ScrimStatus.IN_PROGRESS,
         startsAt,
@@ -342,6 +348,18 @@ export class ScrimService {
       },
     });
     this.readyCaptains.delete(roomId);
+
+    // 경합에서 진 요청도 "시작됨"으로 답한다. 먼저 들어온 요청이 이미 시작한
+    // 상태라, 준비 화면을 다시 띄우면 실제와 어긋난다.
+    if (!started.count) {
+      const current = await this.prisma.scrim.findUnique({
+        where: { id: scrim.id },
+        select: { status: true },
+      });
+      if (current?.status !== ScrimStatus.IN_PROGRESS) {
+        throw new BadRequestException("경기를 시작할 수 없는 상태입니다.");
+      }
+    }
 
     return { started: true as const, ...(await this.getReadyState(roomId)) };
   }
