@@ -11,6 +11,19 @@ import { RedisService } from "../redis/redis.service";
 import { PubgApiService } from "../pubg/pubg-api.service";
 import { ConfigService } from "@nestjs/config";
 
+/**
+ * 종료 시각이 지난 뒤에도 수집을 이어가는 여유 시간.
+ *
+ * 제한시간 안에 **시작한** 경기는 종료 시각을 넘겨 끝나고, PUBG 매치 상세는
+ * 경기가 끝난 뒤에야 나온다. 종료 즉시 멈추면 마지막 판을 놓친다.
+ *
+ * 반대로 끝없이 돌리면 안 된다. 이 수집은 10초마다 도는데 참가자가 내전 뒤에
+ * 다른 판을 돌리면 그때마다 목록을 다시 읽어, 호스트가 확정을 누르지 않는 한
+ * PUBG 전역 예산(10req/분)을 무한정 먹는다. `findFirst` 로 한 번에 한 방만
+ * 보므로 그 방이 예산을 잡고 있는 동안 다른 방의 수집이 밀린다.
+ */
+export const COLLECT_GRACE_AFTER_CUTOFF_MS = 30 * 60_000;
+
 export interface KillMatchCollectionState {
   roster: {
     teamId: string;
@@ -48,7 +61,11 @@ export class KillMatchCollectorService {
       const scrim = await this.prisma.scrim.findFirst({
         where: {
           status: "IN_PROGRESS",
-          cutoffAt: { not: null },
+          // 종료 + 여유 시간이 지난 방은 더 보지 않는다. 그 뒤로는 새로 들어올
+          // 경기가 없고, 계속 읽으면 전역 예산만 쓴다.
+          cutoffAt: {
+            gt: new Date(Date.now() - COLLECT_GRACE_AFTER_CUTOFF_MS),
+          },
           room: { status: "IN_PROGRESS" },
         },
         orderBy: [

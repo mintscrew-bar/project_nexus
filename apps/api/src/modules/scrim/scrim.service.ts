@@ -23,7 +23,10 @@ import {
 import { Inject, Optional } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateScrimDto, SubmitRoundResultDto } from "./dto";
-import type { KillMatchCollectionState } from "./kill-match-collector.service";
+import {
+  COLLECT_GRACE_AFTER_CUTOFF_MS,
+  type KillMatchCollectionState,
+} from "./kill-match-collector.service";
 import { PubgApiService } from "../pubg/pubg-api.service";
 import { ConfigService } from "@nestjs/config";
 
@@ -500,8 +503,16 @@ export class ScrimService {
     const { scrim } = await this.findOwnedScrim(hostId, roomId);
     if (scrim.cutoffAt && new Date() < scrim.cutoffAt)
       throw new BadRequestException("진행시간이 끝난 뒤 확정할 수 있습니다.");
+    // 수집이 **아직 도는 동안**만 확정을 미룬다.
+    //
+    // 여유 시간이 지나면 수집기는 이 방을 더 보지 않는다. 그때까지 남은
+    // `pending` 은 내전이 끝난 뒤 참가자가 돌린 다른 판일 수 있고, 그건 영영
+    // 줄지 않는다 — 수집 상태만 보고 막으면 방을 확정할 방법이 없어진다.
+    const collectorRunning =
+      !!scrim.cutoffAt &&
+      Date.now() < scrim.cutoffAt.getTime() + COLLECT_GRACE_AFTER_CUTOFF_MS;
     if (
-      scrim.cutoffAt &&
+      collectorRunning &&
       (scrim.collectionError ||
         (scrim.collectorState as unknown as KillMatchCollectionState)?.pending
           ?.length)

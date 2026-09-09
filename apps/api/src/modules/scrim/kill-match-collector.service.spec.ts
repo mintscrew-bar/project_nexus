@@ -1,4 +1,7 @@
-import { KillMatchCollectorService } from "./kill-match-collector.service";
+import {
+  COLLECT_GRACE_AFTER_CUTOFF_MS,
+  KillMatchCollectorService,
+} from "./kill-match-collector.service";
 import { ScrimService } from "./scrim.service";
 import {
   DEFAULT_PUBG_POINT_RULE,
@@ -116,6 +119,90 @@ describe("시간제 킬내기 자동 집계", () => {
     redis.extendLock.mockResolvedValue(false);
     await service.tick();
     expect(db.scrimRound.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 수집은 종료 시각 + 여유 시간까지만 돈다.
+   *
+   * 끝없이 돌면 참가자가 내전 뒤 다른 판을 돌릴 때마다 목록을 다시 읽어,
+   * 호스트가 확정을 누르지 않는 한 PUBG 전역 예산을 무한정 먹는다.
+   */
+  it("종료 후 여유 시간이 지난 방은 조회 대상에서 뺀다", async () => {
+    const now = new Date("2026-09-08T05:00:00Z");
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      const { service, db } = fixture(startsAt.toISOString());
+      await service.tick();
+
+      const where = db.scrim.findFirst.mock.calls[0][0].where;
+      expect(where.cutoffAt.gt).toEqual(
+        new Date(now.getTime() - COLLECT_GRACE_AFTER_CUTOFF_MS),
+      );
+      // 종료(02:00)에 여유 30분을 더해도 02:30 이라 05:00 시점엔 대상이 아니다.
+      expect(cutoffAt.getTime()).toBeLessThan(where.cutoffAt.gt.getTime());
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe("킬내기 확정과 자동 수집", () => {
+  const cutoffAt = new Date("2026-09-08T02:00:00Z");
+
+  /** 수집할 게 남은 채로 종료된 킬내기 */
+  const db = (now: Date) => {
+    jest.useFakeTimers().setSystemTime(now);
+    return {
+      room: {
+        findUnique: jest.fn().mockResolvedValue({
+          hostId: "host",
+          teams: [],
+          scrim: {
+            id: "s",
+            status: "IN_PROGRESS",
+            totalRounds: 2,
+            cutoffAt,
+            collectorState: { pending: [{ id: "m", platform: "STEAM" }] },
+          },
+        }),
+        update: jest.fn(),
+      },
+      scrimRound: { count: jest.fn().mockResolvedValue(2) },
+      // 확정이 통과했을 때 이어지는 호출들 — 여기서 막히면 안 된다.
+      scrim: {
+        update: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({
+          id: "s",
+          status: "COMPLETED",
+          cutoffAt,
+          rounds: [],
+          pointRule: KILL_MATCH_POINT_RULE,
+        }),
+      },
+      team: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn(),
+    } as any;
+  };
+
+  afterEach(() => jest.useRealTimers());
+
+  it("수집이 도는 동안에는 확정을 미룬다", async () => {
+    // 종료 10분 뒤 — 아직 여유 시간 안이다. 마지막 판이 들어오는 중일 수 있다.
+    const prisma = db(new Date("2026-09-08T02:10:00Z"));
+    await expect(
+      new ScrimService(prisma).completeScrim("host", "room"),
+    ).rejects.toThrow("수집 중인 경기 기록이 있습니다");
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 여유 시간이 지나면 수집기는 이 방을 더 보지 않으므로 `pending` 이 영영
+   * 줄지 않는다. 수집 상태만 보고 막으면 방을 확정할 방법이 없어진다.
+   */
+  it("수집이 끝난 뒤에는 남은 pending 이 확정을 막지 않는다", async () => {
+    const prisma = db(new Date("2026-09-08T03:00:00Z"));
+    await new ScrimService(prisma).completeScrim("host", "room");
+    expect(prisma.$transaction).toHaveBeenCalled();
   });
 });
 
