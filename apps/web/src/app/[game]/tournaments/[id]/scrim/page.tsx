@@ -203,7 +203,9 @@ export default function ScrimPage() {
       } else {
         addToast(result.message, "warning");
         // 자동으로 못 찾았으면 바로 손으로 넣을 수 있게 입력창을 연다.
-        setEditingRound(roundNumber);
+        // 쿨다운은 "못 찾았다"가 아니라 "아직 안 봤다"라서 열지 않는다 —
+        // 기다리면 자동으로 채워질 수 있는데 입력창부터 들이밀 이유가 없다.
+        if (result.reason !== "COOLDOWN") setEditingRound(roundNumber);
       }
     } catch (err: any) {
       addToast(

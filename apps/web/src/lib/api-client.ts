@@ -1367,7 +1367,13 @@ export const scrimApi = {
     );
     return response.data as
       | { matched: true; matchId: string; teamsFilled: number }
-      | { matched: false; reason: string; message: string };
+      | {
+          matched: false;
+          reason: string;
+          message: string;
+          /** 쿨다운에 걸렸을 때만 온다. 남은 초. */
+          retryAfterSec?: number;
+        };
   },
 
   startRound: async (roomId: string, roundNumber: number) => {

@@ -14,7 +14,7 @@ describe("ScrimCollectorService 스위치", () => {
   const apiWithoutKey = { isEnabled: false } as unknown as PubgApiService;
 
   const make = (value: string | undefined, api = apiWithKey) =>
-    new ScrimCollectorService({} as any, api, makeConfig(value));
+    new ScrimCollectorService({} as any, api, makeConfig(value), {} as any);
 
   it("설정이 없으면 켜진다 — 시크릿을 안 넣어도 동작해야 한다", () => {
     expect(make(undefined).isEnabled).toBe(true);

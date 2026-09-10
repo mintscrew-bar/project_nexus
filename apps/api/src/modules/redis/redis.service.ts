@@ -53,6 +53,17 @@ export class RedisService implements OnModuleDestroy {
     await this.client.expire(key, seconds);
   }
 
+  /**
+   * 키의 남은 수명(ms). 키가 없거나 만료가 없으면 0.
+   *
+   * 쿨다운을 사람에게 알려줄 때 쓴다 — "잠시 후 다시" 보다 "12초 뒤"가
+   * 낫고, 그러려면 남은 시간을 실제로 읽어야 한다.
+   */
+  async pttl(key: string): Promise<number> {
+    const remaining = await this.client.pttl(key);
+    return remaining > 0 ? remaining : 0;
+  }
+
   // Hash operations
   async hset(key: string, field: string, value: string): Promise<void> {
     await this.client.hset(key, field, value);

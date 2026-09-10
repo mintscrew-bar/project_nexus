@@ -18,6 +18,7 @@ import {
 } from "@nexus/types";
 import { PrismaService } from "../prisma/prisma.service";
 import { PubgApiService } from "../pubg/pubg-api.service";
+import { RedisService } from "../redis/redis.service";
 
 /**
  * 한 번의 수집에서 훑어볼 최근 매치 수.
@@ -29,6 +30,23 @@ const MAX_MATCH_LOOKUPS = 3;
 
 /** 결과 출처 표시 — 수동 입력과 구분해야 나중에 신뢰도를 판단할 수 있다. */
 const RESULT_SOURCE_AUTO = "AUTO";
+
+/**
+ * 같은 라운드를 다시 조회하기까지의 최소 간격.
+ *
+ * 라운드가 막 끝나면 PUBG 매치 상세가 아직 안 나온다. "못 찾았습니다"를 본
+ * 호스트는 당연히 다시 누르는데, 한 번이 최대 4콜(목록 1 + 상세 3)이라
+ * 연속 세 번이면 분당 예산(9)을 넘긴다.
+ *
+ * 그 피해는 누른 사람에게만 가지 않는다. 수집 호출은 `acquireWaiting` 으로
+ * 최대 90초를 기다리며 토큰을 계속 집어가는 반면, 사용자 닉네임 조회는
+ * `acquireInteractive` 로 2초 만에 429 를 낸다. 호스트가 두드리는 동안
+ * 무관한 사용자의 배그 계정 조회가 먼저 끊긴다.
+ *
+ * 60초면 한 방이 최대 4콜/분으로 묶여 사용자 몫 5콜이 남고, 그 사이 매치
+ * 상세가 나올 시간도 번다. 자동이 끝내 실패해도 수동 입력은 항상 열려 있다.
+ */
+const RETRY_COOLDOWN_SEC = 60;
 
 /**
  * 라운드 결과 자동 수집.
@@ -49,6 +67,7 @@ export class ScrimCollectorService {
     private readonly prisma: PrismaService,
     private readonly pubgApi: PubgApiService,
     private readonly config: ConfigService,
+    private readonly redis: RedisService,
   ) {
     // 기본 켜짐, 끄려면 명시적으로 false.
     //
@@ -145,6 +164,26 @@ export class ScrimCollectorService {
       throw new BadRequestException(
         "플레이 플랫폼이 확인된 참가자가 없어 경기를 찾을 수 없습니다.",
       );
+    }
+
+    // 여기서부터 PUBG 예산을 쓴다. 조회 직전에 쿨다운을 잡아 두 번 나가는
+    // 것을 막는다 — 검증 앞에 두면 남의 방 id 로 남의 쿨다운을 태울 수 있고,
+    // 조회 뒤에 두면 동시에 눌린 두 요청이 둘 다 나간다.
+    const cooldownKey = `pubg:collect:${roomId}:${roundNumber}`;
+    if (
+      !(await this.redis.acquireLock(cooldownKey, RETRY_COOLDOWN_SEC * 1000))
+    ) {
+      const remainSec = Math.max(
+        1,
+        Math.ceil((await this.redis.pttl(cooldownKey)) / 1000),
+      );
+      return {
+        matched: false as const,
+        reason: "COOLDOWN" as const,
+        bestOverlap: 0,
+        retryAfterSec: remainSec,
+        message: `방금 조회했습니다. ${remainSec}초 뒤에 다시 시도할 수 있습니다. 경기 기록이 늦게 올라오면 결과를 직접 입력해주세요.`,
+      };
     }
 
     // 매치 목록 1콜 + 상세 최대 3콜.
