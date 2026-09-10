@@ -131,6 +131,25 @@ export default function RoleSelectionPage() {
       router.push(navigationTarget ?? `${gamePrefix}/tournaments/${roomId}/bracket`);
     }
   }, [isCompleted, navigationTarget, roomId, router, addToast, gamePrefix]);
+  useEffect(() => {
+    if (hasRedirected.current || isCompleted || !roomId) return;
+    let cancelled = false;
+    const checkRoomStage = async () => {
+      try {
+        const currentRoom = await roomApi.getRoom(roomId);
+        if (cancelled || hasRedirected.current) return;
+        if (currentRoom?.status === "IN_PROGRESS") {
+          hasRedirected.current = true;
+          addToast("역할 선택 완료! 대진표로 이동합니다.", "success");
+          router.replace(gamePrefix + "/tournaments/" + roomId + "/bracket");
+        }
+      } catch {}
+    };
+    void checkRoomStage();
+    const timer = window.setInterval(checkRoomStage, 2000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [isCompleted, roomId, router, addToast, gamePrefix]);
+
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
