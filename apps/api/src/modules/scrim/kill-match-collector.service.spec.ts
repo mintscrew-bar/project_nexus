@@ -138,8 +138,49 @@ describe("시간제 킬내기 자동 집계", () => {
       expect(where.cutoffAt.gt).toEqual(
         new Date(now.getTime() - COLLECT_GRACE_AFTER_CUTOFF_MS),
       );
-      // 종료(02:00)에 여유 30분을 더해도 02:30 이라 05:00 시점엔 대상이 아니다.
+      // 종료(02:00)에 여유를 더해도 05:00 시점엔 대상이 아니다.
       expect(cutoffAt.getTime()).toBeLessThan(where.cutoffAt.gt.getTime());
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  /**
+   * 종료 뒤에는 느린 주기로만 본다.
+   *
+   * 예산이 앱 전체 9 req/분인데 10초 주기는 최대 6 req/분이다. 경기가 끝난
+   * 방에 그걸 계속 쓰면 사용자가 기다리는 닉네임 조회가 429 를 맞는다.
+   */
+  it("진행 중인 방은 매 tick 본다", async () => {
+    const now = new Date("2026-09-08T01:30:00Z"); // 종료(02:00) 전
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      const { service, db } = fixture(startsAt.toISOString());
+      await service.tick();
+
+      const or = db.scrim.findFirst.mock.calls[0][0].where.OR;
+      // 첫 갈래가 "아직 종료 전" — 주기 제한 없이 뽑힌다.
+      expect(or[0]).toEqual({ cutoffAt: { gt: now } });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("종료된 방은 마지막 조회로부터 느린 주기가 지나야 본다", async () => {
+    const now = new Date("2026-09-08T02:10:00Z"); // 종료 10분 뒤, 여유 시간 안
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      const { service, db } = fixture(startsAt.toISOString());
+      await service.tick();
+
+      const or = db.scrim.findFirst.mock.calls[0][0].where.OR;
+      // 종료 뒤에는 `lastCollectedAt` 이 느린 주기보다 오래됐을 때만 뽑힌다.
+      const throttled = or.find((clause: any) => clause.lastCollectedAt?.lt);
+      expect(throttled.lastCollectedAt.lt.getTime()).toBe(
+        now.getTime() - 3 * 60_000,
+      );
+      // 한 번도 조회 안 한 방은 기다리지 않는다.
+      expect(or).toContainEqual({ lastCollectedAt: null });
     } finally {
       jest.useRealTimers();
     }

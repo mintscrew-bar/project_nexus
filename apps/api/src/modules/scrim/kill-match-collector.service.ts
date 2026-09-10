@@ -11,18 +11,38 @@ import { RedisService } from "../redis/redis.service";
 import { PubgApiService } from "../pubg/pubg-api.service";
 import { ConfigService } from "@nestjs/config";
 
+/** 진행 중인 방을 보는 주기. 화면의 "지금 몇 대 몇"이 이 간격으로 움직인다. */
+const TICK_MS = 10_000;
+
 /**
- * 종료 시각이 지난 뒤에도 수집을 이어가는 여유 시간.
+ * 종료된 방을 보는 주기.
+ *
+ * 예산은 앱 전체 9 req/분이다(`PubgRateLimiterService`). 10초 주기는 최대
+ * 6 req/분 — 예산의 3분의 2다. 경기 중에는 그 값어치를 하지만 종료 뒤에도
+ * 같은 속도로 돌면 사용자가 기다리는 조회가 밀린다. 닉네임 조회는 샤드
+ * 두 곳을 훑어 한 번에 2콜인데, `acquireInteractive` 는 2초만 기다리고
+ * 429 를 낸다.
+ *
+ * 종료 뒤에 새로 들어올 수 있는 건 제한시간 안에 시작해 종료를 넘겨 끝난
+ * 경기 한 판뿐이다. 팀 수만큼의 목록 조회와 상세 한 건이면 되고, 아무도
+ * 그 사이 화면을 보고 있지 않으니 빨리 볼 이유가 없다.
+ * 3분 간격이면 0.33 req/분 — 예산의 4%다.
+ */
+const POST_CUTOFF_INTERVAL_MS = 3 * 60_000;
+
+/**
+ * 종료 시각이 지난 뒤에도 수집을 이어가는 시간.
  *
  * 제한시간 안에 **시작한** 경기는 종료 시각을 넘겨 끝나고, PUBG 매치 상세는
  * 경기가 끝난 뒤에야 나온다. 종료 즉시 멈추면 마지막 판을 놓친다.
+ * 스쿼드 한 판이 30분 안팎이라, 종료 직전에 시작한 판은 종료 +35분쯤
+ * 들어온다. 45분이면 그 한 판을 놓치지 않는다.
  *
- * 반대로 끝없이 돌리면 안 된다. 이 수집은 10초마다 도는데 참가자가 내전 뒤에
- * 다른 판을 돌리면 그때마다 목록을 다시 읽어, 호스트가 확정을 누르지 않는 한
- * PUBG 전역 예산(10req/분)을 무한정 먹는다. `findFirst` 로 한 번에 한 방만
- * 보므로 그 방이 예산을 잡고 있는 동안 다른 방의 수집이 밀린다.
+ * 길이는 **예산이 아니라 경기 길이가 정한다.** 비용은 위의 느린 주기가
+ * 누르기 때문이다 — 이 창 전체가 쓰는 건 45/3 = 15콜로, 예산 1분 40초어치를
+ * 45분에 걸쳐 나눠 쓰는 셈이다.
  */
-export const COLLECT_GRACE_AFTER_CUTOFF_MS = 30 * 60_000;
+export const COLLECT_GRACE_AFTER_CUTOFF_MS = 45 * 60_000;
 
 export interface KillMatchCollectionState {
   roster: {
@@ -47,7 +67,7 @@ export class KillMatchCollectorService {
     private readonly config: ConfigService,
   ) {}
 
-  @Interval(10_000)
+  @Interval(TICK_MS)
   async tick() {
     if (
       !this.api.isEnabled ||
@@ -58,15 +78,28 @@ export class KillMatchCollectorService {
     const token = await this.redis.acquireLock(key, 300_000);
     if (!token) return;
     try {
+      const now = new Date();
       const scrim = await this.prisma.scrim.findFirst({
         where: {
           status: "IN_PROGRESS",
           // 종료 + 여유 시간이 지난 방은 더 보지 않는다. 그 뒤로는 새로 들어올
           // 경기가 없고, 계속 읽으면 전역 예산만 쓴다.
           cutoffAt: {
-            gt: new Date(Date.now() - COLLECT_GRACE_AFTER_CUTOFF_MS),
+            gt: new Date(now.getTime() - COLLECT_GRACE_AFTER_CUTOFF_MS),
           },
           room: { status: "IN_PROGRESS" },
+          // 진행 중이면 매 tick, 종료 뒤에는 느린 주기로만 본다.
+          // 이 조건이 비용을 누르므로 여유 시간을 경기 길이에 맞춰 잡을 수 있다.
+          // 걸러진 방은 `findFirst` 후보에서 빠져 진행 중인 방에 차례가 간다.
+          OR: [
+            { cutoffAt: { gt: now } },
+            { lastCollectedAt: null },
+            {
+              lastCollectedAt: {
+                lt: new Date(now.getTime() - POST_CUTOFF_INTERVAL_MS),
+              },
+            },
+          ],
         },
         orderBy: [
           { lastCollectedAt: { sort: "asc", nulls: "first" } },
