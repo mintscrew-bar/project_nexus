@@ -67,6 +67,24 @@ export default function SnakeDraftPage() {
       );
     }
   }, [draftState?.status, draftId, router, gamePrefix, game]);
+  useEffect(() => {
+    if (hasRedirected.current || draftState?.status === "COMPLETED" || !draftId) return;
+    let cancelled = false;
+    const checkDraftStage = async () => {
+      try {
+        const currentRoom = await roomApi.getRoom(draftId);
+        if (cancelled || hasRedirected.current) return;
+        if (currentRoom?.status === "DRAFT_COMPLETED" || currentRoom?.status === "IN_PROGRESS") {
+          hasRedirected.current = true;
+          router.replace(afterTeamsPath({ id: draftId, gameTitle: currentRoom.gameTitle ?? game, teamMode: "SNAKE_DRAFT" }, gamePrefix));
+        }
+      } catch {}
+    };
+    void checkDraftStage();
+    const timer = window.setInterval(checkDraftStage, 2000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [draftState?.status, draftId, router, gamePrefix, game]);
+
 
   useEffect(() => {
     if (!sessionAbortedAt) return;

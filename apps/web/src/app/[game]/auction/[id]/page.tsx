@@ -712,6 +712,24 @@ export default function AuctionRoomPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [auctionState?.status, auctionId, router, gamePrefix, game]);
+  useEffect(() => {
+    if (hasRedirected.current || auctionState?.status === "COMPLETED" || !auctionId) return;
+    let cancelled = false;
+    const checkAuctionStage = async () => {
+      try {
+        const currentRoom = await roomApi.getRoom(auctionId);
+        if (cancelled || hasRedirected.current) return;
+        if (currentRoom?.status === "DRAFT_COMPLETED" || currentRoom?.status === "IN_PROGRESS") {
+          hasRedirected.current = true;
+          router.replace(afterTeamsPath({ id: auctionId, gameTitle: currentRoom.gameTitle ?? game, teamMode: "AUCTION" }, gamePrefix));
+        }
+      } catch {}
+    };
+    void checkAuctionStage();
+    const timer = window.setInterval(checkAuctionStage, 2000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [auctionState?.status, auctionId, router, gamePrefix, game]);
+
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
