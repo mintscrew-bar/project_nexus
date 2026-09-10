@@ -11,36 +11,56 @@ import { RedisService } from "../redis/redis.service";
 import { PubgApiService } from "../pubg/pubg-api.service";
 import { ConfigService } from "@nestjs/config";
 
-/** 진행 중인 방을 보는 주기. 화면의 "지금 몇 대 몇"이 이 간격으로 움직인다. */
-const TICK_MS = 10_000;
+/**
+ * 진행 중인 방을 보는 주기.
+ *
+ * 예산은 앱 전체 9 req/분이다(`PubgRateLimiterService`, 무료 키 10 에서
+ * 마진 1). 닉네임 조회 같은 사용자 대기 호출이 같은 예산을 쓰고,
+ * `acquireInteractive` 는 2초만 기다리고 429 를 낸다.
+ *
+ * 자주 볼 이유가 없다. 점수는 **한 판이 끝나야** 움직인다. 킬내기는 핫드랍
+ * 급사가 잦아 판이 짧게 끝나는 편이지만, 그래도 분 단위지 초 단위가 아니다.
+ *
+ * 늦게 보는 것이 손해도 아니다 — 한 사이클에 못 받아도 다음 사이클에
+ * 그때 진행 중이던 판과 그 사이 끝난 판을 **함께** 받는다. 목록 조회가
+ * 매치 ID 를 통째로 돌려주므로 놓치는 게 아니라 묶여서 올 뿐이다.
+ *
+ * 비용은 할 일에 따라 붙는다. 새 판이 없으면 목록 확인 1콜로 끝나
+ * 0.33 req/분(4%)이고, 판이 끝난 사이클에만 아래 상한까지 쓴다.
+ */
+export const TICK_MS = 3 * 60_000;
 
 /**
  * 종료된 방을 보는 주기.
  *
- * 예산은 앱 전체 9 req/분이다(`PubgRateLimiterService`). 10초 주기는 최대
- * 6 req/분 — 예산의 3분의 2다. 경기 중에는 그 값어치를 하지만 종료 뒤에도
- * 같은 속도로 돌면 사용자가 기다리는 조회가 밀린다. 닉네임 조회는 샤드
- * 두 곳을 훑어 한 번에 2콜인데, `acquireInteractive` 는 2초만 기다리고
- * 429 를 낸다.
- *
  * 종료 뒤에 새로 들어올 수 있는 건 제한시간 안에 시작해 종료를 넘겨 끝난
- * 경기 한 판뿐이다. 팀 수만큼의 목록 조회와 상세 한 건이면 되고, 아무도
- * 그 사이 화면을 보고 있지 않으니 빨리 볼 이유가 없다.
- * 3분 간격이면 0.33 req/분 — 예산의 4%다.
+ * 경기뿐이고, 그 사이엔 아무도 화면을 보고 있지 않다.
  */
-const POST_CUTOFF_INTERVAL_MS = 3 * 60_000;
+export const POST_CUTOFF_INTERVAL_MS = 10 * 60_000;
+
+/**
+ * 한 사이클에 허용하는 PUBG 호출 수.
+ *
+ * 한 콜만 하면 새 판 하나를 점수에 올리는 데 두 사이클이 든다 — 목록에서
+ * ID 를 찾고(1콜), 다음 사이클에 상세를 읽는다(1콜). 5분 주기면 10분이
+ * 걸리고, 그 사이 판이 더 끝났으면 한 판씩 차례를 기다린다.
+ *
+ * 몇 콜을 묶어 쓰면 목록 한 번 + 상세 두 건까지 한 자리에서 끝난다.
+ * 3콜 / 3분이면 1 req/분 — 예산의 11% 이고, 그마저 판이 끝난 사이클에만
+ * 든다. 몰아 쓰는 순간에도 전역 리미터가 창을 지키므로 사용자 조회를
+ * 밀어내지 않는다.
+ */
+export const MAX_CALLS_PER_CYCLE = 3;
 
 /**
  * 종료 시각이 지난 뒤에도 수집을 이어가는 시간.
  *
  * 제한시간 안에 **시작한** 경기는 종료 시각을 넘겨 끝나고, PUBG 매치 상세는
  * 경기가 끝난 뒤에야 나온다. 종료 즉시 멈추면 마지막 판을 놓친다.
- * 스쿼드 한 판이 30분 안팎이라, 종료 직전에 시작한 판은 종료 +35분쯤
- * 들어온다. 45분이면 그 한 판을 놓치지 않는다.
  *
  * 길이는 **예산이 아니라 경기 길이가 정한다.** 비용은 위의 느린 주기가
- * 누르기 때문이다 — 이 창 전체가 쓰는 건 45/3 = 15콜로, 예산 1분 40초어치를
- * 45분에 걸쳐 나눠 쓰는 셈이다.
+ * 누르기 때문이다 — 창 전체가 45/10 = 4~5 사이클, 최대 15콜이다.
+ * 킬내기는 핫드랍 급사가 잦아 판이 짧게 끝나므로 45분이면 넉넉하다.
  */
 export const COLLECT_GRACE_AFTER_CUTOFF_MS = 45 * 60_000;
 
@@ -79,7 +99,9 @@ export class KillMatchCollectorService {
     if (!token) return;
     try {
       const now = new Date();
-      const scrim = await this.prisma.scrim.findFirst({
+      // 이번 사이클에 볼 방을 하나 고른다. 고르는 조건이 주기를 정하고,
+      // 아래 반복이 그 방에 쓸 수 있는 콜 수를 정한다.
+      const target = await this.prisma.scrim.findFirst({
         where: {
           status: "IN_PROGRESS",
           // 종료 + 여유 시간이 지난 방은 더 보지 않는다. 그 뒤로는 새로 들어올
@@ -88,9 +110,8 @@ export class KillMatchCollectorService {
             gt: new Date(now.getTime() - COLLECT_GRACE_AFTER_CUTOFF_MS),
           },
           room: { status: "IN_PROGRESS" },
-          // 진행 중이면 매 tick, 종료 뒤에는 느린 주기로만 본다.
-          // 이 조건이 비용을 누르므로 여유 시간을 경기 길이에 맞춰 잡을 수 있다.
-          // 걸러진 방은 `findFirst` 후보에서 빠져 진행 중인 방에 차례가 간다.
+          // 진행 중이면 매 사이클, 종료 뒤에는 느린 주기로만 본다.
+          // 걸러진 방은 후보에서 빠져 진행 중인 방에 차례가 간다.
           OR: [
             { cutoffAt: { gt: now } },
             { lastCollectedAt: null },
@@ -105,141 +126,59 @@ export class KillMatchCollectorService {
           { lastCollectedAt: { sort: "asc", nulls: "first" } },
           { createdAt: "asc" },
         ],
+        select: { id: true },
       });
-      if (!scrim?.startsAt || !scrim.cutoffAt || !scrim.collectorState) return;
-      const state = scrim.collectorState as unknown as KillMatchCollectionState;
-      try {
-        // 한 차례에 목록 또는 상세 한 건만 처리해 다른 방도 조회 기회를 얻는다.
-        if (!state.pending.length) {
-          const anchors = [...new Set(state.roster.map((p) => p.teamId))].map(
-            (teamId) => state.roster.find((p) => p.teamId === teamId)!,
-          );
-          const account = anchors[state.cursor % anchors.length];
-          const ids = await this.api.getPlayerMatchIds(
-            account.platform,
-            account.playerId,
-          );
-          state.cursor = (state.cursor + 1) % anchors.length;
-          state.pending = [...new Set(ids)]
-            .filter((id) => !state.seen.includes(id))
-            .map((id) => ({ id, platform: account.platform }));
-        } else {
-          const candidate = state.pending[0];
-          const detail = await this.api.getMatch(
-            candidate.platform,
-            candidate.id,
-          );
-          if (!detail)
-            throw new Error(
-              "경기 상세가 아직 제공되지 않았습니다. 다시 조회합니다.",
-            );
-          const started = new Date(detail.createdAt);
-          if (!Number.isFinite(started.getTime()))
-            throw new Error("경기 시작 시각을 확인하지 못했습니다.");
-          const rows: {
-            teamId: string;
-            teamName: string;
-            placement: number;
-            kills: number;
-            deaths: number;
-            points: number;
-          }[] = [];
-          if (
-            started >= scrim.startsAt &&
-            started < scrim.cutoffAt &&
-            /^squad(?:-fpp)?$/.test(detail.gameMode)
-          ) {
-            const rule = isValidPointRule(scrim.pointRule)
-              ? scrim.pointRule
-              : defaultPointRuleForMode("KILL_MATCH");
-            for (const teamId of new Set(state.roster.map((p) => p.teamId))) {
-              const members = state.roster.filter((p) => p.teamId === teamId);
-              // 네 계정이 모두 같은 인게임 스쿼드에 있어야 한다. 외부인의 킬을 더하지 않는다.
-              const team = detail.teams.find(
-                (t) =>
-                  t.playerIds.length === 4 &&
-                  members.length === 4 &&
-                  members.every((p) => t.playerIds.includes(p.playerId)),
-              );
-              if (!team || team.placement < 1) continue;
-              rows.push({
-                teamId,
-                teamName: members[0].teamName,
-                placement: team.placement,
-                kills: team.kills,
-                deaths: team.deaths,
-                points: calculateScrimPoints(
-                  team.placement,
-                  team.kills,
-                  rule,
-                  team.deaths,
-                ),
-              });
-            }
-          }
-          if (!(await this.redis.extendLock(key, token, 300_000))) return;
-          await this.prisma.$transaction(async (tx) => {
-            // 완료/삭제된 세션에 늦게 돌아온 API 응답을 쓰지 않는다.
-            const active = await tx.scrim.updateMany({
-              where: {
-                id: scrim.id,
-                status: "IN_PROGRESS",
-                updatedAt: scrim.updatedAt,
-              },
-              data: { lastCollectedAt: new Date() },
-            });
-            if (!active.count)
-              throw new Error(
-                "집계 상태가 바뀌어 다음 차례에 다시 확인합니다.",
-              );
-            if (rows.length) {
-              const exists = await tx.scrimRound.findUnique({
-                where: {
-                  scrimId_pubgMatchId: {
-                    scrimId: scrim.id,
-                    pubgMatchId: detail.matchId,
-                  },
-                },
-              });
-              if (!exists) {
-                const last = await tx.scrimRound.aggregate({
-                  where: { scrimId: scrim.id },
-                  _max: { roundNumber: true },
-                });
-                await tx.scrimRound.create({
-                  data: {
-                    scrimId: scrim.id,
-                    roundNumber: (last._max.roundNumber ?? 0) + 1,
-                    pubgMatchId: detail.matchId,
-                    startedAt: started,
-                    endedAt: new Date(),
-                    status: "COMPLETED",
-                    resultSource: "AUTO",
-                    results: { create: rows },
-                  },
-                });
-                await tx.scrim.update({
-                  where: { id: scrim.id },
-                  data: { totalRounds: { increment: 1 } },
-                });
-              }
-            }
-            const nextState = {
-              ...state,
-              pending: state.pending.slice(1),
-              seen: [...state.seen, candidate.id],
-            };
-            await tx.scrim.update({
-              where: { id: scrim.id },
-              data: {
-                collectorState: nextState as unknown as Prisma.InputJsonValue,
-                collectionError: null,
-              },
-            });
-          });
-          return;
-        }
-        if (!(await this.redis.extendLock(key, token, 300_000))) return;
+      if (!target) return;
+
+      // 한 사이클에 목록 한 번 + 상세 몇 건까지 이어서 처리한다.
+      // 한 콜만 하면 새 판 하나가 점수에 오르는 데 두 사이클이 든다.
+      for (let call = 0; call < MAX_CALLS_PER_CYCLE; call++) {
+        const more = await this.collectStep(target.id, key, token);
+        if (!more) break;
+      }
+    } catch (error) {
+      this.logger.warn((error as Error).message);
+    } finally {
+      await this.redis.releaseLock(key, token);
+    }
+  }
+
+  /**
+   * PUBG 호출 한 건 — 목록 조회 **또는** 상세 조회 하나.
+   *
+   * 매번 스크림을 다시 읽는다. 같은 사이클에서 이어 돌 때 앞 단계가 이미
+   * `updatedAt` 을 바꿔 놓기 때문에, 들고 있던 값으로 낙관적 잠금을 걸면
+   * 두 번째 단계가 제 손으로 쓴 변경에 막힌다.
+   *
+   * @returns 이번 사이클에 더 할 일이 남았는지
+   */
+  private async collectStep(
+    scrimId: string,
+    key: string,
+    token: string,
+  ): Promise<boolean> {
+    const scrim = await this.prisma.scrim.findUnique({
+      where: { id: scrimId },
+    });
+    if (!scrim?.startsAt || !scrim.cutoffAt || !scrim.collectorState)
+      return false;
+    const state = scrim.collectorState as unknown as KillMatchCollectionState;
+    try {
+      if (!state.pending.length) {
+        const anchors = [...new Set(state.roster.map((p) => p.teamId))].map(
+          (teamId) => state.roster.find((p) => p.teamId === teamId)!,
+        );
+        const account = anchors[state.cursor % anchors.length];
+        const ids = await this.api.getPlayerMatchIds(
+          account.platform,
+          account.playerId,
+        );
+        state.cursor = (state.cursor + 1) % anchors.length;
+        state.pending = [...new Set(ids)]
+          .filter((id) => !state.seen.includes(id))
+          .map((id) => ({ id, platform: account.platform }));
+
+        if (!(await this.redis.extendLock(key, token, 300_000))) return false;
         await this.prisma.scrim.updateMany({
           where: {
             id: scrim.id,
@@ -252,31 +191,140 @@ export class KillMatchCollectorService {
             collectionError: null,
           },
         });
-      } catch (error) {
-        // 한 경기의 지연이 나머지 경기 조회를 막지 않도록 뒤로 보낸다.
-        if (state.pending.length > 1)
-          state.pending.push(state.pending.shift()!);
-        this.logger.warn(
-          `킬내기 수집 ${scrim.id}: ${(error as Error).message}`,
+        // 새로 찾은 경기가 있으면 이어서 상세를 읽는다. 없으면 이번 사이클은
+        // 여기서 끝 — 더 물어봐야 같은 답이다.
+        return state.pending.length > 0;
+      }
+
+      const candidate = state.pending[0];
+      const detail = await this.api.getMatch(candidate.platform, candidate.id);
+      if (!detail)
+        throw new Error(
+          "경기 상세가 아직 제공되지 않았습니다. 다시 조회합니다.",
         );
-        if (await this.redis.extendLock(key, token, 300_000))
-          await this.prisma.scrim.updateMany({
+      const started = new Date(detail.createdAt);
+      if (!Number.isFinite(started.getTime()))
+        throw new Error("경기 시작 시각을 확인하지 못했습니다.");
+      const rows: {
+        teamId: string;
+        teamName: string;
+        placement: number;
+        kills: number;
+        deaths: number;
+        points: number;
+      }[] = [];
+      if (
+        started >= scrim.startsAt &&
+        started < scrim.cutoffAt &&
+        /^squad(?:-fpp)?$/.test(detail.gameMode)
+      ) {
+        const rule = isValidPointRule(scrim.pointRule)
+          ? scrim.pointRule
+          : defaultPointRuleForMode("KILL_MATCH");
+        for (const teamId of new Set(state.roster.map((p) => p.teamId))) {
+          const members = state.roster.filter((p) => p.teamId === teamId);
+          // 네 계정이 모두 같은 인게임 스쿼드에 있어야 한다. 외부인의 킬을 더하지 않는다.
+          const team = detail.teams.find(
+            (t) =>
+              t.playerIds.length === 4 &&
+              members.length === 4 &&
+              members.every((p) => t.playerIds.includes(p.playerId)),
+          );
+          if (!team || team.placement < 1) continue;
+          rows.push({
+            teamId,
+            teamName: members[0].teamName,
+            placement: team.placement,
+            kills: team.kills,
+            deaths: team.deaths,
+            points: calculateScrimPoints(
+              team.placement,
+              team.kills,
+              rule,
+              team.deaths,
+            ),
+          });
+        }
+      }
+      if (!(await this.redis.extendLock(key, token, 300_000))) return false;
+      await this.prisma.$transaction(async (tx) => {
+        // 완료/삭제된 세션에 늦게 돌아온 API 응답을 쓰지 않는다.
+        const active = await tx.scrim.updateMany({
+          where: {
+            id: scrim.id,
+            status: "IN_PROGRESS",
+            updatedAt: scrim.updatedAt,
+          },
+          data: { lastCollectedAt: new Date() },
+        });
+        if (!active.count)
+          throw new Error("집계 상태가 바뀌어 다음 차례에 다시 확인합니다.");
+        if (rows.length) {
+          const exists = await tx.scrimRound.findUnique({
             where: {
-              id: scrim.id,
-              status: "IN_PROGRESS",
-              updatedAt: scrim.updatedAt,
-            },
-            data: {
-              collectorState: state as unknown as Prisma.InputJsonValue,
-              lastCollectedAt: new Date(),
-              collectionError: "경기 조회가 지연되어 자동 재시도 중입니다.",
+              scrimId_pubgMatchId: {
+                scrimId: scrim.id,
+                pubgMatchId: detail.matchId,
+              },
             },
           });
-      }
+          if (!exists) {
+            const last = await tx.scrimRound.aggregate({
+              where: { scrimId: scrim.id },
+              _max: { roundNumber: true },
+            });
+            await tx.scrimRound.create({
+              data: {
+                scrimId: scrim.id,
+                roundNumber: (last._max.roundNumber ?? 0) + 1,
+                pubgMatchId: detail.matchId,
+                startedAt: started,
+                endedAt: new Date(),
+                status: "COMPLETED",
+                resultSource: "AUTO",
+                results: { create: rows },
+              },
+            });
+            await tx.scrim.update({
+              where: { id: scrim.id },
+              data: { totalRounds: { increment: 1 } },
+            });
+          }
+        }
+        const nextState = {
+          ...state,
+          pending: state.pending.slice(1),
+          seen: [...state.seen, candidate.id],
+        };
+        await tx.scrim.update({
+          where: { id: scrim.id },
+          data: {
+            collectorState: nextState as unknown as Prisma.InputJsonValue,
+            collectionError: null,
+          },
+        });
+      });
+      // 남은 경기가 있으면 같은 사이클에서 이어 읽는다.
+      return state.pending.length > 1;
     } catch (error) {
-      this.logger.warn((error as Error).message);
-    } finally {
-      await this.redis.releaseLock(key, token);
+      // 한 경기의 지연이 나머지 경기 조회를 막지 않도록 뒤로 보낸다.
+      if (state.pending.length > 1) state.pending.push(state.pending.shift()!);
+      this.logger.warn(`킬내기 수집 ${scrim.id}: ${(error as Error).message}`);
+      if (await this.redis.extendLock(key, token, 300_000))
+        await this.prisma.scrim.updateMany({
+          where: {
+            id: scrim.id,
+            status: "IN_PROGRESS",
+            updatedAt: scrim.updatedAt,
+          },
+          data: {
+            collectorState: state as unknown as Prisma.InputJsonValue,
+            lastCollectedAt: new Date(),
+            collectionError: "경기 조회가 지연되어 자동 재시도 중입니다.",
+          },
+        });
+      // 지연은 다음 사이클에 다시 본다. 같은 자리에서 계속 두드리지 않는다.
+      return false;
     }
   }
 }

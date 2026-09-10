@@ -1,6 +1,9 @@
 import {
   COLLECT_GRACE_AFTER_CUTOFF_MS,
   KillMatchCollectorService,
+  MAX_CALLS_PER_CYCLE,
+  POST_CUTOFF_INTERVAL_MS,
+  TICK_MS,
 } from "./kill-match-collector.service";
 import { ScrimService } from "./scrim.service";
 import {
@@ -34,6 +37,12 @@ describe("시간제 킬내기 자동 집계", () => {
     const db: any = {
       scrim: {
         findFirst: jest.fn().mockResolvedValue(scrim),
+        // 사이클은 방을 고른 뒤 단계마다 다시 읽는다. 두 번째부터 null 을
+        // 돌려 한 단계만 돌게 한다 — 여러 콜은 아래 전용 테스트에서 본다.
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce(scrim)
+          .mockResolvedValue(null),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         update: jest.fn(),
       },
@@ -177,13 +186,171 @@ describe("시간제 킬내기 자동 집계", () => {
       // 종료 뒤에는 `lastCollectedAt` 이 느린 주기보다 오래됐을 때만 뽑힌다.
       const throttled = or.find((clause: any) => clause.lastCollectedAt?.lt);
       expect(throttled.lastCollectedAt.lt.getTime()).toBe(
-        now.getTime() - 3 * 60_000,
+        now.getTime() - POST_CUTOFF_INTERVAL_MS,
       );
       // 한 번도 조회 안 한 방은 기다리지 않는다.
       expect(or).toContainEqual({ lastCollectedAt: null });
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+/**
+ * 한 사이클에 목록과 상세를 이어서 처리한다.
+ *
+ * 한 콜만 하면 새 판 하나가 점수에 오르는 데 두 사이클(6분)이 걸리고,
+ * 판이 몰려 끝나면 한 판씩 차례를 기다린다.
+ */
+describe("사이클당 여러 콜", () => {
+  /** 목록에 새 경기 두 건이 있는 상태 */
+  function burstFixture() {
+    const startsAt = new Date("2026-09-08T01:00:00Z");
+    const scrim: any = {
+      id: "s",
+      startsAt,
+      cutoffAt: new Date("2026-09-08T02:00:00Z"),
+      updatedAt: startsAt,
+      pointRule: KILL_MATCH_POINT_RULE,
+      collectorState: {
+        roster: ["a", "b", "c", "d"].map((playerId) => ({
+          playerId,
+          teamId: "team",
+          teamName: "A",
+          platform: "STEAM",
+        })),
+        cursor: 0,
+        pending: [],
+        seen: [],
+      },
+    };
+    const db: any = {
+      scrim: {
+        findFirst: jest.fn().mockResolvedValue({ id: "s" }),
+        // 단계마다 다시 읽는다. 앞 단계가 쓴 상태를 그대로 물려준다.
+        findUnique: jest.fn().mockImplementation(() => Promise.resolve(scrim)),
+        updateMany: jest.fn().mockImplementation(({ data }: any) => {
+          if (data.collectorState) scrim.collectorState = data.collectorState;
+          return Promise.resolve({ count: 1 });
+        }),
+        update: jest.fn().mockImplementation(({ data }: any) => {
+          if (data.collectorState) scrim.collectorState = data.collectorState;
+          return Promise.resolve(scrim);
+        }),
+      },
+      scrimRound: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        aggregate: jest.fn().mockResolvedValue({ _max: { roundNumber: 0 } }),
+        create: jest.fn(),
+      },
+    };
+    db.$transaction = (fn: any) => fn(db);
+    const api: any = {
+      isEnabled: true,
+      getPlayerMatchIds: jest.fn().mockResolvedValue(["m1", "m2"]),
+      getMatch: jest.fn().mockImplementation((_p: string, id: string) =>
+        Promise.resolve({
+          matchId: id,
+          createdAt: "2026-09-08T01:30:00Z",
+          gameMode: "squad-fpp",
+          teams: [
+            {
+              playerIds: ["a", "b", "c", "d"],
+              placement: 1,
+              kills: 5,
+              deaths: 1,
+            },
+          ],
+        }),
+      ),
+    };
+    const redis: any = {
+      acquireLock: jest.fn().mockResolvedValue("token"),
+      extendLock: jest.fn().mockResolvedValue(true),
+      releaseLock: jest.fn(),
+    };
+    return {
+      service: new KillMatchCollectorService(db, redis, api, {
+        get: () => undefined,
+      } as any),
+      db,
+      api,
+    };
+  }
+
+  it("목록 한 번 + 상세 두 건을 한 사이클에 처리한다", async () => {
+    const { service, db, api } = burstFixture();
+    await service.tick();
+
+    // 상한이 3콜이므로 목록 1 + 상세 2 다.
+    expect(api.getPlayerMatchIds).toHaveBeenCalledTimes(1);
+    expect(api.getMatch).toHaveBeenCalledTimes(2);
+    expect(db.scrimRound.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("상한을 넘겨 호출하지 않는다", async () => {
+    const { service, api } = burstFixture();
+    api.getPlayerMatchIds.mockResolvedValue(["m1", "m2", "m3", "m4", "m5"]);
+    await service.tick();
+
+    const calls =
+      api.getPlayerMatchIds.mock.calls.length + api.getMatch.mock.calls.length;
+    expect(calls).toBe(MAX_CALLS_PER_CYCLE);
+  });
+});
+
+/**
+ * 주기와 사이클당 콜 수가 곧 예산 소비량이다.
+ *
+ * 예산은 앱 전체 9 req/분이고(`PubgRateLimiterService`, 무료 키 10 에서
+ * 마진 1) 닉네임 조회 같은 사용자 대기 호출이 같은 예산을 쓴다. 주기를
+ * 줄이거나 상한을 올리는 건 한 줄이면 되는데 그 비용이 코드에 드러나지
+ * 않으므로, 산식을 여기 못박는다.
+ */
+describe("수집 주기와 전역 예산", () => {
+  /** `PubgRateLimiterService` 의 기본값(PUBG_GLOBAL_RATE_MAX) */
+  const BUDGET_PER_MIN = 9;
+  const perMinute = (calls: number, intervalMs: number) =>
+    (calls * 60_000) / intervalMs;
+
+  it("새 판이 없는 사이클은 목록 확인 한 번으로 끝난다", () => {
+    // 비용이 할 일에 따라 붙는다는 게 요점이다 — 노는 동안은 거의 안 쓴다.
+    const idle = perMinute(1, TICK_MS);
+    expect(idle).toBeCloseTo(0.33, 2);
+    expect(idle / BUDGET_PER_MIN).toBeLessThan(1 / 20);
+  });
+
+  it("판이 끝난 사이클에도 예산의 6분의 1을 넘지 않는다", () => {
+    const busy = perMinute(MAX_CALLS_PER_CYCLE, TICK_MS);
+    expect(busy).toBe(1);
+    expect(busy / BUDGET_PER_MIN).toBeLessThanOrEqual(1 / 6);
+  });
+
+  it("한 사이클에 목록과 상세를 같이 받을 수 있다", () => {
+    // 1콜이면 새 판 하나가 점수에 오르는 데 두 사이클이 든다.
+    // 목록 한 번 + 상세 두 건은 돼야 판이 몰려 끝나도 따라간다.
+    expect(MAX_CALLS_PER_CYCLE).toBeGreaterThanOrEqual(2);
+  });
+
+  it("종료 뒤에는 더 느리게 본다", () => {
+    expect(POST_CUTOFF_INTERVAL_MS).toBeGreaterThan(TICK_MS);
+    const after = perMinute(MAX_CALLS_PER_CYCLE, POST_CUTOFF_INTERVAL_MS);
+    expect(after / BUDGET_PER_MIN).toBeLessThan(1 / 20);
+  });
+
+  it("여유 시간 전체가 쓰는 콜 수는 한 줌이다", () => {
+    const cycles = COLLECT_GRACE_AFTER_CUTOFF_MS / POST_CUTOFF_INTERVAL_MS;
+    expect(cycles).toBeLessThanOrEqual(5);
+    expect(cycles * MAX_CALLS_PER_CYCLE).toBeLessThanOrEqual(15);
+  });
+
+  it("여유 시간은 마지막 한 판이 들어올 만큼 길다", () => {
+    // 킬내기는 핫드랍 급사가 잦아 판이 짧게 끝난다. 종료 직전에 시작한
+    // 판이 넉넉잡아 30분 뒤 상세로 나오고, 목록·상세 두 사이클이 더 든다.
+    const lastMatchVisibleMs = 30 * 60_000 + POST_CUTOFF_INTERVAL_MS;
+    expect(COLLECT_GRACE_AFTER_CUTOFF_MS).toBeGreaterThanOrEqual(
+      lastMatchVisibleMs,
+    );
   });
 });
 
