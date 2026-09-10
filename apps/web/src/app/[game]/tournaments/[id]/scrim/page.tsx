@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ScrimProgressChart } from "./_components/ScrimProgressChart";
 import { motion } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -454,6 +455,13 @@ export default function ScrimPage() {
         )}
         {!scrim.ready && (
           <Leaderboard scrim={scrim} lastRoundIndex={lastRoundIndex} />
+        )}
+        {/* 표가 정본이고 그림은 흐름을 읽는 용도라 표 뒤에 둔다. */}
+        {!scrim.ready && (
+          <ScrimProgressChart
+            rounds={scrim.rounds}
+            leaderboard={scrim.leaderboard}
+          />
         )}
         {scrim.cutoffAt && (
           <Card>
