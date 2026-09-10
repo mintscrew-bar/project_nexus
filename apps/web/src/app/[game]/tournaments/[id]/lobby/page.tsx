@@ -799,7 +799,7 @@ export default function TournamentLobbyPage() {
           onMouseLeave={scheduleHoverClose}
         />
       )}
-      <div className="flex flex-col h-full min-h-0">
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* ═══ Room Header ═══ */}
         <header className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 lg:px-6">
           <div className="container mx-auto flex items-center justify-between gap-4">
@@ -1068,7 +1068,7 @@ export default function TournamentLobbyPage() {
         )}
 
         {/* ═══ Main Content: Desktop 2-col / Mobile Tabs ═══ */}
-        <div className="min-h-0 flex-1 basis-0 overflow-hidden">
+        <div className="flex min-h-0 flex-1 basis-0 overflow-hidden">
           {isAutoBalanceReviewStage ? (
             /* ═══ 편성 확인 전용 데스크톱 레이아웃 ═══
                2:1 분할을 버리고 편성 영역이 폭 전체를 쓴다. 채팅은 좁은 사이드로 유지. */
@@ -1086,14 +1086,14 @@ export default function TournamentLobbyPage() {
                     채팅
                   </h2>
                 </div>
-                <div className="min-h-0 flex-1 basis-0 overflow-hidden">
+                <div className="flex min-h-0 flex-1 basis-0 overflow-hidden">
                   {chatPanel}
                 </div>
               </aside>
             </div>
           ) : (
             /* Desktop layout (lg+) */
-            <div className="container mx-auto hidden h-full min-h-0 gap-4 px-6 py-4 lg:flex">
+            <div className="container mx-auto hidden min-h-0 min-w-0 flex-1 gap-4 overflow-hidden px-6 py-4 lg:flex">
               {/* Participants: 2/3 */}
               <section
                 data-tour="lobby-participants"
@@ -1124,7 +1124,7 @@ export default function TournamentLobbyPage() {
                     채팅
                   </h2>
                 </div>
-                <div className="min-h-0 flex-1 basis-0 overflow-hidden">
+                <div className="flex min-h-0 flex-1 basis-0 overflow-hidden">
                   {chatPanel}
                 </div>
               </section>
