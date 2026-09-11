@@ -32,5 +32,5 @@ export default function GameHome() {
     );
   }
 
-  return <div className="flex flex-1 animate-fade-in"><ErrorBoundary><DashboardContent /></ErrorBoundary></div>;
+  return <div className="container mx-auto flex w-full max-w-[1480px] flex-1 animate-fade-in p-4 md:p-6 lg:py-8"><ErrorBoundary><DashboardContent gameTitle={title} /></ErrorBoundary></div>;
 }

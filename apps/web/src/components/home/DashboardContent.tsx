@@ -210,12 +210,14 @@ function getTimeGreeting() {
 }
 
 function DashboardHero({
+  gameTitle,
   username,
   rooms,
   stats,
   primaryAccount,
   clan,
 }: {
+  gameTitle?: "LOL" | "PUBG";
   username: string;
   rooms: Room[];
   stats: UserStats | null;
@@ -288,7 +290,9 @@ function DashboardHero({
           <p className="mt-5 max-w-xl text-sm leading-6 text-white/45 sm:text-base sm:leading-7">
             {rooms.length > 0
               ? `${rooms.length}개의 내전이 참가자를 기다리고 있습니다. 로비에 합류하거나 직접 새로운 경기를 시작해보세요.`
-              : "현재 모집 중인 내전이 없습니다. 새 로비를 열고 오늘의 경기를 시작해보세요."}
+              : gameTitle === "PUBG"
+                ? "현재 모집 중인 스크림이 없습니다. 새 로비를 열고 오늘의 라운드를 시작해보세요."
+                : "현재 모집 중인 내전이 없습니다. 새 로비를 열고 오늘의 경기를 시작해보세요."}
           </p>
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -297,7 +301,7 @@ function DashboardHero({
               onClick={() => router.push(`${gamePrefix}/tournaments`)}
               className="group inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-[#111218] transition-all hover:bg-violet-100"
             >
-              참가할 내전 찾기
+              {gameTitle === "PUBG" ? "참가할 스크림 찾기" : "참가할 내전 찾기"}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
             <button
@@ -306,7 +310,7 @@ function DashboardHero({
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white/75 transition-colors hover:border-violet-300/25 hover:bg-violet-300/[0.08] hover:text-white"
             >
               <Plus className="h-4 w-4" />
-              새 내전 만들기
+              {gameTitle === "PUBG" ? "새 스크림 만들기" : "새 내전 만들기"}
             </button>
           </div>
 
@@ -382,7 +386,7 @@ function DashboardHero({
   );
 }
 
-function QuickActions({ clan }: { clan: ClanSummary | null }) {
+function QuickActions({ clan, gameTitle }: { clan: ClanSummary | null; gameTitle?: "LOL" | "PUBG" }) {
   const router = useRouter();
   // 내전·전적은 게임별 화면이다. 프리픽스 없이 두면 배그를 보다가 눌러도
   // 롤 화면으로 넘어간다(맨 경로는 308 로 기본 게임에 붙는다).
@@ -391,8 +395,8 @@ function QuickActions({ clan }: { clan: ClanSummary | null }) {
   const gamePrefix = useDashboardGamePrefix();
   const actions = [
     {
-      label: "내전 만들기",
-      description: "새 로비를 열고 참가자를 모집하세요",
+      label: gameTitle === "PUBG" ? "스크림 만들기" : "내전 만들기",
+      description: gameTitle === "PUBG" ? "새 스크림을 열고 스쿼드를 모집하세요" : "새 로비를 열고 참가자를 모집하세요",
       icon: Plus,
       href: `${gamePrefix}/tournaments?create=true`,
       tone: "text-amber-300 bg-amber-300/[0.08] border-amber-300/10",
@@ -1143,7 +1147,7 @@ function DashboardSkeleton() {
 // DashboardContent
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function DashboardContent() {
+export function DashboardContent({ gameTitle }: { gameTitle?: "LOL" | "PUBG" } = {}) {
   const { user, isAuthenticated } = useAuthStore();
   const { primaryAccount, fetchAccounts } = useRiotStore();
 
@@ -1245,6 +1249,7 @@ export function DashboardContent() {
   return (
     <div className="space-y-6">
       <DashboardHero
+        gameTitle={gameTitle}
         username={user?.username || "플레이어"}
         rooms={rooms}
         stats={userStats}
@@ -1252,7 +1257,7 @@ export function DashboardContent() {
         clan={myClan}
       />
 
-      <QuickActions clan={myClan} />
+      <QuickActions clan={myClan} gameTitle={gameTitle} />
 
       {/* 방송 중인 스트리머가 있을 때만 나타나는 섹션 */}
       <ErrorBoundary>
