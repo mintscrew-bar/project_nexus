@@ -80,7 +80,7 @@ const landingNavLinks = [
   { href: "#auction", label: "경매" },
   { href: "#auto-balance", label: "팀 편성 도구" },
   { href: "#operations", label: "주요 기능" },
-  { href: "/tournaments", label: "내전 방" },
+  { href: `${DEFAULT_GAME_PREFIX}/tournaments`, label: "내전 방" },
   { href: "/community", label: "커뮤니티" },
 ];
 

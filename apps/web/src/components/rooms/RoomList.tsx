@@ -407,7 +407,7 @@ export function RoomList({
               </>
             }
             action={onCreateRoom ? { label: "방 만들기", onClick: onCreateRoom } : undefined}
-            secondaryAction={{ label: "가이드 보기", href: "/guide" }}
+            secondaryAction={{ label: "가이드 보기", href: `/${GAMES[gameTitle].slug}/guide` }}
             className="py-16 md:py-24"
           />
         ) : (
