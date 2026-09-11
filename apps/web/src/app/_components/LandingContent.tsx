@@ -654,7 +654,7 @@ function OperationBoard() {
                 MATCH CONTROL
               </p>
               <p className="mt-0.5 truncate text-sm font-semibold text-white">
-                어떤 게임으로 시작할까요?
+                금요일 밤 내전 운영
               </p>
             </div>
           </div>
@@ -832,10 +832,10 @@ export function LandingContentSections() {
             </div>
 
             <h1 className="mt-7 max-w-[760px] text-[clamp(3rem,6vw,6.25rem)] font-black leading-[0.98] tracking-[-0.065em] text-white">
-              게임을 고르고,
+              내전 운영,
               <br />
               <span className="text-amber-200">
-                내전을 시작하세요
+                한곳에서 끝까지
               </span>
             </h1>
 
