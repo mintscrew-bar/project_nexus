@@ -71,7 +71,7 @@ export function GamePickerCards() {
                     {game.title === "PUBG" ? "PLAYERUNKNOWN'S BATTLEGROUNDS" : "LEAGUE OF LEGENDS"}
                   </p>
                   <p className="mt-2 text-2xl font-black tracking-[-0.03em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] sm:text-3xl">
-                    {game.title === "PUBG" ? "PUBG \uB0B4\uC804" : "\uB85C\uC804"}
+                    {game.title === "PUBG" ? "PUBG \uB0B4\uC804" : "\uB864 \uB0B4\uC804"}
                   </p>
                   <p className="mt-2 text-xs font-medium tracking-[0.08em] text-white/70">
                     {game.title === "PUBG" ? "\uD0AC\uB0B4\uAE30 / \uBC30\uD2C0\uB85C\uC584 / \uD300 \uAE30\uB85D" : "\uBAA8\uC9D1 / \uD300 \uD3B8\uC131 / \uACBD\uAE30 \uAE30\uB85D"}
