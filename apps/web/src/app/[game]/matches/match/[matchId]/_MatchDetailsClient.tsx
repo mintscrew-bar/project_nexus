@@ -1092,7 +1092,7 @@ function StatBarSection({
 
 function MatchSkeleton() {
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="min-h-screen">
       <div className="border-b border-bg-tertiary">
         <div className="container mx-auto px-4 py-4">
           <Skeleton className="h-5 w-24" />
@@ -1370,7 +1370,7 @@ export default function MatchDetailsClient({
     const collectable = Boolean(match.tournamentCode || match.riotMatchId);
 
     return (
-      <div className="min-h-screen bg-bg-primary">
+      <div className="min-h-screen">
         <div className="border-b border-bg-tertiary">
           <div className="container mx-auto px-4 py-4">
             <button
@@ -1461,7 +1461,7 @@ export default function MatchDetailsClient({
   const teamBBans = parseBans(teamBStats?.bans);
 
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="min-h-screen">
       {/* Back Button */}
       <div className="border-b border-bg-tertiary">
         <div className="container mx-auto px-4 py-4">

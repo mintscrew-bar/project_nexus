@@ -47,7 +47,7 @@ export function PubgRankingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="min-h-screen">
       <div className="border-b border-bg-tertiary bg-bg-secondary">
         <div className="container mx-auto px-4 py-6">
           <div className="mb-4 flex items-center gap-3">

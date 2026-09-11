@@ -75,7 +75,7 @@ export default function TournamentsPage({
   }, [setSearchRef]);
 
   return (
-    <div className="flex-grow bg-bg-primary">
+    <div className="flex-grow">
       {isAuthenticated && <TournamentsTour />}
       <div className="w-full px-5 py-8 sm:px-6 md:py-10 lg:px-8">
         <header className="grid gap-6 border-b border-bg-tertiary/70 pb-8 md:pb-10 lg:grid-cols-[minmax(18rem,1fr)_minmax(34rem,52rem)] lg:items-start">

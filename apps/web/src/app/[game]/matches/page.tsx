@@ -236,7 +236,7 @@ function LolMatchesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="min-h-screen">
       <MatchesTour />
       {/* Hero Section */}
       <div className="relative isolate overflow-hidden border-b border-white/[0.07] bg-[#0b0c11]">

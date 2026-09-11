@@ -148,7 +148,7 @@ export default function UserStatsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-bg-primary">
+      <div className="min-h-screen">
         <div className="border-b border-bg-tertiary">
           <div className="container mx-auto px-4 py-4">
             <Skeleton className="h-5 w-36" />
@@ -217,7 +217,7 @@ export default function UserStatsPage() {
   const stats = calculateStats();
 
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="min-h-screen">
       {/* Back Button */}
       <div className="border-b border-bg-tertiary">
         <div className="container mx-auto px-4 py-4">

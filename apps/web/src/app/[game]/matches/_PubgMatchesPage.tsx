@@ -49,7 +49,7 @@ export function PubgMatchesPage() {
   }
 
   return (
-    <div className="flex-grow bg-bg-primary px-5 py-8 sm:px-6 md:py-10 lg:px-8">
+    <div className="flex-grow px-5 py-8 sm:px-6 md:py-10 lg:px-8">
       <div className="mx-auto max-w-4xl space-y-6">
         <header>
           <p className="text-sm font-semibold text-accent-primary">

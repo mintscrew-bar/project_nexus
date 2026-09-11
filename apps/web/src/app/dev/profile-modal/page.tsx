@@ -371,7 +371,7 @@ export default function ProfileModalDevPage() {
   const recent = getRecentMetrics(RECENT_MATCHES);
 
   return (
-    <main className="min-h-screen bg-bg-primary px-4 py-10 text-text-primary sm:px-6">
+    <main className="min-h-screen px-4 py-10 text-text-primary sm:px-6">
       <div className="mx-auto mb-5 max-w-5xl">
         <p className="font-mono text-xs text-text-muted">개발 프리뷰 · /dev/profile-modal</p>
         <h1 className="mt-1 text-2xl font-black text-text-primary">PlayerProfileModal</h1>

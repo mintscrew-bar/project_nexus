@@ -64,7 +64,7 @@ function LolRankingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="min-h-screen">
       <RankingTour />
       {/* Header */}
       <div className="border-b border-bg-tertiary bg-bg-secondary">

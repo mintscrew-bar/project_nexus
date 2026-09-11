@@ -335,7 +335,7 @@ export default function ScrimPage() {
           : null;
 
   return (
-    <div className="flex-grow bg-bg-primary px-5 py-8 sm:px-6 md:py-10 lg:px-8">
+    <div className="flex-grow px-5 py-8 sm:px-6 md:py-10 lg:px-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <ScrimFlowStepper mode={room?.pubgGameMode ?? "BATTLE_ROYALE"} currentStep={getScrimFlowStep(scrim, room?.pubgGameMode ?? "BATTLE_ROYALE", completedRounds, runningRound)} />
 
@@ -770,7 +770,7 @@ function ScrimSetup({
   }
 
   return (
-    <div className="flex-grow bg-bg-primary px-5 py-10">
+    <div className="flex-grow px-5 py-10">
       <div className="mx-auto max-w-2xl space-y-6">
         <ScrimFlowStepper mode={mode} currentStep={0} />
         <header>

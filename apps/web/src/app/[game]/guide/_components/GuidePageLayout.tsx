@@ -22,7 +22,7 @@ export function GuidePageLayout({
   homeHref?: string;
 }) {
   return (
-    <main className="flex-grow bg-bg-primary">
+    <main className="flex-grow">
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6 md:py-16">
         <Link
           href={homeHref}

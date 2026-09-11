@@ -327,7 +327,7 @@ export default async function GuidePage({
   const categories = buildCategories(base, game);
   const flow = FLOW[game];
   return (
-    <main className="flex-grow bg-bg-primary">
+    <main className="flex-grow">
       <div className="mx-auto max-w-[1320px] px-4 py-10 md:px-6 md:py-16">
         <header className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-bg-secondary via-bg-secondary to-accent-primary/[0.07] p-7 shadow-[0_28px_80px_rgb(0_0_0/0.16)] md:p-10 lg:p-12">
           <div aria-hidden="true" className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent-primary/[0.08] blur-3xl" />

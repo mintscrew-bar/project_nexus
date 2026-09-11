@@ -413,7 +413,7 @@ function HoverCardPreview({ p }: { p: typeof MOCK_PROFILES[number] }) {
 
 export default function HoverCardDevPage() {
   return (
-    <div className="min-h-screen bg-bg-primary px-8 py-12">
+    <div className="min-h-screen px-8 py-12">
       <div className="mb-8">
         <p className="text-xs font-mono text-text-muted">개발 프리뷰 · /dev/hover-card</p>
         <h1 className="mt-1 text-2xl font-bold text-text-primary">PlayerHoverCard</h1>

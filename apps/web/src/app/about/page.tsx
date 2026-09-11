@@ -97,7 +97,7 @@ const principles = [
 
 export default function AboutPage() {
   return (
-    <div className="flex-grow bg-bg-primary">
+    <div className="flex-grow">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutJsonLd) }}

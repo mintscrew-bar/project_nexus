@@ -63,7 +63,7 @@ const MOCK_ROOMS = [
 
 export default function RoomCardPreviewPage() {
   return (
-    <div className="min-h-full flex-grow bg-bg-primary px-5 py-10 sm:px-6 md:py-14 lg:px-10">
+    <div className="min-h-full flex-grow px-5 py-10 sm:px-6 md:py-14 lg:px-10">
       <div className="mx-auto max-w-[1480px]">
         <div className="mb-8 border-b border-bg-tertiary pb-8">
           <p className="text-[10px] font-bold tracking-[0.2em] text-accent-gold">

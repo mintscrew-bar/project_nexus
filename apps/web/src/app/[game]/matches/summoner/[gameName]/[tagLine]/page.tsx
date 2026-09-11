@@ -441,7 +441,7 @@ export default function SummonerStatsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-bg-primary">
+      <div className="min-h-screen">
         {/* 검색 헤더 스켈레톤 */}
         <div className="border-b border-bg-tertiary bg-bg-secondary">
           <div className="container mx-auto px-4 py-3">
@@ -602,7 +602,7 @@ export default function SummonerStatsPage() {
           : false;
 
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="min-h-screen">
       {/* Search Header */}
       <div className="border-b border-bg-tertiary bg-bg-secondary">
         <div className="container mx-auto px-4 py-3">

@@ -48,7 +48,7 @@ export default async function GuideArticlePage({
   const base = guideBase(guideGame(game));
 
   return (
-    <main className="flex-grow bg-bg-primary">
+    <main className="flex-grow">
       <article className="mx-auto max-w-3xl px-4 py-10 md:px-6 md:py-16">
         <Link
           href={`${base}/guide/resources`}
