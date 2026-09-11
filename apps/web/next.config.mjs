@@ -60,6 +60,12 @@ const uploadRemotePattern = (() => {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // 산출물 경로. 기본은 `.next` 이고 환경변수로만 바꾼다.
+  //
+  // dev 서버를 두 개 띄울 때(운영 확인용 미리보기 등) 경로를 안 나누면
+  // 둘이 같은 디렉터리에 써서 vendor 청크가 반쪽만 남는다 —
+  // "Cannot find module './vendor-chunks/...'" 가 그 증상이다.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   poweredByHeader: false,
   env: {

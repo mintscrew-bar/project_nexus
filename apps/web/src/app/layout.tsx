@@ -117,15 +117,18 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" suppressHydrationWarning>
-      <head suppressHydrationWarning>
+      <body
+        className="font-sans h-screen flex flex-col overflow-hidden"
+      >
+        {/*
+          JSON-LD 를 수동 `<head>` 에 넣지 않는다. App Router 는 head 를 직접
+          관리하고, 서드파티 스크립트가 그 안으로 끼어들면 하이드레이션 때
+          자리가 밀려 트리가 어긋난다. 본문에 두어도 크롤러는 똑같이 읽는다.
+        */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
         />
-      </head>
-      <body
-        className="font-sans h-screen flex flex-col overflow-hidden"
-      >
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>

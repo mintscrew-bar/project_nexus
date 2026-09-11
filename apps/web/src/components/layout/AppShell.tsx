@@ -11,7 +11,7 @@ import { FloatingDmPanel } from '@/components/domain/FloatingDmPanel';
 import { FloatingClanChatPanel } from '@/components/domain/FloatingClanChatPanel';
 import { CreatorPromoStrip } from './CreatorPromoStrip';
 import { ActiveRoomBanner } from './ActiveRoomBanner';
-import { PubgSurfaceGlow } from './PubgSurfaceGlow';
+import { PubgSurfaceGrain } from './PubgSurfaceGrain';
 import { useLobbyStore } from '@/stores/lobby-store';
 import { useCurrentGame } from '@/hooks/useCurrentGame';
 import { gameFromSlug } from '@nexus/types';
@@ -47,9 +47,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // 토큰은 래퍼와 body 양쪽에 건다. 모달·툴팁은 createPortal로
   // document.body에 그려져 래퍼 밖에 있어서, 래퍼에만 걸면 배그 화면에서
   // 모달만 롤 색으로 뜬다.
-  // 바탕 질감(그레인 + 커서 광원)은 body 가 그린다(`body.game-pubg`).
-  // 래퍼에 두면 두 겹으로 깔리고, 마스크로 깎으려 하면 쌓임 맥락이 생겨
-  // 안쪽 `fixed` 요소가 갇힌다(globals.css 참고).
+  // 필름 그레인은 화면 위에 얹는 오버레이다(PubgSurfaceGrain).
+  // 래퍼 배경으로 깔면 페이지들이 자기 배경을 칠해 가려진다.
   // ---------------------------------------------------------------
   // 마지막으로 본 게임을 기억한다. 게임을 한 번 고른 사람에게 매번 다시
   // 고르라고 하지 않기 위한 값이다. 경로로 게임이 특정되는 화면에서만 적는다 —
@@ -96,8 +95,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // 인증된 앱 셸 (또는 마운트 전 기본 셸)
   return (
     <div className={cn("flex h-full min-h-0 flex-col", themeClass)}>
-      {/* 바탕 광원·그레인을 커서에 붙인다. 좌표만 넘기므로 리렌더는 없다. */}
-      {themeClass && <PubgSurfaceGlow />}
+      {/* 필름 그레인 오버레이. 좌표만 넘기므로 리렌더는 없다. */}
+      {themeClass && <PubgSurfaceGrain />}
       <Header />
       <main className="flex min-h-0 min-w-0 flex-grow">
         {/*

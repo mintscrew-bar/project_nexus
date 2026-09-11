@@ -5,6 +5,8 @@ node_modules
 # Build outputs
 dist
 .next
+# 미리보기용 dev 서버 산출물(NEXT_DIST_DIR)
+.next-*
 .turbo
 build
 *.tsbuildinfo
