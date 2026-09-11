@@ -62,10 +62,10 @@ export function GamePickerCards() {
             >
               <div
                 aria-hidden
-                className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-45 grayscale-[0.15] transition duration-500 group-hover:scale-105 group-hover:opacity-65"
+                className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95"
                 style={{ backgroundImage: `url(${CARD_IMAGE[game.title]})` }}
               />
-              <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#090a0d] via-[#090a0d]/55 to-[#090a0d]/10" />
+              <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#090a0d]/75 via-[#090a0d]/20 to-transparent" />
               <div aria-hidden className={`pointer-events-none absolute inset-0 bg-gradient-to-br opacity-30 transition-opacity duration-300 group-hover:opacity-60 ${style.glow}`} />
 
               <div className="relative flex h-full flex-col justify-between gap-4">
