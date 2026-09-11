@@ -44,13 +44,13 @@ export default async function GameHome({ params }: { params: Promise<{ game: str
             <p className="mt-6 max-w-2xl text-base leading-7 text-white/60 md:text-lg md:leading-8">{item.description}</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/auth/login" className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-[#111217] transition hover:-translate-y-0.5">Nexus 로그인 <ArrowRight className="h-4 w-4" /></Link>
-              <Link href={`/${slug}/tournaments`} className="inline-flex items-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.08]">열린 {isPubg ? "스크림" : "내전"} 보기</Link>
+              <Link href={`/${slug}/tournaments?create=true`} className="inline-flex items-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/[0.08]">새 {isPubg ? "스크림" : "내전"} 만들기</Link>
             </div>
           </div>
           <div className={`pointer-events-none absolute -bottom-24 -right-12 h-64 w-64 rounded-full blur-[100px] ${isPubg ? "bg-[#596044]/30" : "bg-[#764BA2]/25"}`} />
         </section>
         <section className="mt-10">
-          <div className="mb-5 flex items-center gap-2 text-white/55"><Users className={`h-4 w-4 ${item.accent}`} /><h2 className="text-sm font-bold tracking-wide">{isPubg ? "배그에서 할 수 있는 것" : "롤에서 할 수 있는 것"}</h2></div>
+          <div className="mb-5 flex items-center gap-2 text-white/55"><Users className={`h-4 w-4 ${item.accent}`} /><h2 className="text-sm font-bold tracking-wide">{isPubg ? "배그 운영 시작하기" : "롤 운영 시작하기"}</h2></div>
           <div className="grid gap-4 md:grid-cols-3">
             {item.features.map(([href, cardTitle, description, Icon]) => (
               <Link key={href} href={`/${slug}/${href}`} className="group rounded-2xl border border-white/[0.09] bg-[#15171c] p-6 transition hover:-translate-y-1 hover:border-white/20">
