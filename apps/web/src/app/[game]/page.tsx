@@ -5,16 +5,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { ErrorBoundary, Skeleton } from "@/components/ui";
-import { GAMES, GAME_TITLES, gameFromSlug } from "@nexus/types";
+import { GAMES, gameFromSlug } from "@nexus/types";
 
 const DashboardContent = dynamic(
   () => import("@/components/home/DashboardContent").then((mod) => mod.DashboardContent),
   { ssr: false, loading: () => <Skeleton className="h-[70vh] rounded-[28px]" /> },
 );
-
-export function generateStaticParams() {
-  return GAME_TITLES.map((title) => ({ game: GAMES[title].slug }));
-}
 
 export default function GameHome() {
   const { game } = useParams<{ game: string }>();
