@@ -42,18 +42,9 @@ export function GamePickerCards() {
   return (
     <section
       className="mx-auto max-w-[1480px] px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
-      aria-labelledby="game-picker-heading"
+      aria-label="Nexus game hubs"
     >
-      <h2
-        id="game-picker-heading"
-        className="text-xs font-bold tracking-[0.2em] text-white/50"
-      >
-        게임을 선택하세요
-      </h2>
-      <p className="mt-4 max-w-xl text-2xl font-black tracking-[-0.04em] text-white sm:text-3xl">어떤 게임으로 시작할까요?</p>
-      <p className="mt-3 max-w-xl text-sm leading-6 text-white/50">게임을 고르면 해당 게임의 로비와 내전 운영 화면으로 바로 이어집니다.</p>
-
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {games.map((game) => {
           const style = CARD_STYLE[game.title] ?? CARD_STYLE.LOL;
           return (
