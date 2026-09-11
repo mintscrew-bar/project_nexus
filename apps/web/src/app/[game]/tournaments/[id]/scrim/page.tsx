@@ -13,6 +13,7 @@ import {
   Play,
   Skull,
   Trophy,
+  CheckCircle2,
 } from "lucide-react";
 import {
   PUBG_POINT_RULE_PRESETS,
@@ -336,6 +337,8 @@ export default function ScrimPage() {
   return (
     <div className="flex-grow bg-bg-primary px-5 py-8 sm:px-6 md:py-10 lg:px-8">
       <div className="mx-auto max-w-5xl space-y-6">
+        <ScrimFlowStepper mode={room?.pubgGameMode ?? "BATTLE_ROYALE"} currentStep={getScrimFlowStep(scrim, room?.pubgGameMode ?? "BATTLE_ROYALE", completedRounds, runningRound)} />
+
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-accent-primary">
@@ -684,6 +687,52 @@ function KillMatchReady({
   );
 }
 
+type ScrimFlowMode = "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH";
+
+function getScrimFlowStep(
+  scrim: Scrim,
+  mode: ScrimFlowMode,
+  completedRounds: number,
+  runningRound: ScrimRound | undefined,
+) {
+  if (scrim.status === "COMPLETED") return 4;
+  if (mode === "KILL_MATCH") {
+    if (scrim.ready) return 1;
+    return completedRounds > 0 ? 3 : 2;
+  }
+  if (runningRound) return 2;
+  return completedRounds > 0 ? 3 : 1;
+}
+
+function ScrimFlowStepper({
+  mode,
+  currentStep,
+}: {
+  mode: ScrimFlowMode;
+  currentStep: number;
+}) {
+  const labels = mode === "KILL_MATCH"
+    ? ["설정", "팀장 준비", "시간제 경기", "결과 검토", "최종 확정"]
+    : ["설정", "라운드 시작", "경기 진행", "누적 순위", "최종 확정"];
+  return (
+    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary px-4 py-3" aria-label="스크림 진행 단계">
+      <div className="flex items-center justify-between gap-2 overflow-x-auto">
+        {labels.map((label, index) => (
+          <div key={label} className="flex min-w-max flex-1 items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className={index <= currentStep ? "flex h-7 w-7 items-center justify-center rounded-full bg-accent-primary text-xs font-bold text-white" : "flex h-7 w-7 items-center justify-center rounded-full border border-bg-elevated text-xs font-bold text-text-tertiary"}>
+                {index < currentStep ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+              </span>
+              <span className={index === currentStep ? "text-sm font-bold text-text-primary" : index < currentStep ? "text-sm font-semibold text-accent-primary" : "text-sm text-text-tertiary"}>{label}</span>
+            </div>
+            {index < labels.length - 1 && <div className={index < currentStep ? "h-px flex-1 bg-accent-primary" : "h-px flex-1 bg-bg-elevated"} /> }
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** 스크림 시작 전 — 라운드 수와 포인트표를 고른다. */
 function ScrimSetup({
   configuredRounds,
@@ -723,6 +772,7 @@ function ScrimSetup({
   return (
     <div className="flex-grow bg-bg-primary px-5 py-10">
       <div className="mx-auto max-w-2xl space-y-6">
+        <ScrimFlowStepper mode={mode} currentStep={0} />
         <header>
           <h1 className="text-2xl font-bold text-text-primary">스크림 설정</h1>
           <p className="mt-2 text-sm text-text-secondary">
