@@ -48,7 +48,7 @@ export function GamePickerCards() {
         <span>LOL</span>
         <span>PUBG</span>
       </div>
-      <div className="relative z-10 mx-auto grid max-w-[760px] grid-cols-2 gap-3 sm:gap-5">
+      <div className="relative z-10 mx-auto grid max-w-[600px] grid-cols-2 gap-3 sm:gap-5">
         {games.map((game) => {
           const style = CARD_STYLE[game.title] ?? CARD_STYLE.LOL;
           return (
