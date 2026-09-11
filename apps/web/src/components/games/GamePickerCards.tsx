@@ -44,8 +44,8 @@ export function GamePickerCards() {
       className="relative isolate mx-auto max-w-[1480px] px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
       aria-label="Nexus game hubs"
     >
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-8 z-0 flex items-center justify-between px-0 text-[clamp(9rem,24vw,24rem)] font-black leading-none tracking-[-0.12em] text-white/[0.045]">
-        <span>LOL</span>
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-8 z-0 flex items-center justify-between px-0 text-[clamp(7rem,18vw,18rem)] font-black leading-none tracking-[-0.12em] text-white/[0.045]">
+        <span>LEAGUE OF LEGENDS</span>
         <span>PUBG</span>
       </div>
       <div className="relative z-10 mx-auto mt-24 grid max-w-[600px] grid-cols-2 gap-3 sm:gap-5">
@@ -71,10 +71,10 @@ export function GamePickerCards() {
                     {game.title === "PUBG" ? "PLAYERUNKNOWN'S BATTLEGROUNDS" : "LEAGUE OF LEGENDS"}
                   </p>
                   <p className="mt-2 text-2xl font-black tracking-[-0.03em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] sm:text-3xl">
-                    {game.title === "PUBG" ? "PUBG SCRIM" : "LOL SCRIM"}
+                    {game.title === "PUBG" ? "PUBG \uB0B4\uC804" : "\uB85C\uC804"}
                   </p>
                   <p className="mt-2 text-xs font-medium tracking-[0.08em] text-white/70">
-                    {game.title === "PUBG" ? "KILL MATCH / BATTLE ROYALE / TEAM STATS" : "LOBBY / TEAM BUILD / MATCH RECORD"}
+                    {game.title === "PUBG" ? "\uD0AC\uB0B4\uAE30 / \uBC30\uD2C0\uB85C\uC584 / \uD300 \uAE30\uB85D" : "\uBAA8\uC9D1 / \uD300 \uD3B8\uC131 / \uACBD\uAE30 \uAE30\uB85D"}
                   </p>
                 </div>
 
