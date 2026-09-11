@@ -44,9 +44,6 @@ export function GamePickerCards() {
       className="relative isolate mx-auto max-w-[1480px] px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
       aria-label="Nexus game hubs"
     >
-      <div aria-hidden className="pointer-events-none absolute -top-1 left-0 right-0 -z-10 text-center whitespace-nowrap text-[clamp(4rem,12vw,12rem)] font-black leading-none tracking-[-0.1em] text-white/[0.025]">
-        NEXUS / PLAY
-      </div>
       <div className="grid gap-4 md:grid-cols-2">
         {games.map((game) => {
           const style = CARD_STYLE[game.title] ?? CARD_STYLE.LOL;
@@ -58,18 +55,18 @@ export function GamePickerCards() {
             >
               <div
                 aria-hidden
-                className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95"
+                className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-95 transition duration-500 group-hover:scale-105 group-hover:opacity-100"
                 style={{ backgroundImage: `url(${CARD_IMAGE[game.title]})` }}
               />
-              <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#090a0d]/75 via-[#090a0d]/20 to-transparent" />
+              <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#090a0d]/90 via-[#090a0d]/35 to-transparent" />
               <div aria-hidden className={`pointer-events-none absolute inset-0 bg-gradient-to-br opacity-30 transition-opacity duration-300 group-hover:opacity-60 ${style.glow}`} />
 
-              <div className="relative flex h-full flex-col justify-between gap-4">
+              <div className="relative flex h-full flex-col justify-end gap-4">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-bold tracking-[0.14em] text-white/70">
+                  <p className="text-[10px] font-bold tracking-[0.2em] text-white/80 drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)]">
                     {game.title === "PUBG" ? "PLAYERUNKNOWN'S BATTLEGROUNDS" : "LEAGUE OF LEGENDS"}
                   </p>
-                  <p className="mt-2 text-4xl font-black tracking-[-0.06em] text-white sm:text-5xl">
+                  <p className="mt-2 text-3xl font-black tracking-[-0.025em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] sm:text-4xl">
                     {game.label} 내전
                   </p>
                 </div>
