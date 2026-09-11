@@ -799,6 +799,19 @@ export default function TournamentLobbyPage() {
           onMouseLeave={scheduleHoverClose}
         />
       )}
+      {/*
+        `h-full` 과 `flex-1` 을 **둘 다** 둔다. 하나만으로는 안 된다.
+
+        AppShell 은 경로(`isDashboardRoute`, 정규식)에 따라 구조가 다른 부모를
+        준다 — 대시보드 경로는 flex column, 그 밖은 grid item 이다.
+        `flex-1` 은 부모가 flex 일 때만 먹고, `h-full` 은 부모 높이만
+        확정돼 있으면 먹는다. 둘 다 있어야 어느 쪽이든 성립한다.
+
+        아래가 전부 `flex-1 basis-0 min-h-0` 사슬이라 여기서 높이가 안 잡히면
+        참가자·채팅 패널이 0 으로 접힌다. DOM 에는 있는데 화면에서 사라진다.
+        같은 증상으로 이미 두 번 고쳤다(28f2bbe9, af4e4468) — 그때 지운 게
+        `h-full` 이었다. 지우지 말 것.
+      */}
       <div className="flex h-full min-h-0 w-full flex-1 flex-col">
         {/* ═══ Room Header ═══ */}
         <header className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 lg:px-6">

@@ -113,6 +113,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/*
             - isDashboardRoute: 페이지 전체가 viewport에 맞게 고정되어야 함 (h-full)
             - 일반 페이지: 내용에 따라 전체 스크롤 가능 (overflow-auto)
+
+            두 갈래가 **구조가 다른 부모**를 준다. 대시보드는 children 이
+            flex column 의 자식이 되고, 일반은 grid item 안에 들어간다.
+            그래서 `flex-1` 에만 기대는 페이지는 이 판정이 뒤집히는 순간
+            높이가 0 으로 접힌다 — 로비가 그래서 두 번 깨졌다.
+            여기 판정은 경로 정규식이라 라우팅이 바뀌어도 컴파일 에러가
+            안 난다. 대시보드형 페이지는 `h-full` 도 같이 들고 있어야 한다.
           */}
           <div className={cn(
             "flex-1 flex flex-col min-h-0",
