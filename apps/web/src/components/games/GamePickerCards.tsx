@@ -67,11 +67,14 @@ export function GamePickerCards() {
 
               <div className="relative flex h-full flex-col justify-end gap-4">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold tracking-[0.2em] text-white/80 drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)]">
+                  <p className="text-[10px] font-bold tracking-[0.16em] leading-[1.2] text-white/80 drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)]">
                     {game.title === "PUBG" ? "PLAYERUNKNOWN'S BATTLEGROUNDS" : "LEAGUE OF LEGENDS"}
                   </p>
-                  <p className="mt-2 text-2xl font-black tracking-[-0.02em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] sm:text-3xl">
-                    {game.label} 내전
+                  <p className="mt-2 text-2xl font-black tracking-[-0.03em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] sm:text-3xl">
+                    {game.title === "PUBG" ? "PUBG SCRIM" : "LOL SCRIM"}
+                  </p>
+                  <p className="mt-2 text-xs font-medium tracking-[0.08em] text-white/70">
+                    {game.title === "PUBG" ? "KILL MATCH / BATTLE ROYALE / TEAM STATS" : "LOBBY / TEAM BUILD / MATCH RECORD"}
                   </p>
                 </div>
 
