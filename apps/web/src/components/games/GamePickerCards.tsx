@@ -44,18 +44,22 @@ export function GamePickerCards() {
       className="relative isolate mx-auto max-w-[1480px] px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
       aria-label="Nexus game hubs"
     >
-      <div className="grid gap-4 md:grid-cols-2">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-20 z-0 flex items-center justify-between px-0 text-[clamp(7rem,20vw,19rem)] font-black leading-none tracking-[-0.12em] text-white/[0.045]">
+        <span>LOL</span>
+        <span>PUBG</span>
+      </div>
+      <div className="relative z-10 mx-auto grid max-w-[980px] grid-cols-2 gap-3 sm:gap-5">
         {games.map((game) => {
           const style = CARD_STYLE[game.title] ?? CARD_STYLE.LOL;
           return (
             <Link
               key={game.title}
               href={`/${game.slug}`}
-              className={`group relative aspect-[16/9] overflow-hidden rounded-xl bg-white/[0.02] p-6 transition-all duration-300 hover:-translate-y-1 sm:p-7 ${style.ring}`}
+              className={`group relative aspect-[9/16] overflow-hidden rounded-md bg-white/[0.02] p-5 transition-all duration-300 hover:-translate-y-0.5 sm:p-6 ${style.ring}`}
             >
               <div
                 aria-hidden
-                className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-95 transition duration-500 group-hover:scale-105 group-hover:opacity-100"
+                className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-100 transition duration-500 group-hover:scale-[1.02]"
                 style={{ backgroundImage: `url(${CARD_IMAGE[game.title]})` }}
               />
               <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#090a0d]/90 via-[#090a0d]/35 to-transparent" />
@@ -66,7 +70,7 @@ export function GamePickerCards() {
                   <p className="text-[10px] font-bold tracking-[0.2em] text-white/80 drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)]">
                     {game.title === "PUBG" ? "PLAYERUNKNOWN'S BATTLEGROUNDS" : "LEAGUE OF LEGENDS"}
                   </p>
-                  <p className="mt-2 text-3xl font-black tracking-[-0.025em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] sm:text-4xl">
+                  <p className="mt-2 text-2xl font-black tracking-[-0.02em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] sm:text-3xl">
                     {game.label} 내전
                   </p>
                 </div>
