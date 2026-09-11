@@ -9,7 +9,7 @@ import { useCurrentGame } from "@/hooks/useCurrentGame";
  * 롤 ↔ 배그 전환.
  *
  * 라우팅이 `/lol/*` `/pubg/*` 로 갈렸는데 사용자가 게임을 오갈 수단이 없었다.
- * 게임을 바꾸면 그 게임의 첫 화면(내전 목록)으로 보낸다 — 현재 경로를 그대로
+ * 게임을 바꾸면 그 게임의 홈으로 보낸다 — 현재 경로를 그대로
  * 갈아끼우면 `/lol/matches/match/xxx` 같은 롤 전용 상세가 배그에서 깨진다.
  */
 export function GameSwitcher({ className }: { className?: string }) {
@@ -18,7 +18,7 @@ export function GameSwitcher({ className }: { className?: string }) {
 
   const go = (title: GameTitle) => {
     if (title === current) return;
-    router.push(`/${GAMES[title].slug}/tournaments`);
+    router.push(`/${GAMES[title].slug}`);
   };
 
   return (

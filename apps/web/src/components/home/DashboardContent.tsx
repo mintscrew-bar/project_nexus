@@ -226,7 +226,7 @@ function DashboardHero({
       detail: rooms.length > 0 ? "지금 참가자를 기다리는 중" : "새 내전을 열어보세요",
       icon: Swords,
       color: "text-amber-200",
-      href: "/tournaments",
+      href: `${gamePrefix}/tournaments`,
     },
     {
       label: "내전 기록",
