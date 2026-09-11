@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useAuthStore } from "@/stores/auth-store";
+import { useEffect, useState } from "react";
 import { ErrorBoundary, Skeleton } from "@/components/ui";
 
 // 대시보드 스켈레톤 — dynamic 청크 로드 중 빈 화면 방지
@@ -46,9 +47,13 @@ export default function HomeClient({
   landing: React.ReactNode;
 }) {
   const { isAuthenticated } = useAuthStore();
+  const [showLanding, setShowLanding] = useState(false);
+  useEffect(() => {
+    setShowLanding(new URLSearchParams(window.location.search).get("home") === "overview");
+  }, []);
 
   // 인증 상태에서는 작업 중심 대시보드만 노출한다.
-  if (isAuthenticated) {
+  if (isAuthenticated && !showLanding) {
     return (
       <div className="flex-grow animate-fade-in">
         {/* 신규 유저 첫 방문 온보딩 가이드 (localStorage로 1회 노출) */}

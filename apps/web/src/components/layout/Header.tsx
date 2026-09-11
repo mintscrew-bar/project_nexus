@@ -76,7 +76,7 @@ export function Header() {
       {/* Left: Logo + Mobile Menu */}
       <div className="flex shrink-0 items-center gap-2">
         <MobileMenu />
-        <Link href="/" className="flex items-center">
+        <Link href="/?home=overview" className="flex items-center">
           <Logo className="h-8 w-auto" />
         </Link>
         <GameSwitcher className="hidden sm:flex" />
