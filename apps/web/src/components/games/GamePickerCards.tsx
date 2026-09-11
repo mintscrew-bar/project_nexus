@@ -44,9 +44,9 @@ export function GamePickerCards() {
       className="relative isolate mx-auto max-w-[1480px] px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
       aria-label="Nexus game hubs"
     >
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-8 z-0 flex items-center justify-between px-0 text-[clamp(7rem,18vw,18rem)] font-black leading-none tracking-[-0.12em] text-white/[0.045]">
-        <span>LEAGUE OF LEGENDS</span>
-        <span>PUBG</span>
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-8 z-0 flex items-center justify-between px-0 text-[clamp(8rem,18vw,18rem)] font-black leading-none tracking-[-0.04em] text-white/[0.08]">
+        <span>READY?</span>
+        <span>GO!</span>
       </div>
       <div className="relative z-10 mx-auto mt-24 grid max-w-[600px] grid-cols-2 gap-3 sm:gap-5">
         {games.map((game) => {
