@@ -41,9 +41,12 @@ export function GamePickerCards() {
 
   return (
     <section
-      className="mx-auto max-w-[1480px] px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
+      className="relative isolate mx-auto max-w-[1480px] overflow-hidden px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
       aria-label="Nexus game hubs"
     >
+      <div aria-hidden className="pointer-events-none absolute -top-8 left-1/2 -z-10 -translate-x-1/2 whitespace-nowrap text-[clamp(6rem,18vw,18rem)] font-black leading-none tracking-[-0.1em] text-white/[0.025]">
+        NEXUS / PLAY
+      </div>
       <div className="grid gap-4 md:grid-cols-2">
         {games.map((game) => {
           const style = CARD_STYLE[game.title] ?? CARD_STYLE.LOL;
@@ -66,7 +69,7 @@ export function GamePickerCards() {
                   <p className="text-[11px] font-bold tracking-[0.2em] text-white/65">
                     {game.title === "PUBG" ? "PLAYERUNKNOWN'S BATTLEGROUNDS" : "LEAGUE OF LEGENDS"}
                   </p>
-                  <p className="mt-2 text-2xl font-black text-white sm:text-3xl">
+                  <p className="mt-2 text-4xl font-black tracking-[-0.06em] text-white sm:text-5xl">
                     {game.label} 내전
                   </p>
                 </div>
