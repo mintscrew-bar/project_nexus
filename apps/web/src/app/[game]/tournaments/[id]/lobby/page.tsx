@@ -799,7 +799,7 @@ export default function TournamentLobbyPage() {
           onMouseLeave={scheduleHoverClose}
         />
       )}
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col">
         {/* ═══ Room Header ═══ */}
         <header className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 lg:px-6">
           <div className="container mx-auto flex items-center justify-between gap-4">
@@ -1077,6 +1077,20 @@ export default function TournamentLobbyPage() {
                 {autoBalanceReview}
               </section>
               <aside
+                data-tour="lobby-participants"
+                className="flex min-h-0 w-72 flex-shrink-0 flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
+              >
+                <div className="border-b border-bg-tertiary px-4 py-2.5">
+                  <h2 className="flex items-center gap-2 text-sm font-bold text-text-primary">
+                    <Users className="h-4 w-4 text-text-secondary" />
+                    참가자 <span className="text-xs font-normal text-text-tertiary">{totalPlayers}/{room.maxParticipants}</span>
+                  </h2>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                  {participantsList}
+                </div>
+              </aside>
+              <aside
                 data-tour="lobby-chat"
                 className="flex min-h-0 w-80 flex-shrink-0 flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
               >
@@ -1182,7 +1196,7 @@ export default function TournamentLobbyPage() {
               >
                 {autoBalanceReview}
                 {/* 편성 확인 중엔 팀 배치가 곧 참가자 목록이라 숨긴다 */}
-                {!isAutoBalanceReviewStage && participantsList}
+                {participantsList}
               </TabsContent>
               <TabsContent
                 value="chat"
