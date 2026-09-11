@@ -277,7 +277,7 @@ export function GuidedTour({
                 if (isLastStep) finish();
                 else setStepIndex((current) => current + 1);
               }}
-              className="inline-flex items-center rounded-lg bg-accent-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+              className="inline-flex items-center rounded-lg bg-accent-primary px-4 py-2 text-sm font-semibold text-accent-on transition-colors hover:bg-accent-hover"
             >
               {isLastStep ? "완료" : "다음"}
               {!isLastStep && <ChevronRight className="ml-1 h-4 w-4" />}

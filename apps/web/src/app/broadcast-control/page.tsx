@@ -366,7 +366,7 @@ function BroadcastControlContent() {
         </p>
         <Link
           href="/auth/login"
-          className="mt-5 inline-flex items-center justify-center rounded-lg bg-accent-primary px-4 py-2 text-sm font-bold text-white hover:bg-accent-hover"
+          className="mt-5 inline-flex items-center justify-center rounded-lg bg-accent-primary px-4 py-2 text-sm font-bold text-accent-on hover:bg-accent-hover"
         >
           로그인으로 이동
         </Link>

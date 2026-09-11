@@ -92,7 +92,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
                     <span className="text-sm font-medium text-text-primary">{msg.username || '알 수 없음'}</span>
                     <span className="text-xs text-text-tertiary">{getRelativeTime(msg.createdAt)}</span>
                   </div>
-                  <div className={cn('px-4 py-2 rounded-lg break-words', isOwn ? 'bg-accent-primary text-white' : 'bg-bg-tertiary text-text-primary')}>
+                  <div className={cn('px-4 py-2 rounded-lg break-words', isOwn ? 'bg-accent-primary text-accent-on' : 'bg-bg-tertiary text-text-primary')}>
                     <p className="whitespace-pre-wrap text-sm">{msg.message}</p>
                   </div>
                 </div>
@@ -107,7 +107,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
         <div className="relative">
           <button
             onClick={() => scrollToBottom()}
-            className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-accent-primary text-white text-xs font-medium rounded-full shadow-lg flex items-center gap-1.5 hover:bg-accent-hover transition-colors animate-bounce-in z-10"
+            className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-accent-primary text-accent-on text-xs font-medium rounded-full shadow-lg flex items-center gap-1.5 hover:bg-accent-hover transition-colors animate-bounce-in z-10"
           >
             <ChevronDown className="h-3.5 w-3.5" />
             새 메시지 {unreadCount > 1 ? `(${unreadCount})` : ''}
@@ -130,7 +130,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
             type="submit"
             disabled={!inputValue.trim() || disabled}
             className={cn(
-              'px-4 py-2.5 bg-accent-primary text-white font-medium rounded-lg flex-shrink-0 whitespace-nowrap',
+              'px-4 py-2.5 bg-accent-primary text-accent-on font-medium rounded-lg flex-shrink-0 whitespace-nowrap',
               'transition-colors duration-150',
               'hover:bg-accent-hover active:bg-accent-active',
               'disabled:opacity-50 disabled:cursor-not-allowed'

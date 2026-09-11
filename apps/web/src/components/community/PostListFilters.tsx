@@ -78,7 +78,7 @@ export function PostListFilters({ popularTags }: PostListFiltersProps) {
           {selectedTag && (
             <button
               onClick={() => setSelectedTag("")}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-primary text-white text-xs"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-primary text-accent-on text-xs"
             >
               #{selectedTag}
               <X className="h-3 w-3" />

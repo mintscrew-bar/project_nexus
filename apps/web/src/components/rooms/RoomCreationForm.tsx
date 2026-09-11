@@ -605,7 +605,7 @@ export function RoomCreationForm({
                 className="flex min-w-0 flex-1 items-start gap-4 rounded-md p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
               >
                 <div
-                  className={`p-2 rounded-lg ${teamMode === mode.value ? "bg-accent-primary text-white" : "bg-bg-elevated text-text-secondary"}`}
+                  className={`p-2 rounded-lg ${teamMode === mode.value ? "bg-accent-primary text-accent-on" : "bg-bg-elevated text-text-secondary"}`}
                 >
                   {mode.icon}
                 </div>
@@ -958,7 +958,7 @@ export function RoomCreationForm({
         </button>
         <button
           type="submit"
-          className="flex w-full items-center justify-center gap-2 px-6 py-2.5 bg-accent-primary hover:bg-accent-hover text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
+          className="flex w-full items-center justify-center gap-2 px-6 py-2.5 bg-accent-primary hover:bg-accent-hover text-accent-on font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
           disabled={isLoading}
         >
           {isLoading ? (

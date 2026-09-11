@@ -96,7 +96,7 @@ export function LandingMobileNav({ links }: { links: NavLink[] }) {
           <Link
             href="/auth/login"
             onClick={() => setIsOpen(false)}
-            className="block rounded-lg bg-accent-primary px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+            className="block rounded-lg bg-accent-primary px-4 py-2.5 text-center text-sm font-semibold text-accent-on transition-colors hover:bg-accent-hover"
           >
             무료로 시작하기
           </Link>

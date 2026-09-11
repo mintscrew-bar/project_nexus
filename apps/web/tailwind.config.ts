@@ -32,6 +32,9 @@ const config: Config = {
           purple: 'rgb(var(--color-accent-purple) / <alpha-value>)',
           info: 'rgb(var(--color-accent-info) / <alpha-value>)',
           gold: 'rgb(var(--color-accent-gold) / <alpha-value>)',
+          /* accent 면 위에 올리는 글자색. 테마가 정한다 — 롤은 흰색,
+             배그는 노랑 위라 검정이다. */
+          on: 'rgb(var(--color-accent-on) / <alpha-value>)',
           success: 'rgb(var(--color-accent-success) / <alpha-value>)',
           danger: 'rgb(var(--color-accent-danger) / <alpha-value>)',
           warning: 'rgb(var(--color-accent-warning) / <alpha-value>)',

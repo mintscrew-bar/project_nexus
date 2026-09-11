@@ -91,7 +91,7 @@ export function GuideStep({
 }) {
   return (
     <li className="flex gap-4 rounded-2xl bg-bg-primary/35 p-4 md:p-5">
-      <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-accent-primary text-sm font-black text-white">
+      <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-accent-primary text-sm font-black text-accent-on">
         {number}
       </span>
       <div>

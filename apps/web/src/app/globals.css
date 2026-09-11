@@ -42,6 +42,12 @@
     --color-accent-purple: 118 75 162; /* #764BA2 로고 그라디언트 끝색 */
     --color-accent-info: 11 196 226; /* #0bc4e2 기존 시안 → info 역할로 강등 */
 
+    /* accent 면 위에 올리는 글자색.
+       `bg-accent-primary text-white` 가 95곳에 박혀 있어서, 테마가 밝은
+       accent 를 쓰면 흰 글자가 안 보인다(노랑 위 흰 글자 2.01:1).
+       글자색도 토큰으로 빼 테마가 정하게 한다. 롤은 그대로 흰색. */
+    --color-accent-on: 255 255 255;
+
     --color-accent-gold: 200 155 60; /* #c89b3c */
     --color-accent-success: 0 200 83; /* #00c853 */
     --color-accent-danger: 255 23 68; /* #ff1744 */
@@ -81,6 +87,12 @@
     --color-accent-purple: 118 75 162; /* #764BA2 로고 그라디언트 끝색 */
     --color-accent-info: 11 196 226; /* #0bc4e2 기존 시안 → info 역할로 강등 */
 
+    /* accent 면 위에 올리는 글자색.
+       `bg-accent-primary text-white` 가 95곳에 박혀 있어서, 테마가 밝은
+       accent 를 쓰면 흰 글자가 안 보인다(노랑 위 흰 글자 2.01:1).
+       글자색도 토큰으로 빼 테마가 정하게 한다. 롤은 그대로 흰색. */
+    --color-accent-on: 255 255 255;
+
     --color-accent-gold: 200 155 60; /* #c89b3c */
     --color-accent-success: 0 200 83; /* #00c853 */
     --color-accent-danger: 255 23 68; /* #ff1744 */
@@ -106,29 +118,32 @@
      `.dark` 는 <html> 에 붙고 이 클래스는 그 자손에 붙는다. 커스텀 속성은
      가까운 조상이 이기므로 `.dark .game-pubg` 를 따로 쓸 필요가 없다. */
   .game-pubg {
-    --color-bg-primary: 20 22 18;
-    --color-bg-secondary: 28 32 25;
-    --color-bg-tertiary: 43 48 38;
-    --color-bg-elevated: 52 58 45;
+    /* 무채색 베이스 — R=G=B 라 색 기울기가 없다.
+       이전에는 G 가 R·B 보다 높아(#141612) 국방색으로 읽혔다. */
+    --color-bg-primary: 11 11 11; /* #0B0B0B */
+    --color-bg-secondary: 20 20 20; /* #141414 */
+    --color-bg-tertiary: 31 31 31; /* #1F1F1F */
+    --color-bg-elevated: 42 42 42; /* #2A2A2A */
 
-    --color-text-primary: 235 232 216;
-    --color-text-secondary: 181 183 161;
-    --color-text-tertiary: 154 158 136;
-    /* 롤 팔레트와 같은 눈높이로 맞춘다. 배그 배경(bg-tertiary)이 더 밝아
-       같은 회색을 쓰면 대비가 4.5:1 아래로 떨어진다. */
-    --color-text-muted: 152 157 134;
+    --color-text-primary: 237 237 237; /* #EDEDED */
+    --color-text-secondary: 180 180 180; /* #B4B4B4 */
+    --color-text-tertiary: 154 154 154; /* #9A9A9A */
+    /* 가장 밝은 면(bg-elevated)에서도 4.5:1 을 지키는 하한.
+       #909090 은 4.496 으로 아슬아슬하게 걸쳐서 한 단계 올렸다. */
+    --color-text-muted: 148 148 148; /* #949494 — bg-elevated 4.73:1 */
 
-    /* accent 는 흰 글자를 얹는 자리다 — `bg-accent-primary text-white` 조합이
-       버튼 기본 변형을 포함해 87곳에서 쓰인다. 밝은 앰버(#CF9E41)를 그대로
-       쓰면 흰 글자가 2.44:1 로 안 보여서, 앰버 계열을 유지하되 글자가 읽히는
-       농도까지 어둡게 잡았다. 밝은 앰버는 accent-gold 로 남아 하이라이트·
-       테두리에 계속 나온다. */
-    --color-accent-primary: 138 90 30; /* #8A5A1E 흰 글자 5.90:1 */
-    --color-accent-hover: 158 103 34; /* #9E6722 흰 글자 4.75:1 */
-    --color-accent-active: 110 71 22; /* #6E4716 */
-    --color-accent-purple: 119 126 91; /* 그라디언트 끝색 — 마른 풀색 */
-    --color-accent-info: 104 163 161;
-    --color-accent-gold: 219 169 66; /* #DBA942 밝은 앰버는 여기 남긴다 */
+    /* 노랑은 포인트 하나다. accent 면 위 글자를 검정으로 돌려서
+       배그 노랑을 그대로 쓴다 — 흰 글자로는 2.01:1 이라 못 쓴다. */
+    --color-accent-primary: 242 169 0; /* #F2A900 검은 글자 9.80:1 */
+    --color-accent-hover: 255 185 43; /* #FFB92B */
+    --color-accent-active: 209 143 0; /* #D18F00 */
+    --color-accent-on: 11 11 11; /* 노랑 위에는 배경색 검정을 얹는다 */
+    --color-accent-gold: 255 209 102; /* #FFD166 배지·하이라이트용 밝은 노랑 */
+
+    /* 그라디언트 끝색과 info 도 무채색으로 내린다. 보라·시안이 남으면
+       "흑백 + 노랑 하나" 라는 규칙이 그 자리에서만 깨진다. */
+    --color-accent-purple: 122 122 122;
+    --color-accent-info: 154 154 154;
   }
 
   body {
@@ -137,7 +152,7 @@
 
   /* 표면 질감은 토큰과 분리한다.
      토큰(`.game-pubg`)은 포털로 body 에 그려지는 모달까지 덮으려고 body 에도
-     붙는데, 질감까지 같이 붙으면 격자와 노이즈가 두 겹으로 깔린다.
+     붙는데, 질감까지 같이 붙으면 그레인이 두 겹으로 깔린다.
      질감은 앱 셸 래퍼 한 곳에만 준다.
 
      가상 요소(::before/::after)에 z-index: -1 로 깔지 않는다. 그러려면
@@ -149,38 +164,41 @@
      래퍼 자체는 스크롤하지 않으므로(스크롤은 안쪽 overflow-auto 가 맡는다)
      background-attachment 없이도 화면에 고정된 것처럼 보인다. */
   .game-pubg-surface {
+    /* 배경은 두 겹이다 — 위에 필름 그레인, 아래에 은은한 광원.
+       격자와 스캔라인은 걷었다. 그게 "밀리터리 HUD" 로 읽히게 만든
+       주범이고, 참고한 화면들은 전부 그레인만으로 질감을 낸다.
+
+       광원은 커서를 따라온다. 좌표는 `--pointer-x/y` 로 들어오고
+       (PubgSurfaceGlow), 값이 없으면 화면 위쪽 가운데에 고정된다 —
+       터치 기기와 자바스크립트 전에도 그림이 성립해야 한다. */
     background-color: rgb(var(--color-bg-primary));
     background-image:
-      /* 스캔라인 */
-      repeating-linear-gradient(
-        0deg,
-        transparent 0,
-        transparent 3px,
-        rgb(255 255 255 / 0.011) 4px
-      ),
-      /* 필름 그레인 */
-        url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E"),
-      /* 격자 */ linear-gradient(rgb(255 255 255 / 0.018) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(255 255 255 / 0.012) 1px, transparent 1px);
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.085'/%3E%3C/svg%3E"),
+      radial-gradient(
+        60rem circle at var(--pointer-x, 50%) var(--pointer-y, -10%),
+        rgb(255 255 255 / 0.055),
+        rgb(255 255 255 / 0.018) 35%,
+        transparent 62%
+      );
     background-size:
-      auto,
-      180px 180px,
-      6px 6px,
-      9px 9px;
+      160px 160px,
+      auto;
+    background-repeat: repeat, no-repeat;
   }
 
-  /* 움직임을 줄여 달라고 한 사용자에게는 스캔라인을 걷는다.
-     스크롤할 때 어른거려 멀미를 유발할 수 있다. */
+  /* 움직임을 줄여 달라고 한 사용자에게는 광원을 고정한다.
+     커서를 따라 밝은 덩어리가 계속 움직이면 멀미를 유발할 수 있다.
+     질감 자체는 남긴다 — 그레인은 움직이지 않는다. */
   @media (prefers-reduced-motion: reduce) {
     .game-pubg-surface {
       background-image:
-        url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E"),
-        linear-gradient(rgb(255 255 255 / 0.018) 1px, transparent 1px),
-        linear-gradient(90deg, rgb(255 255 255 / 0.012) 1px, transparent 1px);
-      background-size:
-        180px 180px,
-        6px 6px,
-        9px 9px;
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.085'/%3E%3C/svg%3E"),
+        radial-gradient(
+          60rem circle at 50% -10%,
+          rgb(255 255 255 / 0.055),
+          rgb(255 255 255 / 0.018) 35%,
+          transparent 62%
+        );
     }
   }
 
@@ -191,7 +209,7 @@
 @layer components {
   .btn-primary {
     @apply px-6 py-2.5 bg-accent-primary hover:bg-accent-hover active:bg-accent-active
-           text-white font-medium rounded-lg transition-colors duration-150
+           text-accent-on font-medium rounded-lg transition-colors duration-150
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 

@@ -18,7 +18,7 @@ export default function NotFound() {
         <div className="flex gap-3 justify-center">
           <Link
             href="/"
-            className="px-6 py-2.5 bg-accent-primary hover:bg-accent-hover active:bg-accent-active text-white font-medium rounded-lg transition-colors duration-150 inline-block"
+            className="px-6 py-2.5 bg-accent-primary hover:bg-accent-hover active:bg-accent-active text-accent-on font-medium rounded-lg transition-colors duration-150 inline-block"
           >
             홈으로 돌아가기
           </Link>

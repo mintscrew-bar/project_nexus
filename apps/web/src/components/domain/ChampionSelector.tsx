@@ -221,7 +221,7 @@ export function ChampionSelector({
           onClick={() => setActiveTag("all")}
           className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors ${
             activeTag === "all"
-              ? "bg-accent-primary text-white"
+              ? "bg-accent-primary text-accent-on"
               : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
           }`}
         >
@@ -234,7 +234,7 @@ export function ChampionSelector({
             onClick={() => setActiveTag(tag)}
             className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors ${
               activeTag === tag
-                ? "bg-accent-primary text-white"
+                ? "bg-accent-primary text-accent-on"
                 : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
             }`}
           >

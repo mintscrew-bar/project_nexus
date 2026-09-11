@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 import { Header } from './Header';
@@ -11,6 +11,7 @@ import { FloatingDmPanel } from '@/components/domain/FloatingDmPanel';
 import { FloatingClanChatPanel } from '@/components/domain/FloatingClanChatPanel';
 import { CreatorPromoStrip } from './CreatorPromoStrip';
 import { ActiveRoomBanner } from './ActiveRoomBanner';
+import { PubgSurfaceGlow } from './PubgSurfaceGlow';
 import { useLobbyStore } from '@/stores/lobby-store';
 import { useCurrentGame } from '@/hooks/useCurrentGame';
 import { gameFromSlug } from '@nexus/types';
@@ -47,6 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // document.body에 그려져 래퍼 밖에 있어서, 래퍼에만 걸면 배그 화면에서
   // 모달만 롤 색으로 뜬다.
   // 질감(.game-pubg-surface)은 래퍼 한 곳에만 — 두 겹으로 깔리면 안 된다.
+  // 바탕 광원도 같은 래퍼가 기준이다(PubgSurfaceGlow).
   // ---------------------------------------------------------------
   // 마지막으로 본 게임을 기억한다. 게임을 한 번 고른 사람에게 매번 다시
   // 고르라고 하지 않기 위한 값이다. 경로로 게임이 특정되는 화면에서만 적는다 —
@@ -57,6 +59,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname, currentGame]);
 
   const themeClass = currentGame === 'PUBG' ? 'game-pubg' : null;
+  // 바탕 광원이 좌표를 쓸 래퍼.
+  const surfaceRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!themeClass) return;
     document.body.classList.add(themeClass);
@@ -92,16 +96,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // 인증된 앱 셸 (또는 마운트 전 기본 셸)
   return (
-    <div className={cn(
-      "flex h-full min-h-0 flex-col",
-      themeClass,
-      themeClass && "game-pubg-surface",
-    )}>
+    <div
+      ref={surfaceRef}
+      className={cn(
+        "flex h-full min-h-0 flex-col",
+        themeClass,
+        themeClass && "game-pubg-surface",
+      )}
+    >
+      {/* 바탕 광원을 커서에 붙인다. 좌표만 넘기므로 리렌더는 없다. */}
+      {themeClass && <PubgSurfaceGlow target={surfaceRef} />}
       <Header />
       <main className="flex min-h-0 min-w-0 flex-grow">
         {/*
           배그 테마에서는 바탕을 비운다. 여기에 불투명한 배경을 깔면
-          래퍼(.game-pubg-surface)의 격자·노이즈가 통째로 가려진다 —
+          래퍼(.game-pubg-surface)의 그레인과 광원이 통째로 가려진다 —
           질감은 콘텐츠 뒤에 있어야 하고, 카드들이 그 위를 덮는 게 맞다.
         */}
         <div className={cn(

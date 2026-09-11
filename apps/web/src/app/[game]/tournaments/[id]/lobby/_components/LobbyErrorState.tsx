@@ -52,22 +52,22 @@ export function LobbyErrorState({
 
         <div className="flex flex-col gap-2">
           {isDiscordError && (
-            <button onClick={onGoSettings} className="w-full px-4 py-3 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90 transition-colors">
+            <button onClick={onGoSettings} className="w-full px-4 py-3 bg-accent-primary text-accent-on rounded-lg font-medium hover:bg-accent-primary/90 transition-colors">
               설정에서 Discord 연동하기
             </button>
           )}
           {isRiotError && (
-            <button onClick={onGoProfile} className="w-full px-4 py-3 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90 transition-colors">
+            <button onClick={onGoProfile} className="w-full px-4 py-3 bg-accent-primary text-accent-on rounded-lg font-medium hover:bg-accent-primary/90 transition-colors">
               프로필에서 Riot 계정 연동하기
             </button>
           )}
           {isAuthRequired && loginHref && (
-            <Link href={loginHref} className="w-full px-4 py-3 bg-accent-primary text-white text-center rounded-lg font-medium hover:bg-accent-primary/90 transition-colors">
+            <Link href={loginHref} className="w-full px-4 py-3 bg-accent-primary text-accent-on text-center rounded-lg font-medium hover:bg-accent-primary/90 transition-colors">
               로그인하고 입장하기
             </Link>
           )}
           {isTimeout && onRetry && (
-            <button onClick={onRetry} className="w-full px-4 py-3 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90 transition-colors">
+            <button onClick={onRetry} className="w-full px-4 py-3 bg-accent-primary text-accent-on rounded-lg font-medium hover:bg-accent-primary/90 transition-colors">
               다시 시도
             </button>
           )}

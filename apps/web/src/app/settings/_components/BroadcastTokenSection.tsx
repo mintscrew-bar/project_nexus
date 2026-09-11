@@ -255,7 +255,7 @@ export function BroadcastTokenSection() {
           <button
             type="button"
             onClick={() => openBroadcastControlWindow()}
-            className="inline-flex flex-shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-accent-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-bg-primary"
+            className="inline-flex flex-shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-accent-primary px-3 py-1.5 text-sm font-medium text-accent-on transition-colors duration-150 hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-bg-primary"
           >
             <ExternalLink className="mr-1 h-3.5 w-3.5" />
             조작 패널 열기

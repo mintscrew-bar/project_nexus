@@ -91,7 +91,7 @@ function BoardChips({
               className={cn(
                 "flex-shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
                 active
-                  ? "border-accent-primary bg-accent-primary text-white"
+                  ? "border-accent-primary bg-accent-primary text-accent-on"
                   : "border-bg-elevated bg-transparent text-text-secondary hover:border-text-tertiary hover:text-text-primary",
               )}
             >
@@ -600,7 +600,7 @@ function PostListSection({
                   className={cn(
                     "w-8 h-8 rounded-lg text-sm font-medium transition-colors",
                     currentPage === item
-                      ? "bg-accent-primary text-white"
+                      ? "bg-accent-primary text-accent-on"
                       : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
                   )}
                 >

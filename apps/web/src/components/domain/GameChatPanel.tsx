@@ -75,7 +75,7 @@ export function GameChatPanel({ roomId, isFinalStage, variant = "floating", clas
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-accent-primary text-white rounded-full shadow-lg flex items-center justify-center hover:bg-accent-hover transition-colors"
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-accent-primary text-accent-on rounded-full shadow-lg flex items-center justify-center hover:bg-accent-hover transition-colors"
         >
           <MessageSquare className="h-6 w-6" />
           {unread > 0 && (

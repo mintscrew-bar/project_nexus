@@ -106,7 +106,7 @@ export function AppealsTab({ addToast }: { addToast: AddToast }) {
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 statusFilter === s
-                  ? "bg-accent-primary text-white"
+                  ? "bg-accent-primary text-accent-on"
                   : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
               }`}
             >

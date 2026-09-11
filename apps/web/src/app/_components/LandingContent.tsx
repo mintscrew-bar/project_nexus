@@ -1199,7 +1199,7 @@ function LandingHeader() {
         <div className="ml-auto flex items-center gap-2">
           <Link
             href="/auth/login"
-            className="flex-shrink-0 rounded-lg bg-accent-primary px-4 py-2.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-accent-hover active:bg-accent-active sm:px-6"
+            className="flex-shrink-0 rounded-lg bg-accent-primary px-4 py-2.5 text-sm font-medium text-accent-on transition-colors duration-150 hover:bg-accent-hover active:bg-accent-active sm:px-6"
           >
             로그인
           </Link>

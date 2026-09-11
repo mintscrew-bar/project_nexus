@@ -269,7 +269,7 @@ export function EditAccountModal({
                     }}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
                       mainRole === r
-                        ? "bg-accent-primary text-white shadow-sm"
+                        ? "bg-accent-primary text-accent-on shadow-sm"
                         : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
                     }`}
                   >

@@ -38,7 +38,7 @@ export function UserMenu() {
     return (
       <Link
         href="/auth/login"
-        className="px-6 py-2.5 bg-accent-primary hover:bg-accent-hover active:bg-accent-active text-white font-medium rounded-lg transition-colors duration-150 text-sm"
+        className="px-6 py-2.5 bg-accent-primary hover:bg-accent-hover active:bg-accent-active text-accent-on font-medium rounded-lg transition-colors duration-150 text-sm"
       >
         로그인
       </Link>

@@ -211,7 +211,7 @@ export function ReportsTab({ addToast }: { addToast: AddToast }) {
             }}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
               category === cat.key
-                ? "bg-accent-primary text-white"
+                ? "bg-accent-primary text-accent-on"
                 : "text-text-muted hover:text-text-primary"
             }`}
           >

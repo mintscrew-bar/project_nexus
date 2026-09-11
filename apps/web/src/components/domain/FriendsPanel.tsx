@@ -504,7 +504,7 @@ function NicknameModal({ friendship, friendId, onClose }: { friendship: Friendsh
       />
       <div className="flex gap-2 justify-end">
         <button className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg" onClick={onClose}>취소</button>
-        <button className="px-3 py-1.5 text-sm bg-accent-primary text-white rounded-lg hover:bg-accent-hover" onClick={handleSave}>저장</button>
+        <button className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover" onClick={handleSave}>저장</button>
       </div>
     </InlineModal>
   );
@@ -535,7 +535,7 @@ function MemoModal({ friendship, friendId, onClose }: { friendship: Friendship; 
       <p className="text-xs text-text-tertiary text-right mb-2">{value.length}/200</p>
       <div className="flex gap-2 justify-end">
         <button className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg" onClick={onClose}>취소</button>
-        <button className="px-3 py-1.5 text-sm bg-accent-primary text-white rounded-lg hover:bg-accent-hover" onClick={handleSave}>저장</button>
+        <button className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover" onClick={handleSave}>저장</button>
       </div>
     </InlineModal>
   );
@@ -593,7 +593,7 @@ function CategoryPickerModal({ friendship, friendId, onClose }: { friendship: Fr
             onKeyDown={(e) => { if (e.key === "Enter") handleNewCat(); }}
             maxLength={20}
           />
-          <button className="px-2 py-1.5 text-sm bg-accent-primary text-white rounded-lg" onClick={handleNewCat}>
+          <button className="px-2 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg" onClick={handleNewCat}>
             <Check className="w-4 h-4" />
           </button>
         </div>
@@ -680,7 +680,7 @@ function AddFriendModal({ onClose }: { onClose: () => void }) {
               className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex-shrink-0 ${
                 sentIds.has(u.id)
                   ? "bg-bg-tertiary text-text-tertiary cursor-default"
-                  : "bg-accent-primary text-white hover:bg-accent-hover"
+                  : "bg-accent-primary text-accent-on hover:bg-accent-hover"
               }`}
             >
               {sentIds.has(u.id) ? (
@@ -719,7 +719,7 @@ function AddCategoryModal({ onClose }: { onClose: () => void }) {
       />
       <div className="flex gap-2 justify-end">
         <button className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg" onClick={onClose}>취소</button>
-        <button className="px-3 py-1.5 text-sm bg-accent-primary text-white rounded-lg hover:bg-accent-hover" onClick={handleAdd}>추가</button>
+        <button className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover" onClick={handleAdd}>추가</button>
       </div>
     </InlineModal>
   );
@@ -747,7 +747,7 @@ function RenameCategoryModal({ categoryId, currentName, onClose }: { categoryId:
       />
       <div className="flex gap-2 justify-end">
         <button className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg" onClick={onClose}>취소</button>
-        <button className="px-3 py-1.5 text-sm bg-accent-primary text-white rounded-lg hover:bg-accent-hover" onClick={handleSave}>저장</button>
+        <button className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover" onClick={handleSave}>저장</button>
       </div>
     </InlineModal>
   );
@@ -820,7 +820,7 @@ function JoinRoomModal({ roomId, roomName, isPrivate, gameTitle, onClose }: { ro
       )}
       <div className="flex gap-2 justify-end">
         <button className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg" onClick={onClose}>취소</button>
-        <button className="px-3 py-1.5 text-sm bg-accent-primary text-white rounded-lg hover:bg-accent-hover" onClick={handleJoin}>참가</button>
+        <button className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover" onClick={handleJoin}>참가</button>
       </div>
     </InlineModal>
   );
@@ -956,7 +956,7 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
               avatar={r.user.avatar}
               action={
                 <div className="flex gap-1">
-                  <button className="px-2 py-1 text-xs bg-accent-primary text-white rounded-md hover:bg-accent-hover" onClick={() => handleAccept(r.id)}>수락</button>
+                  <button className="px-2 py-1 text-xs bg-accent-primary text-accent-on rounded-md hover:bg-accent-hover" onClick={() => handleAccept(r.id)}>수락</button>
                   <button className="px-2 py-1 text-xs bg-bg-tertiary hover:bg-bg-elevated text-text-secondary rounded-md" onClick={() => handleReject(r.id)}>거절</button>
                 </div>
               }

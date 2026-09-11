@@ -971,7 +971,7 @@ export default function AuctionRoomPage() {
                           className={cn(
                             "w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 transition-colors",
                             isVolunteer
-                              ? "bg-accent-primary text-white"
+                              ? "bg-accent-primary text-accent-on"
                               : "bg-bg-elevated text-text-primary",
                           )}
                         >

@@ -797,7 +797,7 @@ export default function UserProfilePage() {
                 aria-pressed={activeGame === title}
                 className={`rounded-lg px-3 py-2 text-sm font-bold transition-colors ${
                   activeGame === title
-                    ? "bg-accent-primary text-white"
+                    ? "bg-accent-primary text-accent-on"
                     : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
                 }`}
               >

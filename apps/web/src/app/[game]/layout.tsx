@@ -64,7 +64,7 @@ export default async function GameLayout({
           </p>
           <Link
             href={`/${GAMES[DEFAULT_GAME].slug}/tournaments`}
-            className="mt-6 inline-flex min-h-11 items-center rounded-lg bg-accent-primary px-4 font-semibold text-white transition-colors hover:bg-accent-hover"
+            className="mt-6 inline-flex min-h-11 items-center rounded-lg bg-accent-primary px-4 font-semibold text-accent-on transition-colors hover:bg-accent-hover"
           >
             {GAMES[DEFAULT_GAME].label} 내전 보러 가기
           </Link>

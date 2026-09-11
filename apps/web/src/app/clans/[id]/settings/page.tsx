@@ -1489,7 +1489,7 @@ export default function ClanSettingsPage() {
                 <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-2">
                   보낸 초대
                   {sentInvitations.length > 0 && (
-                    <span className="bg-accent-primary text-white text-xs px-1.5 py-0.5 rounded-full">
+                    <span className="bg-accent-primary text-accent-on text-xs px-1.5 py-0.5 rounded-full">
                       {sentInvitations.length}
                     </span>
                   )}
@@ -1561,7 +1561,7 @@ export default function ClanSettingsPage() {
                 <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-2">
                   가입 요청
                   {joinRequests.length > 0 && (
-                    <span className="bg-accent-primary text-white text-xs px-1.5 py-0.5 rounded-full">
+                    <span className="bg-accent-primary text-accent-on text-xs px-1.5 py-0.5 rounded-full">
                       {joinRequests.length}
                     </span>
                   )}

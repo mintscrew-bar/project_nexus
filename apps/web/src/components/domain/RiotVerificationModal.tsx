@@ -119,7 +119,7 @@ export function RiotVerificationModal({
 
       <div className="bg-bg-tertiary rounded-lg p-4 space-y-3">
         <div className="flex items-start gap-3">
-          <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-white rounded-full flex items-center justify-center text-sm font-bold">
+          <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-accent-on rounded-full flex items-center justify-center text-sm font-bold">
             1
           </span>
           <p className="text-text-primary text-sm">
@@ -128,7 +128,7 @@ export function RiotVerificationModal({
         </div>
 
         <div className="flex items-start gap-3">
-          <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-white rounded-full flex items-center justify-center text-sm font-bold">
+          <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-accent-on rounded-full flex items-center justify-center text-sm font-bold">
             2
           </span>
           <p className="text-text-primary text-sm">
@@ -137,7 +137,7 @@ export function RiotVerificationModal({
         </div>
 
         <div className="flex items-start gap-3">
-          <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-white rounded-full flex items-center justify-center text-sm font-bold">
+          <span className="flex-shrink-0 w-6 h-6 bg-accent-primary text-accent-on rounded-full flex items-center justify-center text-sm font-bold">
             3
           </span>
           <p className="text-text-primary text-sm">

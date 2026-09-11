@@ -106,7 +106,7 @@ function AgreePageContent() {
           </p>
           <Link
             href="/auth/login"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-primary text-white text-sm font-semibold rounded-xl hover:bg-accent-hover transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-primary text-accent-on text-sm font-semibold rounded-xl hover:bg-accent-hover transition-colors"
           >
             다시 로그인하기
           </Link>
@@ -194,7 +194,7 @@ function AgreePageContent() {
         <button
           onClick={handleSubmit}
           disabled={!allRequiredChecked || isSubmitting}
-          className="mt-5 w-full py-3 rounded-xl bg-accent-primary text-white font-semibold text-sm hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          className="mt-5 w-full py-3 rounded-xl bg-accent-primary text-accent-on font-semibold text-sm hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
             <>

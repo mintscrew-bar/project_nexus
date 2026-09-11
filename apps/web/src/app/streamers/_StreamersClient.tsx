@@ -163,7 +163,7 @@ function EmptyState() {
       </p>
       <Link
         href="/partners"
-        className="mt-6 inline-flex items-center gap-2 rounded-xl bg-accent-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        className="mt-6 inline-flex items-center gap-2 rounded-xl bg-accent-primary px-5 py-2.5 text-sm font-semibold text-accent-on transition-opacity hover:opacity-90"
       >
         <Sparkles className="h-4 w-4" />
         스트리머로 함께하기

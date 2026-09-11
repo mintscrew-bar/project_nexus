@@ -86,7 +86,7 @@ function LolRankingPage() {
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 tab === "global"
-                  ? "bg-accent-primary text-white"
+                  ? "bg-accent-primary text-accent-on"
                   : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
               }`}
             >
@@ -100,7 +100,7 @@ function LolRankingPage() {
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 tab === "clan"
-                  ? "bg-accent-primary text-white"
+                  ? "bg-accent-primary text-accent-on"
                   : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
               }`}
             >

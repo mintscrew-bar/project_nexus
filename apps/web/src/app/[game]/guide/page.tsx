@@ -136,7 +136,7 @@ function GuideCardVisual({ type }: { type: GuideVisual }) {
           </div>
           <div className="mt-5 grid grid-cols-3 gap-2">
             {["10명", "경매", "공개"].map((item, index) => (
-              <div key={item} className={`rounded-xl px-3 py-3 ${index === 0 ? "bg-accent-primary text-white" : "bg-white/[0.05] text-white/65"}`}>
+              <div key={item} className={`rounded-xl px-3 py-3 ${index === 0 ? "bg-accent-primary text-accent-on" : "bg-white/[0.05] text-white/65"}`}>
                 <p className="text-[10px] text-current opacity-60">{index === 0 ? "참가 인원" : index === 1 ? "팀 구성" : "방 설정"}</p>
                 <p className="mt-1 text-sm font-bold">{item}</p>
               </div>
@@ -348,7 +348,7 @@ export default async function GuidePage({
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
                   href={`${base}/tournaments`}
-                  className="inline-flex items-center gap-2 rounded-xl bg-accent-primary px-5 py-3 font-semibold text-white transition-colors hover:bg-accent-hover"
+                  className="inline-flex items-center gap-2 rounded-xl bg-accent-primary px-5 py-3 font-semibold text-accent-on transition-colors hover:bg-accent-hover"
                 >
                   내전 방 보기 <ArrowRight className="h-4 w-4" />
                 </Link>
@@ -409,7 +409,7 @@ export default async function GuidePage({
                         {category.description}
                       </p>
                     </div>
-                    <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-bg-tertiary text-text-secondary transition-colors group-hover:bg-accent-primary group-hover:text-white">
+                    <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-bg-tertiary text-text-secondary transition-colors group-hover:bg-accent-primary group-hover:text-accent-on">
                       <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
                     </span>
                   </div>

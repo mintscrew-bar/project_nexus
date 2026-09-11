@@ -528,7 +528,7 @@ export default function RecentStatsSummary({
                 onClick={() => setActiveTab("all")}
                 className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
                   effectiveTab === "all"
-                    ? "bg-accent-primary text-white"
+                    ? "bg-accent-primary text-accent-on"
                     : "text-text-secondary hover:text-text-primary"
                 }`}
               >
@@ -538,7 +538,7 @@ export default function RecentStatsSummary({
                 onClick={() => setActiveTab("soloRanked")}
                 className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
                   effectiveTab === "soloRanked"
-                    ? "bg-accent-primary text-white"
+                    ? "bg-accent-primary text-accent-on"
                     : "text-text-secondary hover:text-text-primary"
                 }`}
               >
@@ -548,7 +548,7 @@ export default function RecentStatsSummary({
                 onClick={() => setActiveTab("flexRanked")}
                 className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
                   effectiveTab === "flexRanked"
-                    ? "bg-accent-primary text-white"
+                    ? "bg-accent-primary text-accent-on"
                     : "text-text-secondary hover:text-text-primary"
                 }`}
               >
@@ -558,7 +558,7 @@ export default function RecentStatsSummary({
                 onClick={() => setActiveTab("normal")}
                 className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
                   effectiveTab === "normal"
-                    ? "bg-accent-primary text-white"
+                    ? "bg-accent-primary text-accent-on"
                     : "text-text-secondary hover:text-text-primary"
                 }`}
               >
@@ -568,7 +568,7 @@ export default function RecentStatsSummary({
                 onClick={() => setActiveTab("aram")}
                 className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
                   effectiveTab === "aram"
-                    ? "bg-accent-primary text-white"
+                    ? "bg-accent-primary text-accent-on"
                     : "text-text-secondary hover:text-text-primary"
                 }`}
               >
@@ -580,7 +580,7 @@ export default function RecentStatsSummary({
             onClick={() => setActiveTab("nexus")}
             className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
               effectiveTab === "nexus"
-                ? "bg-accent-primary text-white"
+                ? "bg-accent-primary text-accent-on"
                 : "text-text-secondary hover:text-text-primary"
             }`}
           >

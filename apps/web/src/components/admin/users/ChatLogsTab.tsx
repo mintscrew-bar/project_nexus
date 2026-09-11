@@ -103,7 +103,7 @@ export function ChatLogsTab() {
             onClick={() => handleCategoryChange(cat.id)}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
               category === cat.id
-                ? "bg-accent-primary text-white"
+                ? "bg-accent-primary text-accent-on"
                 : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
             }`}
           >

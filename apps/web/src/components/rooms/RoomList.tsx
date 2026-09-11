@@ -280,7 +280,7 @@ export function RoomList({
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-xs font-bold transition-colors",
                     platformFilter === value
-                      ? "bg-accent-primary text-white"
+                      ? "bg-accent-primary text-accent-on"
                       : "bg-bg-tertiary/60 text-text-secondary hover:text-text-primary",
                   )}
                 >
@@ -316,7 +316,7 @@ export function RoomList({
                 <span className={cn(
                   "flex h-10 w-10 flex-none items-center justify-center rounded-lg transition-colors",
                   isSelected
-                    ? "bg-accent-primary text-white"
+                    ? "bg-accent-primary text-accent-on"
                     : "bg-bg-elevated/50 text-text-secondary group-hover:text-text-primary"
                 )}>
                   <Icon className="h-4 w-4" />
@@ -358,7 +358,7 @@ export function RoomList({
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-xs font-bold transition-colors",
                     modeFilter === option.value
-                      ? "bg-accent-primary text-white"
+                      ? "bg-accent-primary text-accent-on"
                       : "bg-bg-tertiary/60 text-text-secondary hover:text-text-primary",
                   )}
                 >

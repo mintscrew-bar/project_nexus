@@ -264,7 +264,7 @@ export function FloatingClanChatPanel() {
               </p>
               <button
                 onClick={fetchMyClan}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent-primary text-white rounded-lg hover:bg-accent-hover transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover transition-colors"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 다시 시도

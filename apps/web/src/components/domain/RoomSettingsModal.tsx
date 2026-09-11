@@ -517,7 +517,7 @@ export function RoomSettingsModal({
                   className="flex min-w-0 flex-1 items-start gap-2 rounded-md p-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
                 >
                   <div
-                    className={`p-1.5 rounded-lg ${teamMode === mode.value ? "bg-accent-primary text-white" : "bg-bg-elevated text-text-secondary"}`}
+                    className={`p-1.5 rounded-lg ${teamMode === mode.value ? "bg-accent-primary text-accent-on" : "bg-bg-elevated text-text-secondary"}`}
                   >
                     {mode.icon}
                   </div>

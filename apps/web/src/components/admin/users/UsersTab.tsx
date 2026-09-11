@@ -788,7 +788,7 @@ export function UsersTab({
                 className={cn(
                   "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
                   kind === filter.value
-                    ? "bg-accent-primary text-white"
+                    ? "bg-accent-primary text-accent-on"
                     : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary",
                 )}
               >

@@ -154,7 +154,7 @@ export function StreamersTab({ addToast }: { addToast: AddToast }) {
             onClick={() => setFilter(item.value)}
             className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
               filter === item.value
-                ? "bg-accent-primary text-white"
+                ? "bg-accent-primary text-accent-on"
                 : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
             }`}
           >

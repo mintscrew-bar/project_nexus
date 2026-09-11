@@ -93,7 +93,7 @@ export function ConsentBanner() {
           <button
             type="button"
             onClick={() => decide(true)}
-            className="rounded-lg bg-accent-primary px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+            className="rounded-lg bg-accent-primary px-3 py-1.5 text-xs font-medium text-accent-on transition hover:opacity-90"
           >
             동의
           </button>

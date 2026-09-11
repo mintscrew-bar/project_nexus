@@ -720,7 +720,7 @@ function ScrimFlowStepper({
         {labels.map((label, index) => (
           <div key={label} className="flex min-w-max flex-1 items-center gap-2">
             <div className="flex items-center gap-2">
-              <span className={index <= currentStep ? "flex h-7 w-7 items-center justify-center rounded-full bg-accent-primary text-xs font-bold text-white" : "flex h-7 w-7 items-center justify-center rounded-full border border-bg-elevated text-xs font-bold text-text-tertiary"}>
+              <span className={index <= currentStep ? "flex h-7 w-7 items-center justify-center rounded-full bg-accent-primary text-xs font-bold text-accent-on" : "flex h-7 w-7 items-center justify-center rounded-full border border-bg-elevated text-xs font-bold text-text-tertiary"}>
                 {index < currentStep ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
               </span>
               <span className={index === currentStep ? "text-sm font-bold text-text-primary" : index < currentStep ? "text-sm font-semibold text-accent-primary" : "text-sm text-text-tertiary"}>{label}</span>

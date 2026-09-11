@@ -374,7 +374,7 @@ export function AddAccountModal({
                     }}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
                       mainRole === r
-                        ? "bg-accent-primary text-white shadow-sm"
+                        ? "bg-accent-primary text-accent-on shadow-sm"
                         : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
                     }`}
                   >
@@ -443,7 +443,7 @@ export function AddAccountModal({
               <button
                 type="button"
                 onClick={() => setOpenSection(subRole)}
-                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-semibold text-white bg-accent-primary hover:bg-accent-hover rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-semibold text-accent-on bg-accent-primary hover:bg-accent-hover rounded-lg transition-colors"
               >
                 주 역할 완료 — 부 역할 선택하기
                 <ArrowRight className="w-4 h-4" />
@@ -471,7 +471,7 @@ export function AddAccountModal({
               <button
                 type="button"
                 onClick={() => setOpenSection(null)}
-                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-semibold text-white bg-accent-primary hover:bg-accent-hover rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-semibold text-accent-on bg-accent-primary hover:bg-accent-hover rounded-lg transition-colors"
               >
                 부 역할 완료
                 <ArrowRight className="w-4 h-4" />

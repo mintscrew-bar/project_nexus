@@ -260,7 +260,7 @@ export function DraftBoard({
             className={cn(
               "w-full py-3 rounded-lg font-bold transition-colors",
               selectedPlayer && !disabled && !isPicking
-                ? "bg-accent-primary text-white hover:bg-accent-primary/90"
+                ? "bg-accent-primary text-accent-on hover:bg-accent-primary/90"
                 : "bg-bg-tertiary text-text-muted cursor-not-allowed",
             )}
           >
@@ -339,7 +339,7 @@ export function DraftBoard({
               onClick={() => setMobileTab(key)}
               className={cn(
                 "py-2 rounded-md text-sm font-semibold transition-colors flex items-center justify-center gap-1.5",
-                mobileTab === key ? "bg-accent-primary text-white" : "text-text-secondary",
+                mobileTab === key ? "bg-accent-primary text-accent-on" : "text-text-secondary",
               )}
             >
               {key === "pool" ? <Swords className="h-4 w-4" /> : <Users className="h-4 w-4" />}

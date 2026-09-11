@@ -853,7 +853,7 @@ export default function PostDetailClient() {
                             <button
                               type="submit"
                               disabled={isSubmittingReply || !replyText.trim()}
-                              className="px-3 py-2 bg-accent-primary text-white rounded-lg text-sm disabled:opacity-50"
+                              className="px-3 py-2 bg-accent-primary text-accent-on rounded-lg text-sm disabled:opacity-50"
                             >
                               <Send className="h-4 w-4" />
                             </button>
@@ -1047,7 +1047,7 @@ export default function PostDetailClient() {
                 </p>
                 <button
                   onClick={() => setReportTarget(null)}
-                  className="px-4 py-2 text-sm bg-accent-primary text-white rounded-lg hover:bg-accent-hover"
+                  className="px-4 py-2 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover"
                 >
                   확인
                 </button>

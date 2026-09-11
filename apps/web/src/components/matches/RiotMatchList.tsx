@@ -167,7 +167,7 @@ export default function RiotMatchList({
             onClick={() => handleQueueChange(tab.queueId)}
             className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[11px] sm:text-xs font-medium transition-colors whitespace-nowrap ${
               selectedQueueId === tab.queueId
-                ? "bg-accent-primary text-white"
+                ? "bg-accent-primary text-accent-on"
                 : "text-text-secondary hover:text-text-primary hover:bg-bg-elevated"
             }`}
           >
@@ -1072,7 +1072,7 @@ export default function RiotMatchList({
                                 }}
                                 className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                                   activeStatSub === key
-                                    ? 'bg-accent-primary text-white'
+                                    ? 'bg-accent-primary text-accent-on'
                                     : 'text-text-secondary hover:text-text-primary'
                                 }`}
                               >

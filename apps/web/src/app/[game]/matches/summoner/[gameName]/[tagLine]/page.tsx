@@ -933,7 +933,7 @@ export default function SummonerStatsPage() {
                         onClick={() => setChampStatTab(tab.key)}
                         className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap ${
                           champStatTab === tab.key
-                            ? "bg-accent-primary text-white"
+                            ? "bg-accent-primary text-accent-on"
                             : "text-text-secondary hover:text-text-primary"
                         }`}
                       >

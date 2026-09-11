@@ -506,7 +506,7 @@ export function ClanChat({ clanId, myRole }: ClanChatProps) {
                       className={cn(
                         "px-3 py-2 rounded-2xl text-sm break-words",
                         isMe
-                          ? "bg-accent-primary text-white rounded-br-sm"
+                          ? "bg-accent-primary text-accent-on rounded-br-sm"
                           : "bg-bg-elevated text-text-primary rounded-bl-sm",
                       )}
                     >
@@ -599,7 +599,7 @@ export function ClanChat({ clanId, myRole }: ClanChatProps) {
           onClick={handleSend}
           disabled={!isConnected || !input.trim()}
           aria-label="메시지 전송"
-          className="p-2 rounded-lg bg-accent-primary text-white hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-2 rounded-lg bg-accent-primary text-accent-on hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <Send className="h-4 w-4" />
         </button>
@@ -634,7 +634,7 @@ export function ClanChat({ clanId, myRole }: ClanChatProps) {
                 </p>
                 <button
                   onClick={() => setReportTarget(null)}
-                  className="px-4 py-2 text-sm bg-accent-primary text-white rounded-lg hover:bg-accent-hover"
+                  className="px-4 py-2 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover"
                 >
                   확인
                 </button>

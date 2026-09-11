@@ -276,7 +276,7 @@ export default function BookmarksPage() {
                       onClick={() => setCurrentPage(page as number)}
                       className={`w-8 h-8 rounded text-sm font-medium transition-colors ${
                         currentPage === page
-                          ? "bg-accent-primary text-white"
+                          ? "bg-accent-primary text-accent-on"
                           : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
                       }`}
                     >

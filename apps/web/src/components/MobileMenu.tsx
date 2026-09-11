@@ -265,7 +265,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
               <Link
                 href="/auth/login"
                 onClick={() => setIsOpen(false)}
-                className="flex min-h-11 items-center gap-3 rounded-lg bg-accent-primary px-3 py-2.5 font-semibold text-white transition-colors hover:bg-accent-hover"
+                className="flex min-h-11 items-center gap-3 rounded-lg bg-accent-primary px-3 py-2.5 font-semibold text-accent-on transition-colors hover:bg-accent-hover"
               >
                 <User className="h-5 w-5" />
                 Discord로 로그인

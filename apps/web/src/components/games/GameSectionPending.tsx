@@ -59,7 +59,7 @@ export function GameSectionPending({
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           <Link
             href={`/${GAMES[game].slug}/tournaments`}
-            className="inline-flex min-h-11 items-center rounded-lg bg-accent-primary px-4 font-semibold text-white transition-colors hover:bg-accent-hover"
+            className="inline-flex min-h-11 items-center rounded-lg bg-accent-primary px-4 font-semibold text-accent-on transition-colors hover:bg-accent-hover"
           >
             {GAMES[game].shortLabel} 내전 보러 가기
           </Link>

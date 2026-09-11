@@ -261,7 +261,7 @@ export function DmChatView({ otherUserId, otherUsername, otherAvatar }: Props) {
                 className={cn(
                   'max-w-[75%] px-3 py-1.5 rounded-2xl text-sm leading-relaxed',
                   isMine
-                    ? 'bg-accent-primary text-white rounded-br-sm'
+                    ? 'bg-accent-primary text-accent-on rounded-br-sm'
                     : 'bg-bg-tertiary text-text-primary rounded-bl-sm',
                 )}
               >

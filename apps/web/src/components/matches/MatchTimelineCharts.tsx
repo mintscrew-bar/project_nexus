@@ -249,7 +249,7 @@ export function TimelineGraphs({
               onClick={() => setActiveTab(t.key)}
               className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                 activeTab === t.key
-                  ? 'bg-accent-primary text-white'
+                  ? 'bg-accent-primary text-accent-on'
                   : 'text-text-secondary hover:text-text-primary'
               }`}
             >

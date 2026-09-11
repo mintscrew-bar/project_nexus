@@ -1208,7 +1208,7 @@ export default function TournamentLobbyPage() {
                       className={`inline-flex min-h-11 items-center justify-center rounded-lg px-5 py-2.5 text-sm font-bold transition-all ${
                         currentUserIsReady
                           ? "border border-bg-elevated bg-bg-tertiary text-text-primary hover:bg-bg-elevated"
-                          : "bg-accent-primary hover:bg-accent-hover text-white"
+                          : "bg-accent-primary hover:bg-accent-hover text-accent-on"
                       } disabled:cursor-not-allowed disabled:opacity-50`}
                       disabled={needsManualTeamSelection}
                       title={
