@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRiotStore, type RiotAccount } from "@/stores/riot-store";
@@ -41,7 +41,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLastGamePrefix } from "@/hooks/useCurrentGame";
+import { useGamePrefix, useLastGamePrefix } from "@/hooks/useCurrentGame";
+import { gameFromSlug } from "@nexus/types";
 import { roomPath } from "@/lib/room-links";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,6 +90,13 @@ interface PositionStat {
   position: string;
   games: number;
   wins: number;
+}
+
+function useDashboardGamePrefix() {
+  const pathname = usePathname();
+  const currentGamePrefix = useGamePrefix();
+  const lastGamePrefix = useLastGamePrefix();
+  return gameFromSlug(pathname.split("/")[1]) ? currentGamePrefix : lastGamePrefix;
 }
 
 interface ClanSummary {
@@ -217,7 +225,7 @@ function DashboardHero({
   const router = useRouter();
   // 홈은 경로로 게임을 알 수 없다. 마지막으로 본 게임을 따라간다 —
   // 기본 게임으로 두면 배그만 하는 사람의 링크가 전부 롤로 간다.
-  const gamePrefix = useLastGamePrefix();
+  const gamePrefix = useDashboardGamePrefix();
   const clanMemberCount = clan?._count?.members ?? clan?.members?.length ?? 0;
   const metrics = [
     {
@@ -380,7 +388,7 @@ function QuickActions({ clan }: { clan: ClanSummary | null }) {
   // 롤 화면으로 넘어간다(맨 경로는 308 로 기본 게임에 붙는다).
   // 홈은 경로로 게임을 알 수 없다. 마지막으로 본 게임을 따라간다 —
   // 기본 게임으로 두면 배그만 하는 사람의 링크가 전부 롤로 간다.
-  const gamePrefix = useLastGamePrefix();
+  const gamePrefix = useDashboardGamePrefix();
   const actions = [
     {
       label: "내전 만들기",
@@ -595,7 +603,7 @@ function MyStatsCard({
   const router = useRouter();
   // 홈은 경로로 게임을 알 수 없다. 마지막으로 본 게임을 따라간다 —
   // 기본 게임으로 두면 배그만 하는 사람의 링크가 전부 롤로 간다.
-  const gamePrefix = useLastGamePrefix();
+  const gamePrefix = useDashboardGamePrefix();
   const winRate = stats?.winRate ?? 0;
   const topPositions = positionStats.slice(0, 3);
   const topChampions = championStats.slice(0, 3);
@@ -789,7 +797,7 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
   const router = useRouter();
   // 홈은 경로로 게임을 알 수 없다. 마지막으로 본 게임을 따라간다 —
   // 기본 게임으로 두면 배그만 하는 사람의 링크가 전부 롤로 간다.
-  const gamePrefix = useLastGamePrefix();
+  const gamePrefix = useDashboardGamePrefix();
 
   return (
     <div data-tour="home-active-rooms">
