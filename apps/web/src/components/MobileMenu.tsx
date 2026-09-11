@@ -188,7 +188,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
         <div className="flex items-center justify-between p-4 border-b border-bg-tertiary flex-shrink-0">
           <GameSwitcher className="mr-auto" />
           <Link
-            href="/"
+            href="/?home=overview"
             className="flex items-center gap-2"
             onClick={() => setIsOpen(false)}
           >

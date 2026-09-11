@@ -12,7 +12,7 @@ export function NavBar() {
     <header className="border-b border-bg-tertiary bg-bg-secondary/50 backdrop-blur-sm sticky top-0 z-50">
       <nav className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link
-          href="/"
+          href="/?home=overview"
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
           <Logo size="md" variant="icon-only" />
