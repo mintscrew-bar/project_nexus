@@ -72,7 +72,7 @@ export function GamePickerCards() {
           return (
             <Link
               key={game.title}
-              href={`/${game.slug}/tournaments`}
+              href={`/${game.slug}`}
               className={`group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6 transition-colors duration-200 sm:p-7 ${style.ring}`}
             >
               <div
@@ -110,7 +110,7 @@ export function GamePickerCards() {
               </div>
 
               <span className="relative mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-white/85">
-                열린 내전 보기
+                게임 홈으로 들어가기
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </span>
             </Link>
