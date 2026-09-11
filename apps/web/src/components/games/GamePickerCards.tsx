@@ -32,6 +32,11 @@ const HIGHLIGHT_SECTIONS: { section: GameSection; label: string }[] = [
  * 카드가 미리 그 색을 띠고 있어야 넘어갔을 때 갑작스럽지 않다.
  * 랜딩은 자체 팔레트를 쓰는 어두운 화면이라 토큰 대신 값을 직접 적는다.
  */
+const CARD_IMAGE: Record<string, string> = {
+  LOL: "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg",
+  PUBG: "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/578080/841ea38bc58cabb70aef65365cf50bc2d79329d9/library_header_2x.jpg",
+};
+
 const CARD_STYLE: Record<string, { ring: string; glow: string; tag: string }> = {
   LOL: {
     ring: "hover:border-[#667EEA]/60",
@@ -73,17 +78,23 @@ export function GamePickerCards() {
             <Link
               key={game.title}
               href={`/${game.slug}`}
-              className={`group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6 transition-colors duration-200 sm:p-7 ${style.ring}`}
+              className={`group relative min-h-[260px] overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6 transition-all duration-300 hover:-translate-y-1 sm:p-7 ${style.ring}`}
             >
               <div
                 aria-hidden
-                className={`pointer-events-none absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-200 group-hover:opacity-100 ${style.glow}`}
+                className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-45 grayscale-[0.15] transition duration-500 group-hover:scale-105 group-hover:opacity-65"
+                style={{ backgroundImage: `url(${CARD_IMAGE[game.title]})` }}
               />
+              <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#090a0d] via-[#090a0d]/55 to-[#090a0d]/10" />
+              <div aria-hidden className={`pointer-events-none absolute inset-0 bg-gradient-to-br opacity-30 transition-opacity duration-300 group-hover:opacity-60 ${style.glow}`} />
 
-              <div className="relative flex items-start justify-between gap-4">
+              <div className="relative flex h-full min-h-[208px] flex-col justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-xl font-bold text-white sm:text-2xl">
-                    {game.label}
+                  <p className="text-[11px] font-bold tracking-[0.2em] text-white/65">
+                    {game.title === "PUBG" ? "PLAYERUNKNOWN'S BATTLEGROUNDS" : "LEAGUE OF LEGENDS"}
+                  </p>
+                  <p className="mt-2 text-2xl font-black text-white sm:text-3xl">
+                    {game.label} 내전
                   </p>
                   <p className="mt-2 text-sm leading-6 text-white/55">
                     {game.title === "PUBG"
