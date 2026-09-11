@@ -42,7 +42,7 @@ const operations: Array<{
     title: "참가 상태와 계정 정보를 한 번에",
     description:
       "참가 인원과 준비 여부를 확인하고, 연동된 Riot 계정과 등록한 포지션을 기준으로 다음 단계를 준비합니다.",
-    features: ["참가·준비 상태", "Riot 계정 연동", "주·부 포지션"],
+    features: ["참가·준비 상태", "실시간 진행 상태", "주·부 포지션"],
     visual: "readiness",
     accent: "text-amber-300",
   },
@@ -51,8 +51,8 @@ const operations: Array<{
     icon: Scale,
     title: "팀을 나눈 뒤에도 직접 검토",
     description:
-      "자동 밸런스·경매·스네이크·자유 선택 중 방에 맞는 방식을 고르고, 방장은 결과를 확인한 뒤 확정합니다.",
-    features: ["자동 밸런스", "경매·스네이크", "자유 팀 선택"],
+      "팀 편성 도구·경매·스네이크·자유 선택 중 방에 맞는 방식을 고르고, 방장은 결과를 확인한 뒤 확정합니다.",
+    features: ["팀 편성 도구", "경매·스네이크", "자유 팀 선택"],
     visual: "balance",
     accent: "text-amber-200",
   },
@@ -79,7 +79,7 @@ const footerLinks = [
 
 const landingNavLinks = [
   { href: "#auction", label: "경매" },
-  { href: "#auto-balance", label: "자동 밸런스" },
+  { href: "#auto-balance", label: "팀 편성 도구" },
   { href: "#operations", label: "주요 기능" },
   { href: "/tournaments", label: "내전 방" },
   { href: "/community", label: "커뮤니티" },
@@ -88,10 +88,10 @@ const landingNavLinks = [
 const positions = ["TOP", "JGL", "MID", "BOT", "SUP"];
 
 const heroSignals = [
-  "Discord 로그인",
-  "실시간 경매",
-  "자동 밸런스",
-  "Riot 계정 연동",
+  "롤 · 배그 지원",
+  "모집부터 결과까지",
+  "팀 편성 도구",
+  "실시간 진행 상태",
   "방송 오버레이",
 ];
 
@@ -105,7 +105,7 @@ const workflowOutcomes = [
   {
     value: "4가지",
     label: "내전에 맞는 팀 편성",
-    description: "경매, 스네이크, 자동 밸런스, 자유 선택을 지원합니다",
+    description: "경매, 스네이크, 팀 편성 도구, 자유 선택을 지원합니다",
   },
   {
     value: "실시간",
@@ -172,7 +172,7 @@ function OperationCardVisual({
               TEAM BALANCE
             </p>
             <p className="mt-1 text-xs font-semibold text-white/80">
-              자동 밸런스 결과
+              팀 편성 도구 결과
             </p>
           </div>
           <p className="text-xs font-bold tabular-nums text-violet-200">
@@ -539,7 +539,7 @@ function AutoBalanceShowcase() {
             <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-4 sm:px-5">
               <div>
                 <p className="text-[9px] font-bold tracking-[0.18em] text-white/45">TEAM BUILDER</p>
-                <p className="mt-1 text-sm font-bold text-white">자동 밸런스 결과</p>
+                <p className="mt-1 text-sm font-bold text-white">팀 편성 도구 결과</p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
@@ -654,7 +654,7 @@ function OperationBoard() {
                 MATCH CONTROL
               </p>
               <p className="mt-0.5 truncate text-sm font-semibold text-white">
-                금요일 밤 5:5 내전
+                어떤 게임으로 시작할까요?
               </p>
             </div>
           </div>
@@ -683,7 +683,7 @@ function OperationBoard() {
 
             <div className="mt-5 space-y-2.5">
               {[
-                ["Riot 계정 연동", "8 / 8", true],
+                ["실시간 진행 상태", "8 / 8", true],
                 ["포지션 선택", "8 / 8", true],
                 ["Discord 음성", "6 / 8", false],
               ].map(([label, value, ready]) => (
@@ -723,7 +723,7 @@ function OperationBoard() {
                     AUTO BALANCE RESULT
                   </p>
                   <p className="mt-1 text-sm font-semibold text-white">
-                    자동 밸런스 편성 결과
+                    팀 편성 도구 편성 결과
                   </p>
                 </div>
                 <Scale className="h-5 w-5 text-amber-200" />
@@ -780,7 +780,7 @@ function OperationBoard() {
 
         <div className="grid grid-cols-3 border-t border-white/[0.07] bg-black/20">
           {[
-            ["MODE", "자동 밸런스"],
+            ["MODE", "팀 편성 도구"],
             ["FORMAT", "5 VS 5"],
             ["STATUS", "참가 가능"],
           ].map(([label, value]) => (
@@ -831,18 +831,16 @@ export function LandingContentSections() {
             </div>
 
             <h1 className="mt-7 max-w-[760px] text-[clamp(3rem,6vw,6.25rem)] font-black leading-[0.98] tracking-[-0.065em] text-white">
-              내전 운영,
+              게임을 고르고,
               <br />
               <span className="text-amber-200">
-                한곳에서
+                내전을 시작하세요
               </span>
-              <br />
-              끝까지
             </h1>
 
             <p className="mt-7 max-w-xl text-base leading-7 text-white/55 sm:text-lg sm:leading-8">
-              로비 모집과 팀 편성부터 경기 진행, 결과 기록까지 하나의 내전
-              방에서 이어갑니다
+              롤과 배그 중 하나를 고르면, 모집부터 팀 편성·경기·결과 기록까지
+              게임에 맞는 흐름으로 바로 이어집니다
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -1115,7 +1113,7 @@ export function LandingContentSections() {
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
               <p className="text-[10px] text-white/60">
-                Discord 로그인 후 바로 시작
+                게임을 고르고 바로 시작
               </p>
             </div>
           </div>
@@ -1139,7 +1137,7 @@ export function LandingFooter() {
           <div>
             <Logo size="sm" />
             <p className="mt-3 max-w-md text-xs leading-5 text-white/60">
-              롤 내전의 로비, 팀 구성, 경기 결과를 연결하는 운영 플랫폼입니다
+              롤과 배그의 로비, 팀 구성, 경기 결과를 연결하는 운영 플랫폼입니다
             </p>
           </div>
           <nav className="flex flex-wrap gap-x-5 gap-y-2">

@@ -57,7 +57,7 @@ export function GamePickerCards() {
         id="game-picker-heading"
         className="text-sm font-semibold tracking-wide text-white/45"
       >
-        어떤 게임 내전인가요
+        게임을 선택하세요
       </h2>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -110,7 +110,7 @@ export function GamePickerCards() {
               </div>
 
               <span className="relative mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-white/85">
-                게임 홈으로 들어가기
+                이 게임 홈 열기
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </span>
             </Link>
