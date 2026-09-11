@@ -52,8 +52,9 @@ export default function HomeClient({
     setShowLanding(new URLSearchParams(window.location.search).get("home") === "overview");
   }, []);
 
-  // 인증 상태에서는 작업 중심 대시보드만 노출한다.
-  if (isAuthenticated && !showLanding) {
+  // 종합 홈(`/`)은 로그인 여부와 관계없이 랜딩을 보여준다.
+  // 대시보드는 별도 진입점에서 유지한다.
+  if (isAuthenticated && !showLanding && false) {
     return (
       <div className="flex-grow animate-fade-in">
         {/* 신규 유저 첫 방문 온보딩 가이드 (localStorage로 1회 노출) */}

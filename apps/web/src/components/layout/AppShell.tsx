@@ -74,13 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // / 라우트의 비로그인 랜딩은 자체 정적 헤더/푸터를 가진다.
   // SSR과 첫 hydration 렌더에서도 앱 헤더를 감싸지 않아 공개 랜딩 HTML이 중복 탐색을 만들지 않게 한다.
   // 인증 상태가 확정된 뒤에는 Header + 대시보드 구조로 전환한다.
-  const [overviewLanding, setOverviewLanding] = useState(false);
-  useEffect(() => {
-    setOverviewLanding(new URLSearchParams(window.location.search).get('home') === 'overview');
-  }, []);
-  const isLandingFullscreen = pathname === '/' && (
-    !mounted || !isAuthenticated || overviewLanding
-  );
+  const isLandingFullscreen = pathname === '/';
 
   // 푸터 숨김 라우트 (대시보드성 페이지들: 자체적인 액션바나 스크롤 관리가 필요한 경우)
   // 게임 접두사를 제외한 경로로 판별해야 로비의 고정 높이와 내부 스크롤이 유지된다.
