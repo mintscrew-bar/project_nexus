@@ -2,6 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes game-picker-wordmark-reveal {
+  from { opacity: 0; transform: translate3d(0, -28px, 0) scale(0.96); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes game-picker-card-reveal {
+  from { opacity: 0; transform: translate3d(0, 72px, 0) rotate(1.5deg); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) rotate(0); }
+}
+
+@supports (animation-timeline: view()) {
+  .game-picker-wordmark {
+    animation: game-picker-wordmark-reveal linear both;
+    animation-timeline: view(10% 75%);
+  }
+
+  .game-picker-card {
+    animation: game-picker-card-reveal linear both;
+    animation-timeline: view(8% 72%);
+  }
+
+  .game-picker-card:nth-child(2) {
+    animation-range: entry 12% cover 34%;
+  }
+
+  .game-picker-card:nth-child(1) {
+    animation-range: entry 4% cover 28%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-picker-wordmark,
+  .game-picker-card { animation: none !important; }
+}
+
 @layer base {
   /* 메모먼트 꾹꾹체 — CreatorBanner 문구 전용.
      원본 전체 폰트는 2.46MB(한글 11,172자)라 첫 방문마다 그만큼 내려받았다.

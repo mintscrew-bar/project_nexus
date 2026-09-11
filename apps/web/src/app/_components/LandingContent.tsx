@@ -13,7 +13,6 @@ import {
   ArrowLeftRight,
   Scale,
   ShieldCheck,
-  Sparkles,
   Swords,
   Trophy,
   Users,
@@ -113,6 +112,12 @@ const workflowOutcomes = [
     description:
       "준비 상태와 팀 구성, 경매와 경기 진행을 참가자에게 동기화합니다",
   },
+];
+
+const pubgHighlights = [
+  ["01", "4인 스쿼드 구성", "스팀·카카오 참가자를 구분하고 4인 단위로 팀을 준비합니다."],
+  ["02", "킬내기와 배틀로얄", "시간제 킬내기부터 판수제 배틀로얄까지 방에 맞는 모드를 고릅니다."],
+  ["03", "라운드 누적 리더보드", "킬·순위·치킨 포인트를 라운드별로 기록해 스크림 결과를 한눈에 봅니다."],
 ];
 
 function OperationCardVisual({
@@ -817,21 +822,11 @@ export function LandingContentSections() {
     <>
       <GamePickerCards />
       <section className="relative isolate overflow-hidden px-5 pb-20 pt-12 sm:px-6 md:pb-24 md:pt-16 lg:flex lg:min-h-[720px] lg:items-center lg:py-16 xl:min-h-[760px]">
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_18%_20%,rgba(255,255,255,0.06),transparent_30%),radial-gradient(circle_at_82%_70%,rgba(245,158,11,0.05),transparent_28%),linear-gradient(180deg,#111214_0%,#0d0e11_100%)]"
-        />
+        <div aria-hidden="true" className="absolute inset-0 -z-20 bg-[#111214]" />
 
         <div className="mx-auto grid w-full max-w-[1480px] items-center gap-14 lg:grid-cols-[0.88fr_1.12fr] lg:gap-12">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-              <span className="text-[10px] font-semibold tracking-[0.16em] text-white/55 sm:text-xs">
-                CUSTOM MATCH OPERATIONS
-              </span>
-            </div>
-
-            <h1 className="mt-7 max-w-[760px] text-[clamp(3rem,6vw,6.25rem)] font-black leading-[0.98] tracking-[-0.065em] text-white">
+            <h1 className="max-w-[760px] text-[clamp(3rem,6vw,6.25rem)] font-black leading-[0.98] tracking-[-0.065em] text-white">
               내전 운영,
               <br />
               <span className="text-amber-200">
@@ -910,14 +905,13 @@ export function LandingContentSections() {
         </div>
       </section>
 
-      <section className="bg-[#efede7] px-5 py-24 text-[#151515] sm:px-6 md:py-36">
+      <section className="relative overflow-hidden bg-[#f4f7fb] px-5 py-20 text-[#151515] sm:px-6 md:py-28">
+        <div aria-hidden="true" className="absolute -right-24 top-12 h-72 w-72 rounded-full bg-amber-300/[0.16] blur-[100px]" />
+        <div aria-hidden="true" className="absolute -left-24 bottom-0 h-64 w-64 rounded-full bg-violet-300/[0.12] blur-[100px]" />
         <div className="mx-auto max-w-[1480px]">
-          <p className="text-xs font-bold tracking-[0.18em] text-[#151515]/65">
-            WHY NEXUS
-          </p>
-          <h2 className="mt-8 max-w-[1240px] text-[clamp(2.5rem,6vw,6.6rem)] font-black leading-[1.02] tracking-[-0.065em]">
-            내전 운영은 방 생성에서 끝나지 않습니다.
-            <span className="text-[#5d63d8]">
+          <h2 className="max-w-[1240px] text-[clamp(2.5rem,6vw,6.6rem)] font-black leading-[1.02] tracking-[-0.065em]">
+            게임이 달라도 운영은 한 흐름으로.
+            <span className="text-[#b7791f]">
               {" "}참가 준비부터 경기 결과까지 이어집니다
             </span>
           </h2>
@@ -937,13 +931,13 @@ export function LandingContentSections() {
             </Link>
           </div>
 
-          <div className="mt-16 grid overflow-hidden rounded-[28px] border border-black/10 bg-white/35 md:grid-cols-3 md:divide-x md:divide-black/10">
+          <div className="mt-12 grid overflow-hidden rounded-[24px] border border-[#b7791f]/20 bg-white/65 shadow-[0_20px_70px_rgba(73,87,110,0.10)] md:grid-cols-3 md:divide-x md:divide-black/10">
             {workflowOutcomes.map((outcome) => (
               <article
                 key={outcome.value}
                 className="border-b border-black/10 p-6 last:border-b-0 sm:p-8 md:border-b-0"
               >
-                <p className="text-3xl font-black tracking-[-0.04em] text-[#5d63d8] sm:text-4xl">
+                <p className="text-3xl font-black tracking-[-0.04em] text-[#b7791f] sm:text-4xl">
                   {outcome.value}
                 </p>
                 <h3 className="mt-4 text-lg font-bold tracking-[-0.02em]">
@@ -958,6 +952,32 @@ export function LandingContentSections() {
         </div>
       </section>
 
+      <section className="border-y border-white/[0.07] bg-[#101113] px-5 py-20 sm:px-6 md:py-28">
+        <div className="mx-auto max-w-[1480px]">
+          <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+            <div>
+              <p className="text-xs font-bold tracking-[0.18em] text-amber-200">PUBG MATCH FLOW</p>
+              <h2 className="mt-5 max-w-2xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
+                배그는 스쿼드와<br />라운드에 맞춰 운영합니다
+              </h2>
+            </div>
+            <p className="max-w-2xl text-base leading-7 text-white/60 lg:ml-auto lg:text-lg">
+              롤처럼 포지션을 나누는 대신, 배그는 4인 스쿼드와 경기 모드를 먼저 정합니다.
+              킬내기와 배틀로얄 스크림의 라운드 결과까지 한 방에서 이어집니다.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-3 md:grid-cols-3">
+            {pubgHighlights.map(([index, title, description]) => (
+              <article key={index} className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
+                <span className="text-[10px] font-bold tracking-[0.18em] text-amber-200/75">{index}</span>
+                <h3 className="mt-5 text-lg font-bold text-white">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-white/55">{description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <AuctionShowcase />
       <section
         id="auto-balance"
@@ -965,11 +985,7 @@ export function LandingContentSections() {
       >
         <div className="relative mx-auto grid max-w-[1480px] gap-14 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-20">
           <div>
-            <div className="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-amber-200/80">
-              <Scale className="h-3.5 w-3.5" />
-              AUTO BALANCE
-            </div>
-            <h2 className="mt-7 max-w-xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
+            <h2 className="max-w-xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
               빠르게 나누고,
               <br />
               납득할 수 있게 검토합니다
@@ -1090,11 +1106,7 @@ export function LandingContentSections() {
         <div className="mx-auto max-w-[1480px]">
           <div className="grid gap-10 border-y border-white/[0.08] py-12 md:py-16 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
-              <div className="flex items-center gap-3 text-[10px] font-bold tracking-[0.2em] text-amber-200">
-                <span className="h-px w-8 bg-amber-200/50" />
-                READY TO HOST
-              </div>
-              <h2 className="mt-6 max-w-5xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
+              <h2 className="max-w-5xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
             내전 준비,
             <br />한 방에서 시작하세요
               </h2>

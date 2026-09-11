@@ -19,8 +19,9 @@ import { enabledGames } from "@nexus/types";
 
 /** 카드에서 "이 게임에서 볼 수 있는 것"으로 훑어줄 화면 */
 const CARD_IMAGE: Record<string, string> = {
-  LOL: "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg",
-  PUBG: "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/578080/841ea38bc58cabb70aef65365cf50bc2d79329d9/library_header_2x.jpg",
+  // 최신 공식 챔피언 Locke 스플래시와 PUBG 공식 최신 키아트
+  LOL: "https://ddragon.leagueoflegends.com/cdn/16.18.1/img/champion/Locke_0.jpg",
+  PUBG: "https://wstatic-prod.pubg.com/web/live/main_49267b7/img/49a81ea.webp",
 };
 
 const CARD_STYLE: Record<string, { ring: string; glow: string; tag: string }> = {
@@ -44,17 +45,19 @@ export function GamePickerCards() {
       className="relative isolate mx-auto max-w-[1480px] px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
       aria-label="Nexus game hubs"
     >
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-8 z-0 flex items-center justify-center px-0 text-[clamp(8rem,18vw,18rem)] font-black italic leading-none tracking-[0.02em] text-white/[0.08]">
+      <div aria-hidden className="pointer-events-none absolute left-[12%] top-20 -z-10 h-48 w-48 rounded-full bg-amber-300/[0.07] blur-[90px]" />
+      <div aria-hidden className="pointer-events-none absolute right-[14%] top-8 -z-10 h-56 w-56 rounded-full bg-violet-400/[0.08] blur-[110px]" />
+      <div aria-hidden className="game-picker-wordmark pointer-events-none absolute inset-x-0 top-8 z-0 flex items-center justify-center px-0 text-[clamp(8rem,18vw,18rem)] font-black italic leading-none tracking-[0.02em] text-transparent opacity-80 [background:linear-gradient(105deg,rgba(251,191,36,0.18),rgba(196,181,253,0.16)_48%,rgba(103,232,249,0.12))] [background-clip:text]">
         <span>LET HIM COOK</span>
       </div>
-      <div className="relative z-10 mx-auto mt-24 grid max-w-[600px] grid-cols-2 gap-3 sm:gap-5">
+      <div className="game-picker-cards relative z-10 mx-auto mt-24 grid max-w-[600px] grid-cols-2 gap-3 sm:gap-5">
         {games.map((game) => {
           const style = CARD_STYLE[game.title] ?? CARD_STYLE.LOL;
           return (
             <Link
               key={game.title}
               href={`/${game.slug}`}
-              className={`group relative aspect-[9/16] overflow-hidden rounded-md bg-white/[0.02] p-5 transition-all duration-300 hover:-translate-y-0.5 sm:p-6 ${style.ring}`}
+              className={`game-picker-card group relative aspect-[9/16] overflow-hidden rounded-md border border-white/[0.09] bg-white/[0.02] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-200/25 hover:shadow-[0_28px_90px_rgba(245,158,11,0.12)] sm:p-6 ${style.ring}`}
             >
               <div
                 aria-hidden
