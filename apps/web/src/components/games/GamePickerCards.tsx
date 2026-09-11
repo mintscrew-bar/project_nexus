@@ -25,12 +25,12 @@ const CARD_IMAGE: Record<string, string> = {
 
 const CARD_STYLE: Record<string, { ring: string; glow: string; tag: string }> = {
   LOL: {
-    ring: "hover:border-[#667EEA]/60",
+    ring: "",
     glow: "from-[#667EEA]/20 to-[#764BA2]/10",
     tag: "bg-[#667EEA]/15 text-[#C7D2FE]",
   },
   PUBG: {
-    ring: "hover:border-[#CF9E41]/60",
+    ring: "",
     glow: "from-[#8A5A1E]/25 to-[#5C7330]/10",
     tag: "bg-[#CF9E41]/15 text-[#F0D9A8]",
   },
@@ -41,10 +41,10 @@ export function GamePickerCards() {
 
   return (
     <section
-      className="relative isolate mx-auto max-w-[1480px] overflow-hidden px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
+      className="relative isolate mx-auto max-w-[1480px] px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
       aria-label="Nexus game hubs"
     >
-      <div aria-hidden className="pointer-events-none absolute -top-8 left-1/2 -z-10 -translate-x-1/2 whitespace-nowrap text-[clamp(6rem,18vw,18rem)] font-black leading-none tracking-[-0.1em] text-white/[0.025]">
+      <div aria-hidden className="pointer-events-none absolute -top-1 left-0 right-0 -z-10 text-center whitespace-nowrap text-[clamp(4rem,12vw,12rem)] font-black leading-none tracking-[-0.1em] text-white/[0.025]">
         NEXUS / PLAY
       </div>
       <div className="grid gap-4 md:grid-cols-2">
@@ -54,7 +54,7 @@ export function GamePickerCards() {
             <Link
               key={game.title}
               href={`/${game.slug}`}
-              className={`group relative aspect-[16/9] overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6 transition-all duration-300 hover:-translate-y-1 sm:p-7 ${style.ring}`}
+              className={`group relative aspect-[16/9] overflow-hidden rounded-xl bg-white/[0.02] p-6 transition-all duration-300 hover:-translate-y-1 sm:p-7 ${style.ring}`}
             >
               <div
                 aria-hidden
@@ -66,7 +66,7 @@ export function GamePickerCards() {
 
               <div className="relative flex h-full flex-col justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-bold tracking-[0.2em] text-white/65">
+                  <p className="text-[11px] font-bold tracking-[0.14em] text-white/70">
                     {game.title === "PUBG" ? "PLAYERUNKNOWN'S BATTLEGROUNDS" : "LEAGUE OF LEGENDS"}
                   </p>
                   <p className="mt-2 text-4xl font-black tracking-[-0.06em] text-white sm:text-5xl">
