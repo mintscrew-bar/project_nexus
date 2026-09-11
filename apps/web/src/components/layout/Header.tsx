@@ -76,7 +76,16 @@ export function Header() {
       {/* Left: Logo + Mobile Menu */}
       <div className="flex shrink-0 items-center gap-2">
         <MobileMenu />
-        <Link href="/?home=overview" className="flex items-center">
+        <Link
+          href="/?home=overview"
+          onClick={(event) => {
+            // 같은 `/` 경로에서 쿼리만 바뀌면 AppShell이 기존 대시보드 상태를
+            // 유지할 수 있어, 종합 랜딩은 새 문서 진입으로 확실히 전환한다.
+            event.preventDefault();
+            window.location.assign("/?home=overview");
+          }}
+          className="flex items-center"
+        >
           <Logo className="h-8 w-auto" />
         </Link>
         <GameSwitcher className="hidden sm:flex" />
