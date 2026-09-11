@@ -135,7 +135,7 @@ function LoginPageContent() {
             <span className="text-accent-primary">Nexus</span>
           </h1>
           <p className="text-text-secondary">
-            LoL 내전 토너먼트 플랫폼에 오신 것을 환영합니다
+            롤과 배그 내전 운영 플랫폼에 오신 것을 환영합니다
           </p>
         </div>
 

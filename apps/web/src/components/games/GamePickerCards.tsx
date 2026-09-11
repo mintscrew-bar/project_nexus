@@ -56,7 +56,7 @@ export function GamePickerCards() {
           return (
             <Link
               key={game.title}
-              href={`/${game.slug}`}
+              href={`/auth/login?redirect=/${game.slug}`}
               className={`game-picker-card group relative aspect-[9/16] overflow-hidden rounded-md border border-white/[0.09] bg-white/[0.02] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-200/25 hover:shadow-[0_28px_90px_rgba(245,158,11,0.12)] sm:p-6 ${style.ring}`}
             >
               <div
