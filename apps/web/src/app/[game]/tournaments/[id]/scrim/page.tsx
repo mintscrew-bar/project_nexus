@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ScrimProgressChart } from "./_components/ScrimProgressChart";
 import { motion } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
@@ -457,7 +457,7 @@ export default function ScrimPage() {
           <FinalResultSummary scrim={scrim} />
         )}
         {!scrim.ready && (
-          <Leaderboard scrim={scrim} lastRoundIndex={lastRoundIndex} />
+          <Leaderboard scrim={scrim} lastRoundIndex={lastRoundIndex} teams={teams} />
         )}
         {/* 표가 정본이고 그림은 흐름을 읽는 용도라 표 뒤에 둔다. */}
         {!scrim.ready && (
@@ -893,103 +893,47 @@ function RankDelta({ delta }: { delta: number | null }) {
 function Leaderboard({
   scrim,
   lastRoundIndex,
+  teams,
 }: {
   scrim: Scrim;
-  /** 방금 결과가 들어간 라운드. 그 칸을 강조하고 순위 변동을 계산한다. */
   lastRoundIndex: number;
+  teams: { id: string; name: string; members?: { id: string; user?: { username?: string; nickname?: string } }[] }[];
 }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
   const before = previousRanks(scrim, lastRoundIndex);
+  const teamMembers = new Map(teams.map((team) => [team.id, team.members ?? []]));
   return (
     <Card>
       <CardHeader>
         <CardTitle>누적 리더보드</CardTitle>
       </CardHeader>
-      <CardContent>
-        {/* 팀이 많으면 표가 화면을 넘는다. 표만 가로로 스크롤시킨다. */}
+      <CardContent className="space-y-3">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[600px] text-sm">
-            <thead>
-              <tr className="border-b border-bg-tertiary text-left text-xs text-text-tertiary">
-                <th className="py-2 pr-3 font-semibold">#</th>
-                <th className="py-2 pr-3 font-semibold">팀</th>
-                {scrim.rounds.map((round, roundIndex) => (
-                  <th
-                    key={round.id}
-                    className={`py-2 pr-3 text-center font-semibold ${
-                      roundIndex === lastRoundIndex ? "text-accent-primary" : ""
-                    }`}
-                  >
-                    {round.roundNumber}R
-                  </th>
-                ))}
-                <th className="py-2 pr-3 text-right font-semibold">킬</th>
-                <th className="py-2 pr-3 text-right font-semibold">데스</th>
-                <th className="py-2 text-right font-semibold">총점</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scrim.leaderboard.map((row, index) => (
-                <motion.tr
-                  key={row.teamId ?? row.teamName}
-                  layout
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.25, delay: Math.min(index * 0.015, 0.35) }}
-                  className="border-b border-bg-tertiary/50 last:border-0"
-                >
-                  <td className="whitespace-nowrap py-2.5 pr-3 font-bold text-text-tertiary">
-                    {index + 1}
-                    <RankDelta
-                      delta={
-                        before.size === 0
-                          ? null
-                          : (before.get(row.teamId ?? row.teamName) ??
-                              index + 1) -
-                            (index + 1)
-                      }
-                    />
-                  </td>
-                  <td className="py-2.5 pr-3">
-                    <span className="font-semibold text-text-primary">
-                      {row.teamName}
-                    </span>
-                    {row.wins > 0 && (
-                      <Badge variant="primary" className="ml-2">
-                        치킨 {row.wins}회
-                      </Badge>
-                    )}
-                  </td>
-                  {row.roundPoints.map((points, roundIndex) => (
-                    <td
-                      key={roundIndex}
-                      className={`py-2.5 pr-3 text-center ${
-                        roundIndex === lastRoundIndex
-                          ? "font-bold text-accent-primary"
-                          : "text-text-secondary"
-                      }`}
-                    >
-                      {/* 아직 안 한 판과 0점 받은 판은 다르다. */}
-                      {points === null ? "–" : points}
-                    </td>
-                  ))}
-                  <td className="py-2.5 pr-3 text-right text-text-secondary">
-                    {row.totalKills}
-                  </td>
-                  <td className="py-2.5 pr-3 text-right text-text-secondary">
-                    {row.totalDeaths}
-                  </td>
-                  <td className="py-2.5 text-right font-black text-text-primary">
-                    {row.totalPoints}
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
+          <table className="w-full min-w-[680px] text-sm">
+            <thead><tr className="border-b border-bg-tertiary text-left text-xs text-text-tertiary">
+              <th className="py-2 pr-3">#</th><th className="py-2 pr-3">팀</th>
+              {scrim.rounds.map((round, i) => <th key={round.id} className={`py-2 pr-3 text-center ${i === lastRoundIndex ? "text-accent-primary" : ""}`}>{round.roundNumber}R</th>)}
+              <th className="py-2 pr-3 text-right">킬</th><th className="py-2 pr-3 text-right">데스</th><th className="py-2 text-right">총점</th>
+            </tr></thead>
+            <tbody>{scrim.leaderboard.map((row, index) => {
+              const key = row.teamId ?? row.teamName;
+              const members = teamMembers.get(row.teamId ?? "") ?? [];
+              const isOpen = expanded === key;
+              return <Fragment key={key}><tr className="border-b border-bg-tertiary/50">
+                <td className="py-2.5 pr-3 font-bold text-text-tertiary">{index + 1}<RankDelta delta={before.size === 0 ? null : (before.get(key) ?? index + 1) - (index + 1)} /></td>
+                <td className="py-2.5 pr-3"><button type="button" onClick={() => setExpanded(isOpen ? null : key)} aria-expanded={isOpen} className="text-left font-semibold text-text-primary hover:text-accent-primary">{row.teamName}<span className="ml-2 text-xs text-text-tertiary">{isOpen ? "접기" : "팀원 보기"}</span></button>{row.wins > 0 && <Badge variant="primary" className="ml-2">치킨 {row.wins}회</Badge>}</td>
+                {row.roundPoints.map((points, i) => <td key={i} className={`py-2.5 pr-3 text-center ${i === lastRoundIndex ? "font-bold text-accent-primary" : "text-text-secondary"}`}>{points === null ? "–" : points}</td>)}
+                <td className="py-2.5 pr-3 text-right text-text-secondary">{row.totalKills}</td><td className="py-2.5 pr-3 text-right text-text-secondary">{row.totalDeaths}</td><td className="py-2.5 text-right font-black">{row.totalPoints}</td>
+              </tr>{isOpen && <tr className="border-b border-bg-tertiary"><td colSpan={scrim.rounds.length + 5} className="bg-bg-primary p-3"><div className="grid gap-2 sm:grid-cols-2">{members.length > 0 ? members.map((member) => <div key={member.id} className="flex items-center justify-between rounded-md border border-bg-tertiary bg-bg-secondary px-4 py-3"><span className="truncate font-semibold">{member.user?.nickname ?? member.user?.username ?? "참가자"}</span><span className="text-xs text-text-tertiary">K/D/A · 딜량 수집 대기</span></div>) : <p className="px-2 py-3 text-xs text-text-tertiary">팀원 정보가 아직 없습니다.</p>}</div></td></tr>}</Fragment>;
+            })}</tbody>
           </table>
         </div>
+        <p className="text-xs text-text-tertiary">팀 행을 클릭하면 팀원 목록이 펼쳐집니다. 선수별 K/D/A·딜량 데이터가 연결되면 같은 카드에 표시됩니다.</p>
       </CardContent>
     </Card>
   );
 }
+
 
 function RoundRow({
   round,
