@@ -91,7 +91,7 @@ function LiveStreamerTile({ streamer }: { streamer: StreamerListItem }) {
   const thumbnailFailed = !!thumbnail && failedThumbnail === thumbnail;
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-bg-secondary transition-colors hover:border-accent-primary/40">
+    <div className="group overflow-hidden rounded-panel border border-white/[0.08] bg-bg-secondary transition-colors hover:border-accent-primary/40">
       <a href={streamer.channelUrl} target="_blank" rel="noopener noreferrer">
         <div className="relative aspect-video w-full overflow-hidden bg-bg-tertiary">
           {thumbnail && !thumbnailFailed ? (
@@ -110,7 +110,7 @@ function LiveStreamerTile({ streamer }: { streamer: StreamerListItem }) {
             </div>
           )}
 
-          <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-lg">
+          <span className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-chip bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-lg">
             <span className="h-1 w-1 animate-pulse rounded-full bg-white" />
             LIVE
           </span>

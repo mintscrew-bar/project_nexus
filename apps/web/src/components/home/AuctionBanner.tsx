@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { AUCTION_COLORS, bannerBadgeStyle, bannerGlowGradient } from "./banner-constants";
+import {
+  AUCTION_COLORS,
+  bannerBadgeStyle,
+  bannerGlowGradient,
+} from "./banner-constants";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -98,7 +102,7 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
 
     // 각 입찰 이벤트를 시간차로 등장시킴
     const ids = BID_EVENTS.map((evt, i) =>
-      setTimeout(() => setBidIndex(i + 1), evt.delay)
+      setTimeout(() => setBidIndex(i + 1), evt.delay),
     );
     return () => ids.forEach(clearTimeout);
   }, [isActive]);
@@ -107,7 +111,7 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
     <Link
       href={`${gamePrefix}/tournaments`}
       aria-label="경매 드래프트 시스템 — 내전방 목록으로 이동"
-      className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
+      className="group relative block h-full rounded-panel overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -149,12 +153,11 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
 
       {/* ── 메인 콘텐츠: 모바일 세로 / md 이상 좌우 분할 ── */}
       <div className="relative z-10 flex flex-col md:flex-row h-full">
-
         {/* ── 좌측 — DRAFT 뱃지 + 큰 후크 + 입찰가 (모바일: 전체 너비) ── */}
         <div className="flex flex-col justify-center px-[5%] py-[5%] md:px-[6%] w-full md:w-[54%] h-full md:h-auto">
           {/* DRAFT 뱃지 */}
           <span
-            className="inline-block w-fit px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider mb-2 md:mb-2.5"
+            className="inline-block w-fit px-2.5 py-0.5 rounded-chip text-[10px] font-bold tracking-wider mb-2 md:mb-2.5"
             style={bannerBadgeStyle(VIOLET_GLOW)}
           >
             DRAFT
@@ -163,16 +166,20 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
           {/* 큰 후크 타이틀 — 호버 시 미세 슬라이드 */}
           <h3
             className="text-lg sm:text-xl md:text-2xl font-black text-white mb-1.5 transition-transform duration-500 ease-out"
-            style={{ transform: isHovered ? "translateX(4px)" : "translateX(0)" }}
+            style={{
+              transform: isHovered ? "translateX(4px)" : "translateX(0)",
+            }}
           >
-            팀장님,{" "}
-            <span style={{ color: VIOLET_GLOW }}>포인트 배분</span>은 신중하게
+            팀장님, <span style={{ color: VIOLET_GLOW }}>포인트 배분</span>은
+            신중하게
           </h3>
 
           {/* 부제목 — 호버 시 약간 더 이동 */}
           <p
             className="text-[11px] sm:text-xs text-white/55 mb-2 md:mb-3.5 transition-transform duration-500 ease-out"
-            style={{ transform: isHovered ? "translateX(8px)" : "translateX(0)" }}
+            style={{
+              transform: isHovered ? "translateX(8px)" : "translateX(0)",
+            }}
           >
             가성비 원딜? 올스타 상체? 당신의 픽은?
           </p>
@@ -180,14 +187,20 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
           {/* 현재 입찰가 — 호버 시 glow 강화 */}
           <div
             className="flex items-baseline gap-1.5 transition-transform duration-500 ease-out"
-            style={{ transform: isHovered ? "translateX(8px)" : "translateX(0)" }}
+            style={{
+              transform: isHovered ? "translateX(8px)" : "translateX(0)",
+            }}
           >
-            <span className="text-[10px] text-white/30 tracking-wider">현재 입찰</span>
+            <span className="text-[10px] text-white/30 tracking-wider">
+              현재 입찰
+            </span>
             <span
               className="text-lg md:text-xl font-black tabular-nums transition-all duration-300"
               style={{
                 color: GOLD,
-                textShadow: isHovered ? `0 0 20px ${GOLD}60` : `0 0 12px ${GOLD}40`,
+                textShadow: isHovered
+                  ? `0 0 20px ${GOLD}60`
+                  : `0 0 12px ${GOLD}40`,
               }}
             >
               {currentBid}
@@ -199,19 +212,27 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
         {/* 세로 구분선 — 모바일에서 숨김 */}
         <div
           className="hidden md:block w-px self-stretch my-6 shrink-0"
-          style={{ background: `linear-gradient(180deg, transparent, ${VIOLET}30, transparent)` }}
+          style={{
+            background: `linear-gradient(180deg, transparent, ${VIOLET}30, transparent)`,
+          }}
         />
 
         {/* ── 우측 — 5v5 슬롯 시각화 (모바일에서 숨김) ── */}
         <div className="hidden md:flex flex-1 items-center justify-center gap-2 md:gap-3 px-[3%] py-[5%]">
-
           {/* 블루팀 */}
           <div className="flex flex-col gap-1">
-            <p className="text-[9px] font-bold tracking-widest text-center mb-0.5" style={{ color: TEAM_BLUE }}>
+            <p
+              className="text-[9px] font-bold tracking-widest text-center mb-0.5"
+              style={{ color: TEAM_BLUE }}
+            >
               BLUE
             </p>
             {INITIAL_BLUE.map((slot) => (
-              <SlotCell key={`blue-${slot.position}`} slot={slot} teamColor={TEAM_BLUE} />
+              <SlotCell
+                key={`blue-${slot.position}`}
+                slot={slot}
+                teamColor={TEAM_BLUE}
+              />
             ))}
           </div>
 
@@ -225,17 +246,26 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
 
           {/* 레드팀 */}
           <div className="flex flex-col gap-1">
-            <p className="text-[9px] font-bold tracking-widest text-center mb-0.5" style={{ color: TEAM_RED }}>
+            <p
+              className="text-[9px] font-bold tracking-widest text-center mb-0.5"
+              style={{ color: TEAM_RED }}
+            >
               RED
             </p>
             {INITIAL_RED.map((slot) => (
-              <SlotCell key={`red-${slot.position}`} slot={slot} teamColor={TEAM_RED} />
+              <SlotCell
+                key={`red-${slot.position}`}
+                slot={slot}
+                teamColor={TEAM_RED}
+              />
             ))}
           </div>
 
           {/* 입찰 로그 (데스크톱만) */}
           <div className="hidden lg:flex flex-col gap-1 ml-1 w-20">
-            <p className="text-[9px] text-white/25 tracking-wider mb-1">입찰 로그</p>
+            <p className="text-[9px] text-white/25 tracking-wider mb-1">
+              입찰 로그
+            </p>
             {BID_EVENTS.map((evt, i) => {
               const isVisible = i < bidIndex;
               return (
@@ -249,9 +279,13 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
                 >
                   <span
                     className="block w-1.5 h-1.5 rounded-full shrink-0"
-                    style={{ background: evt.team === "blue" ? TEAM_BLUE : TEAM_RED }}
+                    style={{
+                      background: evt.team === "blue" ? TEAM_BLUE : TEAM_RED,
+                    }}
                   />
-                  <span className="text-[10px] text-white/50 tabular-nums">{evt.points}P</span>
+                  <span className="text-[10px] text-white/50 tabular-nums">
+                    {evt.points}P
+                  </span>
                   {i === bidIndex - 1 && (
                     <span
                       className="text-[8px] font-bold px-1 rounded"
@@ -292,13 +326,7 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
 // SlotCell — 개별 포지션 슬롯
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SlotCell({
-  slot,
-  teamColor,
-}: {
-  slot: TeamSlot;
-  teamColor: string;
-}) {
+function SlotCell({ slot, teamColor }: { slot: TeamSlot; teamColor: string }) {
   const { position, state, points } = slot;
 
   // 슬롯 상태별 스타일 분기
@@ -312,21 +340,12 @@ function SlotCell({
           border: `1px solid ${teamColor}30`,
         }}
       >
-        <span
-          className="text-[9px] font-bold w-5"
-          style={{ color: teamColor }}
-        >
+        <span className="text-[9px] font-bold w-5" style={{ color: teamColor }}>
           {position}
         </span>
-        <span className="text-[9px] text-white/60 tabular-nums">
-          {points}P
-        </span>
+        <span className="text-[9px] text-white/60 tabular-nums">{points}P</span>
         {/* 체크 표시 */}
-        <svg
-          className="w-2.5 h-2.5 ml-auto"
-          viewBox="0 0 10 10"
-          fill="none"
-        >
+        <svg className="w-2.5 h-2.5 ml-auto" viewBox="0 0 10 10" fill="none">
           <path
             d="M2 5l2.5 2.5L8 3"
             stroke={teamColor}
@@ -356,10 +375,7 @@ function SlotCell({
         >
           {position}
         </span>
-        <span
-          className="text-[9px] font-medium"
-          style={{ color: GOLD }}
-        >
+        <span className="text-[9px] font-medium" style={{ color: GOLD }}>
           입찰 중
         </span>
         {/* 맥동 점 */}
@@ -383,9 +399,7 @@ function SlotCell({
         border: "1px dashed rgba(255,255,255,0.08)",
       }}
     >
-      <span className="text-[9px] font-bold w-5 text-white/20">
-        {position}
-      </span>
+      <span className="text-[9px] font-bold w-5 text-white/20">{position}</span>
       <span className="text-[9px] text-white/15">—</span>
     </div>
   );

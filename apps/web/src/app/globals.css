@@ -117,6 +117,15 @@
 
      `.dark` 는 <html> 에 붙고 이 클래스는 그 자손에 붙는다. 커스텀 속성은
      가까운 조상이 이기므로 `.dark .game-pubg` 를 따로 쓸 필요가 없다. */
+  :root {
+    /* 형태 토큰. 롤과 게임 무관 화면의 기본값은 지금 모습 그대로다 —
+       둥글고 매끈한 쪽이 롤의 언어다. */
+    --radius-panel: 1.75rem; /* 28px */
+    --radius-control: 0.75rem; /* 12px */
+    --radius-chip: 9999px;
+    --font-figure: inherit;
+  }
+
   .game-pubg {
     /* 무채색 베이스 — R=G=B 라 색 기울기가 없다.
        이전에는 G 가 R·B 보다 높아(#141612) 국방색으로 읽혔다. */
@@ -144,6 +153,21 @@
        "흑백 + 노랑 하나" 라는 규칙이 그 자리에서만 깨진다. */
     --color-accent-purple: 122 122 122;
     --color-accent-info: 154 154 154;
+
+    /* 형태. 배그는 각지고 딱 떨어지는 쪽이다 — 색을 빼고 봐도 롤과
+       구분되게 하는 게 이 토큰의 목적이다. 0 이 아니라 2px 인 이유는
+       완전한 직각이 스크린에서 계단처럼 보여서다. */
+    --radius-panel: 2px;
+    --radius-control: 2px;
+    --radius-chip: 2px;
+    /* 숫자는 등폭으로. 순위·킬·포인트가 라운드마다 바뀌는 화면이라
+       자릿수가 흔들리지 않는 쪽이 읽기도 편하고 톤도 맞는다. */
+    /* 한글 폴백을 반드시 끼운다. 등폭 스택만 두면 "3개"·"42전" 의 한글이
+       글리프 없는 generic monospace 로 떨어져 두부(▯)가 됐다.
+       숫자는 앞쪽 등폭이 잡고, 한글은 Pretendard 가 받는다. */
+    --font-figure:
+      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      "Pretendard Variable", monospace;
   }
 
   body {

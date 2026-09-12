@@ -23,7 +23,7 @@ export function CreatorBanner({
     <Link
       href="/partners"
       className={cn(
-        "group relative block h-full w-full overflow-hidden rounded-2xl border border-violet-100/70 bg-[#fff8ef]",
+        "group relative block h-full w-full overflow-hidden rounded-panel border border-violet-100/70 bg-[#fff8ef]",
         "shadow-[0_18px_56px_rgba(83,61,135,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary",
         className,
       )}

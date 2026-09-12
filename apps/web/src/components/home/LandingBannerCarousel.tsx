@@ -27,7 +27,9 @@ export function LandingBannerCarousel() {
     const diff = touchStartX.current - touchEndX.current;
     if (Math.abs(diff) < SWIPE_THRESHOLD) return;
     if (timerRef.current) clearInterval(timerRef.current);
-    setCurrent((c) => diff > 0 ? (c + 1) % TOTAL_SLIDES : (c - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
+    setCurrent((c) =>
+      diff > 0 ? (c + 1) % TOTAL_SLIDES : (c - 1 + TOTAL_SLIDES) % TOTAL_SLIDES,
+    );
     startTimer();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -40,7 +42,9 @@ export function LandingBannerCarousel() {
 
   useEffect(() => {
     startTimer();
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [startTimer]);
 
   const goTo = (idx: number) => {
@@ -50,7 +54,12 @@ export function LandingBannerCarousel() {
   };
 
   const slides = [
-    <CreatorBanner key="creator" className="h-full aspect-auto" isActive={current === 0} priority />,
+    <CreatorBanner
+      key="creator"
+      className="h-full aspect-auto"
+      isActive={current === 0}
+      priority
+    />,
     <AuctionBanner key="auction" isActive={current === 1} />,
     <StatsBanner key="stats" isActive={current === 2} />,
     <DiscordBanner key="discord" />,
@@ -58,7 +67,7 @@ export function LandingBannerCarousel() {
 
   return (
     <div
-      className="relative aspect-[3/2] w-full overflow-hidden rounded-2xl"
+      className="relative aspect-[3/2] w-full overflow-hidden rounded-panel"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -103,7 +112,9 @@ export function LandingBannerCarousel() {
             <span
               className={cn(
                 "block rounded-full transition-all duration-500",
-                i === current ? "h-1.5 w-6 bg-violet-500" : "h-1.5 w-1.5 bg-white/50"
+                i === current
+                  ? "h-1.5 w-6 bg-violet-500"
+                  : "h-1.5 w-1.5 bg-white/50",
               )}
             />
           </button>

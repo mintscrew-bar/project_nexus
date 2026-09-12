@@ -17,6 +17,9 @@ export default function robots(): MetadataRoute.Robots {
     "/admin",
     "/api",
     "/auth",
+    // 개발용 프리뷰 하네스(`/dev/*`). 가짜 데이터로 컴포넌트를 그리는
+    // 화면이라 색인되면 안 된다 — 실제 화면인 줄 알고 들어온다.
+    "/dev",
     "/dashboard",
     "/settings",
     "/rooms",

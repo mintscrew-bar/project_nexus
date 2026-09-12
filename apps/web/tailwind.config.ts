@@ -6,154 +6,172 @@ const config: Config = {
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-  darkMode: 'class',
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
         // Background Colors (CSS Variables)
         bg: {
-          primary: 'rgb(var(--color-bg-primary) / <alpha-value>)',
-          secondary: 'rgb(var(--color-bg-secondary) / <alpha-value>)',
-          tertiary: 'rgb(var(--color-bg-tertiary) / <alpha-value>)',
-          elevated: 'rgb(var(--color-bg-elevated) / <alpha-value>)',
+          primary: "rgb(var(--color-bg-primary) / <alpha-value>)",
+          secondary: "rgb(var(--color-bg-secondary) / <alpha-value>)",
+          tertiary: "rgb(var(--color-bg-tertiary) / <alpha-value>)",
+          elevated: "rgb(var(--color-bg-elevated) / <alpha-value>)",
         },
         // Text Colors
         text: {
-          primary: 'rgb(var(--color-text-primary) / <alpha-value>)',
-          secondary: 'rgb(var(--color-text-secondary) / <alpha-value>)',
-          tertiary: 'rgb(var(--color-text-tertiary) / <alpha-value>)',
-          muted: 'rgb(var(--color-text-muted) / <alpha-value>)',
+          primary: "rgb(var(--color-text-primary) / <alpha-value>)",
+          secondary: "rgb(var(--color-text-secondary) / <alpha-value>)",
+          tertiary: "rgb(var(--color-text-tertiary) / <alpha-value>)",
+          muted: "rgb(var(--color-text-muted) / <alpha-value>)",
         },
         // Accent Colors — 로고 그라디언트(#667EEA → #764BA2) 기반
         accent: {
-          primary: 'rgb(var(--color-accent-primary) / <alpha-value>)',
-          hover: 'rgb(var(--color-accent-hover) / <alpha-value>)',
-          active: 'rgb(var(--color-accent-active) / <alpha-value>)',
-          purple: 'rgb(var(--color-accent-purple) / <alpha-value>)',
-          info: 'rgb(var(--color-accent-info) / <alpha-value>)',
-          gold: 'rgb(var(--color-accent-gold) / <alpha-value>)',
+          primary: "rgb(var(--color-accent-primary) / <alpha-value>)",
+          hover: "rgb(var(--color-accent-hover) / <alpha-value>)",
+          active: "rgb(var(--color-accent-active) / <alpha-value>)",
+          purple: "rgb(var(--color-accent-purple) / <alpha-value>)",
+          info: "rgb(var(--color-accent-info) / <alpha-value>)",
+          gold: "rgb(var(--color-accent-gold) / <alpha-value>)",
           /* accent 면 위에 올리는 글자색. 테마가 정한다 — 롤은 흰색,
              배그는 노랑 위라 검정이다. */
-          on: 'rgb(var(--color-accent-on) / <alpha-value>)',
-          success: 'rgb(var(--color-accent-success) / <alpha-value>)',
-          danger: 'rgb(var(--color-accent-danger) / <alpha-value>)',
-          warning: 'rgb(var(--color-accent-warning) / <alpha-value>)',
+          on: "rgb(var(--color-accent-on) / <alpha-value>)",
+          success: "rgb(var(--color-accent-success) / <alpha-value>)",
+          danger: "rgb(var(--color-accent-danger) / <alpha-value>)",
+          warning: "rgb(var(--color-accent-warning) / <alpha-value>)",
         },
         // Tier Colors (LoL 티어 시스템)
         tier: {
-          iron: 'rgb(var(--color-tier-iron) / <alpha-value>)',
-          bronze: 'rgb(var(--color-tier-bronze) / <alpha-value>)',
-          silver: 'rgb(var(--color-tier-silver) / <alpha-value>)',
-          gold: 'rgb(var(--color-tier-gold) / <alpha-value>)',
-          platinum: 'rgb(var(--color-tier-platinum) / <alpha-value>)',
-          emerald: 'rgb(var(--color-tier-emerald) / <alpha-value>)',
-          diamond: 'rgb(var(--color-tier-diamond) / <alpha-value>)',
-          master: 'rgb(var(--color-tier-master) / <alpha-value>)',
-          grandmaster: 'rgb(var(--color-tier-grandmaster) / <alpha-value>)',
-          challenger: 'rgb(var(--color-tier-challenger) / <alpha-value>)',
+          iron: "rgb(var(--color-tier-iron) / <alpha-value>)",
+          bronze: "rgb(var(--color-tier-bronze) / <alpha-value>)",
+          silver: "rgb(var(--color-tier-silver) / <alpha-value>)",
+          gold: "rgb(var(--color-tier-gold) / <alpha-value>)",
+          platinum: "rgb(var(--color-tier-platinum) / <alpha-value>)",
+          emerald: "rgb(var(--color-tier-emerald) / <alpha-value>)",
+          diamond: "rgb(var(--color-tier-diamond) / <alpha-value>)",
+          master: "rgb(var(--color-tier-master) / <alpha-value>)",
+          grandmaster: "rgb(var(--color-tier-grandmaster) / <alpha-value>)",
+          challenger: "rgb(var(--color-tier-challenger) / <alpha-value>)",
         },
       },
+      /*
+       * 게임마다 갈리는 **형태** 토큰.
+       *
+       * 색은 `.game-pubg` 가 이미 갈아끼우는데 모서리·서체는 컴포넌트마다
+       * `rounded-2xl` 로 박혀 있어서, 배그 화면도 롤과 똑같이 둥글었다.
+       * 색을 빼고 보면 두 홈이 구분되지 않는다. 반지름을 토큰으로 돌려
+       * 테마가 형태까지 정하게 한다.
+       */
+      borderRadius: {
+        /** 큰 패널·카드 */
+        panel: "var(--radius-panel)",
+        /** 버튼·입력처럼 손대는 것 */
+        control: "var(--radius-control)",
+        /** 배지·칩 */
+        chip: "var(--radius-chip)",
+      },
       fontFamily: {
+        /** 숫자를 읽는 자리(전적·포인트·인원). 배그는 등폭으로 갈린다. */
+        figure: "var(--font-figure)",
         // Pretendard 는 src/styles/pretendard.css 에서 자체 호스팅한다.
         // 라틴 글리프도 Pretendard 가 모두 가지고 있어 한 서체로 통일한다.
         // (Inter 를 앞에 두면 한영 혼용 문장에서 두 서체의 자간·굵기가 섞였다)
         sans: [
-          'Pretendard Variable',
-          '-apple-system',
-          'BlinkMacSystemFont',
-          'Segoe UI',
-          'sans-serif',
+          "Pretendard Variable",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "sans-serif",
         ],
       },
       // 애니메이션 시스템
       animation: {
-        'fade-in': 'fadeIn 200ms ease-out',
-        'fade-out': 'fadeOut 200ms ease-in',
-        'slide-in': 'slideIn 300ms ease-out',
-        'slide-out': 'slideOut 300ms ease-in',
-        'slide-up': 'slideUp 300ms ease-out',
-        'slide-down': 'slideDown 300ms ease-out',
-        'scale-in': 'scaleIn 200ms ease-out',
-        'scale-out': 'scaleOut 200ms ease-in',
-        'bounce-in': 'bounceIn 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'shimmer': 'shimmer 2s infinite linear',
-        'spin-slow': 'spin 2s linear infinite',
-        'bid-flash': 'bidFlash 400ms ease-out',
-        'shake': 'shake 500ms ease-in-out',
-        'sold-glow': 'soldGlow 600ms ease-out',
+        "fade-in": "fadeIn 200ms ease-out",
+        "fade-out": "fadeOut 200ms ease-in",
+        "slide-in": "slideIn 300ms ease-out",
+        "slide-out": "slideOut 300ms ease-in",
+        "slide-up": "slideUp 300ms ease-out",
+        "slide-down": "slideDown 300ms ease-out",
+        "scale-in": "scaleIn 200ms ease-out",
+        "scale-out": "scaleOut 200ms ease-in",
+        "bounce-in": "bounceIn 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55)",
+        "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        shimmer: "shimmer 2s infinite linear",
+        "spin-slow": "spin 2s linear infinite",
+        "bid-flash": "bidFlash 400ms ease-out",
+        shake: "shake 500ms ease-in-out",
+        "sold-glow": "soldGlow 600ms ease-out",
       },
       keyframes: {
         fadeIn: {
-          from: { opacity: '0' },
-          to: { opacity: '1' },
+          from: { opacity: "0" },
+          to: { opacity: "1" },
         },
         fadeOut: {
-          from: { opacity: '1' },
-          to: { opacity: '0' },
+          from: { opacity: "1" },
+          to: { opacity: "0" },
         },
         slideIn: {
-          from: { transform: 'translateX(100%)' },
-          to: { transform: 'translateX(0)' },
+          from: { transform: "translateX(100%)" },
+          to: { transform: "translateX(0)" },
         },
         slideOut: {
-          from: { transform: 'translateX(0)' },
-          to: { transform: 'translateX(100%)' },
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(100%)" },
         },
         slideUp: {
-          from: { transform: 'translateY(20px)', opacity: '0' },
-          to: { transform: 'translateY(0)', opacity: '1' },
+          from: { transform: "translateY(20px)", opacity: "0" },
+          to: { transform: "translateY(0)", opacity: "1" },
         },
         slideDown: {
-          from: { transform: 'translateY(-20px)', opacity: '0' },
-          to: { transform: 'translateY(0)', opacity: '1' },
+          from: { transform: "translateY(-20px)", opacity: "0" },
+          to: { transform: "translateY(0)", opacity: "1" },
         },
         scaleIn: {
-          from: { transform: 'scale(0.95)', opacity: '0' },
-          to: { transform: 'scale(1)', opacity: '1' },
+          from: { transform: "scale(0.95)", opacity: "0" },
+          to: { transform: "scale(1)", opacity: "1" },
         },
         scaleOut: {
-          from: { transform: 'scale(1)', opacity: '1' },
-          to: { transform: 'scale(0.95)', opacity: '0' },
+          from: { transform: "scale(1)", opacity: "1" },
+          to: { transform: "scale(0.95)", opacity: "0" },
         },
         bounceIn: {
-          '0%': { transform: 'scale(0.3)', opacity: '0' },
-          '50%': { transform: 'scale(1.05)' },
-          '70%': { transform: 'scale(0.9)' },
-          '100%': { transform: 'scale(1)', opacity: '1' },
+          "0%": { transform: "scale(0.3)", opacity: "0" },
+          "50%": { transform: "scale(1.05)" },
+          "70%": { transform: "scale(0.9)" },
+          "100%": { transform: "scale(1)", opacity: "1" },
         },
         shimmer: {
-          '0%': { backgroundPosition: '-200% 0' },
-          '100%': { backgroundPosition: '200% 0' },
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
         },
         bidFlash: {
-          '0%': { backgroundColor: 'rgba(255, 193, 7, 0.25)' },
-          '100%': { backgroundColor: 'transparent' },
+          "0%": { backgroundColor: "rgba(255, 193, 7, 0.25)" },
+          "100%": { backgroundColor: "transparent" },
         },
         shake: {
-          '0%, 100%': { transform: 'translateX(0)' },
-          '15%': { transform: 'translateX(-4px)' },
-          '30%': { transform: 'translateX(4px)' },
-          '45%': { transform: 'translateX(-3px)' },
-          '60%': { transform: 'translateX(3px)' },
-          '75%': { transform: 'translateX(-1px)' },
+          "0%, 100%": { transform: "translateX(0)" },
+          "15%": { transform: "translateX(-4px)" },
+          "30%": { transform: "translateX(4px)" },
+          "45%": { transform: "translateX(-3px)" },
+          "60%": { transform: "translateX(3px)" },
+          "75%": { transform: "translateX(-1px)" },
         },
         soldGlow: {
-          '0%': { boxShadow: '0 0 0 0 rgba(34, 197, 94, 0.5)' },
-          '50%': { boxShadow: '0 0 20px 4px rgba(34, 197, 94, 0.3)' },
-          '100%': { boxShadow: '0 0 0 0 rgba(34, 197, 94, 0)' },
+          "0%": { boxShadow: "0 0 0 0 rgba(34, 197, 94, 0.5)" },
+          "50%": { boxShadow: "0 0 20px 4px rgba(34, 197, 94, 0.3)" },
+          "100%": { boxShadow: "0 0 0 0 rgba(34, 197, 94, 0)" },
         },
       },
       // 반응형 브레이크포인트 추가
       screens: {
-        'xs': '475px',
+        xs: "475px",
         // 헤더 데스크톱 네비가 줄바꿈 없이 들어가는 최소 너비.
         // 이 미만에서는 햄버거(MobileMenu)로 전환한다.
-        'nav': '1321px',
+        nav: "1321px",
       },
       // Transition duration (성능 최적화)
       transitionDuration: {
-        '150': '150ms',
+        "150": "150ms",
       },
     },
   },

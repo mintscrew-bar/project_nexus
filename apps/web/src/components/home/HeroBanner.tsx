@@ -40,19 +40,39 @@ const itemVariants = {
 const cornerVariants = {
   topLeft: {
     hidden: { x: -16, y: -16, opacity: 0 },
-    visible: { x: 0, y: 0, opacity: 1, transition: { duration: 0.5, delay: 0.1 } },
+    visible: {
+      x: 0,
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.5, delay: 0.1 },
+    },
   },
   topRight: {
     hidden: { x: 16, y: -16, opacity: 0 },
-    visible: { x: 0, y: 0, opacity: 1, transition: { duration: 0.5, delay: 0.2 } },
+    visible: {
+      x: 0,
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.5, delay: 0.2 },
+    },
   },
   bottomLeft: {
     hidden: { x: -16, y: 16, opacity: 0 },
-    visible: { x: 0, y: 0, opacity: 1, transition: { duration: 0.5, delay: 0.3 } },
+    visible: {
+      x: 0,
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.5, delay: 0.3 },
+    },
   },
   bottomRight: {
     hidden: { x: 16, y: 16, opacity: 0 },
-    visible: { x: 0, y: 0, opacity: 1, transition: { duration: 0.5, delay: 0.4 } },
+    visible: {
+      x: 0,
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.5, delay: 0.4 },
+    },
   },
 };
 
@@ -118,11 +138,27 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
         className="relative flex flex-col items-center justify-center h-[400px] md:h-[440px] px-4 text-center overflow-hidden bg-bg-primary"
       >
         {/* 헥스 그리드 배경 */}
-        <div ref={hexGridRef} className="absolute inset-0 pointer-events-none" style={{ willChange: "transform" }}>
+        <div
+          ref={hexGridRef}
+          className="absolute inset-0 pointer-events-none"
+          style={{ willChange: "transform" }}
+        >
           <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
             <defs>
-              <pattern id="hex-grid-auth" width="56" height="100" patternUnits="userSpaceOnUse" patternTransform="scale(1.2)">
-                <polygon points="28,2 51,16 51,44 28,58 5,44 5,16" fill="none" stroke={INDIGO} strokeWidth="0.5" strokeOpacity="0.05" />
+              <pattern
+                id="hex-grid-auth"
+                width="56"
+                height="100"
+                patternUnits="userSpaceOnUse"
+                patternTransform="scale(1.2)"
+              >
+                <polygon
+                  points="28,2 51,16 51,44 28,58 5,44 5,16"
+                  fill="none"
+                  stroke={INDIGO}
+                  strokeWidth="0.5"
+                  strokeOpacity="0.05"
+                />
               </pattern>
             </defs>
             <rect width="100%" height="100%" fill="url(#hex-grid-auth)" />
@@ -165,7 +201,9 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           >
             <span
               className="bg-clip-text text-transparent"
-              style={{ backgroundImage: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})` }}
+              style={{
+                backgroundImage: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
+              }}
             >
               NEXUS
             </span>
@@ -175,20 +213,25 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
             className="text-sm sm:text-base md:text-lg text-text-secondary mb-6 md:mb-8 leading-relaxed"
             variants={itemVariants}
           >
-            솔랭 억까에 지쳤다면?<br className="sm:hidden" />{" "}
+            솔랭 억까에 지쳤다면?
+            <br className="sm:hidden" />{" "}
             <span className="text-text-primary">여기서 제대로 된 한 판.</span>
           </motion.p>
 
           <motion.div className="flex justify-center" variants={itemVariants}>
             <Link href={`${gamePrefix}/tournaments`}>
               <button
-                className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-control text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 style={{
                   background: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
                   boxShadow: `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 36px ${rgba(INDIGO_RGB, 0.5)}`; }}
-                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`; }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = `0 0 36px ${rgba(INDIGO_RGB, 0.5)}`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`;
+                }}
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                 <Swords className="h-4 w-4" />
@@ -215,9 +258,27 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
       >
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <pattern id="hex-grid" width="56" height="100" patternUnits="userSpaceOnUse" patternTransform="scale(1.2)">
-              <polygon points="28,2 51,16 51,44 28,58 5,44 5,16" fill="none" stroke={INDIGO} strokeWidth="0.5" strokeOpacity="0.05" />
-              <polygon points="28,52 51,66 51,94 28,108 5,94 5,66" fill="none" stroke={PURPLE} strokeWidth="0.5" strokeOpacity="0.03" />
+            <pattern
+              id="hex-grid"
+              width="56"
+              height="100"
+              patternUnits="userSpaceOnUse"
+              patternTransform="scale(1.2)"
+            >
+              <polygon
+                points="28,2 51,16 51,44 28,58 5,44 5,16"
+                fill="none"
+                stroke={INDIGO}
+                strokeWidth="0.5"
+                strokeOpacity="0.05"
+              />
+              <polygon
+                points="28,52 51,66 51,94 28,108 5,94 5,66"
+                fill="none"
+                stroke={PURPLE}
+                strokeWidth="0.5"
+                strokeOpacity="0.03"
+              />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#hex-grid)" />
@@ -252,34 +313,88 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
             stroke={INDIGO}
             strokeWidth="1"
             strokeOpacity="0.2"
-            style={{ animation: "hex-rotate-cw 40s linear infinite", transformOrigin: "center" }}
+            style={{
+              animation: "hex-rotate-cw 40s linear infinite",
+              transformOrigin: "center",
+            }}
           />
           {/* 꼭짓점 강조 — 정적 */}
           {hexVertices.map((v, i) => (
-            <circle key={i} cx={v.x} cy={v.y} r={2.5} fill={INDIGO} opacity="0.35" />
+            <circle
+              key={i}
+              cx={v.x}
+              cy={v.y}
+              r={2.5}
+              fill={INDIGO}
+              opacity="0.35"
+            />
           ))}
         </svg>
       </div>
 
       {/* 레이어 3: 코너 브래킷 */}
-      <motion.div className="absolute top-6 left-6 pointer-events-none" variants={cornerVariants.topLeft} initial="hidden" animate="visible">
+      <motion.div
+        className="absolute top-6 left-6 pointer-events-none"
+        variants={cornerVariants.topLeft}
+        initial="hidden"
+        animate="visible"
+      >
         <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-          <path d="M2 16 L2 2 L16 2" stroke={INDIGO} strokeWidth="1.5" strokeOpacity="0.3" strokeLinecap="square" />
+          <path
+            d="M2 16 L2 2 L16 2"
+            stroke={INDIGO}
+            strokeWidth="1.5"
+            strokeOpacity="0.3"
+            strokeLinecap="square"
+          />
         </svg>
       </motion.div>
-      <motion.div className="absolute top-6 right-6 pointer-events-none" variants={cornerVariants.topRight} initial="hidden" animate="visible">
+      <motion.div
+        className="absolute top-6 right-6 pointer-events-none"
+        variants={cornerVariants.topRight}
+        initial="hidden"
+        animate="visible"
+      >
         <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-          <path d="M28 2 L42 2 L42 16" stroke={INDIGO} strokeWidth="1.5" strokeOpacity="0.3" strokeLinecap="square" />
+          <path
+            d="M28 2 L42 2 L42 16"
+            stroke={INDIGO}
+            strokeWidth="1.5"
+            strokeOpacity="0.3"
+            strokeLinecap="square"
+          />
         </svg>
       </motion.div>
-      <motion.div className="absolute bottom-6 left-6 pointer-events-none" variants={cornerVariants.bottomLeft} initial="hidden" animate="visible">
+      <motion.div
+        className="absolute bottom-6 left-6 pointer-events-none"
+        variants={cornerVariants.bottomLeft}
+        initial="hidden"
+        animate="visible"
+      >
         <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-          <path d="M2 28 L2 42 L16 42" stroke={INDIGO} strokeWidth="1.5" strokeOpacity="0.3" strokeLinecap="square" />
+          <path
+            d="M2 28 L2 42 L16 42"
+            stroke={INDIGO}
+            strokeWidth="1.5"
+            strokeOpacity="0.3"
+            strokeLinecap="square"
+          />
         </svg>
       </motion.div>
-      <motion.div className="absolute bottom-6 right-6 pointer-events-none" variants={cornerVariants.bottomRight} initial="hidden" animate="visible">
+      <motion.div
+        className="absolute bottom-6 right-6 pointer-events-none"
+        variants={cornerVariants.bottomRight}
+        initial="hidden"
+        animate="visible"
+      >
         <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-          <path d="M28 42 L42 42 L42 28" stroke={INDIGO} strokeWidth="1.5" strokeOpacity="0.3" strokeLinecap="square" />
+          <path
+            d="M28 42 L42 42 L42 28"
+            stroke={INDIGO}
+            strokeWidth="1.5"
+            strokeOpacity="0.3"
+            strokeLinecap="square"
+          />
         </svg>
       </motion.div>
 
@@ -330,7 +445,9 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
         >
           <span
             className="bg-clip-text text-transparent"
-            style={{ backgroundImage: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})` }}
+            style={{
+              backgroundImage: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
+            }}
           >
             NEXUS
           </span>
@@ -341,21 +458,29 @@ export function HeroBanner({ isAuthenticated = false }: HeroBannerProps) {
           className="text-sm sm:text-base md:text-lg text-text-secondary mb-6 md:mb-8 leading-relaxed"
           variants={itemVariants}
         >
-          솔랭 억까에 지쳤다면?<br className="sm:hidden" />{" "}
+          솔랭 억까에 지쳤다면?
+          <br className="sm:hidden" />{" "}
           <span className="text-text-primary">여기서 제대로 된 한 판.</span>
         </motion.p>
 
         {/* CTA */}
-        <motion.div className="flex flex-col sm:flex-row gap-3 justify-center" variants={itemVariants}>
+        <motion.div
+          className="flex flex-col sm:flex-row gap-3 justify-center"
+          variants={itemVariants}
+        >
           <Link href="/auth/login">
             <button
-              className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="group relative inline-flex items-center gap-2 px-6 py-3 rounded-control text-sm font-semibold text-white overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
               style={{
                 background: `linear-gradient(135deg, ${INDIGO}, ${PURPLE})`,
                 boxShadow: `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`,
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 36px ${rgba(INDIGO_RGB, 0.5)}`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`; }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = `0 0 36px ${rgba(INDIGO_RGB, 0.5)}`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = `0 0 24px ${rgba(INDIGO_RGB, 0.3)}`;
+              }}
             >
               <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
               Discord로 시작하기

@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { STATS_COLORS, bannerBadgeStyle, bannerGlowGradient } from "./banner-constants";
+import {
+  STATS_COLORS,
+  bannerBadgeStyle,
+  bannerGlowGradient,
+} from "./banner-constants";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,16 +25,34 @@ const BG_RIGHT = STATS_COLORS.bgRight;
 // 스탯 데이터 — 우측 패널에 표시될 3개 행
 interface StatRow {
   label: string;
-  targetValue: number;  // 카운트업 목표값
+  targetValue: number; // 카운트업 목표값
   displaySuffix: string; // 숫자 뒤 붙는 문자 (%, 배수 등)
-  decimals: number;      // 소수점 자릿수
-  barPercent: number;    // progress bar 퍼센트 (0~100)
+  decimals: number; // 소수점 자릿수
+  barPercent: number; // progress bar 퍼센트 (0~100)
 }
 
 const STATS: StatRow[] = [
-  { label: "승률",  targetValue: 72,  displaySuffix: "%", decimals: 0, barPercent: 72 },
-  { label: "KDA",  targetValue: 3.4, displaySuffix: "",  decimals: 1, barPercent: 68 },
-  { label: "출전",  targetValue: 47,  displaySuffix: "",  decimals: 0, barPercent: 47 },
+  {
+    label: "승률",
+    targetValue: 72,
+    displaySuffix: "%",
+    decimals: 0,
+    barPercent: 72,
+  },
+  {
+    label: "KDA",
+    targetValue: 3.4,
+    displaySuffix: "",
+    decimals: 1,
+    barPercent: 68,
+  },
+  {
+    label: "출전",
+    targetValue: 47,
+    displaySuffix: "",
+    decimals: 0,
+    barPercent: 47,
+  },
 ];
 
 // 카운트업 소요 시간 (ms)
@@ -64,12 +86,14 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
       const progress = Math.min(elapsed / STAT_COUNT_DURATION, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
 
-      setStatValues(STATS.map((s) => {
-        const val = eased * s.targetValue;
-        return s.decimals > 0
-          ? parseFloat(val.toFixed(s.decimals))
-          : Math.floor(val);
-      }));
+      setStatValues(
+        STATS.map((s) => {
+          const val = eased * s.targetValue;
+          return s.decimals > 0
+            ? parseFloat(val.toFixed(s.decimals))
+            : Math.floor(val);
+        }),
+      );
 
       if (progress < 1) frameId = requestAnimationFrame(tick);
     };
@@ -82,14 +106,17 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
     <Link
       href={`${gamePrefix}/matches`}
       aria-label="내전 전적 통계 — 매치 기록 페이지로 이동"
-      className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
+      className="group relative block h-full rounded-panel overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* ── 배경: 좌우 분할 (좌 60% 어두운 인디고, 우 40% 약간 밝은 인디고) ── */}
       <div className="absolute inset-0 flex">
         <div className="w-full md:w-[60%]" style={{ background: BG_LEFT }} />
-        <div className="hidden md:block w-[40%]" style={{ background: BG_RIGHT }} />
+        <div
+          className="hidden md:block w-[40%]"
+          style={{ background: BG_RIGHT }}
+        />
       </div>
 
       {/* 좌측 배경 장식 — 미니 차트 실루엣 (우측 하단, 희미하게) */}
@@ -97,7 +124,10 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
         className="absolute right-[42%] md:right-[42%] bottom-2 w-28 h-20 md:w-36 md:h-24 pointer-events-none"
         viewBox="0 0 140 80"
         fill="none"
-        style={{ opacity: isHovered ? 0.08 : 0.04, transition: "opacity 0.5s ease" }}
+        style={{
+          opacity: isHovered ? 0.08 : 0.04,
+          transition: "opacity 0.5s ease",
+        }}
       >
         {/* 상승 꺾은선 그래프 */}
         <polyline
@@ -154,13 +184,12 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
 
       {/* ── 메인 컨텐츠: 좌우 분할 ── */}
       <div className="relative z-10 flex flex-col md:flex-row h-full">
-
         {/* ── 좌측 60% — 타이틀 영역 ── */}
         {/* 좌측 — 타이틀 영역 (모바일: 전체 너비, 패딩 축소) */}
         <div className="w-full md:w-[60%] flex flex-col justify-center px-[5%] py-[5%] md:px-[7%] h-full md:h-auto">
           {/* UPDATE 뱃지 */}
           <span
-            className="inline-block w-fit px-3 py-1 rounded-full text-[11px] font-bold tracking-wider mb-1.5 md:mb-3"
+            className="inline-block w-fit px-3 py-1 rounded-chip text-[11px] font-bold tracking-wider mb-1.5 md:mb-3"
             style={bannerBadgeStyle(INDIGO_LIGHT)}
           >
             UPDATE
@@ -169,7 +198,9 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
           {/* 큰 타이틀 — 호버 시 미세 슬라이드 */}
           <h3
             className="text-xl sm:text-2xl md:text-3xl font-black text-white mb-1.5 md:mb-2 transition-transform duration-500 ease-out"
-            style={{ transform: isHovered ? "translateX(4px)" : "translateX(0)" }}
+            style={{
+              transform: isHovered ? "translateX(4px)" : "translateX(0)",
+            }}
           >
             당신의 폼,{" "}
             <span style={{ color: INDIGO_LIGHT }}>우리가 다 기록</span>하고
@@ -179,7 +210,9 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
           {/* 설명 텍스트 — 호버 시 약간 더 이동 */}
           <p
             className="text-xs sm:text-sm md:text-base text-white/60 leading-relaxed mb-2 md:mb-5 transition-transform duration-500 ease-out"
-            style={{ transform: isHovered ? "translateX(8px)" : "translateX(0)" }}
+            style={{
+              transform: isHovered ? "translateX(8px)" : "translateX(0)",
+            }}
           >
             KDA, 모스트, 주포지션. 숨길 수 없는 당신의 데이터.
             <br className="hidden sm:block" />
@@ -199,11 +232,12 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
                     ? statValues[i].toFixed(stat.decimals)
                     : statValues[i]}
                 </span>
-                <span className="text-[10px] text-white/25">{stat.displaySuffix}</span>
+                <span className="text-[10px] text-white/25">
+                  {stat.displaySuffix}
+                </span>
               </div>
             ))}
           </div>
-
         </div>
 
         {/* ── 우측 — 스탯 패널 (모바일에서 숨김) ── */}
@@ -239,15 +273,17 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
                 <div className="relative w-full h-1 rounded-full bg-white/[0.06] overflow-hidden">
                   <div
                     className="absolute top-0 left-0 h-full rounded-full"
-                    style={{
-                      "--bar-target": `${stat.barPercent}%`,
-                      background: `linear-gradient(90deg, ${INDIGO}, ${INDIGO_LIGHT})`,
-                      boxShadow: `0 0 8px ${INDIGO}50`,
-                      animation: isActive
-                        ? `bar-fill 1.2s cubic-bezier(0.16, 1, 0.3, 1) ${200 + i * 150}ms both`
-                        : "none",
-                      width: isActive ? undefined : "0%",
-                    } as React.CSSProperties & { "--bar-target": string }}
+                    style={
+                      {
+                        "--bar-target": `${stat.barPercent}%`,
+                        background: `linear-gradient(90deg, ${INDIGO}, ${INDIGO_LIGHT})`,
+                        boxShadow: `0 0 8px ${INDIGO}50`,
+                        animation: isActive
+                          ? `bar-fill 1.2s cubic-bezier(0.16, 1, 0.3, 1) ${200 + i * 150}ms both`
+                          : "none",
+                        width: isActive ? undefined : "0%",
+                      } as React.CSSProperties & { "--bar-target": string }
+                    }
                   />
                 </div>
 

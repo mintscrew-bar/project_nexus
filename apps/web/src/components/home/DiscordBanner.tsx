@@ -37,13 +37,16 @@ export function DiscordBanner() {
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
 
   // 마우스 위치 추적 (parallax 효과용)
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setMousePos({
-      x: (e.clientX - rect.left) / rect.width,
-      y: (e.clientY - rect.top) / rect.height,
-    });
-  }, []);
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setMousePos({
+        x: (e.clientX - rect.left) / rect.width,
+        y: (e.clientY - rect.top) / rect.height,
+      });
+    },
+    [],
+  );
 
   return (
     <a
@@ -51,7 +54,7 @@ export function DiscordBanner() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="NEXUS Discord 서버 참가하기 (새 탭에서 열림)"
-      className="group relative block h-full rounded-2xl overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-[#5865F2] focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
+      className="group relative block h-full rounded-panel overflow-hidden cursor-pointer focus-visible:ring-2 focus-visible:ring-[#5865F2] focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => {
         setIsHovered(false);
@@ -90,11 +93,12 @@ export function DiscordBanner() {
               top: `${p.y}%`,
               width: p.size,
               height: p.size,
-              background: p.id % 3 === 0
-                ? `${DISCORD_LIGHT}99`   // Discord light blue
-                : p.id % 3 === 1
-                ? `${BLURPLE}80`         // Blurple
-                : "rgba(255,255,255,0.3)", // White
+              background:
+                p.id % 3 === 0
+                  ? `${DISCORD_LIGHT}99` // Discord light blue
+                  : p.id % 3 === 1
+                    ? `${BLURPLE}80` // Blurple
+                    : "rgba(255,255,255,0.3)", // White
               opacity: isHovered ? 1 : 0,
               transform: isHovered
                 ? `translate(${Math.sin(p.angle) * 15}px, ${Math.cos(p.angle) * 15}px) scale(1)`
@@ -119,7 +123,9 @@ export function DiscordBanner() {
             transform: isHovered
               ? `translateY(-8px) rotate(-3deg) scale(1.05)`
               : "translateY(0) rotate(0) scale(1)",
-            filter: isHovered ? "drop-shadow(0 8px 24px rgba(88,101,242,0.4))" : "none",
+            filter: isHovered
+              ? "drop-shadow(0 8px 24px rgba(88,101,242,0.4))"
+              : "none",
           }}
         >
           <Image
@@ -183,7 +189,7 @@ export function DiscordBanner() {
 
         {/* 오른쪽 — Discord 참가 버튼 (모바일에서 패딩 축소) */}
         <div
-          className="shrink-0 flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2 md:px-5 md:py-3 transition-all duration-500 ease-out"
+          className="shrink-0 flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-control px-3 py-2 md:px-5 md:py-3 transition-all duration-500 ease-out"
           style={{
             transform: isHovered
               ? "translateX(4px) scale(1.03)"
@@ -191,9 +197,7 @@ export function DiscordBanner() {
             background: isHovered
               ? "rgba(255,255,255,0.18)"
               : "rgba(255,255,255,0.1)",
-            boxShadow: isHovered
-              ? `0 4px 20px ${BLURPLE}4D`
-              : "none",
+            boxShadow: isHovered ? `0 4px 20px ${BLURPLE}4D` : "none",
           }}
         >
           {/* Discord 로고 SVG */}
@@ -240,7 +244,6 @@ export function DiscordBanner() {
           background: bannerGlowGradient(DISCORD_LIGHT),
         }}
       />
-
     </a>
   );
 }

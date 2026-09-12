@@ -157,7 +157,7 @@ function CardHeader({
   return (
     <div className="flex items-center justify-between px-5 py-4">
       <div className="flex items-center gap-3">
-        <div className={cn("p-2 rounded-lg", iconColor)}>
+        <div className={cn("p-2 rounded-control", iconColor)}>
           <Icon className="h-4 w-4 text-white" />
         </div>
         <h2 className="text-sm font-semibold text-text-primary tracking-wide uppercase">
@@ -191,7 +191,7 @@ function GlassCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-white/[0.06] bg-bg-secondary/60 backdrop-blur-sm overflow-hidden",
+        "rounded-panel border border-white/[0.06] bg-bg-secondary/60 backdrop-blur-sm overflow-hidden",
         "hover:border-violet-500/10 transition-colors duration-300",
         className,
       )}
@@ -213,7 +213,7 @@ function getTimeGreeting() {
   return "좋은 저녁이에요";
 }
 
-function DashboardHero({
+export function DashboardHero({
   gameTitle,
   username,
   rooms,
@@ -232,73 +232,124 @@ function DashboardHero({
   // 홈은 경로로 게임을 알 수 없다. 마지막으로 본 게임을 따라간다 —
   // 기본 게임으로 두면 배그만 하는 사람의 링크가 전부 롤로 간다.
   const gamePrefix = useDashboardGamePrefix();
-  const clanHref = `/clans?game=${gameTitle === "PUBG" ? "pubg" : "lol"}`;
+  const isPubg = gameTitle === "PUBG";
+  const clanHref = `/clans?game=${isPubg ? "pubg" : "lol"}`;
   const clanMemberCount = clan?._count?.members ?? clan?.members?.length ?? 0;
+  /* 배그는 "내전"이 아니라 "스크림"이다. 전에는 라벨이 한글로 박혀 있어서
+     배그 홈에서도 "참가 가능한 내전 / 내전 기록"이라고 나왔다. */
+  const matchWord = isPubg ? "스크림" : "내전";
   const metrics = [
     {
-      label: "참가 가능한 내전",
+      label: `참가 가능한 ${matchWord}`,
       value: `${rooms.length}개`,
       detail:
-        rooms.length > 0 ? "지금 참가자를 기다리는 중" : "새 내전을 열어보세요",
+        rooms.length > 0
+          ? "지금 참가자를 기다리는 중"
+          : `새 ${matchWord}을 열어보세요`,
       icon: Swords,
-      color: "text-amber-200",
       href: `${gamePrefix}/tournaments`,
     },
     {
-      label: "내전 기록",
+      label: `${matchWord} 기록`,
       value: stats ? `${stats.gamesPlayed}전` : "기록 전",
       detail:
         stats && stats.gamesPlayed > 0
           ? `승률 ${stats.winRate.toFixed(0)}%`
           : "첫 경기를 시작해보세요",
       icon: Trophy,
-      color: "text-cyan-200",
       href: `${gamePrefix}/profile`,
     },
     {
-      label: gameTitle === "PUBG" ? "내 배그 클랜" : "내 롤 클랜",
+      label: isPubg ? "내 배그 클랜" : "내 롤 클랜",
       value: clan ? `[${clan.tag}]` : "미가입",
       detail: clan
         ? `${clan.name} · ${clanMemberCount}명`
         : "함께할 클랜을 찾아보세요",
       icon: Shield,
-      color: "text-violet-200",
       href: clanHref,
     },
   ];
 
   return (
-    <section className="relative isolate overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#0b0c11] px-5 py-7 shadow-[0_35px_100px_rgba(0,0,0,0.28)] sm:px-8 sm:py-9 lg:px-10 lg:py-10">
+    <section
+      className={cn(
+        "relative isolate overflow-hidden rounded-panel px-5 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-10",
+        /* 롤은 떠 있는 판 — 부드러운 그림자와 보라 광원.
+           배그는 바닥에 놓인 판 — 그림자 없이 선 하나로 끊는다. */
+        isPubg
+          ? "border border-white/[0.14] bg-[#0e0e0e]"
+          : "border border-white/[0.09] bg-[#0b0c11] shadow-[0_35px_100px_rgba(0,0,0,0.28)]",
+      )}
+    >
+      {/* 격자. 배그는 눈금이 굵고 촘촘해 계측기처럼 읽힌다. */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 -z-20 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:44px_44px]"
+        className={cn(
+          "absolute inset-0 -z-20",
+          isPubg
+            ? "opacity-80 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:22px_22px]"
+            : "opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:44px_44px]",
+        )}
       />
-      <div
-        aria-hidden="true"
-        className="absolute -left-24 -top-32 -z-10 h-96 w-96 rounded-full bg-violet-500/20 blur-[120px]"
-      />
-      <div
-        aria-hidden="true"
-        className="absolute -bottom-40 right-0 -z-10 h-96 w-96 rounded-full bg-cyan-400/10 blur-[120px]"
-      />
+      {/* 광원. 배그 테마는 "흑백 + 노랑 하나"라 보라·시안을 쓰면 그 규칙이
+          이 자리에서만 깨진다. 노랑 하나만, 그것도 아주 옅게 깐다. */}
+      {isPubg ? (
+        <div
+          aria-hidden="true"
+          className="absolute -right-20 -top-24 -z-10 h-80 w-80 rounded-full bg-accent-primary/[0.07] blur-[130px]"
+        />
+      ) : (
+        <>
+          <div
+            aria-hidden="true"
+            className="absolute -left-24 -top-32 -z-10 h-96 w-96 rounded-full bg-violet-500/20 blur-[120px]"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute -bottom-40 right-0 -z-10 h-96 w-96 rounded-full bg-cyan-400/10 blur-[120px]"
+          />
+        </>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-end lg:gap-12">
         <div>
-          <div className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-violet-200/75">
+          <div
+            className={cn(
+              "inline-flex items-center gap-2 text-[10px] font-bold uppercase",
+              isPubg
+                ? "tracking-[0.3em] text-accent-primary"
+                : "tracking-[0.22em] text-violet-200/75",
+            )}
+          >
             <Sparkles className="h-3.5 w-3.5" />
-            Nexus command center
+            {isPubg ? "Squad operations" : "Nexus command center"}
           </div>
-          <h1 className="mt-5 max-w-3xl text-3xl font-black leading-[1.08] tracking-[-0.045em] text-white sm:text-4xl lg:text-5xl">
+          <h1
+            className={cn(
+              "mt-5 max-w-3xl font-black text-white",
+              /* 롤은 넓고 부드럽게, 배그는 좁고 단단하게. 같은 문장인데
+                 자간과 행간만으로도 톤이 갈린다. */
+              isPubg
+                ? "text-3xl uppercase leading-[1.02] tracking-[-0.055em] sm:text-4xl lg:text-5xl"
+                : "text-3xl leading-[1.08] tracking-[-0.045em] sm:text-4xl lg:text-5xl",
+            )}
+          >
             {getTimeGreeting()},
             <br />
-            <span className="bg-gradient-to-r from-violet-200 via-white to-cyan-200 bg-clip-text text-transparent">
-              {username}님.
-            </span>
+            {/* 배그는 그라디언트 글자를 쓰지 않는다 — 보라·시안이 들어가면
+                "흑백 + 노랑 하나" 규칙이 깨지고, 노랑 그라디언트는 탁해진다. */}
+            {isPubg ? (
+              <span className="text-accent-primary">{username}님.</span>
+            ) : (
+              <span className="bg-gradient-to-r from-violet-200 via-white to-cyan-200 bg-clip-text text-transparent">
+                {username}님.
+              </span>
+            )}
           </h1>
           <p className="mt-5 max-w-xl text-sm leading-6 text-white/45 sm:text-base sm:leading-7">
             {rooms.length > 0
-              ? `${rooms.length}개의 내전이 참가자를 기다리고 있습니다. 로비에 합류하거나 직접 새로운 경기를 시작해보세요.`
-              : gameTitle === "PUBG"
+              ? `${rooms.length}개의 ${matchWord}이 참가자를 기다리고 있습니다. 로비에 합류하거나 직접 새로 시작해보세요.`
+              : isPubg
                 ? "현재 모집 중인 스크림이 없습니다. 새 로비를 열고 오늘의 라운드를 시작해보세요."
                 : "현재 모집 중인 내전이 없습니다. 새 로비를 열고 오늘의 경기를 시작해보세요."}
           </p>
@@ -307,9 +358,14 @@ function DashboardHero({
             <button
               type="button"
               onClick={() => router.push(`${gamePrefix}/tournaments`)}
-              className="group inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-[#111218] transition-all hover:bg-violet-100"
+              className={cn(
+                "group inline-flex items-center justify-center gap-2 rounded-control px-5 py-3 text-sm font-bold transition-all",
+                isPubg
+                  ? "bg-accent-primary text-accent-on hover:bg-accent-hover"
+                  : "bg-white text-[#111218] hover:bg-violet-100",
+              )}
             >
-              {gameTitle === "PUBG" ? "참가할 스크림 찾기" : "참가할 내전 찾기"}
+              {`참가할 ${matchWord} 찾기`}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
             <button
@@ -317,10 +373,15 @@ function DashboardHero({
               onClick={() =>
                 router.push(`${gamePrefix}/tournaments?create=true`)
               }
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white/75 transition-colors hover:border-violet-300/25 hover:bg-violet-300/[0.08] hover:text-white"
+              className={cn(
+                "inline-flex items-center justify-center gap-2 rounded-control border px-5 py-3 text-sm font-bold text-white/75 transition-colors hover:text-white",
+                isPubg
+                  ? "border-white/20 bg-transparent hover:border-accent-primary/60 hover:bg-accent-primary/[0.08]"
+                  : "border-white/10 bg-white/[0.04] hover:border-violet-300/25 hover:bg-violet-300/[0.08]",
+              )}
             >
               <Plus className="h-4 w-4" />
-              {gameTitle === "PUBG" ? "새 스크림 만들기" : "새 내전 만들기"}
+              {`새 ${matchWord} 만들기`}
             </button>
           </div>
 
@@ -328,7 +389,7 @@ function DashboardHero({
             <button
               type="button"
               onClick={() => router.push(`${gamePrefix}/profile`)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80"
+              className="inline-flex items-center gap-2 rounded-chip border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
               {primaryAccount
@@ -338,7 +399,7 @@ function DashboardHero({
             <button
               type="button"
               onClick={() => router.push(clanHref)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80"
+              className="inline-flex items-center gap-2 rounded-chip border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80"
             >
               <span
                 className="h-1.5 w-1.5 rounded-full"
@@ -349,11 +410,16 @@ function DashboardHero({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-black/20 backdrop-blur-sm">
+        <div className="overflow-hidden rounded-panel border border-white/[0.08] bg-black/20 backdrop-blur-sm">
           <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3">
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/25">
-                Today at nexus
+              <p
+                className={cn(
+                  "text-[9px] font-bold uppercase text-white/25",
+                  isPubg ? "tracking-[0.3em]" : "tracking-[0.18em]",
+                )}
+              >
+                {isPubg ? "Status board" : "Today at nexus"}
               </p>
               <p className="mt-0.5 text-xs font-semibold text-white/70">
                 지금 확인할 항목
@@ -369,12 +435,12 @@ function DashboardHero({
                 onClick={() => router.push(metric.href)}
                 className="group grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.035]"
               >
-                <span className="text-[10px] font-bold tabular-nums text-white/20">
+                <span className="font-figure text-[10px] font-bold tabular-nums text-white/20">
                   0{index + 1}
                 </span>
                 <span className="min-w-0">
                   <span className="flex items-center gap-2 text-xs font-semibold text-white/65">
-                    <metric.icon className={cn("h-3.5 w-3.5", metric.color)} />
+                    <metric.icon className="h-3.5 w-3.5 text-accent-primary" />
                     {metric.label}
                   </span>
                   <span className="mt-1 block truncate text-[11px] text-white/30">
@@ -382,7 +448,7 @@ function DashboardHero({
                   </span>
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="text-sm font-black tabular-nums text-white/85">
+                  <span className="font-figure text-sm font-black tabular-nums text-white/85">
                     {metric.value}
                   </span>
                   <ChevronRight className="h-3.5 w-3.5 text-white/20 transition-transform group-hover:translate-x-0.5 group-hover:text-white/50" />
@@ -459,11 +525,11 @@ function QuickActions({
           key={action.label}
           type="button"
           onClick={() => router.push(action.href)}
-          className="group flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-bg-secondary/55 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-violet-400/20 hover:bg-bg-secondary"
+          className="group flex items-center gap-3 rounded-panel border border-white/[0.06] bg-bg-secondary/55 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-violet-400/20 hover:bg-bg-secondary"
         >
           <span
             className={cn(
-              "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border",
+              "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-control border",
               action.tone,
             )}
           >
@@ -558,7 +624,7 @@ function BannerCarousel() {
   return (
     // 모든 배너는 3:2 고정 비율로 통일 — 새 배너 추가 시 1536x1024 기준
     <div
-      className="relative aspect-[3/2] w-full overflow-hidden rounded-2xl"
+      className="relative aspect-[3/2] w-full overflow-hidden rounded-panel"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -659,7 +725,7 @@ function MyStatsCard({
       <div className="relative px-5 pb-5">
         {!primaryAccount ? (
           <div className="flex flex-col items-center justify-center py-8 text-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-violet-500/10 flex items-center justify-center">
+            <div className="w-14 h-14 rounded-panel bg-violet-500/10 flex items-center justify-center">
               <Shield className="h-7 w-7 text-violet-400" />
             </div>
             <div>
@@ -672,7 +738,7 @@ function MyStatsCard({
             </div>
             <button
               onClick={() => router.push(`${gamePrefix}/profile`)}
-              className="px-5 py-2 rounded-xl text-sm font-medium text-violet-400 border border-violet-500/30 hover:bg-violet-500/10 transition-colors"
+              className="px-5 py-2 rounded-control text-sm font-medium text-violet-400 border border-violet-500/30 hover:bg-violet-500/10 transition-colors"
             >
               계정 연동하기
             </button>
@@ -680,7 +746,7 @@ function MyStatsCard({
         ) : (
           <div className="grid gap-4 lg:grid-cols-[minmax(250px,0.8fr)_minmax(300px,1.1fr)_auto]">
             {/* 왼쪽: 계정 정보 */}
-            <div className="flex items-center gap-4 rounded-2xl border border-violet-400/10 bg-gradient-to-br from-violet-500/[0.09] to-transparent p-4">
+            <div className="flex items-center gap-4 rounded-panel border border-violet-400/10 bg-gradient-to-br from-violet-500/[0.09] to-transparent p-4">
               <TierBadge tier={primaryAccount.tier} size="lg" />
               <div className="min-w-0">
                 <p className="truncate text-base font-bold text-text-primary">
@@ -707,7 +773,7 @@ function MyStatsCard({
             </div>
 
             {/* 가운데: 내전 통계 */}
-            <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4">
+            <div className="rounded-panel border border-white/[0.05] bg-white/[0.02] p-4">
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
                   <p className="text-[10px] uppercase tracking-wider text-text-tertiary">
@@ -755,7 +821,7 @@ function MyStatsCard({
             </div>
 
             {/* 오른쪽: 포지션 + 챔피언 */}
-            <div className="flex min-w-[220px] gap-6 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4">
+            <div className="flex min-w-[220px] gap-6 rounded-panel border border-white/[0.05] bg-white/[0.02] p-4">
               {topPositions.length > 0 && (
                 <div>
                   <p className="mb-2 text-[10px] uppercase tracking-wider text-text-tertiary">
@@ -766,7 +832,7 @@ function MyStatsCard({
                       <span
                         key={pos.position}
                         className={cn(
-                          "rounded-lg px-3 py-1 text-xs font-medium",
+                          "rounded-control px-3 py-1 text-xs font-medium",
                           i === 0
                             ? "bg-violet-500/15 text-violet-400"
                             : "bg-white/[0.04] text-text-secondary",
@@ -799,7 +865,7 @@ function MyStatsCard({
                             alt={champ.championName}
                             width={40}
                             height={40}
-                            className="rounded-xl border-2 border-white/[0.08]"
+                            className="rounded-control border-2 border-white/[0.08]"
                             onError={(e) => {
                               e.currentTarget.style.display = "none";
                             }}
@@ -850,7 +916,7 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
         <div className="px-5 pb-5">
           {rooms.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 gap-4 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-panel bg-amber-500/10 flex items-center justify-center">
                 <Swords className="h-7 w-7 text-amber-400" />
               </div>
               <p className="text-sm text-text-secondary">
@@ -859,7 +925,7 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
               <button
                 onClick={() => router.push(`${gamePrefix}/tournaments`)}
                 data-tour="home-create-room"
-                className="px-5 py-2 rounded-xl text-sm font-medium text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 transition-colors flex items-center gap-1.5"
+                className="px-5 py-2 rounded-control text-sm font-medium text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 transition-colors flex items-center gap-1.5"
               >
                 <Plus className="h-3.5 w-3.5" />방 만들기
               </button>
@@ -875,7 +941,7 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
                   <div
                     key={room.id}
                     onClick={() => router.push(roomPath(room))}
-                    className="flex flex-col gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-violet-500/20 hover:bg-white/[0.04] cursor-pointer transition-all duration-200 group"
+                    className="flex flex-col gap-3 p-4 rounded-control bg-white/[0.02] border border-white/[0.05] hover:border-violet-500/20 hover:bg-white/[0.04] cursor-pointer transition-all duration-200 group"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
@@ -919,7 +985,7 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
               <button
                 onClick={() => router.push(`${gamePrefix}/tournaments`)}
                 data-tour="home-create-room"
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/[0.08] text-text-tertiary hover:text-violet-400 hover:border-violet-500/30 transition-all duration-200 min-h-[80px]"
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-control border border-dashed border-white/[0.08] text-text-tertiary hover:text-violet-400 hover:border-violet-500/30 transition-all duration-200 min-h-[80px]"
               >
                 <Plus className="h-5 w-5" />
                 <span className="text-xs">새 내전 만들기</span>
@@ -978,7 +1044,7 @@ function PopularPostsCard({ posts }: { posts: Post[] }) {
                   {/* 순위 뱃지 */}
                   <span
                     className={cn(
-                      "flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-bold",
+                      "flex-shrink-0 w-6 h-6 rounded-control flex items-center justify-center text-[11px] font-bold",
                       i === 0
                         ? "bg-amber-500/15 text-amber-400"
                         : i === 1
@@ -1036,7 +1102,7 @@ function PopularPostsCard({ posts }: { posts: Post[] }) {
         <div className="px-5 py-3.5 border-t border-white/[0.04]">
           <button
             onClick={() => router.push("/community/write")}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-white/[0.08] text-text-tertiary hover:text-violet-400 hover:border-violet-500/30 text-sm transition-all duration-200"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-control border border-dashed border-white/[0.08] text-text-tertiary hover:text-violet-400 hover:border-violet-500/30 text-sm transition-all duration-200"
           >
             <Plus className="h-4 w-4" />
             글쓰기
@@ -1106,34 +1172,34 @@ function DashboardSkeleton() {
   return (
     <div className="space-y-6">
       {/* 작업 중심 히어로 */}
-      <div className="relative min-h-[360px] overflow-hidden rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-7 md:p-10">
+      <div className="relative min-h-[360px] overflow-hidden rounded-panel border border-white/[0.06] bg-white/[0.03] p-7 md:p-10">
         <div className="max-w-xl space-y-4">
           <Skeleton className="h-6 w-16 rounded-full" />
           <Skeleton className="h-10 w-72" />
           <Skeleton className="h-10 w-56" />
           <Skeleton className="h-4 w-full max-w-md" />
           <div className="flex gap-3 pt-2">
-            <Skeleton className="h-11 w-36 rounded-xl" />
-            <Skeleton className="h-11 w-36 rounded-xl" />
+            <Skeleton className="h-11 w-36 rounded-control" />
+            <Skeleton className="h-11 w-36 rounded-control" />
           </div>
         </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-[78px] rounded-2xl" />
+          <Skeleton key={i} className="h-[78px] rounded-panel" />
         ))}
       </div>
 
       {/* 내 전적 */}
-      <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
+      <div className="rounded-panel bg-white/[0.03] border border-white/[0.06] p-5">
         <div className="flex items-center gap-3 mb-5">
-          <Skeleton className="h-8 w-8 rounded-lg" />
+          <Skeleton className="h-8 w-8 rounded-control" />
           <Skeleton className="h-4 w-16" />
         </div>
         <div className="flex flex-col md:flex-row gap-5">
           <div className="flex items-center gap-4 md:w-60">
-            <Skeleton className="w-12 h-12 rounded-lg" />
+            <Skeleton className="w-12 h-12 rounded-control" />
             <div className="space-y-2">
               <Skeleton className="h-5 w-32" />
               <Skeleton className="h-3 w-24" />
@@ -1142,7 +1208,7 @@ function DashboardSkeleton() {
           <div className="flex-grow">
             <div className="grid grid-cols-3 gap-3">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-20 rounded-xl" />
+                <Skeleton key={i} className="h-20 rounded-control" />
               ))}
             </div>
           </div>
@@ -1150,14 +1216,14 @@ function DashboardSkeleton() {
       </div>
 
       {/* 모집중인 내전 */}
-      <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5">
+      <div className="rounded-panel bg-white/[0.03] border border-white/[0.06] p-5">
         <div className="flex items-center gap-3 mb-5">
-          <Skeleton className="h-8 w-8 rounded-lg" />
+          <Skeleton className="h-8 w-8 rounded-control" />
           <Skeleton className="h-4 w-24" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-20 rounded-xl" />
+            <Skeleton key={i} className="h-20 rounded-control" />
           ))}
         </div>
       </div>
@@ -1167,10 +1233,10 @@ function DashboardSkeleton() {
         {[1, 2].map((section) => (
           <div
             key={section}
-            className="rounded-2xl bg-white/[0.03] border border-white/[0.06]"
+            className="rounded-panel bg-white/[0.03] border border-white/[0.06]"
           >
             <div className="flex items-center gap-3 p-5">
-              <Skeleton className="h-8 w-8 rounded-lg" />
+              <Skeleton className="h-8 w-8 rounded-control" />
               <Skeleton className="h-4 w-16" />
             </div>
             {[1, 2, 3, 4, 5].map((i) => (
@@ -1179,7 +1245,7 @@ function DashboardSkeleton() {
                 className="flex items-center gap-3 px-5 py-3.5 border-t border-white/[0.04]"
               >
                 {section === 1 && (
-                  <Skeleton className="h-6 w-6 rounded-lg flex-shrink-0" />
+                  <Skeleton className="h-6 w-6 rounded-control flex-shrink-0" />
                 )}
                 <div className="flex-grow space-y-2">
                   <Skeleton className="h-4 w-3/4" />
@@ -1213,16 +1279,16 @@ function PubgStatsCard({ history }: { history: PubgHistoryResponse | null }) {
     ["킬내기 승", summary?.killMatchWins ?? 0],
   ];
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5">
+    <div className="rounded-panel border border-white/[0.06] bg-white/[0.03] p-5">
       <div className="mb-5 flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-300/10 text-amber-200">
+        <div className="flex h-8 w-8 items-center justify-center rounded-control bg-amber-300/10 text-amber-200">
           <Crosshair className="h-4 w-4" />
         </div>
         <h2 className="font-bold text-white">내 PUBG 전적</h2>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map(([label, value]) => (
-          <div key={label} className="rounded-xl bg-black/20 p-4">
+          <div key={label} className="rounded-control bg-black/20 p-4">
             <p className="text-xs text-white/45">{label}</p>
             <p className="mt-2 text-2xl font-black text-white">{value}</p>
           </div>
