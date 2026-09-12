@@ -70,7 +70,7 @@ const CARD_ART: Record<
     imagePosition: "bg-center",
     wash: "bg-[radial-gradient(120%_85%_at_22%_0%,rgba(242,169,0,0.3),transparent_60%),radial-gradient(110%_70%_at_88%_22%,rgba(255,209,102,0.16),transparent_55%),linear-gradient(180deg,#241c0d_0%,#0b0b0b_74%)]",
     mark: "text-[#F2A900]/[0.14]",
-    kicker: "PLAYERUNKNOWN'S BATTLEGROUNDS",
+    kicker: "BATTLEGROUNDS",
   },
 };
 
@@ -88,16 +88,16 @@ export function GamePickerCards() {
 
   return (
     <section
-      className="relative isolate mx-auto max-w-[1480px] px-5 pb-20 pt-10 sm:px-6 md:pb-24 md:pt-20"
+      className="relative isolate mx-auto max-w-[1480px] bg-[radial-gradient(125%_85%_at_50%_0%,rgba(118,75,162,0.3),transparent_64%)] px-5 pb-20 pt-10 sm:px-6 md:pb-24 md:pt-20"
       aria-label="Nexus game hubs"
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute left-[12%] top-20 -z-10 h-48 w-48 rounded-full bg-amber-300/[0.07] blur-[90px]"
+        className="pointer-events-none absolute left-[12%] top-20 -z-10 h-48 w-48 rounded-full bg-[#667EEA]/[0.1] blur-[90px]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute right-[14%] top-8 -z-10 h-56 w-56 rounded-full bg-violet-400/[0.08] blur-[110px]"
+        className="pointer-events-none absolute right-[14%] top-8 -z-10 h-56 w-56 rounded-full bg-[#764BA2]/[0.16] blur-[110px]"
       />
 
       {/*
@@ -113,7 +113,7 @@ export function GamePickerCards() {
       */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-[clamp(1.5rem,3vw,3.5rem)] z-0 flex items-center justify-center whitespace-nowrap text-[clamp(3rem,11.5vw,13rem)] font-black italic leading-[0.82] tracking-[-0.02em] text-white/[0.07]"
+        className="pointer-events-none absolute inset-x-0 top-[clamp(1.5rem,3vw,3.5rem)] z-0 flex items-center justify-center whitespace-nowrap text-[clamp(2rem,9.4vw,13rem)] sm:text-[clamp(3rem,11.5vw,13rem)] font-black italic leading-[0.82] tracking-[-0.02em] text-white/[0.07]"
       >
         <span>LET HIM COOK</span>
       </div>
@@ -166,7 +166,10 @@ export function GamePickerCards() {
               <span
                 aria-hidden
                 className="pointer-events-none absolute inset-0 opacity-70 mix-blend-overlay"
-                style={{ backgroundImage: GRAIN, backgroundSize: "160px 160px" }}
+                style={{
+                  backgroundImage: GRAIN,
+                  backgroundSize: "160px 160px",
+                }}
               />
 
               {/* 남기는 건 게임 이름뿐이다. 태그와 CTA 는 카드를 설명문으로

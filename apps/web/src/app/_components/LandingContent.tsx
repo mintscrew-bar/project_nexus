@@ -12,7 +12,6 @@ import {
   Gavel,
   ArrowLeftRight,
   Scale,
-  ShieldCheck,
   Swords,
   Trophy,
   Users,
@@ -41,27 +40,27 @@ const operations: Array<{
     icon: Users,
     title: "참가 상태와 계정 정보를 한 번에",
     description:
-      "참가 인원과 준비 여부를 확인하고, 연동된 Riot 계정과 등록한 포지션을 기준으로 다음 단계를 준비합니다.",
+      "참가 인원과 준비 여부, 연동된 Riot 계정과 포지션을 한 화면에서 확인합니다.",
     features: ["참가·준비 상태", "실시간 진행 상태", "주·부 포지션"],
     visual: "readiness",
-    accent: "text-amber-300",
+    accent: "text-indigo-400",
   },
   {
     index: "02",
     icon: Scale,
     title: "팀을 나눈 뒤에도 직접 검토",
     description:
-      "팀 편성 도구·경매·스네이크·자유 선택 중 방에 맞는 방식을 고르고, 방장은 결과를 확인한 뒤 확정합니다.",
+      "경매·스네이크·자동 편성·자유 선택 중에서 고르고, 방장이 결과를 확인한 뒤 확정합니다.",
     features: ["팀 편성 도구", "경매·스네이크", "자유 팀 선택"],
     visual: "balance",
-    accent: "text-amber-200",
+    accent: "text-indigo-300",
   },
   {
     index: "03",
     icon: Trophy,
     title: "경기 결과를 남기고 공유",
     description:
-      "대진표와 승패, 경기 후 개인 기록을 확인하고 OBS 브라우저 소스로 대기·진행·결과 화면을 방송에 연결합니다.",
+      "대진표·승패와 개인 기록을 남기고, OBS 브라우저 소스로 방송에 바로 연결합니다.",
     features: ["대진표·승패", "KDA·개인 전적", "OBS 브라우저 소스"],
     visual: "records",
     accent: "text-emerald-300",
@@ -99,164 +98,37 @@ const workflowOutcomes = [
   {
     value: "10–40명",
     label: "방 규모에 맞춰",
-    description:
-      "두 팀 내전부터 여러 팀 토너먼트까지 같은 운영 흐름을 사용합니다",
+    description: "두 팀 내전부터 여러 팀 토너먼트까지",
   },
   {
     value: "4가지",
     label: "내전에 맞는 팀 편성",
-    description: "경매, 스네이크, 팀 편성 도구, 자유 선택을 지원합니다",
+    description: "경매 · 스네이크 · 자동 편성 · 자유 선택",
   },
   {
     value: "실시간",
     label: "모두가 같은 진행 상태",
-    description:
-      "준비 상태와 팀 구성, 경매와 경기 진행을 참가자에게 동기화합니다",
+    description: "준비 상태와 팀 구성, 경기 진행을 모두에게 동기화",
   },
 ];
 
 const pubgHighlights = [
-  ["01", "4인 스쿼드 구성", "스팀·카카오 참가자를 구분하고 4인 단위로 팀을 준비합니다."],
-  ["02", "킬내기와 배틀로얄", "시간제 킬내기부터 판수제 배틀로얄까지 방에 맞는 모드를 고릅니다."],
-  ["03", "라운드 누적 리더보드", "킬·순위·치킨 포인트를 라운드별로 기록해 스크림 결과를 한눈에 봅니다."],
+  [
+    "01",
+    "4인 스쿼드 구성",
+    "스팀·카카오 참가자를 구분하고 4인 단위로 팀을 준비합니다.",
+  ],
+  [
+    "02",
+    "킬내기와 배틀로얄",
+    "시간제 킬내기부터 판수제 배틀로얄까지 방에 맞는 모드를 고릅니다.",
+  ],
+  [
+    "03",
+    "라운드 누적 리더보드",
+    "킬·순위·치킨 포인트를 라운드별로 기록해 스크림 결과를 한눈에 봅니다.",
+  ],
 ];
-
-function OperationCardVisual({
-  kind,
-  wide = false,
-}: {
-  kind: "readiness" | "balance" | "records";
-  wide?: boolean;
-}) {
-  const visualClassName = wide
-    ? "absolute inset-x-6 bottom-5 rounded-2xl border border-white/[0.08] bg-[#101116]/95 p-4 shadow-2xl shadow-black/30 lg:inset-x-auto lg:bottom-8 lg:right-8 lg:w-[48%]"
-    : "absolute inset-x-6 bottom-5 rounded-2xl border border-white/[0.08] bg-[#101116]/95 p-4 shadow-2xl shadow-black/30";
-
-  if (kind === "readiness") {
-    return (
-      <div className={visualClassName}>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
-              PLAYER CHECK
-            </p>
-            <p className="mt-1 text-xs font-semibold text-white/80">
-              참가 준비
-            </p>
-          </div>
-          <p className="text-lg font-bold tabular-nums text-white">
-            8 <span className="text-white/60">/ 10</span>
-          </p>
-        </div>
-        <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/[0.06]">
-          <div className="h-full w-4/5 rounded-full bg-amber-300" />
-        </div>
-        <div className="mt-4 grid grid-cols-5 gap-2">
-          {["TOP", "JGL", "MID", "BOT", "SUP"].map((position, index) => (
-            <div key={position} className="text-center">
-              <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-full border border-amber-300/15 bg-amber-300/[0.07]">
-                <Check
-                  className={`h-3 w-3 ${index < 4 ? "text-amber-200" : "text-white/60"}`}
-                />
-              </div>
-              <p className="mt-1.5 text-[8px] font-semibold text-white/60">
-                {position}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (kind === "balance") {
-    return (
-      <div className={visualClassName}>
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
-              TEAM BALANCE
-            </p>
-            <p className="mt-1 text-xs font-semibold text-white/80">
-              팀 편성 도구 결과
-            </p>
-          </div>
-          <p className="text-xs font-bold tabular-nums text-violet-200">
-            티어·포지션 반영
-          </p>
-        </div>
-        <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-          <div className="space-y-1.5">
-            {["TOP · D4", "MID · E2", "BOT · P1"].map((player) => (
-              <div
-                key={player}
-                className="rounded-md border border-cyan-300/10 bg-cyan-300/[0.05] px-2 py-1.5 text-[9px] font-medium text-cyan-100/60"
-              >
-                {player}
-              </div>
-            ))}
-          </div>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-violet-300/15 bg-violet-300/[0.07] text-[9px] font-black text-violet-200">
-            VS
-          </div>
-          <div className="space-y-1.5 text-right">
-            {["TOP · D3", "MID · E1", "BOT · P2"].map((player) => (
-              <div
-                key={player}
-                className="rounded-md border border-rose-300/10 bg-rose-300/[0.05] px-2 py-1.5 text-[9px] font-medium text-rose-100/60"
-              >
-                {player}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={visualClassName}>
-      <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-        <div>
-          <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
-            MATCH RESULT · BROADCAST OVERLAY
-          </p>
-          <p className="mt-1 text-xs font-semibold text-white/80">
-            금요일 정기 내전 · 3세트
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-sm font-black tabular-nums">
-          <span className="text-cyan-200">BLUE 2</span>
-          <span className="text-white/60">:</span>
-          <span className="text-rose-200">1 RED</span>
-        </div>
-      </div>
-      <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-5">
-        <div className="space-y-2">
-          {[72, 58, 84].map((width, index) => (
-            <div key={width} className="flex items-center gap-2">
-              <span className="w-7 text-[8px] font-medium text-white/60">
-                {["KDA", "DMG", "GOLD"][index]}
-              </span>
-              <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
-                <div
-                  className="h-full rounded-full bg-cyan-300/65"
-                  style={{ width: `${width}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="rounded-lg border border-cyan-300/10 bg-cyan-300/[0.05] px-3 py-2 text-center">
-          <p className="text-[8px] text-white/60">MVP</p>
-          <p className="mt-1 text-[10px] font-bold text-cyan-100/75">
-            MID · 4표
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const auctionBenefits: Array<{
   icon: LucideIcon;
@@ -266,8 +138,7 @@ const auctionBenefits: Array<{
   {
     icon: Clock,
     title: "모두에게 같은 경매 시계",
-    description:
-      "현재 매물·남은 시간·입찰 이벤트를 모든 참가자와 시청자에게 같은 상태로 보여줍니다",
+    description: "현재 매물·남은 시간·입찰을 모두에게 같은 상태로",
   },
   {
     icon: Coins,
@@ -278,7 +149,8 @@ const auctionBenefits: Array<{
   {
     icon: Gavel,
     title: "유찰부터 다음 매물까지",
-    description: "팀장 선정부터 선수 경매·유찰·라인 선택·대진표까지 정해진 순서로 진행합니다",
+    description:
+      "팀장 선정부터 선수 경매·유찰·라인 선택·대진표까지 정해진 순서로 진행합니다",
   },
 ];
 
@@ -290,28 +162,28 @@ function AuctionShowcase() {
     >
       <div
         aria-hidden="true"
-        className="absolute left-1/2 top-0 h-[420px] w-[920px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-300/[0.08] blur-[140px]"
+        className="absolute left-1/2 top-0 h-[420px] w-[920px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-400/[0.08] blur-[140px]"
       />
       <div className="relative mx-auto grid max-w-[1480px] gap-14 lg:grid-cols-[0.78fr_1.22fr] lg:items-center lg:gap-20">
         <div>
-          <div className="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-amber-200/75">
+          <div className="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-indigo-300/75">
             <Gavel className="h-3.5 w-3.5" />
             AUCTION SYSTEM
           </div>
-          <h2 className="mt-7 max-w-2xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
+          <h2 className="mt-7 max-w-2xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
             제한 시간과 예산으로
             <br />
             진행하는 실시간 팀 경매
           </h2>
           <p className="mt-7 max-w-xl text-base leading-7 text-white/60 md:text-lg md:leading-8">
-            팀장을 정한 뒤 제한 시간 안에 선수를 입찰합니다. 참가자는 현재 매물과
-            최고가, 팀별 예산과 로스터 변화를 같은 화면에서 확인합니다
+            팀장이 제한 시간 안에 선수를 입찰하고, 참가자는 현재 매물과 최고가,
+            팀별 예산을 같은 화면에서 봅니다
           </p>
 
           <ul className="mt-10 space-y-5">
             {auctionBenefits.map((benefit) => (
               <li key={benefit.title} className="flex gap-4">
-                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-amber-200">
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-indigo-300">
                   <benefit.icon className="h-4 w-4" />
                 </span>
                 <div>
@@ -328,7 +200,7 @@ function AuctionShowcase() {
 
           <Link
             href={`${DEFAULT_GAME_PREFIX}/guide#draft`}
-            className="group mt-10 inline-flex items-center gap-2 text-sm font-bold text-amber-200 transition-colors hover:text-amber-100"
+            className="group mt-10 inline-flex items-center gap-2 text-sm font-bold text-indigo-300 transition-colors hover:text-indigo-200"
           >
             경매 진행 방식 보기
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -336,11 +208,11 @@ function AuctionShowcase() {
         </div>
 
         <div className="relative select-none rounded-[30px] border border-white/[0.09] bg-[#101116] p-3 shadow-[0_45px_120px_rgba(0,0,0,0.5)] sm:p-5">
-          <div className="absolute -inset-px -z-10 rounded-[30px] bg-amber-200/[0.04] blur-xl" />
+          <div className="absolute -inset-px -z-10 rounded-[30px] bg-indigo-300/[0.04] blur-xl" />
           <div className="overflow-hidden rounded-[22px] border border-white/[0.07] bg-[#0c0d12]">
             <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3.5 sm:px-5">
               <div className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-300/10 text-amber-200">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-400/10 text-indigo-300">
                   <Gavel className="auction-hammer h-4 w-4" />
                 </span>
                 <div>
@@ -366,14 +238,14 @@ function AuctionShowcase() {
                       현재 매물 06 / 08
                     </p>
                     <div className="mt-4 flex items-center gap-3">
-                      <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-amber-200/15 bg-amber-200/[0.07] text-lg font-black text-amber-100/80">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-300/15 bg-indigo-300/[0.07] text-lg font-black text-indigo-200/80">
                         N
                       </span>
                       <div>
                         <p className="text-base font-bold text-white">
                           NEXUS_06
                         </p>
-                        <p className="mt-1 text-[10px] font-medium text-amber-100/60">
+                        <p className="mt-1 text-[10px] font-medium text-indigo-200/60">
                           DIAMOND IV · MID / SUP
                         </p>
                       </div>
@@ -389,8 +261,8 @@ function AuctionShowcase() {
                   </div>
                 </div>
 
-                <div className="auction-bid-flash relative mt-5 overflow-hidden rounded-xl border border-amber-300/10 bg-amber-300/[0.04] p-4">
-                  <span className="auction-bid-event absolute right-3 top-2 rounded-full border border-amber-200/15 bg-amber-200/10 px-2 py-1 text-[8px] font-bold text-amber-100">
+                <div className="auction-bid-flash relative mt-5 overflow-hidden rounded-xl border border-indigo-400/10 bg-indigo-400/[0.04] p-4">
+                  <span className="auction-bid-event absolute right-3 top-2 rounded-full border border-indigo-300/15 bg-indigo-300/10 px-2 py-1 text-[8px] font-bold text-indigo-200">
                     +50G
                   </span>
                   <div className="flex items-end justify-between gap-3">
@@ -398,7 +270,7 @@ function AuctionShowcase() {
                       <p className="text-[9px] font-medium text-white/60">
                         최고 입찰가
                       </p>
-                      <p className="auction-bid-value mt-1 text-2xl font-black tabular-nums text-amber-200">
+                      <p className="auction-bid-value mt-1 text-2xl font-black tabular-nums text-indigo-300">
                         1,250G
                       </p>
                     </div>
@@ -421,7 +293,7 @@ function AuctionShowcase() {
                     </div>
                   ))}
                 </div>
-                <div className="auction-cta-pulse mt-2 rounded-lg bg-amber-200 px-3 py-2.5 text-center text-xs font-black text-[#17130b]">
+                <div className="auction-cta-pulse mt-2 rounded-lg bg-indigo-300 px-3 py-2.5 text-center text-xs font-black text-[#17130b]">
                   1,300G 입찰
                 </div>
               </div>
@@ -432,7 +304,7 @@ function AuctionShowcase() {
                     <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
                       TEAM BUDGET
                     </p>
-                    <Coins className="h-3.5 w-3.5 text-amber-200/60" />
+                    <Coins className="h-3.5 w-3.5 text-indigo-300/60" />
                   </div>
                   <div className="mt-4 space-y-2.5">
                     {[
@@ -480,7 +352,8 @@ function AuctionShowcase() {
             </div>
           </div>
           <p className="mt-3 px-1 text-[10px] font-medium text-white/45">
-            실제 경매 화면을 바탕으로 구성한 미리보기 · 입찰, 예산, 로스터가 한 화면에 표시됩니다
+            실제 경매 화면을 바탕으로 구성한 미리보기 · 입찰, 예산, 로스터가 한
+            화면에 표시됩니다
           </p>
         </div>
       </div>
@@ -509,19 +382,19 @@ function AutoBalanceShowcase() {
     >
       <div className="relative mx-auto grid max-w-[1480px] gap-14 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-20">
         <div>
-          <div className="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-amber-200/80">
+          <div className="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-indigo-300/80">
             <Scale className="h-3.5 w-3.5" />
             AUTO BALANCE
           </div>
-          <h2 className="mt-7 max-w-xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
+          <h2 className="mt-7 max-w-xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
             빠르게 나누고,
             <br />
             납득할 수 있게 검토합니다
           </h2>
           <p className="mt-7 max-w-xl text-base leading-7 text-white/60 md:text-lg md:leading-8">
-            준비된 참가자의 Riot 계정 정보와 라인별 밸런스 점수로 팀을 나눈 다음,
-            포지션 선호를 함께 확인합니다. 자동 편성이 끝나도 방장이 직접 검토하고
-            재편성·되돌리기·확정을 선택할 수 있습니다.
+            준비된 참가자의 Riot 계정 정보와 라인별 밸런스 점수로 팀을 나눈
+            다음, 포지션 선호를 함께 확인합니다. 자동 편성이 끝나도 방장이 직접
+            검토하고 재편성·되돌리기·확정을 선택할 수 있습니다.
           </p>
 
           <div className="mt-9 grid gap-3 sm:grid-cols-2">
@@ -531,10 +404,17 @@ function AutoBalanceShowcase() {
               ["03", "방장 검토", "결과를 재편성하거나 그대로 확정"],
               ["04", "바로 시작", "별도 역할 선택 없이 대진표로 이동"],
             ].map(([step, title, description]) => (
-              <div key={step} className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-3.5">
-                <span className="text-[10px] font-bold tracking-[0.16em] text-amber-200/70">{step}</span>
+              <div
+                key={step}
+                className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-3.5"
+              >
+                <span className="text-[10px] font-bold tracking-[0.16em] text-indigo-300/70">
+                  {step}
+                </span>
                 <p className="mt-2 text-sm font-bold text-white/85">{title}</p>
-                <p className="mt-1 text-xs leading-5 text-white/50">{description}</p>
+                <p className="mt-1 text-xs leading-5 text-white/50">
+                  {description}
+                </p>
               </div>
             ))}
           </div>
@@ -544,16 +424,22 @@ function AutoBalanceShowcase() {
           <div className="rounded-[22px] border border-white/[0.07] bg-[#0d0e11]">
             <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-4 sm:px-5">
               <div>
-                <p className="text-[9px] font-bold tracking-[0.18em] text-white/45">TEAM BUILDER</p>
-                <p className="mt-1 text-sm font-bold text-white">팀 편성 도구 결과</p>
+                <p className="text-[9px] font-bold tracking-[0.18em] text-white/45">
+                  TEAM BUILDER
+                </p>
+                <p className="mt-1 text-sm font-bold text-white">
+                  팀 편성 도구 결과
+                </p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <p className="text-[9px] text-white/40">팀 점수 차</p>
-                  <p className="text-sm font-black tabular-nums text-emerald-200">0.5</p>
+                  <p className="text-sm font-black tabular-nums text-emerald-200">
+                    0.5
+                  </p>
                 </div>
                 <span className="flex items-center gap-1.5 rounded-full border border-emerald-300/15 bg-emerald-300/[0.06] px-2.5 py-1 text-[10px] font-bold text-emerald-200">
-                <Check className="h-3 w-3" /> 편성 완료
+                  <Check className="h-3 w-3" /> 편성 완료
                 </span>
               </div>
             </div>
@@ -562,78 +448,138 @@ function AutoBalanceShowcase() {
               {["BLUE", "VS", "RED"].map((team, teamIndex) => {
                 if (team === "VS") {
                   return (
-                    <div key={team} className="hidden items-center justify-center pt-14 md:flex">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-200/15 bg-amber-200/[0.06] text-[10px] font-black text-amber-100">VS</span>
+                    <div
+                      key={team}
+                      className="hidden items-center justify-center pt-14 md:flex"
+                    >
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full border border-indigo-300/15 bg-indigo-300/[0.06] text-[10px] font-black text-indigo-200">
+                        VS
+                      </span>
                     </div>
                   );
                 }
                 const sideIndex = team === "BLUE" ? 0 : 1;
                 return (
-                <div key={team} className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3.5 sm:p-4">
-                  <div className="flex items-center justify-between">
-                    <p className={`text-[10px] font-black tracking-[0.16em] ${sideIndex === 0 ? "text-sky-200" : "text-rose-200"}`}>
-                      {team}
-                    </p>
-                    <div className="text-right">
-                      <p className="text-[9px] text-white/40">팀 점수</p>
-                      <p className="text-xs font-black tabular-nums text-white/80">{sideIndex === 0 ? "82.4" : "81.9"}</p>
+                  <div
+                    key={team}
+                    className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3.5 sm:p-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p
+                        className={`text-[10px] font-black tracking-[0.16em] ${sideIndex === 0 ? "text-sky-200" : "text-rose-200"}`}
+                      >
+                        {team}
+                      </p>
+                      <div className="text-right">
+                        <p className="text-[9px] text-white/40">팀 점수</p>
+                        <p className="text-xs font-black tabular-nums text-white/80">
+                          {sideIndex === 0 ? "82.4" : "81.9"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between border-b border-white/[0.06] pb-2 text-[9px] text-white/40">
+                      <span>5명 편성</span>
+                      <span>라인 선호 반영</span>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {players.map(([name, rank, role], index) => {
+                        const belongs = (index + sideIndex) % 2 === 0;
+                        if (!belongs) return null;
+                        return (
+                          <div
+                            key={name}
+                            className="flex items-center gap-2 rounded-lg bg-black/20 px-2.5 py-2"
+                          >
+                            <span
+                              className={`flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-black ${sideIndex === 0 ? "bg-sky-300/10 text-sky-100" : "bg-rose-300/10 text-rose-100"}`}
+                            >
+                              {name.slice(0, 1)}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-white/70">
+                              {name}
+                            </span>
+                            <span className="text-right text-[9px] leading-4 text-white/45">
+                              {rank}
+                              <br />
+                              {role} ·{" "}
+                              <span className="text-white/65">
+                                {84 - index}점
+                              </span>
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                  <div className="mt-2 flex items-center justify-between border-b border-white/[0.06] pb-2 text-[9px] text-white/40">
-                    <span>5명 편성</span>
-                    <span>라인 선호 반영</span>
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {players.map(([name, rank, role], index) => {
-                      const belongs = (index + sideIndex) % 2 === 0;
-                      if (!belongs) return null;
-                      return (
-                        <div key={name} className="flex items-center gap-2 rounded-lg bg-black/20 px-2.5 py-2">
-                          <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-black ${sideIndex === 0 ? "bg-sky-300/10 text-sky-100" : "bg-rose-300/10 text-rose-100"}`}>
-                            {name.slice(0, 1)}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-white/70">{name}</span>
-                          <span className="text-right text-[9px] leading-4 text-white/45">{rank}<br />{role} · <span className="text-white/65">{84 - index}점</span></span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
                 );
               })}
             </div>
 
             <div className="grid gap-3 border-t border-white/[0.07] px-3 py-4 sm:px-5 md:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-xl border border-amber-200/15 bg-amber-200/[0.04] p-3.5">
+              <div className="rounded-xl border border-indigo-300/15 bg-indigo-300/[0.04] p-3.5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-bold tracking-[0.14em] text-amber-100/80">SWAP PREVIEW</p>
-                    <p className="mt-1 text-xs font-bold text-white/80">카드를 끌어 다른 선수 위에 놓아 교체</p>
+                    <p className="text-[10px] font-bold tracking-[0.14em] text-indigo-200/80">
+                      SWAP PREVIEW
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-white/80">
+                      카드를 끌어 다른 선수 위에 놓아 교체
+                    </p>
                   </div>
-                    <span className="rounded-lg bg-amber-200/15 px-2 py-1 text-[10px] font-black text-amber-100">차이 1.8 → 0.6</span>
+                  <span className="rounded-lg bg-indigo-300/15 px-2 py-1 text-[10px] font-black text-indigo-200">
+                    차이 1.8 → 0.6
+                  </span>
                 </div>
-                <p className="mt-2 text-[10px] leading-5 text-white/50">드롭 대상 라인의 개인 점수와 교체 후 팀 점수 차이를 미리 계산합니다.</p>
+                <p className="mt-2 text-[10px] leading-5 text-white/50">
+                  드롭 대상 라인의 개인 점수와 교체 후 팀 점수 차이를 미리
+                  계산합니다.
+                </p>
               </div>
               <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5">
-                <p className="text-[10px] font-bold tracking-[0.14em] text-white/45">추천 교체</p>
-                <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-white/65"><span className="flex min-w-0 items-center gap-1.5 truncate"><span>밤하늘</span><ArrowLeftRight className="h-3 w-3 flex-shrink-0 text-white/35" /><span>소금빵</span></span><span className="font-bold text-emerald-200">차이 0.6</span></div>
-                <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-white/45"><span className="flex min-w-0 items-center gap-1.5 truncate"><span>모카빵</span><ArrowLeftRight className="h-3 w-3 flex-shrink-0 text-white/35" /><span>노을빛</span></span><span>선호 개선</span></div>
+                <p className="text-[10px] font-bold tracking-[0.14em] text-white/45">
+                  추천 교체
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-white/65">
+                  <span className="flex min-w-0 items-center gap-1.5 truncate">
+                    <span>밤하늘</span>
+                    <ArrowLeftRight className="h-3 w-3 flex-shrink-0 text-white/35" />
+                    <span>소금빵</span>
+                  </span>
+                  <span className="font-bold text-emerald-200">차이 0.6</span>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-white/45">
+                  <span className="flex min-w-0 items-center gap-1.5 truncate">
+                    <span>모카빵</span>
+                    <ArrowLeftRight className="h-3 w-3 flex-shrink-0 text-white/35" />
+                    <span>노을빛</span>
+                  </span>
+                  <span>선호 개선</span>
+                </div>
               </div>
             </div>
 
             <div className="flex flex-col gap-3 border-t border-white/[0.07] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div>
-                <p className="text-[10px] font-bold text-white/70">방장 검토 단계</p>
-                <p className="mt-1 text-[10px] text-white/45">결과를 확인한 뒤 재편성 또는 확정</p>
+                <p className="text-[10px] font-bold text-white/70">
+                  방장 검토 단계
+                </p>
+                <p className="mt-1 text-[10px] text-white/45">
+                  결과를 확인한 뒤 재편성 또는 확정
+                </p>
               </div>
               <div className="flex gap-2">
-                <span className="rounded-lg border border-white/[0.08] px-3 py-2 text-[10px] font-bold text-white/55">재편성</span>
-                <span className="rounded-lg bg-amber-200 px-3 py-2 text-[10px] font-black text-[#17130b]">팀 확정</span>
+                <span className="rounded-lg border border-white/[0.08] px-3 py-2 text-[10px] font-bold text-white/55">
+                  재편성
+                </span>
+                <span className="rounded-lg bg-indigo-300 px-3 py-2 text-[10px] font-black text-[#17130b]">
+                  팀 확정
+                </span>
               </div>
             </div>
           </div>
           <p className="mt-3 px-1 text-[10px] font-medium text-white/45">
-            실제 자동 편성 확인 화면의 구조를 축약한 예시입니다. 방장이 확인하고 확정하는 운영 흐름을 제공합니다.
+            실제 자동 편성 확인 화면의 구조를 축약한 예시입니다. 방장이 확인하고
+            확정하는 운영 흐름을 제공합니다.
           </p>
         </div>
       </div>
@@ -646,7 +592,7 @@ function OperationBoard() {
     <div className="relative mx-auto w-full max-w-[680px] lg:ml-auto">
       <div
         aria-hidden="true"
-        className="absolute -inset-12 -z-10 rounded-full bg-amber-200/[0.05] blur-[90px]"
+        className="absolute -inset-12 -z-10 rounded-full bg-indigo-300/[0.05] blur-[90px]"
       />
 
       <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[#111217]/95 shadow-[0_40px_120px_rgba(0,0,0,0.55)]">
@@ -672,19 +618,19 @@ function OperationBoard() {
 
         <div className="grid gap-4 p-3 sm:p-6 md:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 sm:p-5">
-            <div className="flex items-end justify-between">
+            <div className="flex items-end justify-between gap-2">
               <div>
                 <p className="text-xs text-white/60">참가 준비</p>
                 <p className="mt-1 text-3xl font-bold tracking-tight text-white">
                   8<span className="text-white/60"> / 10</span>
                 </p>
               </div>
-              <span className="text-xs font-semibold text-amber-300">
+              <span className="text-xs font-semibold text-indigo-400">
                 2명 남음
               </span>
             </div>
             <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-              <div className="h-full w-4/5 rounded-full bg-amber-300/80" />
+              <div className="h-full w-4/5 rounded-full bg-indigo-400/80" />
             </div>
 
             <div className="mt-5 space-y-2.5">
@@ -702,7 +648,7 @@ function OperationBoard() {
                       className={`flex h-5 w-5 items-center justify-center rounded-full ${
                         ready
                           ? "bg-emerald-400/15 text-emerald-300"
-                          : "bg-amber-400/15 text-amber-300"
+                          : "bg-violet-400/15 text-indigo-400"
                       }`}
                     >
                       {ready ? (
@@ -725,17 +671,17 @@ function OperationBoard() {
             <div className="flex-1 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-semibold tracking-[0.18em] text-amber-200/70">
+                  <p className="text-[10px] font-semibold tracking-[0.18em] text-indigo-300/70">
                     AUTO BALANCE RESULT
                   </p>
                   <p className="mt-1 text-sm font-semibold text-white">
                     팀 편성 도구 편성 결과
                   </p>
                 </div>
-                <Scale className="h-5 w-5 text-amber-200" />
+                <Scale className="h-5 w-5 text-indigo-300" />
               </div>
               <p className="mt-2 text-[10px] leading-5 text-white/45">
-                티어·LP와 주/부 포지션을 반영해 팀을 나누고, 방장이 검토 후 확정합니다.
+                티어·LP와 주/부 포지션을 반영해 나눕니다.
               </p>
 
               <div className="mt-4 grid grid-cols-2 gap-2">
@@ -804,16 +750,6 @@ function OperationBoard() {
           ))}
         </div>
       </div>
-
-      <div className="absolute -bottom-5 -left-3 hidden items-center gap-3 rounded-2xl border border-white/10 bg-[#18191f]/95 px-4 py-3 shadow-2xl backdrop-blur lg:flex">
-        <ShieldCheck className="h-5 w-5 text-emerald-300" />
-        <div>
-          <p className="text-[10px] text-white/60">START CHECK</p>
-          <p className="text-xs font-semibold text-white">
-            참가 준비와 시작 조건 확인 중
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
@@ -823,16 +759,17 @@ export function LandingContentSections() {
     <>
       <GamePickerCards />
       <section className="relative isolate overflow-hidden px-5 pb-20 pt-12 sm:px-6 md:pb-24 md:pt-16 lg:flex lg:min-h-[720px] lg:items-center lg:py-16 xl:min-h-[760px]">
-        <div aria-hidden="true" className="absolute inset-0 -z-20 bg-[#111214]" />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-20 bg-[#111214]"
+        />
 
         <div className="mx-auto grid w-full max-w-[1480px] items-center gap-14 lg:grid-cols-[0.88fr_1.12fr] lg:gap-12">
           <div>
             <h1 className="max-w-[760px] text-[clamp(3rem,6vw,6.25rem)] font-black leading-[0.98] tracking-[-0.065em] text-white">
               내전 운영,
               <br />
-              <span className="text-amber-200">
-                한곳에서 끝까지
-              </span>
+              <span className="text-indigo-300">한곳에서 끝까지</span>
             </h1>
 
             <p className="mt-7 max-w-xl text-base leading-7 text-white/55 sm:text-lg sm:leading-8">
@@ -895,7 +832,7 @@ export function LandingContentSections() {
               key={number}
               className="flex items-center gap-3 px-4 py-5 sm:px-7"
             >
-              <span className="text-[10px] font-bold text-amber-200/70">
+              <span className="text-[10px] font-bold text-indigo-300/70">
                 {number}
               </span>
               <span className="text-xs font-semibold text-white/55 sm:text-sm">
@@ -907,19 +844,26 @@ export function LandingContentSections() {
       </section>
 
       <section className="relative overflow-hidden bg-[#f4f7fb] px-5 py-20 text-[#151515] sm:px-6 md:py-28">
-        <div aria-hidden="true" className="absolute -right-24 top-12 h-72 w-72 rounded-full bg-amber-300/[0.16] blur-[100px]" />
-        <div aria-hidden="true" className="absolute -left-24 bottom-0 h-64 w-64 rounded-full bg-violet-300/[0.12] blur-[100px]" />
+        <div
+          aria-hidden="true"
+          className="absolute -right-24 top-12 h-72 w-72 rounded-full bg-indigo-400/[0.16] blur-[100px]"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -left-24 bottom-0 h-64 w-64 rounded-full bg-violet-300/[0.12] blur-[100px]"
+        />
         <div className="mx-auto max-w-[1480px]">
           <h2 className="max-w-[1240px] text-[clamp(2.5rem,6vw,6.6rem)] font-black leading-[1.02] tracking-[-0.065em]">
             게임이 달라도 운영은 한 흐름으로.
-            <span className="text-[#b7791f]">
-              {" "}참가 준비부터 경기 결과까지 이어집니다
+            <span className="text-[#6d3fa0]">
+              {" "}
+              참가 준비부터 경기 결과까지 이어집니다
             </span>
           </h2>
           <div className="mt-12 flex flex-col justify-between gap-8 border-t border-black/15 pt-6 md:flex-row md:items-start">
             <p className="max-w-xl text-base leading-7 text-black/55 md:text-lg">
-            방 생성, 참가 준비, 팀 구성, 경기 결과 기록을 각각 다른 도구로 옮기지
-            않고 하나의 내전 방에서 이어서 관리합니다.
+              방 생성부터 경기 결과 기록까지, 도구를 옮겨 다니지 않고 한 방에서
+              이어집니다.
             </p>
             <Link
               href="/about"
@@ -932,13 +876,13 @@ export function LandingContentSections() {
             </Link>
           </div>
 
-          <div className="mt-12 grid overflow-hidden rounded-[24px] border border-[#b7791f]/20 bg-white/65 shadow-[0_20px_70px_rgba(73,87,110,0.10)] md:grid-cols-3 md:divide-x md:divide-black/10">
+          <div className="mt-12 grid overflow-hidden rounded-[24px] border border-[#6d3fa0]/20 bg-white/65 shadow-[0_20px_70px_rgba(73,87,110,0.10)] md:grid-cols-3 md:divide-x md:divide-black/10">
             {workflowOutcomes.map((outcome) => (
               <article
                 key={outcome.value}
                 className="border-b border-black/10 p-6 last:border-b-0 sm:p-8 md:border-b-0"
               >
-                <p className="text-3xl font-black tracking-[-0.04em] text-[#b7791f] sm:text-4xl">
+                <p className="text-3xl font-black tracking-[-0.04em] text-[#6d3fa0] sm:text-4xl">
                   {outcome.value}
                 </p>
                 <h3 className="mt-4 text-lg font-bold tracking-[-0.02em]">
@@ -957,22 +901,33 @@ export function LandingContentSections() {
         <div className="mx-auto max-w-[1480px]">
           <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
             <div>
-              <p className="text-xs font-bold tracking-[0.18em] text-amber-200">PUBG MATCH FLOW</p>
-              <h2 className="mt-5 max-w-2xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
-                배그는 스쿼드와<br />라운드에 맞춰 운영합니다
+              <p className="text-xs font-bold tracking-[0.18em] text-indigo-300">
+                PUBG MATCH FLOW
+              </p>
+              <h2 className="mt-5 max-w-2xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
+                배그는 스쿼드와
+                <br />
+                라운드에 맞춰 운영합니다
               </h2>
             </div>
             <p className="max-w-2xl text-base leading-7 text-white/60 lg:ml-auto lg:text-lg">
-              롤처럼 포지션을 나누는 대신, 배그는 4인 스쿼드와 경기 모드를 먼저 정합니다.
-              킬내기와 배틀로얄 스크림의 라운드 결과까지 한 방에서 이어집니다.
+              포지션 대신 4인 스쿼드와 경기 모드를 먼저 정하고, 라운드 결과까지
+              한 방에서 이어집니다.
             </p>
           </div>
           <div className="mt-10 grid gap-3 md:grid-cols-3">
             {pubgHighlights.map(([index, title, description]) => (
-              <article key={index} className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
-                <span className="text-[10px] font-bold tracking-[0.18em] text-amber-200/75">{index}</span>
+              <article
+                key={index}
+                className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6"
+              >
+                <span className="text-[10px] font-bold tracking-[0.18em] text-indigo-300/75">
+                  {index}
+                </span>
                 <h3 className="mt-5 text-lg font-bold text-white">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-white/55">{description}</p>
+                <p className="mt-2 text-sm leading-6 text-white/55">
+                  {description}
+                </p>
               </article>
             ))}
           </div>
@@ -986,15 +941,14 @@ export function LandingContentSections() {
       >
         <div className="relative mx-auto grid max-w-[1480px] gap-14 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-20">
           <div>
-            <h2 className="max-w-xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
+            <h2 className="max-w-xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
               빠르게 나누고,
               <br />
               납득할 수 있게 검토합니다
             </h2>
             <p className="mt-7 max-w-xl text-base leading-7 text-white/60 md:text-lg md:leading-8">
-              준비된 참가자의 Riot 계정 정보와 라인별 밸런스 점수로 팀을 나눈 다음,
-              포지션 선호를 함께 확인합니다. 자동 편성이 끝나도 방장이 직접 검토하고
-              재편성·되돌리기·확정을 선택할 수 있습니다.
+              라인별 밸런스 점수와 포지션 선호로 팀을 나눕니다. 편성이 끝나도
+              방장이 재편성·되돌리기·확정을 직접 고릅니다.
             </p>
             <div className="mt-9 grid gap-3 sm:grid-cols-2">
               {[
@@ -1003,10 +957,19 @@ export function LandingContentSections() {
                 ["03", "방장 검토", "교체·다시 뽑기로 결과를 조정"],
                 ["04", "팀 확정", "확정 후 역할과 대진표로 이동"],
               ].map(([step, title, description]) => (
-                <div key={step} className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-3.5">
-                  <span className="text-[10px] font-bold tracking-[0.16em] text-amber-200/70">{step}</span>
-                  <p className="mt-2 text-sm font-bold text-white/85">{title}</p>
-                  <p className="mt-1 text-xs leading-5 text-white/50">{description}</p>
+                <div
+                  key={step}
+                  className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-3.5"
+                >
+                  <span className="text-[10px] font-bold tracking-[0.16em] text-indigo-300/70">
+                    {step}
+                  </span>
+                  <p className="mt-2 text-sm font-bold text-white/85">
+                    {title}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-white/50">
+                    {description}
+                  </p>
                 </div>
               ))}
             </div>
@@ -1021,12 +984,12 @@ export function LandingContentSections() {
       >
         <div
           aria-hidden="true"
-          className="absolute left-1/2 top-0 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-amber-200/[0.04] blur-[140px]"
+          className="absolute left-1/2 top-0 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-indigo-300/[0.04] blur-[140px]"
         />
         <div className="relative mx-auto max-w-[1480px]">
           <div className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-end">
             <div>
-              <p className="text-xs font-bold tracking-[0.18em] text-amber-200">
+              <p className="text-xs font-bold tracking-[0.18em] text-indigo-300">
                 OPERATIONS
               </p>
               <h2 className="mt-5 text-4xl font-black leading-[1.05] tracking-[-0.045em] text-white sm:text-5xl md:text-6xl">
@@ -1055,9 +1018,9 @@ export function LandingContentSections() {
                 <div
                   className={`absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t to-transparent ${
                     operation.index === "01"
-                      ? "from-amber-400/[0.07]"
+                      ? "from-violet-400/[0.07]"
                       : operation.index === "02"
-                        ? "from-amber-200/[0.05]"
+                        ? "from-indigo-300/[0.05]"
                         : "from-white/[0.035]"
                   }`}
                 />
@@ -1070,7 +1033,9 @@ export function LandingContentSections() {
                       FEATURE · {operation.index}
                     </span>
                     <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.035]">
-                      <operation.icon className={`h-5 w-5 ${operation.accent}`} />
+                      <operation.icon
+                        className={`h-5 w-5 ${operation.accent}`}
+                      />
                     </span>
                   </div>
                   <div
@@ -1107,14 +1072,13 @@ export function LandingContentSections() {
         <div className="mx-auto max-w-[1480px]">
           <div className="grid gap-10 border-y border-white/[0.08] py-12 md:py-16 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
-              <h2 className="max-w-5xl text-4xl font-black leading-[1.04] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl">
-            내전 준비,
-            <br />한 방에서 시작하세요
+              <h2 className="max-w-5xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
+                내전 준비,
+                <br />한 방에서 시작하세요
               </h2>
               <p className="mt-5 max-w-2xl text-sm leading-6 text-white/60 sm:text-base">
-                브라우저에서 참가자와 팀 구성을 확인하세요. 활성 내전의 방송 토큰을
-                OBS 브라우저 소스에 등록하면 대기·경매·대진표·결과 화면을 방송에
-                사용할 수 있습니다.
+                방을 만들면 참가 준비부터 팀 구성, 경기 결과까지 이어집니다.
+                방송 화면은 OBS 브라우저 소스로 바로 연결됩니다.
               </p>
             </div>
             <div className="flex flex-col items-start gap-3 lg:items-end">
@@ -1220,7 +1184,7 @@ function LandingHeader() {
 
 export default function LandingContent() {
   return (
-    <main className="min-h-screen overflow-x-clip bg-[#0f0f0f] pt-12 md:pt-16">
+    <main className="min-h-screen overflow-x-clip break-keep bg-[#0f0f0f] pt-12 md:pt-16">
       <LandingHeader />
       <LandingContentSections />
       <LandingFooter />
