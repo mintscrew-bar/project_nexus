@@ -80,11 +80,14 @@ export function GamePickerCards() {
         className="pointer-events-none absolute right-[14%] top-8 -z-10 h-56 w-56 rounded-full bg-violet-400/[0.08] blur-[110px]"
       />
 
-      {/* 배경 워드마크. 알파를 올려 실제로 읽히게 했다 — 전에는 그라디언트가
-          0.12~0.18 인데 등장 애니메이션이 투명도를 물고 있어 안 보였다. */}
+      {/* 배경 워드마크.
+          `background-clip: text` 로 그라디언트를 글자에 물리던 걸 버렸다.
+          Chrome 은 `-webkit-` 접두사가 필요해서 그게 빠지면 **글자로 잘리지
+          않고 사각형 색 띠**가 화면 위를 가로지른다 — 실제로 그렇게 나왔다.
+          단색 고스트는 접두사에 의존하지 않아 어디서나 같게 나온다. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-6 z-0 flex items-center justify-center text-[clamp(6rem,15vw,15rem)] font-black italic leading-none tracking-[0.02em] text-transparent [background:linear-gradient(105deg,rgba(251,191,36,0.3),rgba(196,181,253,0.26)_48%,rgba(103,232,249,0.2))] [background-clip:text]"
+        className="pointer-events-none absolute inset-x-0 top-4 z-0 flex items-center justify-center whitespace-nowrap text-[clamp(4.5rem,12vw,11rem)] font-black italic leading-none tracking-[-0.01em] text-white/[0.055]"
       >
         <span>LET HIM COOK</span>
       </div>
@@ -97,12 +100,14 @@ export function GamePickerCards() {
             <GameEntryLink
               key={game.title}
               slug={game.slug}
-              className={`group relative aspect-[9/16] overflow-hidden rounded-xl border border-white/[0.09] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-1 sm:p-6 ${art.wash} ${art.edge} ${art.halo}`}
+              className={`group relative aspect-[9/16] overflow-hidden rounded-xl [container-type:inline-size] border border-white/[0.09] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-1 sm:p-6 ${art.wash} ${art.edge} ${art.halo}`}
             >
-              {/* 카드 안쪽 큰 약어. 아트를 대신해 카드에 무게를 준다. */}
+              {/* 카드 안쪽 큰 약어. 아트를 대신해 카드에 무게를 준다.
+                  카드 폭 기준(`cqw`)으로 재야 글자가 경계에서 잘리지 않는다 —
+                  뷰포트 기준(`vw`)으로 잡았다가 `LOL` 이 `LOI` 로 잘렸다. */}
               <span
                 aria-hidden
-                className={`pointer-events-none absolute -right-2 top-2 text-[clamp(3.5rem,9vw,6rem)] font-black italic leading-none tracking-[-0.04em] transition-transform duration-500 group-hover:-translate-y-1 ${art.mark}`}
+                className={`pointer-events-none absolute right-3 top-3 text-[26cqw] font-black italic leading-[0.85] tracking-[-0.05em] transition-transform duration-500 group-hover:-translate-y-1 ${art.mark}`}
               >
                 {game.title}
               </span>
