@@ -56,8 +56,9 @@ const CARD_ART: Record<
   }
 > = {
   LOL: {
+    // 1215×717 splash. `loading` 아트에 박힌 비네팅을 피하려고 이쪽을 쓴다.
     image: "/images/games/lol.jpg",
-    imagePosition: "bg-top",
+    imagePosition: "bg-[position:68%_50%]",
     wash: "bg-[radial-gradient(120%_85%_at_20%_0%,rgba(102,126,234,0.34),transparent_62%),radial-gradient(110%_75%_at_85%_18%,rgba(118,75,162,0.28),transparent_58%),linear-gradient(180deg,#161a2e_0%,#0b0c14_72%)]",
     mark: "text-[#8b9cf0]/[0.13]",
     kicker: "LEAGUE OF LEGENDS",
@@ -87,7 +88,7 @@ export function GamePickerCards() {
 
   return (
     <section
-      className="relative isolate mx-auto max-w-[1480px] px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
+      className="relative isolate mx-auto max-w-[1480px] px-5 pb-20 pt-10 sm:px-6 md:pb-24 md:pt-20"
       aria-label="Nexus game hubs"
     >
       <div
@@ -103,18 +104,21 @@ export function GamePickerCards() {
         워터마크는 **크고**, 카드와 살짝 겹쳐 뒤에 깔린다.
         폭은 `vw` 로 잰다 — 고정 크기로 두면 넓은 화면에서 양옆이 잘려
         `ET HIM COO` 처럼 읽힌다. 13rem 상한은 초광폭에서 너무 커지지 않게.
+
+        **카드 위치도 같은 `vw` 축으로 움직인다.** 글자만 vw 로 키우고 카드를
+        고정 px 로 두면 폭이 바뀔 때마다 겹침이 사라지거나 파묻힌다.
         `background-clip: text` 로 그라디언트를 물리면 Chrome 에서 접두사가
         빠질 때 글자가 아니라 사각형 색 띠가 된다 — 실제로 그렇게 나왔다.
         단색 고스트는 접두사에 의존하지 않는다.
       */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-10 z-0 flex items-center justify-center whitespace-nowrap text-[clamp(3rem,11.5vw,13rem)] font-black italic leading-[0.82] tracking-[-0.02em] text-white/[0.07]"
+        className="pointer-events-none absolute inset-x-0 top-[clamp(1.5rem,3vw,3.5rem)] z-0 flex items-center justify-center whitespace-nowrap text-[clamp(3rem,11.5vw,13rem)] font-black italic leading-[0.82] tracking-[-0.02em] text-white/[0.07]"
       >
         <span>LET HIM COOK</span>
       </div>
 
-      <div className="relative z-10 mx-auto mt-28 grid max-w-[600px] grid-cols-2 gap-3 sm:gap-4 md:mt-32">
+      <div className="relative z-10 mx-auto mt-[clamp(0.5rem,3.5vw,4.5rem)] grid max-w-[600px] grid-cols-2 gap-3 sm:gap-4">
         {games.map((game) => {
           const art = CARD_ART[game.title] ?? CARD_ART.LOL;
           const copy = CARD_COPY[game.title] ?? CARD_COPY.LOL;
@@ -137,7 +141,11 @@ export function GamePickerCards() {
               )}
 
               {/* 게임 아트. `wash` 위에 덮고, 아래 그라디언트가 다시 눌러
-                  글자 대비를 만든다. 없으면 `wash` 만 보인다. */}
+                  글자 대비를 만든다. 없으면 `wash` 만 보인다.
+
+                  롤은 **splash** 를 쓴다. `loading` 아트는 로딩 화면용이라
+                  테두리에 비네팅이 박혀 있어, 깔아 두면 카드에 안쪽 그림자가
+                  두른 것처럼 보인다. splash 는 그 테두리가 없는 원본이다. */}
               {art.image ? (
                 <span
                   aria-hidden
