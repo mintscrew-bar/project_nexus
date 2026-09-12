@@ -1,75 +1,19 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useAuthStore } from "@/stores/auth-store";
-import { useEffect, useState } from "react";
-import { ErrorBoundary, Skeleton } from "@/components/ui";
-
-// 대시보드 스켈레톤 — dynamic 청크 로드 중 빈 화면 방지
-function DashboardFallback() {
-  return (
-    <div className="space-y-5">
-      <Skeleton className="h-[360px] rounded-[28px]" />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[1, 2, 3, 4].map((item) => (
-          <Skeleton key={item} className="h-[78px] rounded-2xl" />
-        ))}
-      </div>
-      <Skeleton className="h-56 rounded-2xl" />
-    </div>
-  );
-}
-
-// 대시보드 컴포넌트는 인증 시에만 필요하므로 dynamic import로 로드
-const DashboardContent = dynamic(
-  () => import("@/components/home/DashboardContent").then((mod) => mod.DashboardContent),
-  { ssr: false, loading: () => <DashboardFallback /> }
-);
-
-// 온보딩 코드는 로그인 사용자에게만 필요하다. 공개 랜딩의 초기 번들에서 분리한다.
-const OnboardingGuideModal = dynamic(
-  () =>
-    import("@/components/OnboardingGuideModal").then(
-      (mod) => mod.OnboardingGuideModal,
-    ),
-  { ssr: false },
-);
-const HomeTour = dynamic(
-  () => import("@/components/onboarding/HomeTour").then((mod) => mod.HomeTour),
-  { ssr: false },
-);
-
-// 비로그인 랜딩(landing)은 page.tsx에서 서버 컴포넌트로 렌더해 prop으로 주입한다.
-// → 미인증/로딩/SSR 시 그대로 출력되므로 검색봇이 랜딩 본문을 HTML로 읽을 수 있다.
-export default function HomeClient({
-  landing,
-}: {
-  landing: React.ReactNode;
-}) {
-  const { isAuthenticated } = useAuthStore();
-  const [showLanding, setShowLanding] = useState(false);
-  useEffect(() => {
-    setShowLanding(new URLSearchParams(window.location.search).get("home") === "overview");
-  }, []);
-
-  // 종합 홈(`/`)은 로그인 여부와 관계없이 랜딩을 보여준다.
-  // 대시보드는 별도 진입점에서 유지한다.
-  if (isAuthenticated && !showLanding && false) {
-    return (
-      <div className="flex-grow animate-fade-in">
-        {/* 신규 유저 첫 방문 온보딩 가이드 (localStorage로 1회 노출) */}
-        <OnboardingGuideModal />
-        <HomeTour />
-        <div className="container mx-auto max-w-[1480px] space-y-5 p-4 md:p-6 lg:py-8">
-          {/* 대시보드 개별 컴포넌트 crash가 전체 페이지를 다운시키지 않도록 보호 */}
-          <ErrorBoundary>
-            <DashboardContent />
-          </ErrorBoundary>
-        </div>
-      </div>
-    );
-  }
-
-  // 미인증·로딩·SSR → 서버 렌더된 랜딩 그대로 출력 (SEO 본문 노출)
+/**
+ * 종합 홈(`/`).
+ *
+ * 로그인 여부와 관계없이 랜딩을 그린다. 랜딩은 `page.tsx` 에서 서버
+ * 컴포넌트로 렌더해 prop 으로 받으므로, SSR·검색봇에 본문이 그대로 나간다.
+ *
+ * 전에는 로그인 상태에서 대시보드를 그리는 분기가 있었는데 `&& false` 로
+ * 죽여 둔 상태였다. 대시보드는 게임별 홈(`[game]/page.tsx`)이 따로 들고
+ * 있으므로 그 분기와 딸린 dynamic import 를 걷어냈다 — 조건이 죽은 코드는
+ * 다음 사람이 왜 있는지 알 수 없다.
+ *
+ * 로그인 상태는 랜딩 헤더(`LandingAuthAction`)가 보여준다. 이 경로에서는
+ * AppShell 이 앱 헤더를 감싸지 않기 때문이다.
+ */
+export default function HomeClient({ landing }: { landing: React.ReactNode }) {
   return <>{landing}</>;
 }

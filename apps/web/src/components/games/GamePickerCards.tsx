@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { enabledGames } from "@nexus/types";
+import { GameEntryLink } from "./GameEntryLink";
 
 /**
  * 게임 선택 카드.
@@ -14,27 +14,53 @@ import { enabledGames } from "@nexus/types";
  * 고르게 된다. 본문은 그대로 두고 히어로 바로 아래에 크게 놓는 편이,
  * 발견성은 같으면서 색인과 전환을 잃지 않는다.
  *
- * 링크 뿐이라 서버 컴포넌트로 둔다 — 랜딩 초기 번들이 커지지 않는다.
+ * 마크업은 서버에서 그린다. 링크만 인증 상태를 보므로 그 껍데기
+ * (`GameEntryLink`)만 클라이언트다 — 랜딩 초기 번들이 커지지 않는다.
+ *
+ * **스크롤 연동 연출을 걷어냈다.** `animation-timeline: view()` 로 등장
+ * 애니메이션을 넣었었는데 세 가지가 겹쳐 망가졌다.
+ * · 인셋(`view(8% 72%)`)이 타임라인 구간을 화면 위쪽 좁은 띠로 줄여서
+ *   카드가 **떠날 때** 밝아졌다
+ * · `fill-mode: both` 가 그전까지 `opacity: 0` 을 물고 있어 아예 안 보였다
+ * · 이 랜딩은 스크롤러가 불안정하다 — body 가 `h-screen overflow-hidden`
+ *   인데 `LandingMobileNav` 가 마운트되며 인라인으로 덮어야 비로소 스크롤된다.
+ *   스크롤이 없으면 스크롤 타임라인은 진행하지 않는다.
+ * 정적 연출은 하이드레이션 전에도, 스크롤이 없어도 그대로 성립한다.
+ *
+ * **외부 이미지도 걷어냈다.** 챔피언 스플래시를 버전 경로에 붙여 403 이
+ * 났고(올바른 경로는 버전이 없는 `cdn/img/champion/loading/…`), PUBG 쪽은
+ * 해시가 박힌 CDN 경로라 언제든 바뀐다. 공개 랜딩의 가장 큰 이미지 두 장을
+ * 남의 CDN 에 맡기면 깨질 때 첫 화면이 빈다. 카드 아트는 CSS 로 짠다.
  */
 
-/** 카드에서 "이 게임에서 볼 수 있는 것"으로 훑어줄 화면 */
-const CARD_IMAGE: Record<string, string> = {
-  // 최신 공식 챔피언 Locke 스플래시와 PUBG 공식 최신 키아트
-  LOL: "https://ddragon.leagueoflegends.com/cdn/16.18.1/img/champion/Locke_0.jpg",
-  PUBG: "https://wstatic-prod.pubg.com/web/live/main_49267b7/img/49a81ea.webp",
-};
-
-const CARD_STYLE: Record<string, { ring: string; glow: string; tag: string }> = {
+/** 게임별 카드 아트. 전부 CSS 라 외부 요청이 없다. */
+const CARD_ART: Record<
+  string,
+  { wash: string; edge: string; halo: string; mark: string; kicker: string }
+> = {
   LOL: {
-    ring: "",
-    glow: "from-[#667EEA]/20 to-[#764BA2]/10",
-    tag: "bg-[#667EEA]/15 text-[#C7D2FE]",
+    wash: "bg-[radial-gradient(120%_85%_at_20%_0%,rgba(102,126,234,0.34),transparent_62%),radial-gradient(110%_75%_at_85%_18%,rgba(118,75,162,0.28),transparent_58%),linear-gradient(180deg,#161a2e_0%,#0b0c14_72%)]",
+    edge: "group-hover:border-[#8b9cf0]/45",
+    halo: "group-hover:shadow-[0_28px_90px_rgba(102,126,234,0.18)]",
+    mark: "text-[#8b9cf0]/[0.13]",
+    kicker: "LEAGUE OF LEGENDS",
   },
   PUBG: {
-    ring: "",
-    glow: "from-[#8A5A1E]/25 to-[#5C7330]/10",
-    tag: "bg-[#CF9E41]/15 text-[#F0D9A8]",
+    wash: "bg-[radial-gradient(120%_85%_at_22%_0%,rgba(242,169,0,0.3),transparent_60%),radial-gradient(110%_70%_at_88%_22%,rgba(255,209,102,0.16),transparent_55%),linear-gradient(180deg,#241c0d_0%,#0b0b0b_74%)]",
+    edge: "group-hover:border-[#F2A900]/45",
+    halo: "group-hover:shadow-[0_28px_90px_rgba(242,169,0,0.16)]",
+    mark: "text-[#F2A900]/[0.14]",
+    kicker: "PLAYERUNKNOWN'S BATTLEGROUNDS",
   },
+};
+
+/** 카드 위에 얹는 미세한 결. 배그 테마의 그레인과 같은 계열이다. */
+const GRAIN =
+  "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E\")";
+
+const CARD_COPY: Record<string, { title: string; features: string[] }> = {
+  LOL: { title: "롤 내전", features: ["모집", "팀 편성", "경기 기록"] },
+  PUBG: { title: "PUBG 내전", features: ["킬내기", "배틀로얄", "팀 기록"] },
 };
 
 export function GamePickerCards() {
@@ -45,46 +71,76 @@ export function GamePickerCards() {
       className="relative isolate mx-auto max-w-[1480px] px-5 pb-20 pt-16 sm:px-6 md:pb-24 md:pt-20"
       aria-label="Nexus game hubs"
     >
-      <div aria-hidden className="pointer-events-none absolute left-[12%] top-20 -z-10 h-48 w-48 rounded-full bg-amber-300/[0.07] blur-[90px]" />
-      <div aria-hidden className="pointer-events-none absolute right-[14%] top-8 -z-10 h-56 w-56 rounded-full bg-violet-400/[0.08] blur-[110px]" />
-      <div aria-hidden className="game-picker-wordmark pointer-events-none absolute inset-x-0 top-8 z-0 flex items-center justify-center px-0 text-[clamp(8rem,18vw,18rem)] font-black italic leading-none tracking-[0.02em] text-transparent opacity-80 [background:linear-gradient(105deg,rgba(251,191,36,0.18),rgba(196,181,253,0.16)_48%,rgba(103,232,249,0.12))] [background-clip:text]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-[12%] top-20 -z-10 h-48 w-48 rounded-full bg-amber-300/[0.07] blur-[90px]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-[14%] top-8 -z-10 h-56 w-56 rounded-full bg-violet-400/[0.08] blur-[110px]"
+      />
+
+      {/* 배경 워드마크. 알파를 올려 실제로 읽히게 했다 — 전에는 그라디언트가
+          0.12~0.18 인데 등장 애니메이션이 투명도를 물고 있어 안 보였다. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-6 z-0 flex items-center justify-center text-[clamp(6rem,15vw,15rem)] font-black italic leading-none tracking-[0.02em] text-transparent [background:linear-gradient(105deg,rgba(251,191,36,0.3),rgba(196,181,253,0.26)_48%,rgba(103,232,249,0.2))] [background-clip:text]"
+      >
         <span>LET HIM COOK</span>
       </div>
-      <div className="game-picker-cards relative z-10 mx-auto mt-24 grid max-w-[600px] grid-cols-2 gap-3 sm:gap-5">
+
+      <div className="relative z-10 mx-auto mt-20 grid max-w-[600px] grid-cols-2 gap-3 sm:gap-5 md:mt-24">
         {games.map((game) => {
-          const style = CARD_STYLE[game.title] ?? CARD_STYLE.LOL;
+          const art = CARD_ART[game.title] ?? CARD_ART.LOL;
+          const copy = CARD_COPY[game.title] ?? CARD_COPY.LOL;
           return (
-            <Link
+            <GameEntryLink
               key={game.title}
-              href={`/auth/login?redirect=/${game.slug}`}
-              className={`game-picker-card group relative aspect-[9/16] overflow-hidden rounded-md border border-white/[0.09] bg-white/[0.02] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-200/25 hover:shadow-[0_28px_90px_rgba(245,158,11,0.12)] sm:p-6 ${style.ring}`}
+              slug={game.slug}
+              className={`group relative aspect-[9/16] overflow-hidden rounded-xl border border-white/[0.09] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-1 sm:p-6 ${art.wash} ${art.edge} ${art.halo}`}
             >
-              <div
+              {/* 카드 안쪽 큰 약어. 아트를 대신해 카드에 무게를 준다. */}
+              <span
                 aria-hidden
-                className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-100 transition duration-500 group-hover:scale-[1.02]"
-                style={{ backgroundImage: `url(${CARD_IMAGE[game.title]})` }}
+                className={`pointer-events-none absolute -right-2 top-2 text-[clamp(3.5rem,9vw,6rem)] font-black italic leading-none tracking-[-0.04em] transition-transform duration-500 group-hover:-translate-y-1 ${art.mark}`}
+              >
+                {game.title}
+              </span>
+
+              {/* 아래쪽을 눌러 글자가 확실히 읽히게 한다. */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#07080b] via-[#07080b]/45 to-transparent"
               />
-              <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#090a0d]/90 via-[#090a0d]/35 to-transparent" />
-              <div aria-hidden className={`pointer-events-none absolute inset-0 bg-gradient-to-br opacity-30 transition-opacity duration-300 group-hover:opacity-60 ${style.glow}`} />
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-70 mix-blend-overlay"
+                style={{ backgroundImage: GRAIN, backgroundSize: "160px 160px" }}
+              />
 
-              <div className="relative flex h-full flex-col justify-end gap-4">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold tracking-[0.16em] leading-[1.2] text-white/80 drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)]">
-                    {game.title === "PUBG" ? "PLAYERUNKNOWN'S BATTLEGROUNDS" : "LEAGUE OF LEGENDS"}
-                  </p>
-                  <p className="mt-2 text-2xl font-black tracking-[-0.03em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] sm:text-3xl">
-                    {game.title === "PUBG" ? "PUBG \uB0B4\uC804" : "\uB864 \uB0B4\uC804"}
-                  </p>
-                  <p className="mt-2 text-xs font-medium tracking-[0.08em] text-white/70">
-                    {game.title === "PUBG" ? "\uD0AC\uB0B4\uAE30 / \uBC30\uD2C0\uB85C\uC584 / \uD300 \uAE30\uB85D" : "\uBAA8\uC9D1 / \uD300 \uD3B8\uC131 / \uACBD\uAE30 \uAE30\uB85D"}
-                  </p>
-                </div>
-
+              <div className="relative flex h-full flex-col justify-end gap-3">
+                <p className="text-[10px] font-bold leading-[1.2] tracking-[0.16em] text-white/70">
+                  {art.kicker}
+                </p>
+                <p className="text-2xl font-black tracking-[-0.03em] text-white sm:text-3xl">
+                  {copy.title}
+                </p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {copy.features.map((feature) => (
+                    <li
+                      key={feature}
+                      className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[11px] font-semibold text-white/75"
+                    >
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <span className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-white/85">
+                  들어가기
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
+                </span>
               </div>
-
-
-
-            </Link>
+            </GameEntryLink>
           );
         })}
       </div>

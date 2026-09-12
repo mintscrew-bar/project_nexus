@@ -25,6 +25,7 @@ import { AutoBalanceDemo } from "./AutoBalanceDemo";
 import { LandingFeatureDemo } from "./LandingFeatureDemo";
 import { DEFAULT_GAME_PREFIX } from "@/lib/game-links";
 import { GamePickerCards } from "@/components/games/GamePickerCards";
+import { LandingAuthAction } from "./LandingAuthAction";
 
 const operations: Array<{
   index: string;
@@ -1207,12 +1208,10 @@ function LandingHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <Link
-            href="/auth/login"
-            className="flex-shrink-0 rounded-lg bg-accent-primary px-4 py-2.5 text-sm font-medium text-accent-on transition-colors duration-150 hover:bg-accent-hover active:bg-accent-active sm:px-6"
-          >
-            로그인
-          </Link>
+          {/* 로그인한 사람에게는 대시보드로 보내는 버튼이 된다.
+              여기에 "로그인"만 박아 두면 `/` 에서는 앱 헤더도 안 붙기 때문에
+              세션이 멀쩡해도 로그아웃된 것처럼 보인다. */}
+          <LandingAuthAction />
         </div>
       </div>
     </header>
