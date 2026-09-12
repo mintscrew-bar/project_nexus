@@ -389,7 +389,7 @@ function AutoBalanceShowcase() {
       <div className="relative mx-auto grid max-w-[1480px] gap-14 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-20">
         <div>
           <h2 className="max-w-xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
-            빠르게 나누고,
+            빠르게 나누고
             <br />
             납득할 수 있게 검토합니다
           </h2>
@@ -769,7 +769,7 @@ export function LandingContentSections() {
         <div className="mx-auto grid w-full max-w-[1480px] items-center gap-14 lg:grid-cols-[0.88fr_1.12fr] lg:gap-12">
           <div>
             <h1 className="max-w-[760px] text-[clamp(3rem,6vw,6.25rem)] font-black leading-[0.98] tracking-[-0.065em] text-white">
-              내전 운영,
+              내전 운영
               <br />
               <span className="text-indigo-300">한곳에서 끝까지</span>
             </h1>
@@ -856,7 +856,7 @@ export function LandingContentSections() {
         />
         <div className="mx-auto max-w-[1480px]">
           <h2 className="max-w-[1240px] text-[clamp(2.5rem,6vw,6.6rem)] font-black leading-[1.02] tracking-[-0.065em]">
-            게임이 달라도 운영은 한 흐름으로.
+            게임이 달라도 운영은 한 흐름으로
             <span className="text-[#6d3fa0]">
               {" "}
               참가 준비부터 경기 결과까지 이어집니다
@@ -941,7 +941,7 @@ export function LandingContentSections() {
         <div className="relative mx-auto grid max-w-[1480px] gap-14 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-20">
           <div>
             <h2 className="max-w-xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
-              빠르게 나누고,
+              빠르게 나누고
               <br />
               납득할 수 있게 검토합니다
             </h2>
@@ -1069,7 +1069,7 @@ export function LandingContentSections() {
           <div className="grid gap-10 border-y border-white/[0.08] py-12 md:py-16 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
               <h2 className="max-w-5xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
-                내전 준비,
+                내전 준비
                 <br />한 방에서 시작하세요
               </h2>
               <p className="mt-5 max-w-2xl text-sm leading-6 text-white/60 sm:text-base">

@@ -334,15 +334,15 @@ export function DashboardHero({
                 : "text-3xl leading-[1.08] tracking-[-0.045em] sm:text-4xl lg:text-5xl",
             )}
           >
-            {getTimeGreeting()},
+            {getTimeGreeting()}
             <br />
             {/* 배그는 그라디언트 글자를 쓰지 않는다 — 보라·시안이 들어가면
                 "흑백 + 노랑 하나" 규칙이 깨지고, 노랑 그라디언트는 탁해진다. */}
             {isPubg ? (
-              <span className="text-accent-primary">{username}님.</span>
+              <span className="text-accent-primary">{username}님</span>
             ) : (
               <span className="bg-gradient-to-r from-violet-200 via-white to-cyan-200 bg-clip-text text-transparent">
-                {username}님.
+                {username}님
               </span>
             )}
           </h1>
