@@ -166,11 +166,7 @@ function AuctionShowcase() {
       />
       <div className="relative mx-auto grid max-w-[1480px] gap-14 lg:grid-cols-[0.78fr_1.22fr] lg:items-center lg:gap-20">
         <div>
-          <div className="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-indigo-300/75">
-            <Gavel className="h-3.5 w-3.5" />
-            AUCTION SYSTEM
-          </div>
-          <h2 className="mt-7 max-w-2xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
+          <h2 className="max-w-2xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
             제한 시간과 예산으로
             <br />
             진행하는 실시간 팀 경매
@@ -382,11 +378,7 @@ function AutoBalanceShowcase() {
     >
       <div className="relative mx-auto grid max-w-[1480px] gap-14 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-20">
         <div>
-          <div className="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-indigo-300/80">
-            <Scale className="h-3.5 w-3.5" />
-            AUTO BALANCE
-          </div>
-          <h2 className="mt-7 max-w-xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
+          <h2 className="max-w-xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
             빠르게 나누고,
             <br />
             납득할 수 있게 검토합니다
@@ -901,10 +893,7 @@ export function LandingContentSections() {
         <div className="mx-auto max-w-[1480px]">
           <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
             <div>
-              <p className="text-xs font-bold tracking-[0.18em] text-indigo-300">
-                PUBG MATCH FLOW
-              </p>
-              <h2 className="mt-5 max-w-2xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
+              <h2 className="max-w-2xl text-[clamp(2.25rem,3.1vw,3rem)] font-black leading-[1.04] tracking-[-0.05em] text-white">
                 배그는 스쿼드와
                 <br />
                 라운드에 맞춰 운영합니다
@@ -989,10 +978,7 @@ export function LandingContentSections() {
         <div className="relative mx-auto max-w-[1480px]">
           <div className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-end">
             <div>
-              <p className="text-xs font-bold tracking-[0.18em] text-indigo-300">
-                OPERATIONS
-              </p>
-              <h2 className="mt-5 text-4xl font-black leading-[1.05] tracking-[-0.045em] text-white sm:text-5xl md:text-6xl">
+              <h2 className="text-4xl font-black leading-[1.05] tracking-[-0.045em] text-white sm:text-5xl md:text-6xl">
                 진행할수록
                 <br />더 명확하게
               </h2>
