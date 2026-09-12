@@ -36,6 +36,7 @@ import {
   Megaphone,
   ArrowRight,
   Activity,
+  Crosshair,
   UserRound,
   PenLine,
   Sparkles,
@@ -44,6 +45,7 @@ import { cn } from "@/lib/utils";
 import { useGamePrefix, useLastGamePrefix } from "@/hooks/useCurrentGame";
 import { gameFromSlug } from "@nexus/types";
 import { roomPath } from "@/lib/room-links";
+import { pubgApi, type PubgHistoryResponse } from "@/lib/api-client";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -250,7 +252,7 @@ function DashboardHero({
       href: `${gamePrefix}/profile`,
     },
     {
-      label: "내 클랜",
+      label: gameTitle === "PUBG" ? "내 배그 클랜" : "내 롤 클랜",
       value: clan ? `[${clan.tag}]` : "미가입",
       detail: clan ? `${clan.name} · ${clanMemberCount}명` : "함께할 클랜을 찾아보세요",
       icon: Shield,
@@ -402,7 +404,7 @@ function QuickActions({ clan, gameTitle }: { clan: ClanSummary | null; gameTitle
       tone: "text-amber-300 bg-amber-300/[0.08] border-amber-300/10",
     },
     {
-      label: clan ? "내 클랜" : "클랜 찾기",
+      label: clan ? (gameTitle === "PUBG" ? "내 배그 클랜" : "내 롤 클랜") : (gameTitle === "PUBG" ? "배그 클랜 찾기" : "클랜 찾기"),
       description: clan ? `[${clan.tag}] ${clan.name}으로 이동` : "함께할 팀을 찾아보세요",
       icon: Users,
       href: "/clans",
@@ -1143,6 +1145,22 @@ function DashboardSkeleton() {
   );
 }
 
+function PubgStatsCard({ history }: { history: PubgHistoryResponse | null }) {
+  const summary = history?.summary;
+  const stats = [
+    ["스크림", summary?.scrimCount ?? 0],
+    ["평균 순위", summary?.averageScrimRank ? `${summary.averageScrimRank.toFixed(1)}위` : "-"],
+    ["평균 킬", summary?.averageKillsPerRound ? summary.averageKillsPerRound.toFixed(1) : "-"],
+    ["킬내기 승", summary?.killMatchWins ?? 0],
+  ];
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5">
+      <div className="mb-5 flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-300/10 text-amber-200"><Crosshair className="h-4 w-4" /></div><h2 className="font-bold text-white">내 PUBG 전적</h2></div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{stats.map(([label, value]) => <div key={label} className="rounded-xl bg-black/20 p-4"><p className="text-xs text-white/45">{label}</p><p className="mt-2 text-2xl font-black text-white">{value}</p></div>)}</div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DashboardContent
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1153,8 +1171,8 @@ export function DashboardContent({ gameTitle }: { gameTitle?: "LOL" | "PUBG" } =
 
   // 로그인 직후 riot 계정 목록 1회 동기화
   useEffect(() => {
-    if (isAuthenticated) fetchAccounts();
-  }, [isAuthenticated, fetchAccounts]);
+    if (isAuthenticated && gameTitle !== "PUBG") fetchAccounts();
+  }, [isAuthenticated, fetchAccounts, gameTitle]);
 
   const enabled = isAuthenticated && !!user?.id;
 
@@ -1234,6 +1252,13 @@ export function DashboardContent({ gameTitle }: { gameTitle?: "LOL" | "PUBG" } =
     enabled,
   });
 
+  const { data: pubgHistory = null } = useQuery<PubgHistoryResponse | null>({
+    queryKey: ["dashboard", "pubgHistory", user?.id],
+    queryFn: () => pubgApi.getHistory(user!.id).catch(() => null),
+    staleTime: 5 * 60 * 1000,
+    enabled: enabled && gameTitle === "PUBG",
+  });
+
   const isDataLoading =
     enabled &&
     (isStatsLoading ||
@@ -1269,12 +1294,7 @@ export function DashboardContent({ gameTitle }: { gameTitle?: "LOL" | "PUBG" } =
 
       {/* 내 전적 */}
       <div data-tour="home-my-stats">
-        <MyStatsCard
-          stats={userStats}
-          primaryAccount={primaryAccount}
-          championStats={championStats}
-          positionStats={positionStats}
-        />
+        {gameTitle === "PUBG" ? <PubgStatsCard history={pubgHistory} /> : <MyStatsCard stats={userStats} primaryAccount={primaryAccount} championStats={championStats} positionStats={positionStats} />}
       </div>
 
       {/* 인기글 + 공지사항 */}
