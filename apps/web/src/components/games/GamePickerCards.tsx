@@ -1,4 +1,3 @@
-import { ArrowRight } from "lucide-react";
 import { enabledGames } from "@nexus/types";
 import { GameEntryLink } from "./GameEntryLink";
 
@@ -52,8 +51,6 @@ const CARD_ART: Record<
     /** 잘라 쓸 기준. 세로 아트는 얼굴이 있는 위쪽, 가로 아트는 가운데. */
     imagePosition?: string;
     wash: string;
-    edge: string;
-    halo: string;
     mark: string;
     kicker: string;
   }
@@ -62,8 +59,6 @@ const CARD_ART: Record<
     image: "/images/games/lol.jpg",
     imagePosition: "bg-top",
     wash: "bg-[radial-gradient(120%_85%_at_20%_0%,rgba(102,126,234,0.34),transparent_62%),radial-gradient(110%_75%_at_85%_18%,rgba(118,75,162,0.28),transparent_58%),linear-gradient(180deg,#161a2e_0%,#0b0c14_72%)]",
-    edge: "group-hover:border-[#8b9cf0]/45",
-    halo: "group-hover:shadow-[0_28px_90px_rgba(102,126,234,0.18)]",
     mark: "text-[#8b9cf0]/[0.13]",
     kicker: "LEAGUE OF LEGENDS",
   },
@@ -73,8 +68,6 @@ const CARD_ART: Record<
     image: "/images/games/pubg.webp",
     imagePosition: "bg-center",
     wash: "bg-[radial-gradient(120%_85%_at_22%_0%,rgba(242,169,0,0.3),transparent_60%),radial-gradient(110%_70%_at_88%_22%,rgba(255,209,102,0.16),transparent_55%),linear-gradient(180deg,#241c0d_0%,#0b0b0b_74%)]",
-    edge: "group-hover:border-[#F2A900]/45",
-    halo: "group-hover:shadow-[0_28px_90px_rgba(242,169,0,0.16)]",
     mark: "text-[#F2A900]/[0.14]",
     kicker: "PLAYERUNKNOWN'S BATTLEGROUNDS",
   },
@@ -84,9 +77,9 @@ const CARD_ART: Record<
 const GRAIN =
   "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E\")";
 
-const CARD_COPY: Record<string, { title: string; features: string[] }> = {
-  LOL: { title: "롤 내전", features: ["모집", "팀 편성", "경기 기록"] },
-  PUBG: { title: "PUBG 내전", features: ["킬내기", "배틀로얄", "팀 기록"] },
+const CARD_COPY: Record<string, { title: string }> = {
+  LOL: { title: "롤 내전" },
+  PUBG: { title: "PUBG 내전" },
 };
 
 export function GamePickerCards() {
@@ -106,19 +99,22 @@ export function GamePickerCards() {
         className="pointer-events-none absolute right-[14%] top-8 -z-10 h-56 w-56 rounded-full bg-violet-400/[0.08] blur-[110px]"
       />
 
-      {/* 배경 워드마크.
-          `background-clip: text` 로 그라디언트를 글자에 물리던 걸 버렸다.
-          Chrome 은 `-webkit-` 접두사가 필요해서 그게 빠지면 **글자로 잘리지
-          않고 사각형 색 띠**가 화면 위를 가로지른다 — 실제로 그렇게 나왔다.
-          단색 고스트는 접두사에 의존하지 않아 어디서나 같게 나온다. */}
+      {/*
+        워터마크는 **크고**, 카드와 살짝 겹쳐 뒤에 깔린다.
+        폭은 `vw` 로 잰다 — 고정 크기로 두면 넓은 화면에서 양옆이 잘려
+        `ET HIM COO` 처럼 읽힌다. 13rem 상한은 초광폭에서 너무 커지지 않게.
+        `background-clip: text` 로 그라디언트를 물리면 Chrome 에서 접두사가
+        빠질 때 글자가 아니라 사각형 색 띠가 된다 — 실제로 그렇게 나왔다.
+        단색 고스트는 접두사에 의존하지 않는다.
+      */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-4 z-0 flex items-center justify-center whitespace-nowrap text-[clamp(4.5rem,12vw,11rem)] font-black italic leading-none tracking-[-0.01em] text-white/[0.055]"
+        className="pointer-events-none absolute inset-x-0 top-10 z-0 flex items-center justify-center whitespace-nowrap text-[clamp(3rem,11.5vw,13rem)] font-black italic leading-[0.82] tracking-[-0.02em] text-white/[0.07]"
       >
         <span>LET HIM COOK</span>
       </div>
 
-      <div className="relative z-10 mx-auto mt-20 grid max-w-[600px] grid-cols-2 gap-3 sm:gap-5 md:mt-24">
+      <div className="relative z-10 mx-auto mt-28 grid max-w-[600px] grid-cols-2 gap-3 sm:gap-4 md:mt-32">
         {games.map((game) => {
           const art = CARD_ART[game.title] ?? CARD_ART.LOL;
           const copy = CARD_COPY[game.title] ?? CARD_COPY.LOL;
@@ -126,7 +122,7 @@ export function GamePickerCards() {
             <GameEntryLink
               key={game.title}
               slug={game.slug}
-              className={`group relative aspect-[9/16] overflow-hidden rounded-xl [container-type:inline-size] border border-white/[0.09] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-1 sm:p-6 ${art.wash} ${art.edge} ${art.halo}`}
+              className={`group relative aspect-[9/16] overflow-hidden rounded-lg [container-type:inline-size] p-5 transition-transform duration-300 hover:-translate-y-1 sm:p-6 ${art.wash}`}
             >
               {/* 카드 안쪽 큰 약어. 이미지가 없을 때 카드를 받쳐준다.
                   카드 폭 기준(`cqw`)으로 재야 글자가 경계에서 잘리지 않는다 —
@@ -165,27 +161,15 @@ export function GamePickerCards() {
                 style={{ backgroundImage: GRAIN, backgroundSize: "160px 160px" }}
               />
 
-              <div className="relative flex h-full flex-col justify-end gap-3">
-                <p className="text-[10px] font-bold leading-[1.2] tracking-[0.16em] text-white/70">
+              {/* 남기는 건 게임 이름뿐이다. 태그와 CTA 는 카드를 설명문으로
+                  만들 뿐이고, 카드 자체가 이미 링크다. */}
+              <div className="relative flex h-full flex-col justify-end gap-1.5">
+                <p className="text-[10px] font-bold leading-[1.2] tracking-[0.16em] text-white/60">
                   {art.kicker}
                 </p>
                 <p className="text-2xl font-black tracking-[-0.03em] text-white sm:text-3xl">
                   {copy.title}
                 </p>
-                <ul className="flex flex-wrap gap-1.5">
-                  {copy.features.map((feature) => (
-                    <li
-                      key={feature}
-                      className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[11px] font-semibold text-white/75"
-                    >
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <span className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-white/85">
-                  들어가기
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
-                </span>
               </div>
             </GameEntryLink>
           );
