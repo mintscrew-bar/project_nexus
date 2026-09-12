@@ -39,7 +39,6 @@ import {
   Crosshair,
   UserRound,
   PenLine,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGamePrefix, useLastGamePrefix } from "@/hooks/useCurrentGame";
@@ -313,20 +312,9 @@ export function DashboardHero({
 
       <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-end lg:gap-12">
         <div>
-          <div
-            className={cn(
-              "inline-flex items-center gap-2 text-[10px] font-bold uppercase",
-              isPubg
-                ? "tracking-[0.3em] text-accent-primary"
-                : "tracking-[0.22em] text-violet-200/75",
-            )}
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            {isPubg ? "Squad operations" : "Nexus command center"}
-          </div>
           <h1
             className={cn(
-              "mt-5 max-w-3xl font-black text-white",
+              "max-w-3xl font-black text-white",
               /* 롤은 넓고 부드럽게, 배그는 좁고 단단하게. 같은 문장인데
                  자간과 행간만으로도 톤이 갈린다. */
               isPubg
