@@ -7,15 +7,7 @@ import { Logo } from "@/components/Logo";
 import { AlertCircle, X, CornerDownLeft } from "lucide-react";
 import Link from "next/link";
 import { withoutGamePrefix } from "@/lib/game-links";
-
-const POST_LOGIN_REDIRECT_KEY = "nexus_post_login_redirect";
-
-function sanitizeRedirect(value: string | null) {
-  if (!value) return null;
-  if (!value.startsWith("/") || value.startsWith("//")) return null;
-  if (value.startsWith("/api/") || value.startsWith("/auth/")) return null;
-  return value;
-}
+import { rememberPostLoginRedirect } from "@/lib/post-login-redirect";
 
 /**
  * 어디서 로그인 화면으로 넘어왔는지 알려주는 복귀 안내 문구.
@@ -30,8 +22,10 @@ function getRedirectNotice(redirect: string | null) {
   if (redirect.startsWith("/tournaments")) {
     return "로그인 후 내전 방 목록으로 돌아가 바로 방을 만들 수 있습니다.";
   }
-  if (redirect.startsWith("/community")) return "로그인하면 보던 커뮤니티 화면으로 돌아갑니다.";
-  if (redirect.startsWith("/clans")) return "로그인하면 보던 클랜 화면으로 돌아갑니다.";
+  if (redirect.startsWith("/community"))
+    return "로그인하면 보던 커뮤니티 화면으로 돌아갑니다.";
+  if (redirect.startsWith("/clans"))
+    return "로그인하면 보던 클랜 화면으로 돌아갑니다.";
   return "로그인하면 이전 화면으로 돌아갑니다.";
 }
 
@@ -72,11 +66,9 @@ function LoginQueryNotices() {
       window.history.replaceState({}, "", "/auth/login");
     }
 
-    const redirect = sanitizeRedirect(searchParams.get("redirect"));
-    if (redirect) {
-      sessionStorage.setItem(POST_LOGIN_REDIRECT_KEY, redirect);
-      setRedirectTo(redirect);
-    }
+    // 쿼리가 없으면 `null` 을 넘겨 이전 목적지를 버린다. 목적지 없이 로그인
+    // 화면에 들어왔다는 건 "그냥 로그인" 이고, 그때는 종합 홈으로 가야 한다.
+    setRedirectTo(rememberPostLoginRedirect(searchParams.get("redirect")));
   }, [searchParams]);
 
   const redirectNotice = getRedirectNotice(redirectTo);
@@ -142,9 +134,12 @@ function LoginPageContent() {
         <div className="card">
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-semibold text-text-primary mb-2">로그인</h2>
+              <h2 className="text-2xl font-semibold text-text-primary mb-2">
+                로그인
+              </h2>
               <p className="text-text-secondary text-sm">
-                Nexus는 Discord 계정으로만 로그인합니다. 별도 회원가입은 없습니다.
+                Nexus는 Discord 계정으로만 로그인합니다. 별도 회원가입은
+                없습니다.
               </p>
             </div>
 
@@ -180,12 +175,17 @@ function LoginPageContent() {
             {/* Discord 권한 범위와 Riot 연동 시점 안내 — 권한 요청 화면에서 당황하지 않도록 미리 설명한다 */}
             <ul className="space-y-1.5 text-xs leading-relaxed text-text-tertiary">
               <li>
-                Discord에서 <span className="text-text-secondary">기본 프로필과 이메일(identify, email)</span>만
-                받아 계정 식별과 내전 알림에 사용합니다.
+                Discord에서{" "}
+                <span className="text-text-secondary">
+                  기본 프로필과 이메일(identify, email)
+                </span>
+                만 받아 계정 식별과 내전 알림에 사용합니다.
               </li>
               <li>
                 Riot 계정은 로그인 후 별도 단계에서 직접 입력합니다.{" "}
-                <span className="text-text-secondary">비밀번호는 어떤 경우에도 요청하지 않습니다.</span>
+                <span className="text-text-secondary">
+                  비밀번호는 어떤 경우에도 요청하지 않습니다.
+                </span>
               </li>
             </ul>
 

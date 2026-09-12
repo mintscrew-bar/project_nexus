@@ -3,16 +3,7 @@
 import { Suspense, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
-
-const POST_LOGIN_REDIRECT_KEY = "nexus_post_login_redirect";
-
-function takeStoredRedirect() {
-  const value = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY);
-  sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
-  if (value.startsWith("/api/") || value.startsWith("/auth/")) return null;
-  return value;
-}
+import { takePostLoginRedirect } from "@/lib/post-login-redirect";
 
 function AuthCallbackContent() {
   const router = useRouter();
@@ -28,7 +19,7 @@ function AuthCallbackContent() {
     // 쿠키 → /api/auth/refresh → 메모리 저장 순서라 URL·로그·Referer에 남지 않는다.
     completeOAuthLogin()
       .then(() => {
-        const redirect = takeStoredRedirect();
+        const redirect = takePostLoginRedirect();
         // 신규 사용자도 설정 페이지로 강제 이동시키지 않는다.
         // 메인 페이지에서 온보딩 모달을 띄우고 필요한 설정을 이어서 진행한다.
         router.push(redirect ?? "/");
