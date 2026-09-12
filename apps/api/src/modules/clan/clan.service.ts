@@ -15,6 +15,7 @@ import {
   ClanInvitationStatus,
   ClanInvitationType,
   ClanRole,
+  GameTitle,
   NotificationType,
 } from "@nexus/database";
 import { NotificationService } from "../notification/notification.service";
@@ -24,6 +25,7 @@ import {
 } from "./discord-invite-stats.service";
 
 export interface CreateClanDto {
+  gameTitle: GameTitle;
   name: string;
   tag: string; // 2-5 characters, unique
   description?: string;
@@ -142,16 +144,16 @@ export class ClanService {
 
     // Check if user is already in a clan
     const existingMembership = await this.prisma.clanMember.findFirst({
-      where: { userId: ownerId },
+      where: { userId: ownerId, clan: { gameTitle: dto.gameTitle } },
     });
 
     if (existingMembership) {
-      throw new ConflictException("You are already in a clan");
+      throw new ConflictException("You are already in a clan for this game");
     }
 
     // Check if tag is already taken
-    const existingTag = await this.prisma.clan.findUnique({
-      where: { tag: dto.tag.toUpperCase() },
+    const existingTag = await this.prisma.clan.findFirst({
+      where: { gameTitle: dto.gameTitle, tag: dto.tag.toUpperCase() },
     });
 
     if (existingTag) {
@@ -168,6 +170,7 @@ export class ClanService {
       data: {
         name: dto.name,
         tag: dto.tag.toUpperCase(),
+        gameTitle: dto.gameTitle,
         description: dto.description,
         ownerId,
         isRecruiting: dto.isRecruiting,
@@ -265,13 +268,16 @@ export class ClanService {
   }
 
   async listClans(filters?: {
+    gameTitle?: GameTitle;
     search?: string;
     isRecruiting?: boolean;
     minTier?: string;
     recruitRoles?: string[];
     sort?: string; // 'latest' | 'members' | 'active'
   }) {
-    const where: any = {};
+    const where: any = {
+      gameTitle: filters?.gameTitle ?? GameTitle.LOL,
+    };
 
     if (filters?.search) {
       where.OR = [
@@ -308,6 +314,7 @@ export class ClanService {
         id: true,
         name: true,
         tag: true,
+        gameTitle: true,
         description: true,
         logo: true,
         banner: true,
@@ -487,21 +494,20 @@ export class ClanService {
   // ========================================
 
   async joinClan(userId: string, clanId: string) {
-    // Check if user is already in a clan
-    const existingMembership = await this.prisma.clanMember.findFirst({
-      where: { userId },
-    });
-
-    if (existingMembership) {
-      throw new ConflictException("You are already in a clan");
-    }
-
     const clan = await this.prisma.clan.findUnique({
       where: { id: clanId },
     });
 
     if (!clan) {
       throw new NotFoundException("Clan not found");
+    }
+
+    const existingMembership = await this.prisma.clanMember.findFirst({
+      where: { userId, clan: { gameTitle: clan.gameTitle } },
+    });
+
+    if (existingMembership) {
+      throw new ConflictException("You are already in a clan for this game");
     }
 
     if (!clan.isRecruiting) {
@@ -1131,11 +1137,15 @@ export class ClanService {
       throw new ForbiddenException("Only owner or officers can invite users");
     }
 
-    // 이미 멤버인지 확인
+    // 같은 게임의 다른 클랜에 이미 가입한 사용자에게도 초대를 보내지 않는다.
     const existing = await this.prisma.clanMember.findFirst({
-      where: { userId: inviteeId, clanId },
+      where: {
+        userId: inviteeId,
+        clan: { gameTitle: clan.gameTitle },
+      },
     });
-    if (existing) throw new ConflictException("User is already a member");
+    if (existing)
+      throw new ConflictException("User is already in a clan for this game");
 
     // 중복 초대 확인
     const duplicate = await this.prisma.clanInvitation.findFirst({
@@ -1219,15 +1229,14 @@ export class ClanService {
    * 가입 요청 보내기
    */
   async requestToJoin(userId: string, clanId: string) {
-    // 이미 클랜이 있는지 확인
-    const existingMembership = await this.prisma.clanMember.findFirst({
-      where: { userId },
-    });
-    if (existingMembership)
-      throw new ConflictException("You are already in a clan");
-
     const clan = await this.prisma.clan.findUnique({ where: { id: clanId } });
     if (!clan) throw new NotFoundException("Clan not found");
+
+    const existingMembership = await this.prisma.clanMember.findFirst({
+      where: { userId, clan: { gameTitle: clan.gameTitle } },
+    });
+    if (existingMembership)
+      throw new ConflictException("You are already in a clan for this game");
 
     // 중복 요청 확인
     const duplicate = await this.prisma.clanInvitation.findFirst({
@@ -1297,10 +1306,15 @@ export class ClanService {
       async (tx: Prisma.TransactionClient) => {
         // 이미 클랜이 있는지 확인
         const existingMembership = await tx.clanMember.findFirst({
-          where: { userId },
+          where: {
+            userId,
+            clan: { gameTitle: invitation.clan.gameTitle },
+          },
         });
         if (existingMembership)
-          throw new ConflictException("You are already in a clan");
+          throw new ConflictException(
+            "You are already in a clan for this game",
+          );
 
         // 클랜 정원 확인
         const memberCount = await tx.clanMember.count({
@@ -1369,10 +1383,15 @@ export class ClanService {
       // 멤버십 중복 검사 + 초대 처리 + 멤버 추가를 원자적으로 실행
       await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const existingMembership = await tx.clanMember.findFirst({
-          where: { userId },
+          where: {
+            userId,
+            clan: { gameTitle: invitation.clan.gameTitle },
+          },
         });
         if (existingMembership) {
-          throw new ConflictException("You are already in a clan");
+          throw new ConflictException(
+            "You are already in a clan for this game",
+          );
         }
 
         await tx.clanInvitation.update({
@@ -1454,6 +1473,18 @@ export class ClanService {
     if (accept) {
       // 정원 확인 + 초대 처리 + 멤버 추가를 원자적으로 실행
       await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const existingMembership = await tx.clanMember.findFirst({
+          where: {
+            userId: request.inviterId,
+            clan: { gameTitle: clan.gameTitle },
+          },
+        });
+        if (existingMembership) {
+          throw new ConflictException(
+            "User is already in a clan for this game",
+          );
+        }
+
         const memberCount = await tx.clanMember.count({
           where: { clanId },
         });
@@ -1755,9 +1786,9 @@ export class ClanService {
   // Utility
   // ========================================
 
-  async getUserClan(userId: string) {
+  async getUserClan(userId: string, gameTitle: GameTitle = GameTitle.LOL) {
     const membership = await this.prisma.clanMember.findFirst({
-      where: { userId },
+      where: { userId, clan: { gameTitle } },
       include: {
         clan: {
           include: {

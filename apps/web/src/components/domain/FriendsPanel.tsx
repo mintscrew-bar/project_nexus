@@ -32,7 +32,12 @@ import {
   Sword,
 } from "lucide-react";
 import { statsApi, friendApi, dmApi, clanApi } from "@/lib/api-client";
-import { useFriendStore, type Friendship, type FriendCategory } from "@/stores/friend-store";
+import { clanGameFromLocation } from "@/lib/clan-game";
+import {
+  useFriendStore,
+  type Friendship,
+  type FriendCategory,
+} from "@/stores/friend-store";
 import { usePresenceStore } from "@/stores/presence-store";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -94,7 +99,9 @@ function ContextMenu({
     const down = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     document.addEventListener("mousedown", down);
     document.addEventListener("keydown", key);
     return () => {
@@ -129,7 +136,10 @@ function ContextMenu({
       className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors text-left hover:bg-bg-elevated ${
         danger ? "text-accent-danger" : "text-text-primary"
       }`}
-      onClick={() => { onClick(); onClose(); }}
+      onClick={() => {
+        onClick();
+        onClose();
+      }}
     >
       <Icon className="w-4 h-4 flex-shrink-0 text-text-tertiary" />
       {label}
@@ -147,9 +157,15 @@ function ContextMenu({
       <Item icon={Tag} label="별명 설정" onClick={onNickname} />
       <Item icon={FileText} label="메모" onClick={onMemo} />
       <Item icon={FolderOpen} label="카테고리 변경" onClick={onCategory} />
-      {(onInvite || onJoin) && <div className="border-t border-bg-tertiary my-1" />}
-      {onInvite && <Item icon={Sword} label="내전 초대하기" onClick={onInvite} />}
-      {onJoin && <Item icon={ExternalLink} label="내전 참가하기" onClick={onJoin} />}
+      {(onInvite || onJoin) && (
+        <div className="border-t border-bg-tertiary my-1" />
+      )}
+      {onInvite && (
+        <Item icon={Sword} label="내전 초대하기" onClick={onInvite} />
+      )}
+      {onJoin && (
+        <Item icon={ExternalLink} label="내전 참가하기" onClick={onJoin} />
+      )}
       <div className="border-t border-bg-tertiary my-1" />
       <Item icon={Trash2} label="친구 삭제" onClick={onRemove} danger />
     </div>
@@ -184,9 +200,13 @@ function HoverTooltip({
           size="md"
         />
         <div className="min-w-0">
-          <p className="font-semibold text-text-primary text-sm truncate">{username}</p>
+          <p className="font-semibold text-text-primary text-sm truncate">
+            {username}
+          </p>
           {meta.nickname && (
-            <p className="text-xs text-text-tertiary truncate">({friendship.friend?.username || friendship.user.username})</p>
+            <p className="text-xs text-text-tertiary truncate">
+              ({friendship.friend?.username || friendship.user.username})
+            </p>
           )}
         </div>
       </div>
@@ -252,13 +272,19 @@ function FriendItem({
   return (
     <div
       draggable
-      onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStart(); }}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart();
+      }}
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onContextMenu={(e) => { e.preventDefault(); onContextMenu(e, friendship); }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onContextMenu(e, friendship);
+      }}
       onClick={() => onOpenDm(friendUser.id)}
       className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors group select-none
         ${dragging ? "opacity-40" : ""}
@@ -269,7 +295,7 @@ function FriendItem({
       <div className="relative flex-shrink-0">
         {unread > 0 && (
           <span className="absolute -top-1 -right-1 z-10 min-w-[16px] h-4 px-1 flex items-center justify-center bg-accent-danger text-white text-[9px] font-bold rounded-full leading-none">
-            {unread > 99 ? '99+' : unread}
+            {unread > 99 ? "99+" : unread}
           </span>
         )}
         <Avatar
@@ -287,9 +313,15 @@ function FriendItem({
 
       {/* Name */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-text-primary truncate">{displayName}</p>
+        <p className="text-sm font-medium text-text-primary truncate">
+          {displayName}
+        </p>
         <p className="text-xs text-text-tertiary truncate">
-          {status?.status === "ONLINE" ? "온라인" : status?.status === "AWAY" ? "자리비움" : "오프라인"}
+          {status?.status === "ONLINE"
+            ? "온라인"
+            : status?.status === "AWAY"
+              ? "자리비움"
+              : "오프라인"}
         </p>
       </div>
 
@@ -307,7 +339,11 @@ function FriendItem({
 
       {/* Hover tooltip */}
       {hovered && (
-        <HoverTooltip friendship={friendship} friendId={friendUser.id} username={displayName} />
+        <HoverTooltip
+          friendship={friendship}
+          friendId={friendUser.id}
+          username={displayName}
+        />
       )}
     </div>
   );
@@ -347,14 +383,22 @@ function CategorySection({
   onDelete?: () => void;
   onOpenDm: (userId: string) => void;
 }) {
-  const { toggleCategoryCollapse, toggleUncategorizedCollapse, uncategorizedCollapsed, categories } = useFriendStore();
+  const {
+    toggleCategoryCollapse,
+    toggleUncategorizedCollapse,
+    uncategorizedCollapsed,
+    categories,
+  } = useFriendStore();
   const getFriendStatus = usePresenceStore((s) => s.getFriendStatus);
   const cat = categories.find((c) => c.id === categoryId);
   // 커스텀 카테고리는 categories 배열에서 접기 상태 조회, 미분류("전체")는 별도 상태 사용
-  const isCollapsed = categoryId ? (cat?.isCollapsed ?? false) : uncategorizedCollapsed;
+  const isCollapsed = categoryId
+    ? (cat?.isCollapsed ?? false)
+    : uncategorizedCollapsed;
   const [editingName, setEditingName] = useState(false);
 
-  const sectionDragOver = dragOverCategoryId === (categoryId ?? "uncategorized");
+  const sectionDragOver =
+    dragOverCategoryId === (categoryId ?? "uncategorized");
 
   // 온라인 친구 수 계산
   const onlineCount = friends.filter((f) => {
@@ -364,7 +408,9 @@ function CategorySection({
   }).length;
 
   return (
-    <div className={`mb-1 transition-colors ${sectionDragOver ? "bg-accent-primary/5 rounded-lg" : ""}`}>
+    <div
+      className={`mb-1 transition-colors ${sectionDragOver ? "bg-accent-primary/5 rounded-lg" : ""}`}
+    >
       {/* Header */}
       <div
         className="flex items-center gap-1 px-2 py-1 group"
@@ -381,7 +427,11 @@ function CategorySection({
       >
         <button
           className="flex items-center gap-1 flex-1 min-w-0"
-          onClick={() => categoryId ? toggleCategoryCollapse(categoryId) : toggleUncategorizedCollapse()}
+          onClick={() =>
+            categoryId
+              ? toggleCategoryCollapse(categoryId)
+              : toggleUncategorizedCollapse()
+          }
         >
           {isCollapsed ? (
             <ChevronRight className="w-3.5 h-3.5 text-text-tertiary flex-shrink-0" />
@@ -391,7 +441,11 @@ function CategorySection({
           <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider truncate">
             {label}{" "}
             <span className="normal-case tracking-normal">
-              (<span className={onlineCount > 0 ? "text-accent-success" : ""}>{onlineCount}</span>/{friends.length})
+              (
+              <span className={onlineCount > 0 ? "text-accent-success" : ""}>
+                {onlineCount}
+              </span>
+              /{friends.length})
             </span>
           </span>
         </button>
@@ -429,7 +483,10 @@ function CategorySection({
                 dragging={dragFriendId === friendUser.id}
                 dragOver={false}
                 onDragStart={() => setDragFriendId(friendUser.id)}
-                onDragEnd={() => { setDragFriendId(null); setDragOverCategoryId(null); }}
+                onDragEnd={() => {
+                  setDragFriendId(null);
+                  setDragOverCategoryId(null);
+                }}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setDragOverCategoryId(categoryId ?? "uncategorized");
@@ -445,7 +502,9 @@ function CategorySection({
             );
           })}
           {friends.length === 0 && (
-            <p className="text-xs text-text-tertiary px-2 py-1 italic">비어있음 — 친구를 드래그하여 추가</p>
+            <p className="text-xs text-text-tertiary px-2 py-1 italic">
+              비어있음 — 친구를 드래그하여 추가
+            </p>
           )}
         </div>
       )}
@@ -469,7 +528,10 @@ function InlineModal({
       <div className="relative z-10 bg-bg-secondary border border-bg-tertiary rounded-xl shadow-2xl w-80 p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-text-primary text-sm">{title}</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-bg-elevated">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-bg-elevated"
+          >
             <X className="w-4 h-4 text-text-tertiary" />
           </button>
         </div>
@@ -479,7 +541,15 @@ function InlineModal({
   );
 }
 
-function NicknameModal({ friendship, friendId, onClose }: { friendship: Friendship; friendId: string; onClose: () => void }) {
+function NicknameModal({
+  friendship,
+  friendId,
+  onClose,
+}: {
+  friendship: Friendship;
+  friendId: string;
+  onClose: () => void;
+}) {
   const { setNickname, getMeta, getDisplayName } = useFriendStore();
   const friendUser = friendship.friend ?? friendship.user;
   const currentNickname = getMeta(friendId).nickname ?? "";
@@ -492,25 +562,47 @@ function NicknameModal({ friendship, friendId, onClose }: { friendship: Friendsh
 
   return (
     <InlineModal title={`별명 설정 — ${friendUser.username}`} onClose={onClose}>
-      <p className="text-xs text-text-tertiary mb-2">나에게만 표시되는 별명입니다.</p>
+      <p className="text-xs text-text-tertiary mb-2">
+        나에게만 표시되는 별명입니다.
+      </p>
       <input
         autoFocus
         className="w-full input text-sm mb-3"
         placeholder={friendUser.username}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSave();
+        }}
         maxLength={20}
       />
       <div className="flex gap-2 justify-end">
-        <button className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg" onClick={onClose}>취소</button>
-        <button className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover" onClick={handleSave}>저장</button>
+        <button
+          className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg"
+          onClick={onClose}
+        >
+          취소
+        </button>
+        <button
+          className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover"
+          onClick={handleSave}
+        >
+          저장
+        </button>
       </div>
     </InlineModal>
   );
 }
 
-function MemoModal({ friendship, friendId, onClose }: { friendship: Friendship; friendId: string; onClose: () => void }) {
+function MemoModal({
+  friendship,
+  friendId,
+  onClose,
+}: {
+  friendship: Friendship;
+  friendId: string;
+  onClose: () => void;
+}) {
   const { setMemo, getMeta } = useFriendStore();
   const friendUser = friendship.friend ?? friendship.user;
   const current = getMeta(friendId).memo ?? "";
@@ -523,7 +615,9 @@ function MemoModal({ friendship, friendId, onClose }: { friendship: Friendship; 
 
   return (
     <InlineModal title={`메모 — ${friendUser.username}`} onClose={onClose}>
-      <p className="text-xs text-text-tertiary mb-2">나만 볼 수 있는 메모입니다.</p>
+      <p className="text-xs text-text-tertiary mb-2">
+        나만 볼 수 있는 메모입니다.
+      </p>
       <textarea
         autoFocus
         className="w-full input text-sm mb-3 resize-none h-24"
@@ -532,17 +626,38 @@ function MemoModal({ friendship, friendId, onClose }: { friendship: Friendship; 
         onChange={(e) => setValue(e.target.value)}
         maxLength={200}
       />
-      <p className="text-xs text-text-tertiary text-right mb-2">{value.length}/200</p>
+      <p className="text-xs text-text-tertiary text-right mb-2">
+        {value.length}/200
+      </p>
       <div className="flex gap-2 justify-end">
-        <button className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg" onClick={onClose}>취소</button>
-        <button className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover" onClick={handleSave}>저장</button>
+        <button
+          className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg"
+          onClick={onClose}
+        >
+          취소
+        </button>
+        <button
+          className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover"
+          onClick={handleSave}
+        >
+          저장
+        </button>
       </div>
     </InlineModal>
   );
 }
 
-function CategoryPickerModal({ friendship, friendId, onClose }: { friendship: Friendship; friendId: string; onClose: () => void }) {
-  const { categories, setFriendCategory, getMeta, addCategory } = useFriendStore();
+function CategoryPickerModal({
+  friendship,
+  friendId,
+  onClose,
+}: {
+  friendship: Friendship;
+  friendId: string;
+  onClose: () => void;
+}) {
+  const { categories, setFriendCategory, getMeta, addCategory } =
+    useFriendStore();
   const current = getMeta(friendId).categoryId;
   const [newCatName, setNewCatName] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -562,7 +677,10 @@ function CategoryPickerModal({ friendship, friendId, onClose }: { friendship: Fr
   };
 
   return (
-    <InlineModal title={`카테고리 변경 — ${friendUser.username}`} onClose={onClose}>
+    <InlineModal
+      title={`카테고리 변경 — ${friendUser.username}`}
+      onClose={onClose}
+    >
       <div className="space-y-1 mb-3">
         <button
           className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between ${!current ? "bg-accent-primary/10 text-accent-primary" : "hover:bg-bg-elevated text-text-primary"}`}
@@ -590,10 +708,15 @@ function CategoryPickerModal({ friendship, friendId, onClose }: { friendship: Fr
             placeholder="새 카테고리 이름"
             value={newCatName}
             onChange={(e) => setNewCatName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleNewCat(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleNewCat();
+            }}
             maxLength={20}
           />
-          <button className="px-2 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg" onClick={handleNewCat}>
+          <button
+            className="px-2 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg"
+            onClick={handleNewCat}
+          >
             <Check className="w-4 h-4" />
           </button>
         </div>
@@ -602,8 +725,7 @@ function CategoryPickerModal({ friendship, friendId, onClose }: { friendship: Fr
           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-bg-elevated rounded-lg transition-colors"
           onClick={() => setShowNew(true)}
         >
-          <Plus className="w-4 h-4" />
-          새 카테고리 만들기
+          <Plus className="w-4 h-4" />새 카테고리 만들기
         </button>
       )}
     </InlineModal>
@@ -625,7 +747,9 @@ function AddFriendModal({ onClose }: { onClose: () => void }) {
     return () => clearTimeout(debounceTimer.current);
   }, [query]);
 
-  const { data: results = [], isFetching: searching } = useQuery<{ id: string; username: string; avatar: string | null }[]>({
+  const { data: results = [], isFetching: searching } = useQuery<
+    { id: string; username: string; avatar: string | null }[]
+  >({
     queryKey: ["friendSearch", debouncedQuery],
     queryFn: async () => {
       const data = await statsApi.searchUsers(debouncedQuery.trim(), 8);
@@ -642,7 +766,10 @@ function AddFriendModal({ onClose }: { onClose: () => void }) {
       addToast("친구 요청을 보냈습니다!", "success");
       fetchFriends();
     } catch (e: any) {
-      addToast(e?.response?.data?.message ?? "친구 요청에 실패했습니다.", "error");
+      addToast(
+        e?.response?.data?.message ?? "친구 요청에 실패했습니다.",
+        "error",
+      );
     }
   };
 
@@ -665,32 +792,51 @@ function AddFriendModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
         {!searching && query.trim().length >= 2 && results.length === 0 && (
-          <p className="text-sm text-text-tertiary text-center py-3">검색 결과가 없습니다.</p>
+          <p className="text-sm text-text-tertiary text-center py-3">
+            검색 결과가 없습니다.
+          </p>
         )}
         {!searching && query.trim().length < 2 && (
-          <p className="text-xs text-text-tertiary text-center py-3">두 글자 이상 입력하세요.</p>
+          <p className="text-xs text-text-tertiary text-center py-3">
+            두 글자 이상 입력하세요.
+          </p>
         )}
-        {!searching && results.map((u) => (
-          <div key={u.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-bg-tertiary transition-colors">
-            <Avatar src={u.avatar} alt={u.username} fallback={u.username} size="sm" />
-            <span className="flex-1 text-sm text-text-primary truncate">{u.username}</span>
-            <button
-              disabled={sentIds.has(u.id)}
-              onClick={() => handleSend(u.id)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex-shrink-0 ${
-                sentIds.has(u.id)
-                  ? "bg-bg-tertiary text-text-tertiary cursor-default"
-                  : "bg-accent-primary text-accent-on hover:bg-accent-hover"
-              }`}
+        {!searching &&
+          results.map((u) => (
+            <div
+              key={u.id}
+              className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-bg-tertiary transition-colors"
             >
-              {sentIds.has(u.id) ? (
-                <><Check className="w-3 h-3" /> 요청됨</>
-              ) : (
-                <><UserPlus className="w-3 h-3" /> 추가</>
-              )}
-            </button>
-          </div>
-        ))}
+              <Avatar
+                src={u.avatar}
+                alt={u.username}
+                fallback={u.username}
+                size="sm"
+              />
+              <span className="flex-1 text-sm text-text-primary truncate">
+                {u.username}
+              </span>
+              <button
+                disabled={sentIds.has(u.id)}
+                onClick={() => handleSend(u.id)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex-shrink-0 ${
+                  sentIds.has(u.id)
+                    ? "bg-bg-tertiary text-text-tertiary cursor-default"
+                    : "bg-accent-primary text-accent-on hover:bg-accent-hover"
+                }`}
+              >
+                {sentIds.has(u.id) ? (
+                  <>
+                    <Check className="w-3 h-3" /> 요청됨
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-3 h-3" /> 추가
+                  </>
+                )}
+              </button>
+            </div>
+          ))}
       </div>
     </InlineModal>
   );
@@ -714,18 +860,38 @@ function AddCategoryModal({ onClose }: { onClose: () => void }) {
         placeholder="카테고리 이름"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleAdd();
+        }}
         maxLength={20}
       />
       <div className="flex gap-2 justify-end">
-        <button className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg" onClick={onClose}>취소</button>
-        <button className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover" onClick={handleAdd}>추가</button>
+        <button
+          className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg"
+          onClick={onClose}
+        >
+          취소
+        </button>
+        <button
+          className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover"
+          onClick={handleAdd}
+        >
+          추가
+        </button>
       </div>
     </InlineModal>
   );
 }
 
-function RenameCategoryModal({ categoryId, currentName, onClose }: { categoryId: string; currentName: string; onClose: () => void }) {
+function RenameCategoryModal({
+  categoryId,
+  currentName,
+  onClose,
+}: {
+  categoryId: string;
+  currentName: string;
+  onClose: () => void;
+}) {
   const { renameCategory } = useFriendStore();
   const [name, setName] = useState(currentName);
 
@@ -742,12 +908,24 @@ function RenameCategoryModal({ categoryId, currentName, onClose }: { categoryId:
         className="w-full input text-sm mb-3"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSave();
+        }}
         maxLength={20}
       />
       <div className="flex gap-2 justify-end">
-        <button className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg" onClick={onClose}>취소</button>
-        <button className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover" onClick={handleSave}>저장</button>
+        <button
+          className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg"
+          onClick={onClose}
+        >
+          취소
+        </button>
+        <button
+          className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover"
+          onClick={handleSave}
+        >
+          저장
+        </button>
       </div>
     </InlineModal>
   );
@@ -778,7 +956,10 @@ function ConfirmModal({
         </button>
         <button
           className="px-3 py-1.5 text-sm bg-accent-danger text-white rounded-lg hover:bg-accent-danger/80 transition-colors"
-          onClick={() => { onConfirm(); onClose(); }}
+          onClick={() => {
+            onConfirm();
+            onClose();
+          }}
         >
           {confirmLabel}
         </button>
@@ -787,7 +968,19 @@ function ConfirmModal({
   );
 }
 
-function JoinRoomModal({ roomId, roomName, isPrivate, gameTitle, onClose }: { roomId: string; roomName: string; isPrivate: boolean; gameTitle?: "LOL" | "PUBG"; onClose: () => void }) {
+function JoinRoomModal({
+  roomId,
+  roomName,
+  isPrivate,
+  gameTitle,
+  onClose,
+}: {
+  roomId: string;
+  roomName: string;
+  isPrivate: boolean;
+  gameTitle?: "LOL" | "PUBG";
+  onClose: () => void;
+}) {
   const router = useRouter();
   const { addToast } = useToast();
   const [password, setPassword] = useState("");
@@ -806,7 +999,9 @@ function JoinRoomModal({ roomId, roomName, isPrivate, gameTitle, onClose }: { ro
     <InlineModal title={`내전 참가 — ${roomName}`} onClose={onClose}>
       {isPrivate && (
         <>
-          <p className="text-xs text-text-tertiary mb-2">비공개 방입니다. 비밀번호를 입력하세요.</p>
+          <p className="text-xs text-text-tertiary mb-2">
+            비공개 방입니다. 비밀번호를 입력하세요.
+          </p>
           <input
             autoFocus
             type="password"
@@ -814,13 +1009,25 @@ function JoinRoomModal({ roomId, roomName, isPrivate, gameTitle, onClose }: { ro
             placeholder="비밀번호"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleJoin(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleJoin();
+            }}
           />
         </>
       )}
       <div className="flex gap-2 justify-end">
-        <button className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg" onClick={onClose}>취소</button>
-        <button className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover" onClick={handleJoin}>참가</button>
+        <button
+          className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg"
+          onClick={onClose}
+        >
+          취소
+        </button>
+        <button
+          className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover"
+          onClick={handleJoin}
+        >
+          참가
+        </button>
       </div>
     </InlineModal>
   );
@@ -853,7 +1060,11 @@ function ConversationList({
     const diff = now.getTime() - d.getTime();
     if (diff < 60000) return "방금";
     if (diff < 3600000) return `${Math.floor(diff / 60000)}분 전`;
-    if (diff < 86400000) return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+    if (diff < 86400000)
+      return d.toLocaleTimeString("ko-KR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     return d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
   };
 
@@ -862,7 +1073,9 @@ function ConversationList({
       <div className="flex-1 flex flex-col items-center justify-center py-8 text-center">
         <MessageCircle className="w-8 h-8 text-text-tertiary mb-2" />
         <p className="text-sm text-text-secondary">대화가 없습니다.</p>
-        <p className="text-xs text-text-tertiary mt-1">친구를 클릭하여 대화를 시작하세요.</p>
+        <p className="text-xs text-text-tertiary mt-1">
+          친구를 클릭하여 대화를 시작하세요.
+        </p>
       </div>
     );
   }
@@ -916,19 +1129,42 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
   const outgoing = pendingRequests.filter((r) => r.userId === currentUserId);
 
   const handleAccept = async (id: string) => {
-    try { await acceptRequest(id); addToast("친구 요청을 수락했습니다!", "success"); }
-    catch { addToast("수락 실패", "error"); }
+    try {
+      await acceptRequest(id);
+      addToast("친구 요청을 수락했습니다!", "success");
+    } catch {
+      addToast("수락 실패", "error");
+    }
   };
 
   const handleReject = async (id: string) => {
-    try { await rejectRequest(id); addToast("친구 요청을 거절했습니다.", "info"); }
-    catch { addToast("거절 실패", "error"); }
+    try {
+      await rejectRequest(id);
+      addToast("친구 요청을 거절했습니다.", "info");
+    } catch {
+      addToast("거절 실패", "error");
+    }
   };
 
-  const UserRow = ({ user, avatar, action }: { user: { id: string; username: string; avatar: string | null }; avatar: string | null; action: React.ReactNode }) => (
+  const UserRow = ({
+    user,
+    avatar,
+    action,
+  }: {
+    user: { id: string; username: string; avatar: string | null };
+    avatar: string | null;
+    action: React.ReactNode;
+  }) => (
     <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-elevated transition-colors">
-      <Avatar src={avatar} alt={user.username} fallback={user.username} size="sm" />
-      <span className="flex-1 text-sm font-medium text-text-primary truncate">{user.username}</span>
+      <Avatar
+        src={avatar}
+        alt={user.username}
+        fallback={user.username}
+        size="sm"
+      />
+      <span className="flex-1 text-sm font-medium text-text-primary truncate">
+        {user.username}
+      </span>
       {action}
     </div>
   );
@@ -937,7 +1173,9 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 text-center p-6">
         <Clock className="w-8 h-8 text-text-tertiary mb-2" />
-        <p className="text-sm text-text-secondary">대기 중인 친구 요청이 없습니다.</p>
+        <p className="text-sm text-text-secondary">
+          대기 중인 친구 요청이 없습니다.
+        </p>
       </div>
     );
   }
@@ -956,8 +1194,18 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
               avatar={r.user.avatar}
               action={
                 <div className="flex gap-1">
-                  <button className="px-2 py-1 text-xs bg-accent-primary text-accent-on rounded-md hover:bg-accent-hover" onClick={() => handleAccept(r.id)}>수락</button>
-                  <button className="px-2 py-1 text-xs bg-bg-tertiary hover:bg-bg-elevated text-text-secondary rounded-md" onClick={() => handleReject(r.id)}>거절</button>
+                  <button
+                    className="px-2 py-1 text-xs bg-accent-primary text-accent-on rounded-md hover:bg-accent-hover"
+                    onClick={() => handleAccept(r.id)}
+                  >
+                    수락
+                  </button>
+                  <button
+                    className="px-2 py-1 text-xs bg-bg-tertiary hover:bg-bg-elevated text-text-secondary rounded-md"
+                    onClick={() => handleReject(r.id)}
+                  >
+                    거절
+                  </button>
                 </div>
               }
             />
@@ -974,7 +1222,9 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
               key={r.id}
               user={r.friend}
               avatar={r.friend.avatar}
-              action={<span className="text-xs text-text-tertiary">대기 중</span>}
+              action={
+                <span className="text-xs text-text-tertiary">대기 중</span>
+              }
             />
           ))}
         </div>
@@ -1021,15 +1271,24 @@ export function FriendsPanel() {
   const openFloatingDm = useFriendStore((s) => s.openFloatingDm);
   const toggleClanChat = useFriendStore((s) => s.toggleClanChat);
   // 내 클랜 정보 (클랜 채팅 버튼 표시 여부 결정)
-  const [myClan, setMyClan] = useState<{ id: string; name: string; tag: string } | null>(null);
+  const [myClan, setMyClan] = useState<{
+    id: string;
+    name: string;
+    tag: string;
+  } | null>(null);
 
   const [tab, setTab] = useState<"friends" | "pending" | "messages">("friends");
   const [search, setSearch] = useState("");
   const [ctx, setCtx] = useState<CtxState | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
   const [dragFriendId, setDragFriendId] = useState<string | null>(null);
-  const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
-  const [renameCat, setRenameCat] = useState<{ id: string; name: string } | null>(null);
+  const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(
+    null,
+  );
+  const [renameCat, setRenameCat] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [confirmState, setConfirmState] = useState<{
     title: string;
     message: string;
@@ -1041,10 +1300,14 @@ export function FriendsPanel() {
     if (isOpen && isAuthenticated) {
       fetchFriends();
       // 클랜 채팅 버튼 표시를 위해 내 클랜 정보 조회
-      clanApi.getMyClan().then((clan: any) => {
-        if (clan?.id) setMyClan({ id: clan.id, name: clan.name, tag: clan.tag });
-        else setMyClan(null);
-      }).catch(() => setMyClan(null));
+      clanApi
+        .getMyClan(clanGameFromLocation())
+        .then((clan: any) => {
+          if (clan?.id)
+            setMyClan({ id: clan.id, name: clan.name, tag: clan.tag });
+          else setMyClan(null);
+        })
+        .catch(() => setMyClan(null));
     }
   }, [isOpen, isAuthenticated, fetchFriends]);
 
@@ -1085,7 +1348,14 @@ export function FriendsPanel() {
       dmSocketHelpers.offUserTyping(handleTyping);
       dmSocketHelpers.offUserStoppedTyping(handleStoppedTyping);
     };
-  }, [isAuthenticated, user?.id, appendMessage, updateConversationLastMessage, setTotalUnread, setTyping]);
+  }, [
+    isAuthenticated,
+    user?.id,
+    appendMessage,
+    updateConversationLastMessage,
+    setTotalUnread,
+    setTyping,
+  ]);
 
   // 패널 닫기 (플로팅 DM 창은 독립적이므로 함께 닫지 않음)
   const handleClosePanel = () => {
@@ -1096,7 +1366,7 @@ export function FriendsPanel() {
 
   const getFriendUser = useCallback(
     (f: Friendship) => (f.userId === currentUserId ? f.friend : f.user),
-    [currentUserId]
+    [currentUserId],
   );
 
   // Filter friends by search (user/friend 관계 데이터 없는 항목은 제외)
@@ -1112,7 +1382,10 @@ export function FriendsPanel() {
       seenFriendUserIds.add(fu.id);
       const display = getDisplayName(fu.id, fu.username);
       const q = search.toLowerCase();
-      return display.toLowerCase().includes(q) || fu.username.toLowerCase().includes(q);
+      return (
+        display.toLowerCase().includes(q) ||
+        fu.username.toLowerCase().includes(q)
+      );
     });
   })();
 
@@ -1136,7 +1409,9 @@ export function FriendsPanel() {
 
   const { byCat, uncategorized } = friendsByCategory();
 
-  const incomingCount = pendingRequests.filter((r) => r.friendId === currentUserId).length;
+  const incomingCount = pendingRequests.filter(
+    (r) => r.friendId === currentUserId,
+  ).length;
 
   const handleContextMenu = (e: React.MouseEvent, f: Friendship) => {
     e.preventDefault();
@@ -1169,13 +1444,17 @@ export function FriendsPanel() {
     addToast("내전 초대 링크가 복사되었습니다!", "success");
   };
 
-  const handleDropToCategory = (friendId: string, categoryId: string | null) => {
+  const handleDropToCategory = (
+    friendId: string,
+    categoryId: string | null,
+  ) => {
     setFriendCategory(friendId, categoryId);
   };
 
   // Can invite: in a room with space and status WAITING
   const canInvite =
-    !!room && room.status === "WAITING" &&
+    !!room &&
+    room.status === "WAITING" &&
     room.participants.length < room.maxParticipants;
 
   // 친구/대화 클릭 시 플로팅 DM 창 열기
@@ -1205,7 +1484,14 @@ export function FriendsPanel() {
       // dm-store의 openChat도 호출하여 소켓 읽음 처리 등 기존 로직 유지
       openChat(userId);
     },
-    [friends, conversations, getFriendUser, getDisplayName, openFloatingDm, openChat]
+    [
+      friends,
+      conversations,
+      getFriendUser,
+      getDisplayName,
+      openFloatingDm,
+      openChat,
+    ],
   );
 
   if (!isAuthenticated) return null;
@@ -1227,7 +1513,9 @@ export function FriendsPanel() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-bg-tertiary">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-accent-primary" />
-            <span className="font-semibold text-text-primary text-sm">친구 목록</span>
+            <span className="font-semibold text-text-primary text-sm">
+              친구 목록
+            </span>
           </div>
           <div className="flex items-center gap-1">
             {/* 헤더의 클랜 채팅 아이콘 버튼 제거 → 친구 목록 안에 고정 행으로 이동 */}
@@ -1256,171 +1544,173 @@ export function FriendsPanel() {
 
         {/* 친구 목록 뷰 — 항상 표시 (DM은 플로팅 창으로 분리됨) */}
         <>
-
-        {/* Search */}
-        {tab === "friends" && (
-          <div className="px-3 py-2 border-b border-bg-tertiary">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary" />
-              <input
-                className="w-full bg-bg-tertiary/60 rounded-lg pl-8 pr-3 py-1.5 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary/50"
-                placeholder="친구 검색..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="flex border-b border-bg-tertiary">
-          <button
-            className={`flex-1 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
-              tab === "friends"
-                ? "text-accent-primary border-b-2 border-accent-primary bg-accent-primary/5"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
-            onClick={() => setTab("friends")}
-          >
-            <UserCheck className="w-3.5 h-3.5" />
-            친구 {friends.length > 0 && `(${friends.length})`}
-          </button>
-          <button
-            className={`flex-1 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
-              tab === "messages"
-                ? "text-accent-primary border-b-2 border-accent-primary bg-accent-primary/5"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
-            onClick={() => setTab("messages")}
-          >
-            <MessageCircle className="w-3.5 h-3.5" />
-            메시지
-            {totalUnread > 0 && (
-              <span className="bg-accent-danger text-white text-[10px] px-1.5 py-0.5 rounded-full leading-none">
-                {totalUnread}
-              </span>
-            )}
-          </button>
-          <button
-            className={`flex-1 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
-              tab === "pending"
-                ? "text-accent-primary border-b-2 border-accent-primary bg-accent-primary/5"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
-            onClick={() => setTab("pending")}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            대기
-            {incomingCount > 0 && (
-              <span className="bg-accent-danger text-white text-[10px] px-1.5 py-0.5 rounded-full leading-none">
-                {incomingCount}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* Content */}
-        {tab === "friends" && (
-          <div className="flex-1 overflow-y-auto p-2">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="w-5 h-5 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
+          {/* Search */}
+          {tab === "friends" && (
+            <div className="px-3 py-2 border-b border-bg-tertiary">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary" />
+                <input
+                  className="w-full bg-bg-tertiary/60 rounded-lg pl-8 pr-3 py-1.5 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary/50"
+                  placeholder="친구 검색..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-            ) : (
-              <>
-                {/* 클랜 채팅 고정 행 — 클랜에 가입된 경우만 표시, 클릭 시 플로팅 창 오픈 */}
-                {myClan && (
-                  <button
-                    onClick={toggleClanChat}
-                    className="w-full flex items-center gap-2.5 px-2 py-2 mb-1 rounded-lg hover:bg-bg-elevated group transition-colors text-left"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-accent-primary/15 flex items-center justify-center flex-shrink-0">
-                      <Shield className="w-4 h-4 text-accent-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">
-                        [{myClan.tag}] {myClan.name}
-                      </p>
-                      <p className="text-xs text-text-tertiary">클랜 채팅</p>
-                    </div>
-                    <MessageCircle className="w-4 h-4 text-text-tertiary group-hover:text-accent-primary transition-colors flex-shrink-0" />
-                  </button>
-                )}
+            </div>
+          )}
 
-                {friends.length === 0 && categories.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Users className="w-8 h-8 text-text-tertiary mb-2" />
-                    <p className="text-sm text-text-secondary">친구가 없습니다.</p>
-                  </div>
-                )}
-
-                {/* Custom categories */}
-                {categories.map((cat) => (
-                  <CategorySection
-                    key={cat.id}
-                    label={cat.name}
-                    categoryId={cat.id}
-                    friends={byCat[cat.id] ?? []}
-                    currentUserId={currentUserId}
-                    onContextMenu={handleContextMenu}
-                    dragFriendId={dragFriendId}
-                    dragOverCategoryId={dragOverCategoryId}
-                    setDragFriendId={setDragFriendId}
-                    setDragOverCategoryId={setDragOverCategoryId}
-                    onDropToCategory={handleDropToCategory}
-                    canRename
-                    canDelete
-                    onRename={() => setRenameCat({ id: cat.id, name: cat.name })}
-                    onDelete={() => {
-                      setConfirmState({
-                        title: "카테고리 삭제",
-                        message: `"${cat.name}" 카테고리를 삭제하시겠습니까? 포함된 친구들은 미분류로 이동됩니다.`,
-                        onConfirm: () => deleteCategory(cat.id),
-                      });
-                    }}
-                    onOpenDm={handleOpenDm}
-                  />
-                ))}
-
-                {/* Uncategorized */}
-                {(uncategorized.length > 0 || categories.length === 0) && (
-                  <CategorySection
-                    label="전체"
-                    categoryId={null}
-                    friends={uncategorized}
-                    currentUserId={currentUserId}
-                    onContextMenu={handleContextMenu}
-                    dragFriendId={dragFriendId}
-                    dragOverCategoryId={dragOverCategoryId}
-                    setDragFriendId={setDragFriendId}
-                    setDragOverCategoryId={setDragOverCategoryId}
-                    onDropToCategory={handleDropToCategory}
-                    canRename={false}
-                    canDelete={false}
-                    onOpenDm={handleOpenDm}
-                  />
-                )}
-              </>
-            )}
+          {/* Tabs */}
+          <div className="flex border-b border-bg-tertiary">
+            <button
+              className={`flex-1 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                tab === "friends"
+                  ? "text-accent-primary border-b-2 border-accent-primary bg-accent-primary/5"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+              onClick={() => setTab("friends")}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              친구 {friends.length > 0 && `(${friends.length})`}
+            </button>
+            <button
+              className={`flex-1 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                tab === "messages"
+                  ? "text-accent-primary border-b-2 border-accent-primary bg-accent-primary/5"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+              onClick={() => setTab("messages")}
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              메시지
+              {totalUnread > 0 && (
+                <span className="bg-accent-danger text-white text-[10px] px-1.5 py-0.5 rounded-full leading-none">
+                  {totalUnread}
+                </span>
+              )}
+            </button>
+            <button
+              className={`flex-1 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                tab === "pending"
+                  ? "text-accent-primary border-b-2 border-accent-primary bg-accent-primary/5"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+              onClick={() => setTab("pending")}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              대기
+              {incomingCount > 0 && (
+                <span className="bg-accent-danger text-white text-[10px] px-1.5 py-0.5 rounded-full leading-none">
+                  {incomingCount}
+                </span>
+              )}
+            </button>
           </div>
-        )}
-        {tab === "messages" && (
-          <ConversationList
-            conversations={conversations}
-            onFetchConversations={async () => {
-              try {
-                const data = await dmApi.getConversations();
-                setConversations(data);
-              } catch { /* ignore */ }
-            }}
-            onOpenChat={handleOpenDm}
-            getDisplayName={getDisplayName}
-          />
-        )}
-        {tab === "pending" && (
-          <PendingList currentUserId={currentUserId} />
-        )}
 
+          {/* Content */}
+          {tab === "friends" && (
+            <div className="flex-1 overflow-y-auto p-2">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
+                </div>
+              ) : (
+                <>
+                  {/* 클랜 채팅 고정 행 — 클랜에 가입된 경우만 표시, 클릭 시 플로팅 창 오픈 */}
+                  {myClan && (
+                    <button
+                      onClick={toggleClanChat}
+                      className="w-full flex items-center gap-2.5 px-2 py-2 mb-1 rounded-lg hover:bg-bg-elevated group transition-colors text-left"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-accent-primary/15 flex items-center justify-center flex-shrink-0">
+                        <Shield className="w-4 h-4 text-accent-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          [{myClan.tag}] {myClan.name}
+                        </p>
+                        <p className="text-xs text-text-tertiary">클랜 채팅</p>
+                      </div>
+                      <MessageCircle className="w-4 h-4 text-text-tertiary group-hover:text-accent-primary transition-colors flex-shrink-0" />
+                    </button>
+                  )}
+
+                  {friends.length === 0 && categories.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <Users className="w-8 h-8 text-text-tertiary mb-2" />
+                      <p className="text-sm text-text-secondary">
+                        친구가 없습니다.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Custom categories */}
+                  {categories.map((cat) => (
+                    <CategorySection
+                      key={cat.id}
+                      label={cat.name}
+                      categoryId={cat.id}
+                      friends={byCat[cat.id] ?? []}
+                      currentUserId={currentUserId}
+                      onContextMenu={handleContextMenu}
+                      dragFriendId={dragFriendId}
+                      dragOverCategoryId={dragOverCategoryId}
+                      setDragFriendId={setDragFriendId}
+                      setDragOverCategoryId={setDragOverCategoryId}
+                      onDropToCategory={handleDropToCategory}
+                      canRename
+                      canDelete
+                      onRename={() =>
+                        setRenameCat({ id: cat.id, name: cat.name })
+                      }
+                      onDelete={() => {
+                        setConfirmState({
+                          title: "카테고리 삭제",
+                          message: `"${cat.name}" 카테고리를 삭제하시겠습니까? 포함된 친구들은 미분류로 이동됩니다.`,
+                          onConfirm: () => deleteCategory(cat.id),
+                        });
+                      }}
+                      onOpenDm={handleOpenDm}
+                    />
+                  ))}
+
+                  {/* Uncategorized */}
+                  {(uncategorized.length > 0 || categories.length === 0) && (
+                    <CategorySection
+                      label="전체"
+                      categoryId={null}
+                      friends={uncategorized}
+                      currentUserId={currentUserId}
+                      onContextMenu={handleContextMenu}
+                      dragFriendId={dragFriendId}
+                      dragOverCategoryId={dragOverCategoryId}
+                      setDragFriendId={setDragFriendId}
+                      setDragOverCategoryId={setDragOverCategoryId}
+                      onDropToCategory={handleDropToCategory}
+                      canRename={false}
+                      canDelete={false}
+                      onOpenDm={handleOpenDm}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          {tab === "messages" && (
+            <ConversationList
+              conversations={conversations}
+              onFetchConversations={async () => {
+                try {
+                  const data = await dmApi.getConversations();
+                  setConversations(data);
+                } catch {
+                  /* ignore */
+                }
+              }}
+              onOpenChat={handleOpenDm}
+              getDisplayName={getDisplayName}
+            />
+          )}
+          {tab === "pending" && <PendingList currentUserId={currentUserId} />}
         </>
       </div>
 
@@ -1432,21 +1722,26 @@ export function FriendsPanel() {
           onProfile={() => {
             router.push(`/users/${ctx.friendId}`);
           }}
-          onNickname={() => setModal({ type: "nickname", friendship: ctx.friendship })}
+          onNickname={() =>
+            setModal({ type: "nickname", friendship: ctx.friendship })
+          }
           onMemo={() => setModal({ type: "memo", friendship: ctx.friendship })}
-          onCategory={() => setModal({ type: "category", friendship: ctx.friendship })}
+          onCategory={() =>
+            setModal({ type: "category", friendship: ctx.friendship })
+          }
           onRemove={() => handleRemove(ctx.friendship)}
           onInvite={canInvite ? handleInviteToRoom : null}
           onJoin={(() => {
             const status = getFriendStatus(ctx.friendId) as any;
             if (!status?.currentRoomId) return null;
-            return () => setModal({
-              type: "joinRoom",
-              roomId: status.currentRoomId,
-              roomName: status.currentRoomName ?? "친구의 방",
-              isPrivate: status.currentRoomIsPrivate ?? false,
-              gameTitle: status.currentRoomGameTitle,
-            });
+            return () =>
+              setModal({
+                type: "joinRoom",
+                roomId: status.currentRoomId,
+                roomName: status.currentRoomName ?? "친구의 방",
+                isPrivate: status.currentRoomIsPrivate ?? false,
+                gameTitle: status.currentRoomGameTitle,
+              });
           })()}
         />
       )}

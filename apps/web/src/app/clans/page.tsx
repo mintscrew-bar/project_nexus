@@ -60,6 +60,8 @@ interface Clan {
   };
 }
 
+type ClanGameTitle = "LOL" | "PUBG";
+
 // 정렬 옵션
 type SortOption = "latest" | "members" | "active";
 const SORT_LABELS: Record<SortOption, string> = {
@@ -150,7 +152,7 @@ function JoinByCodeModal({ isOpen, onClose, onSuccess }: JoinByCodeModalProps) {
     } catch (err: any) {
       addToast(
         err.response?.data?.message || "초대 코드가 유효하지 않습니다.",
-        "error"
+        "error",
       );
     } finally {
       setIsLoading(false);
@@ -198,6 +200,10 @@ interface ClanExplorerProps {
 
 function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const gameTitle: ClanGameTitle =
+    searchParams.get("game")?.toLowerCase() === "pubg" ? "PUBG" : "LOL";
+  const gameQuery = `game=${gameTitle.toLowerCase()}`;
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
 
@@ -226,12 +232,14 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
     setError(null);
     try {
       const data = await clanApi.getClans({
+        gameTitle,
         search: debouncedSearchQuery || undefined,
         isRecruiting: showRecruitingOnly || undefined,
-        minTier: minTierFilter || undefined,
-        recruitRoles: recruitRoleFilter.length
-          ? recruitRoleFilter.join(",")
-          : undefined,
+        minTier: gameTitle === "LOL" ? minTierFilter || undefined : undefined,
+        recruitRoles:
+          gameTitle === "LOL" && recruitRoleFilter.length
+            ? recruitRoleFilter.join(",")
+            : undefined,
         sort: sortOption,
       });
       setClans(data);
@@ -246,6 +254,7 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
     minTierFilter,
     recruitRoleFilter,
     sortOption,
+    gameTitle,
   ]);
 
   // 모집 포지션 토글
@@ -270,10 +279,10 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
       return;
     }
     clanApi
-      .getMyClan()
+      .getMyClan(gameTitle)
       .then((c) => setHasMyClan(!!c))
       .catch(() => setHasMyClan(false));
-  }, [isAuthenticated, knownHasMyClan]);
+  }, [gameTitle, isAuthenticated, knownHasMyClan]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -294,8 +303,10 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
       fetchClans();
     } catch (err: any) {
       addToast(
-        err.response?.data?.message || err.message || "클랜 가입에 실패했습니다.",
-        "error"
+        err.response?.data?.message ||
+          err.message ||
+          "클랜 가입에 실패했습니다.",
+        "error",
       );
     } finally {
       setJoiningClanId(null);
@@ -314,8 +325,10 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
       addToast("가입 요청을 보냈습니다.", "success");
     } catch (err: any) {
       addToast(
-        err.response?.data?.message || err.message || "가입 요청에 실패했습니다.",
-        "error"
+        err.response?.data?.message ||
+          err.message ||
+          "가입 요청에 실패했습니다.",
+        "error",
       );
     } finally {
       setJoiningClanId(null);
@@ -356,13 +369,17 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
         <div className="container mx-auto max-w-[1600px]">
           <div className="mb-6">
             <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
-              Clan discovery
+              {gameTitle === "PUBG"
+                ? "PUBG clan discovery"
+                : "LOL clan discovery"}
             </p>
             <h1 className="text-2xl font-bold text-text-primary">
-              클랜 둘러보기
+              {gameTitle === "PUBG" ? "배그 클랜 둘러보기" : "롤 클랜 둘러보기"}
             </h1>
             <p className="mt-1 text-sm text-text-secondary">
-              활동 중인 클랜을 살펴보고 나에게 맞는 클랜을 찾아보세요.
+              {gameTitle === "PUBG"
+                ? "배그 스크림과 스쿼드를 함께할 클랜을 찾아보세요."
+                : "롤 내전과 팀 플레이를 함께할 클랜을 찾아보세요."}
             </p>
           </div>
           {/* 검색 & 필터 */}
@@ -390,7 +407,10 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
               <Dropdown
                 className="w-full sm:w-auto"
                 trigger={
-                  <Button variant="secondary" className="gap-1 w-full sm:w-auto justify-between sm:justify-center">
+                  <Button
+                    variant="secondary"
+                    className="gap-1 w-full sm:w-auto justify-between sm:justify-center"
+                  >
                     {SORT_LABELS[sortOption]}
                     <ChevronDown className="h-3 w-3" />
                   </Button>
@@ -400,20 +420,22 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
               />
 
               {/* 최소 티어 필터 드롭다운 */}
-              <Dropdown
-                className="w-full sm:w-auto"
-                trigger={
-                  <Button
-                    variant={minTierFilter ? "primary" : "secondary"}
-                    className="gap-1 w-full sm:w-auto justify-between sm:justify-center"
-                  >
-                    {minTierFilter ? `${minTierFilter}+` : "티어"}
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                }
-                items={tierItems}
-                align="right"
-              />
+              {gameTitle === "LOL" && (
+                <Dropdown
+                  className="w-full sm:w-auto"
+                  trigger={
+                    <Button
+                      variant={minTierFilter ? "primary" : "secondary"}
+                      className="gap-1 w-full sm:w-auto justify-between sm:justify-center"
+                    >
+                      {minTierFilter ? `${minTierFilter}+` : "티어"}
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  }
+                  items={tierItems}
+                  align="right"
+                />
+              )}
 
               <Button
                 variant={showRecruitingOnly ? "primary" : "secondary"}
@@ -439,11 +461,10 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
               {isAuthenticated && hasMyClan && (
                 <Button
                   variant="primary"
-                  onClick={() => router.push("/clans")}
+                  onClick={() => router.push(`/clans?${gameQuery}`)}
                   className="w-full sm:w-auto"
                 >
-                  <Shield className="h-4 w-4 mr-2" />
-                  내 클랜
+                  <Shield className="h-4 w-4 mr-2" />내 클랜
                 </Button>
               )}
 
@@ -451,7 +472,7 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
               {isAuthenticated && hasMyClan === false && (
                 <Button
                   variant="primary"
-                  onClick={() => router.push("/clans/create")}
+                  onClick={() => router.push(`/clans/create?${gameQuery}`)}
                   className="w-full sm:w-auto"
                 >
                   <Shield className="h-4 w-4 mr-2" />
@@ -462,39 +483,44 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
           </div>
 
           {/* 모집 포지션 필터 토글 */}
-          <div data-tour="clans-roles" className="mb-6 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-text-tertiary">
-              모집 포지션
-            </span>
-            {RECRUIT_ROLE_OPTIONS.map((role) => {
-              const active = recruitRoleFilter.includes(role);
-              return (
+          {gameTitle === "LOL" && (
+            <div
+              data-tour="clans-roles"
+              className="mb-6 flex flex-wrap items-center gap-2"
+            >
+              <span className="text-xs font-semibold text-text-tertiary">
+                모집 포지션
+              </span>
+              {RECRUIT_ROLE_OPTIONS.map((role) => {
+                const active = recruitRoleFilter.includes(role);
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => toggleRecruitRole(role)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      active
+                        ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
+                        : "border-bg-elevated bg-bg-tertiary text-text-tertiary hover:text-text-secondary",
+                    )}
+                  >
+                    <PositionIcon position={role} className="!h-3.5 !w-3.5" />
+                    {POSITION_LABELS[role] || role}
+                  </button>
+                );
+              })}
+              {recruitRoleFilter.length > 0 && (
                 <button
-                  key={role}
                   type="button"
-                  onClick={() => toggleRecruitRole(role)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                    active
-                      ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
-                      : "border-bg-elevated bg-bg-tertiary text-text-tertiary hover:text-text-secondary",
-                  )}
+                  onClick={() => setRecruitRoleFilter([])}
+                  className="text-xs text-text-tertiary underline hover:text-text-secondary"
                 >
-                  <PositionIcon position={role} className="!h-3.5 !w-3.5" />
-                  {POSITION_LABELS[role] || role}
+                  초기화
                 </button>
-              );
-            })}
-            {recruitRoleFilter.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setRecruitRoleFilter([])}
-                className="text-xs text-text-tertiary underline hover:text-text-secondary"
-              >
-                초기화
-              </button>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* 에러 */}
           {error && (
@@ -505,210 +531,226 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
 
           {/* 스켈레톤 로딩 */}
           <div data-tour="clans-results">
-          {isLoading ? (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))]">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <ClanCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : clans.length === 0 ? (
-            <EmptyState
-              icon={Shield}
-              title="클랜이 없습니다"
-              description={
-                searchQuery
-                  ? "검색 조건에 맞는 클랜이 없습니다."
-                  : isAuthenticated
-                  ? "첫 번째 클랜을 만들어보세요!"
-                  : "로그인하면 클랜을 만들거나 가입할 수 있어요."
-              }
-              action={
-                searchQuery
-                  ? { label: "검색 초기화", onClick: () => setSearchQuery("") }
-                  : isAuthenticated
-                  ? { label: "클랜 만들기", onClick: () => router.push("/clans/create") }
-                  : { label: "로그인하기", onClick: () => router.push("/auth/login") }
-              }
-            />
-          ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] stagger-children">
-              {clans.map((clan) => {
-                const memberCount = clan._count.members;
-                const isFull = memberCount >= clan.maxMembers;
-                const fillPercent = Math.min(
-                  (memberCount / clan.maxMembers) * 100,
-                  100
-                );
-
-                const activeAgo = formatActiveAgo(clan.lastActiveAt);
-
-                return (
-                  <Card
-                    key={clan.id}
-                    hoverable
-                    onClick={() => router.push(`/clans/${clan.id}`)}
-                    className="cursor-pointer relative overflow-hidden hover:scale-[1.02] hover:shadow-lg transition-all duration-200"
-                  >
-                    {/* 정체성 띠: 배너 이미지 또는 대표색 그라디언트 */}
-                    <div
-                      className="relative h-24 w-full bg-bg-tertiary"
-                      style={
-                        clan.banner
-                          ? undefined
-                          : {
-                              background: `linear-gradient(135deg, ${
-                                clan.accentColor || "#667EEA"
-                              }44, ${clan.accentColor || "#667EEA"}0d)`,
-                            }
+            {isLoading ? (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))]">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <ClanCardSkeleton key={i} />
+                ))}
+              </div>
+            ) : clans.length === 0 ? (
+              <EmptyState
+                icon={Shield}
+                title="클랜이 없습니다"
+                description={
+                  searchQuery
+                    ? "검색 조건에 맞는 클랜이 없습니다."
+                    : isAuthenticated
+                      ? "첫 번째 클랜을 만들어보세요!"
+                      : "로그인하면 클랜을 만들거나 가입할 수 있어요."
+                }
+                action={
+                  searchQuery
+                    ? {
+                        label: "검색 초기화",
+                        onClick: () => setSearchQuery(""),
                       }
+                    : isAuthenticated
+                      ? {
+                          label: "클랜 만들기",
+                          onClick: () =>
+                            router.push(`/clans/create?${gameQuery}`),
+                        }
+                      : {
+                          label: "로그인하기",
+                          onClick: () => router.push("/auth/login"),
+                        }
+                }
+              />
+            ) : (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))] stagger-children">
+                {clans.map((clan) => {
+                  const memberCount = clan._count.members;
+                  const isFull = memberCount >= clan.maxMembers;
+                  const fillPercent = Math.min(
+                    (memberCount / clan.maxMembers) * 100,
+                    100,
+                  );
+
+                  const activeAgo = formatActiveAgo(clan.lastActiveAt);
+
+                  return (
+                    <Card
+                      key={clan.id}
+                      hoverable
+                      onClick={() => router.push(`/clans/${clan.id}`)}
+                      className="cursor-pointer relative overflow-hidden hover:scale-[1.02] hover:shadow-lg transition-all duration-200"
                     >
-                      {clan.banner && (
-                        <Image
-                          src={clan.banner}
-                          alt=""
-                          fill
-                          className="object-cover"
-                          unoptimized
-                        />
-                      )}
-                      {/* 모집 상태 리본 배지 */}
+                      {/* 정체성 띠: 배너 이미지 또는 대표색 그라디언트 */}
                       <div
-                        className={cn(
-                          "absolute top-2 right-2 text-xs font-bold px-2 py-0.5 rounded-full",
-                          clan.isRecruiting && !isFull
-                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                            : "bg-red-500/20 text-red-400 border border-red-500/30"
-                        )}
-                      >
-                        {clan.isRecruiting && !isFull ? "모집 중" : "정원 마감"}
-                      </div>
-                    </div>
-
-                    <CardContent className="p-4">
-                      <div className="-mt-9 flex items-start gap-3">
-                        <ClanEmblem
-                          tag={clan.tag}
-                          logo={clan.logo}
-                          accentColor={clan.accentColor}
-                          size={56}
-                          rounded="rounded-xl"
-                          className="ring-2 ring-bg-secondary"
-                        />
-                        <div className="min-w-0 flex-grow pt-9">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <ClanTag tag={clan.tag} accentColor={clan.accentColor} />
-                            <p className="font-semibold text-text-primary truncate">
-                              {clan.name}
-                            </p>
-                          </div>
-                          <p className="text-sm text-text-secondary mt-1 line-clamp-2">
-                            {clan.description || "클랜 소개가 없습니다."}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-text-tertiary">
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {memberCount}/{clan.maxMembers}
-                            </span>
-                            {clan.minTier && (
-                              <Badge
-                                variant={
-                                  getTierBadgeColor(clan.minTier) as any
-                                }
-                                size="sm"
-                              >
-                                {clan.minTier}+
-                              </Badge>
-                            )}
-                            {activeAgo && (
-                              <span className="flex items-center gap-1">
-                                <span className="h-1.5 w-1.5 rounded-full bg-accent-success" />
-                                {activeAgo}
-                              </span>
-                            )}
-                          </div>
-                          {/* 모집 포지션 */}
-                          {clan.isRecruiting && clan.recruitRoles?.length > 0 && (
-                            <div className="mt-2 flex flex-wrap items-center gap-1">
-                              {clan.recruitRoles.map((role) => (
-                                <span
-                                  key={role}
-                                  title={POSITION_LABELS[role] || role}
-                                  className="inline-flex items-center gap-1 rounded-md bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
-                                >
-                                  <PositionIcon
-                                    position={role}
-                                    className="!h-3 !w-3"
-                                  />
-                                  {POSITION_LABELS[role] || role}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 멤버 수 프로그레스 바 */}
-                      <div className="mt-3">
-                        <div className="w-full h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all duration-300",
-                              isFull ? "bg-red-500" : "bg-accent-primary"
-                            )}
-                            style={{ width: `${fillPercent}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* 가입 버튼 */}
-                      {isAuthenticated && hasMyClan === false && (
-                        <div className="mt-3">
-                          {clan.isRecruiting && !isFull ? (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              className="w-full"
-                              isLoading={joiningClanId === clan.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleJoinClan(clan.id);
-                              }}
-                            >
-                              가입하기
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="w-full"
-                              isLoading={joiningClanId === clan.id}
-                              // 비모집 상태(isRecruiting=false)면 disabled
-                              disabled={!clan.isRecruiting}
-                              title={
-                                !clan.isRecruiting
-                                  ? "현재 모집 중이 아닙니다"
-                                  : isFull
-                                  ? "정원이 가득 찼습니다"
-                                  : undefined
+                        className="relative h-24 w-full bg-bg-tertiary"
+                        style={
+                          clan.banner
+                            ? undefined
+                            : {
+                                background: `linear-gradient(135deg, ${
+                                  clan.accentColor || "#667EEA"
+                                }44, ${clan.accentColor || "#667EEA"}0d)`,
                               }
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (clan.isRecruiting) {
-                                  handleRequestJoin(clan.id);
-                                }
-                              }}
-                            >
-                              가입 요청
-                            </Button>
+                        }
+                      >
+                        {clan.banner && (
+                          <Image
+                            src={clan.banner}
+                            alt=""
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        )}
+                        {/* 모집 상태 리본 배지 */}
+                        <div
+                          className={cn(
+                            "absolute top-2 right-2 text-xs font-bold px-2 py-0.5 rounded-full",
+                            clan.isRecruiting && !isFull
+                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                              : "bg-red-500/20 text-red-400 border border-red-500/30",
                           )}
+                        >
+                          {clan.isRecruiting && !isFull
+                            ? "모집 중"
+                            : "정원 마감"}
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+                      </div>
+
+                      <CardContent className="p-4">
+                        <div className="-mt-9 flex items-start gap-3">
+                          <ClanEmblem
+                            tag={clan.tag}
+                            logo={clan.logo}
+                            accentColor={clan.accentColor}
+                            size={56}
+                            rounded="rounded-xl"
+                            className="ring-2 ring-bg-secondary"
+                          />
+                          <div className="min-w-0 flex-grow pt-9">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <ClanTag
+                                tag={clan.tag}
+                                accentColor={clan.accentColor}
+                              />
+                              <p className="font-semibold text-text-primary truncate">
+                                {clan.name}
+                              </p>
+                            </div>
+                            <p className="text-sm text-text-secondary mt-1 line-clamp-2">
+                              {clan.description || "클랜 소개가 없습니다."}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-text-tertiary">
+                              <span className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {memberCount}/{clan.maxMembers}
+                              </span>
+                              {clan.minTier && (
+                                <Badge
+                                  variant={
+                                    getTierBadgeColor(clan.minTier) as any
+                                  }
+                                  size="sm"
+                                >
+                                  {clan.minTier}+
+                                </Badge>
+                              )}
+                              {activeAgo && (
+                                <span className="flex items-center gap-1">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-accent-success" />
+                                  {activeAgo}
+                                </span>
+                              )}
+                            </div>
+                            {/* 모집 포지션 */}
+                            {clan.isRecruiting &&
+                              clan.recruitRoles?.length > 0 && (
+                                <div className="mt-2 flex flex-wrap items-center gap-1">
+                                  {clan.recruitRoles.map((role) => (
+                                    <span
+                                      key={role}
+                                      title={POSITION_LABELS[role] || role}
+                                      className="inline-flex items-center gap-1 rounded-md bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
+                                    >
+                                      <PositionIcon
+                                        position={role}
+                                        className="!h-3 !w-3"
+                                      />
+                                      {POSITION_LABELS[role] || role}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                          </div>
+                        </div>
+
+                        {/* 멤버 수 프로그레스 바 */}
+                        <div className="mt-3">
+                          <div className="w-full h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-all duration-300",
+                                isFull ? "bg-red-500" : "bg-accent-primary",
+                              )}
+                              style={{ width: `${fillPercent}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* 가입 버튼 */}
+                        {isAuthenticated && hasMyClan === false && (
+                          <div className="mt-3">
+                            {clan.isRecruiting && !isFull ? (
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                className="w-full"
+                                isLoading={joiningClanId === clan.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleJoinClan(clan.id);
+                                }}
+                              >
+                                가입하기
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="w-full"
+                                isLoading={joiningClanId === clan.id}
+                                // 비모집 상태(isRecruiting=false)면 disabled
+                                disabled={!clan.isRecruiting}
+                                title={
+                                  !clan.isRecruiting
+                                    ? "현재 모집 중이 아닙니다"
+                                    : isFull
+                                      ? "정원이 가득 찼습니다"
+                                      : undefined
+                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (clan.isRecruiting) {
+                                    handleRequestJoin(clan.id);
+                                  }
+                                }}
+                              >
+                                가입 요청
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -744,9 +786,11 @@ function ClansPageContent() {
   const { isAuthenticated, user } = useAuthStore();
   const searchParams = useSearchParams();
   const forceExplore = searchParams.get("view") === "explore";
+  const gameTitle: ClanGameTitle =
+    searchParams.get("game")?.toLowerCase() === "pubg" ? "PUBG" : "LOL";
   const { data: myClan, isLoading } = useQuery<{ id: string } | null>({
-    queryKey: ["clans", "my", user?.id],
-    queryFn: () => clanApi.getMyClan().catch(() => null),
+    queryKey: ["clans", "my", gameTitle, user?.id],
+    queryFn: () => clanApi.getMyClan(gameTitle).catch(() => null),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -760,9 +804,7 @@ function ClansPageContent() {
     return <ClanDetailClient clanIdOverride={myClan.id} isClanHome />;
   }
 
-  return (
-    <ClanExplorer knownHasMyClan={Boolean(isAuthenticated && myClan)} />
-  );
+  return <ClanExplorer knownHasMyClan={Boolean(isAuthenticated && myClan)} />;
 }
 
 export default function ClansPage() {

@@ -10,6 +10,7 @@ export {
 } from "./clan-body.dto";
 export {
   ListClansQueryDto,
+  ClanGameQueryDto,
   ClanCursorQueryDto,
   ClanActivityQueryDto,
 } from "./clan-query.dto";

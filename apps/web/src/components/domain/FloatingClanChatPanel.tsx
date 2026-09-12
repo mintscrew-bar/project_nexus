@@ -20,6 +20,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useClanStore } from "@/stores/clan-store";
 import { clanApi } from "@/lib/api-client";
 import { ClanChat } from "@/components/domain/ClanChat";
+import { clanGameFromLocation } from "@/lib/clan-game";
 
 // ========================================
 // 리사이즈 관련 상수
@@ -58,7 +59,9 @@ export function FloatingClanChatPanel() {
     tag: string;
   } | null>(null);
   // 현재 유저의 클랜 내 역할 (메시지 삭제 권한 판단에 사용)
-  const [myRole, setMyRole] = useState<"OWNER" | "OFFICER" | "MEMBER" | null>(null);
+  const [myRole, setMyRole] = useState<"OWNER" | "OFFICER" | "MEMBER" | null>(
+    null,
+  );
   const [isLoadingClan, setIsLoadingClan] = useState(false);
   // API 에러 상태 — 에러 시 패널을 바로 닫지 않고 재시도 UI 제공
   const [fetchError, setFetchError] = useState(false);
@@ -124,7 +127,7 @@ export function FloatingClanChatPanel() {
     setIsLoadingClan(true);
     setFetchError(false);
     clanApi
-      .getMyClan()
+      .getMyClan(clanGameFromLocation())
       .then((clan: unknown) => {
         const c = clan as {
           id?: string;
@@ -201,9 +204,7 @@ export function FloatingClanChatPanel() {
             : {}
         }
         transition={
-          hasPulse
-            ? { duration: 1, repeat: 1, ease: "easeInOut" }
-            : {}
+          hasPulse ? { duration: 1, repeat: 1, ease: "easeInOut" } : {}
         }
         className="flex items-center justify-between px-3 py-2 border-b border-bg-tertiary bg-bg-secondary/95 backdrop-blur-sm"
       >
@@ -251,7 +252,10 @@ export function FloatingClanChatPanel() {
 
       {/* 채팅 본문 */}
       {!isMinimized && (
-        <div className={isMobile ? "h-[60vh]" : ""} style={isMobile ? {} : { height: panelHeight }}>
+        <div
+          className={isMobile ? "h-[60vh]" : ""}
+          style={isMobile ? {} : { height: panelHeight }}
+        >
           {isLoadingClan ? (
             <div className="flex items-center justify-center h-full">
               <div className="w-5 h-5 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />

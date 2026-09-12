@@ -98,7 +98,9 @@ function useDashboardGamePrefix() {
   const pathname = usePathname();
   const currentGamePrefix = useGamePrefix();
   const lastGamePrefix = useLastGamePrefix();
-  return gameFromSlug(pathname.split("/")[1]) ? currentGamePrefix : lastGamePrefix;
+  return gameFromSlug(pathname.split("/")[1])
+    ? currentGamePrefix
+    : lastGamePrefix;
 }
 
 interface ClanSummary {
@@ -191,7 +193,7 @@ function GlassCard({
       className={cn(
         "rounded-2xl border border-white/[0.06] bg-bg-secondary/60 backdrop-blur-sm overflow-hidden",
         "hover:border-violet-500/10 transition-colors duration-300",
-        className
+        className,
       )}
     >
       {children}
@@ -230,12 +232,14 @@ function DashboardHero({
   // 홈은 경로로 게임을 알 수 없다. 마지막으로 본 게임을 따라간다 —
   // 기본 게임으로 두면 배그만 하는 사람의 링크가 전부 롤로 간다.
   const gamePrefix = useDashboardGamePrefix();
+  const clanHref = `/clans?game=${gameTitle === "PUBG" ? "pubg" : "lol"}`;
   const clanMemberCount = clan?._count?.members ?? clan?.members?.length ?? 0;
   const metrics = [
     {
       label: "참가 가능한 내전",
       value: `${rooms.length}개`,
-      detail: rooms.length > 0 ? "지금 참가자를 기다리는 중" : "새 내전을 열어보세요",
+      detail:
+        rooms.length > 0 ? "지금 참가자를 기다리는 중" : "새 내전을 열어보세요",
       icon: Swords,
       color: "text-amber-200",
       href: `${gamePrefix}/tournaments`,
@@ -254,10 +258,12 @@ function DashboardHero({
     {
       label: gameTitle === "PUBG" ? "내 배그 클랜" : "내 롤 클랜",
       value: clan ? `[${clan.tag}]` : "미가입",
-      detail: clan ? `${clan.name} · ${clanMemberCount}명` : "함께할 클랜을 찾아보세요",
+      detail: clan
+        ? `${clan.name} · ${clanMemberCount}명`
+        : "함께할 클랜을 찾아보세요",
       icon: Shield,
       color: "text-violet-200",
-      href: "/clans",
+      href: clanHref,
     },
   ];
 
@@ -308,7 +314,9 @@ function DashboardHero({
             </button>
             <button
               type="button"
-              onClick={() => router.push(`${gamePrefix}/tournaments?create=true`)}
+              onClick={() =>
+                router.push(`${gamePrefix}/tournaments?create=true`)
+              }
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white/75 transition-colors hover:border-violet-300/25 hover:bg-violet-300/[0.08] hover:text-white"
             >
               <Plus className="h-4 w-4" />
@@ -329,7 +337,7 @@ function DashboardHero({
             </button>
             <button
               type="button"
-              onClick={() => router.push("/clans")}
+              onClick={() => router.push(clanHref)}
               className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80"
             >
               <span
@@ -388,26 +396,44 @@ function DashboardHero({
   );
 }
 
-function QuickActions({ clan, gameTitle }: { clan: ClanSummary | null; gameTitle?: "LOL" | "PUBG" }) {
+function QuickActions({
+  clan,
+  gameTitle,
+}: {
+  clan: ClanSummary | null;
+  gameTitle?: "LOL" | "PUBG";
+}) {
   const router = useRouter();
   // 내전·전적은 게임별 화면이다. 프리픽스 없이 두면 배그를 보다가 눌러도
   // 롤 화면으로 넘어간다(맨 경로는 308 로 기본 게임에 붙는다).
   // 홈은 경로로 게임을 알 수 없다. 마지막으로 본 게임을 따라간다 —
   // 기본 게임으로 두면 배그만 하는 사람의 링크가 전부 롤로 간다.
   const gamePrefix = useDashboardGamePrefix();
+  const clanHref = `/clans?game=${gameTitle === "PUBG" ? "pubg" : "lol"}`;
   const actions = [
     {
       label: gameTitle === "PUBG" ? "스크림 만들기" : "내전 만들기",
-      description: gameTitle === "PUBG" ? "새 스크림을 열고 스쿼드를 모집하세요" : "새 로비를 열고 참가자를 모집하세요",
+      description:
+        gameTitle === "PUBG"
+          ? "새 스크림을 열고 스쿼드를 모집하세요"
+          : "새 로비를 열고 참가자를 모집하세요",
       icon: Plus,
       href: `${gamePrefix}/tournaments?create=true`,
       tone: "text-amber-300 bg-amber-300/[0.08] border-amber-300/10",
     },
     {
-      label: clan ? (gameTitle === "PUBG" ? "내 배그 클랜" : "내 롤 클랜") : (gameTitle === "PUBG" ? "배그 클랜 찾기" : "클랜 찾기"),
-      description: clan ? `[${clan.tag}] ${clan.name}으로 이동` : "함께할 팀을 찾아보세요",
+      label: clan
+        ? gameTitle === "PUBG"
+          ? "내 배그 클랜"
+          : "내 롤 클랜"
+        : gameTitle === "PUBG"
+          ? "배그 클랜 찾기"
+          : "클랜 찾기",
+      description: clan
+        ? `[${clan.tag}] ${clan.name}으로 이동`
+        : "함께할 팀을 찾아보세요",
       icon: Users,
-      href: "/clans",
+      href: clanHref,
       tone: "text-violet-300 bg-violet-300/[0.08] border-violet-300/10",
     },
     {
@@ -493,7 +519,7 @@ function BannerCarousel() {
       setCurrent((c) => (c - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
     }
     startTimer();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const startTimer = useCallback(() => {
@@ -581,7 +607,9 @@ function BannerCarousel() {
             <span
               className={cn(
                 "block rounded-full transition-all duration-500",
-                i === current ? "h-1.5 w-6 bg-violet-500" : "h-1.5 w-1.5 bg-white/50"
+                i === current
+                  ? "h-1.5 w-6 bg-violet-500"
+                  : "h-1.5 w-1.5 bg-white/50",
               )}
             />
           </button>
@@ -662,12 +690,13 @@ function MyStatsCard({
                   </span>
                 </p>
                 <p className="mt-1 text-xs text-text-secondary">
-                  {primaryAccount.tier} {primaryAccount.rank} · {primaryAccount.lp} LP
+                  {primaryAccount.tier} {primaryAccount.rank} ·{" "}
+                  {primaryAccount.lp} LP
                 </p>
                 <button
                   onClick={() =>
                     router.push(
-                      `/matches/summoner/${encodeURIComponent(primaryAccount.gameName)}/${encodeURIComponent(primaryAccount.tagLine)}`
+                      `/matches/summoner/${encodeURIComponent(primaryAccount.gameName)}/${encodeURIComponent(primaryAccount.tagLine)}`,
                     )
                   }
                   className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-violet-400/80 transition-colors hover:text-violet-300"
@@ -740,7 +769,7 @@ function MyStatsCard({
                           "rounded-lg px-3 py-1 text-xs font-medium",
                           i === 0
                             ? "bg-violet-500/15 text-violet-400"
-                            : "bg-white/[0.04] text-text-secondary"
+                            : "bg-white/[0.04] text-text-secondary",
                         )}
                       >
                         {POSITION_LABEL[pos.position] ?? pos.position}
@@ -757,7 +786,9 @@ function MyStatsCard({
                   <div className="flex gap-3">
                     {topChampions.map((champ) => {
                       const wr =
-                        champ.games > 0 ? Math.round((champ.wins / champ.games) * 100) : 0;
+                        champ.games > 0
+                          ? Math.round((champ.wins / champ.games) * 100)
+                          : 0;
                       return (
                         <div
                           key={champ.championId}
@@ -808,93 +839,94 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
   return (
     <div data-tour="home-active-rooms">
       <GlassCard>
-      <CardHeader
-        icon={Swords}
-        iconColor="bg-amber-500/80"
-        title="모집중인 내전"
-        actionLabel="전체"
-        onAction={() => router.push(`${gamePrefix}/tournaments`)}
-      />
+        <CardHeader
+          icon={Swords}
+          iconColor="bg-amber-500/80"
+          title="모집중인 내전"
+          actionLabel="전체"
+          onAction={() => router.push(`${gamePrefix}/tournaments`)}
+        />
 
-      <div className="px-5 pb-5">
-        {rooms.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 gap-4 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center">
-              <Swords className="h-7 w-7 text-amber-400" />
+        <div className="px-5 pb-5">
+          {rooms.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-4 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center">
+                <Swords className="h-7 w-7 text-amber-400" />
+              </div>
+              <p className="text-sm text-text-secondary">
+                모집 중인 내전이 없습니다
+              </p>
+              <button
+                onClick={() => router.push(`${gamePrefix}/tournaments`)}
+                data-tour="home-create-room"
+                className="px-5 py-2 rounded-xl text-sm font-medium text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 transition-colors flex items-center gap-1.5"
+              >
+                <Plus className="h-3.5 w-3.5" />방 만들기
+              </button>
             </div>
-            <p className="text-sm text-text-secondary">모집 중인 내전이 없습니다</p>
-            <button
-              onClick={() => router.push(`${gamePrefix}/tournaments`)}
-              data-tour="home-create-room"
-              className="px-5 py-2 rounded-xl text-sm font-medium text-amber-400 border border-amber-500/30 hover:bg-amber-500/10 transition-colors flex items-center gap-1.5"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              방 만들기
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {rooms.map((room) => {
-              const filled = room.participants?.length ?? 0;
-              const fillRatio =
-                room.maxParticipants > 0 ? filled / room.maxParticipants : 0;
-              const isFull = filled >= room.maxParticipants;
-              return (
-                <div
-                  key={room.id}
-                  onClick={() => router.push(roomPath(room))}
-                  className="flex flex-col gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-violet-500/20 hover:bg-white/[0.04] cursor-pointer transition-all duration-200 group"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      {room.isPrivate && (
-                        <Lock className="h-3 w-3 text-text-tertiary flex-shrink-0" />
-                      )}
-                      <p className="text-sm font-medium text-text-primary truncate group-hover:text-violet-300 transition-colors">
-                        {room.name}
-                      </p>
-                    </div>
-                    <span className="flex-shrink-0 px-2 py-0.5 rounded-md text-[10px] font-bold bg-violet-500/10 text-violet-400">
-                      {TEAM_MODE_LABEL[room.teamMode] ?? room.teamMode}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-grow h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
-                      <div
-                        className={cn(
-                          "h-full rounded-full transition-all",
-                          isFull
-                            ? "bg-red-400"
-                            : fillRatio > 0.7
-                            ? "bg-amber-400"
-                            : "bg-emerald-400"
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {rooms.map((room) => {
+                const filled = room.participants?.length ?? 0;
+                const fillRatio =
+                  room.maxParticipants > 0 ? filled / room.maxParticipants : 0;
+                const isFull = filled >= room.maxParticipants;
+                return (
+                  <div
+                    key={room.id}
+                    onClick={() => router.push(roomPath(room))}
+                    className="flex flex-col gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-violet-500/20 hover:bg-white/[0.04] cursor-pointer transition-all duration-200 group"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {room.isPrivate && (
+                          <Lock className="h-3 w-3 text-text-tertiary flex-shrink-0" />
                         )}
-                        style={{ width: `${fillRatio * 100}%` }}
-                      />
+                        <p className="text-sm font-medium text-text-primary truncate group-hover:text-violet-300 transition-colors">
+                          {room.name}
+                        </p>
+                      </div>
+                      <span className="flex-shrink-0 px-2 py-0.5 rounded-md text-[10px] font-bold bg-violet-500/10 text-violet-400">
+                        {TEAM_MODE_LABEL[room.teamMode] ?? room.teamMode}
+                      </span>
                     </div>
-                    <span
-                      className={cn(
-                        "text-xs font-medium flex-shrink-0 tabular-nums",
-                        isFull ? "text-red-400" : "text-text-secondary"
-                      )}
-                    >
-                      {filled}/{room.maxParticipants}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-grow h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            isFull
+                              ? "bg-red-400"
+                              : fillRatio > 0.7
+                                ? "bg-amber-400"
+                                : "bg-emerald-400",
+                          )}
+                          style={{ width: `${fillRatio * 100}%` }}
+                        />
+                      </div>
+                      <span
+                        className={cn(
+                          "text-xs font-medium flex-shrink-0 tabular-nums",
+                          isFull ? "text-red-400" : "text-text-secondary",
+                        )}
+                      >
+                        {filled}/{room.maxParticipants}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-            <button
-              onClick={() => router.push(`${gamePrefix}/tournaments`)}
-              data-tour="home-create-room"
-              className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/[0.08] text-text-tertiary hover:text-violet-400 hover:border-violet-500/30 transition-all duration-200 min-h-[80px]"
-            >
-              <Plus className="h-5 w-5" />
-              <span className="text-xs">새 내전 만들기</span>
-            </button>
-          </div>
-        )}
-      </div>
+                );
+              })}
+              <button
+                onClick={() => router.push(`${gamePrefix}/tournaments`)}
+                data-tour="home-create-room"
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/[0.08] text-text-tertiary hover:text-violet-400 hover:border-violet-500/30 transition-all duration-200 min-h-[80px]"
+              >
+                <Plus className="h-5 w-5" />
+                <span className="text-xs">새 내전 만들기</span>
+              </button>
+            </div>
+          )}
+        </div>
       </GlassCard>
     </div>
   );
@@ -950,10 +982,10 @@ function PopularPostsCard({ posts }: { posts: Post[] }) {
                       i === 0
                         ? "bg-amber-500/15 text-amber-400"
                         : i === 1
-                        ? "bg-slate-400/15 text-slate-400"
-                        : i === 2
-                        ? "bg-orange-700/15 text-orange-500"
-                        : "bg-white/[0.03] text-text-tertiary"
+                          ? "bg-slate-400/15 text-slate-400"
+                          : i === 2
+                            ? "bg-orange-700/15 text-orange-500"
+                            : "bg-white/[0.03] text-text-tertiary",
                     )}
                   >
                     {i + 1}
@@ -961,10 +993,17 @@ function PopularPostsCard({ posts }: { posts: Post[] }) {
 
                   <div className="flex-grow min-w-0">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <span className={cn("text-[10px] font-semibold flex-shrink-0", cfg.color)}>
+                      <span
+                        className={cn(
+                          "text-[10px] font-semibold flex-shrink-0",
+                          cfg.color,
+                        )}
+                      >
                         {cfg.label}
                       </span>
-                      <p className="text-sm text-text-primary truncate">{post.title}</p>
+                      <p className="text-sm text-text-primary truncate">
+                        {post.title}
+                      </p>
                       {(post._count?.comments || 0) > 0 && (
                         <span className="text-violet-400 text-[11px] flex-shrink-0">
                           {post._count?.comments}
@@ -983,7 +1022,9 @@ function PopularPostsCard({ posts }: { posts: Post[] }) {
                         <Eye className="h-2.5 w-2.5" />
                         {post.views}
                       </span>
-                      <span className="ml-auto">{formatRelativeDate(post.createdAt)}</span>
+                      <span className="ml-auto">
+                        {formatRelativeDate(post.createdAt)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1124,14 +1165,22 @@ function DashboardSkeleton() {
       {/* 인기글 + 공지사항 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {[1, 2].map((section) => (
-          <div key={section} className="rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+          <div
+            key={section}
+            className="rounded-2xl bg-white/[0.03] border border-white/[0.06]"
+          >
             <div className="flex items-center gap-3 p-5">
               <Skeleton className="h-8 w-8 rounded-lg" />
               <Skeleton className="h-4 w-16" />
             </div>
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-center gap-3 px-5 py-3.5 border-t border-white/[0.04]">
-                {section === 1 && <Skeleton className="h-6 w-6 rounded-lg flex-shrink-0" />}
+              <div
+                key={i}
+                className="flex items-center gap-3 px-5 py-3.5 border-t border-white/[0.04]"
+              >
+                {section === 1 && (
+                  <Skeleton className="h-6 w-6 rounded-lg flex-shrink-0" />
+                )}
                 <div className="flex-grow space-y-2">
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-3 w-1/3" />
@@ -1149,14 +1198,36 @@ function PubgStatsCard({ history }: { history: PubgHistoryResponse | null }) {
   const summary = history?.summary;
   const stats = [
     ["스크림", summary?.scrimCount ?? 0],
-    ["평균 순위", summary?.averageScrimRank ? `${summary.averageScrimRank.toFixed(1)}위` : "-"],
-    ["평균 킬", summary?.averageKillsPerRound ? summary.averageKillsPerRound.toFixed(1) : "-"],
+    [
+      "평균 순위",
+      summary?.averageScrimRank
+        ? `${summary.averageScrimRank.toFixed(1)}위`
+        : "-",
+    ],
+    [
+      "평균 킬",
+      summary?.averageKillsPerRound
+        ? summary.averageKillsPerRound.toFixed(1)
+        : "-",
+    ],
     ["킬내기 승", summary?.killMatchWins ?? 0],
   ];
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5">
-      <div className="mb-5 flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-300/10 text-amber-200"><Crosshair className="h-4 w-4" /></div><h2 className="font-bold text-white">내 PUBG 전적</h2></div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{stats.map(([label, value]) => <div key={label} className="rounded-xl bg-black/20 p-4"><p className="text-xs text-white/45">{label}</p><p className="mt-2 text-2xl font-black text-white">{value}</p></div>)}</div>
+      <div className="mb-5 flex items-center gap-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-300/10 text-amber-200">
+          <Crosshair className="h-4 w-4" />
+        </div>
+        <h2 className="font-bold text-white">내 PUBG 전적</h2>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {stats.map(([label, value]) => (
+          <div key={label} className="rounded-xl bg-black/20 p-4">
+            <p className="text-xs text-white/45">{label}</p>
+            <p className="mt-2 text-2xl font-black text-white">{value}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1165,7 +1236,9 @@ function PubgStatsCard({ history }: { history: PubgHistoryResponse | null }) {
 // DashboardContent
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function DashboardContent({ gameTitle }: { gameTitle?: "LOL" | "PUBG" } = {}) {
+export function DashboardContent({
+  gameTitle,
+}: { gameTitle?: "LOL" | "PUBG" } = {}) {
   const { user, isAuthenticated } = useAuthStore();
   const { primaryAccount, fetchAccounts } = useRiotStore();
 
@@ -1176,13 +1249,14 @@ export function DashboardContent({ gameTitle }: { gameTitle?: "LOL" | "PUBG" } =
 
   const enabled = isAuthenticated && !!user?.id;
 
-  const { data: userStats = null, isLoading: isStatsLoading } = useQuery<UserStats | null>({
-    queryKey: ["dashboard", "userStats", user?.id],
-    queryFn: () => userApi.getStats(),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    enabled,
-  });
+  const { data: userStats = null, isLoading: isStatsLoading } =
+    useQuery<UserStats | null>({
+      queryKey: ["dashboard", "userStats", user?.id],
+      queryFn: () => userApi.getStats(),
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      enabled,
+    });
 
   const { data: rooms = [], isLoading: isRoomsLoading } = useQuery<Room[]>({
     queryKey: ["dashboard", "rooms"],
@@ -1196,22 +1270,33 @@ export function DashboardContent({ gameTitle }: { gameTitle?: "LOL" | "PUBG" } =
     enabled,
   });
 
-  const { data: popularPosts = [], isLoading: isPopularPostsLoading } = useQuery<Post[]>({
-    queryKey: ["dashboard", "popularPosts"],
-    queryFn: async () => {
-      const data = await communityApi.getPosts({ limit: 20 });
-      const arr = Array.isArray(data) ? data : (data?.posts ?? []);
-      return [...arr].sort((a: Post, b: Post) => (b._count?.likes || 0) - (a._count?.likes || 0)).slice(0, 5);
-    },
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    enabled,
-  });
+  const { data: popularPosts = [], isLoading: isPopularPostsLoading } =
+    useQuery<Post[]>({
+      queryKey: ["dashboard", "popularPosts"],
+      queryFn: async () => {
+        const data = await communityApi.getPosts({ limit: 20 });
+        const arr = Array.isArray(data) ? data : (data?.posts ?? []);
+        return [...arr]
+          .sort(
+            (a: Post, b: Post) =>
+              (b._count?.likes || 0) - (a._count?.likes || 0),
+          )
+          .slice(0, 5);
+      },
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      enabled,
+    });
 
-  const { data: noticePosts = [], isLoading: isNoticePostsLoading } = useQuery<Post[]>({
+  const { data: noticePosts = [], isLoading: isNoticePostsLoading } = useQuery<
+    Post[]
+  >({
     queryKey: ["dashboard", "noticePosts"],
     queryFn: async () => {
-      const data = await communityApi.getPosts({ category: "NOTICE", limit: 5 });
+      const data = await communityApi.getPosts({
+        category: "NOTICE",
+        limit: 5,
+      });
       const arr = Array.isArray(data) ? data : (data?.posts ?? []);
       return arr.slice(0, 5);
     },
@@ -1224,7 +1309,9 @@ export function DashboardContent({ gameTitle }: { gameTitle?: "LOL" | "PUBG" } =
     queryKey: ["dashboard", "championStats", user?.id],
     queryFn: async () => {
       const data = await statsApi.getUserChampionStats(user!.id);
-      const list = Array.isArray(data) ? data : (data?.stats ?? data?.data ?? []);
+      const list = Array.isArray(data)
+        ? data
+        : (data?.stats ?? data?.data ?? []);
       return list.slice(0, 3);
     },
     staleTime: 10 * 60 * 1000,
@@ -1236,7 +1323,9 @@ export function DashboardContent({ gameTitle }: { gameTitle?: "LOL" | "PUBG" } =
     queryKey: ["dashboard", "positionStats", user?.id],
     queryFn: async () => {
       const data = await statsApi.getUserPositionStats(user!.id);
-      const list = Array.isArray(data) ? data : (data?.stats ?? data?.data ?? []);
+      const list = Array.isArray(data)
+        ? data
+        : (data?.stats ?? data?.data ?? []);
       return list.slice(0, 3);
     },
     staleTime: 10 * 60 * 1000,
@@ -1244,13 +1333,14 @@ export function DashboardContent({ gameTitle }: { gameTitle?: "LOL" | "PUBG" } =
     enabled,
   });
 
-  const { data: myClan = null, isLoading: isClanLoading } = useQuery<ClanSummary | null>({
-    queryKey: ["clans", "my", user?.id],
-    queryFn: () => clanApi.getMyClan().catch(() => null),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    enabled,
-  });
+  const { data: myClan = null, isLoading: isClanLoading } =
+    useQuery<ClanSummary | null>({
+      queryKey: ["clans", "my", gameTitle, user?.id],
+      queryFn: () => clanApi.getMyClan(gameTitle).catch(() => null),
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      enabled,
+    });
 
   const { data: pubgHistory = null } = useQuery<PubgHistoryResponse | null>({
     queryKey: ["dashboard", "pubgHistory", user?.id],
@@ -1294,7 +1384,16 @@ export function DashboardContent({ gameTitle }: { gameTitle?: "LOL" | "PUBG" } =
 
       {/* 내 전적 */}
       <div data-tour="home-my-stats">
-        {gameTitle === "PUBG" ? <PubgStatsCard history={pubgHistory} /> : <MyStatsCard stats={userStats} primaryAccount={primaryAccount} championStats={championStats} positionStats={positionStats} />}
+        {gameTitle === "PUBG" ? (
+          <PubgStatsCard history={pubgHistory} />
+        ) : (
+          <MyStatsCard
+            stats={userStats}
+            primaryAccount={primaryAccount}
+            championStats={championStats}
+            positionStats={positionStats}
+          />
+        )}
       </div>
 
       {/* 인기글 + 공지사항 */}

@@ -7,8 +7,10 @@ import {
   IsBoolean,
   IsArray,
   IsIn,
+  IsEnum,
   Matches,
 } from "class-validator";
+import { GameTitle } from "@nexus/database";
 import { Transform } from "class-transformer";
 import { stripAllHtml } from "@/common/utils/sanitize";
 
@@ -28,6 +30,9 @@ export const CLAN_ACCENT_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
  * 클랜 생성 DTO
  */
 export class CreateClanDto {
+  @IsEnum(GameTitle)
+  gameTitle: GameTitle = GameTitle.LOL;
+
   /** 클랜 이름은 플레인 텍스트만 허용 (모든 HTML 태그 제거) */
   @Transform(({ value }) => stripAllHtml(value))
   @IsString()

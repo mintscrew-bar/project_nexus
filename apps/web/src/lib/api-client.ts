@@ -1433,6 +1433,7 @@ export const scrimApi = {
 // 클랜 관련 API
 export const clanApi = {
   getClans: async (params?: {
+    gameTitle?: "LOL" | "PUBG";
     search?: string;
     isRecruiting?: boolean;
     minTier?: string;
@@ -1460,12 +1461,15 @@ export const clanApi = {
     };
   },
 
-  getMyClan: async () => {
-    const response = await apiClient.get("/clans/my");
+  getMyClan: async (gameTitle: "LOL" | "PUBG" = "LOL") => {
+    const response = await apiClient.get("/clans/my", {
+      params: { gameTitle },
+    });
     return response.data;
   },
 
   createClan: async (data: {
+    gameTitle: "LOL" | "PUBG";
     name: string;
     tag: string;
     description?: string;

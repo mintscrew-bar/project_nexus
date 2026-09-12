@@ -30,6 +30,7 @@ import {
   InviteUserDto,
   ResolveDto,
   ListClansQueryDto,
+  ClanGameQueryDto,
   ClanCursorQueryDto,
   ClanActivityQueryDto,
 } from "./dto";
@@ -72,13 +73,17 @@ export class ClanController {
             .filter(Boolean)
         : undefined,
       sort: query.sort,
+      gameTitle: query.gameTitle,
     });
   }
 
   // /clans/my 로 통일 (api-client 기준)
   @Get("my")
-  async getMyClan(@CurrentUser("sub") userId: string) {
-    return this.clanService.getUserClan(userId);
+  async getMyClan(
+    @CurrentUser("sub") userId: string,
+    @Query() query: ClanGameQueryDto,
+  ) {
+    return this.clanService.getUserClan(userId, query.gameTitle);
   }
 
   @Get(":id")

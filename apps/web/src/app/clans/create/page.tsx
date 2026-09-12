@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect, useMemo, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
@@ -39,8 +39,12 @@ function getCounterColor(current: number, max: number): string {
   return "text-red-400";
 }
 
-export default function CreateClanPage() {
+function CreateClanPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const gameTitle: "LOL" | "PUBG" =
+    searchParams.get("game")?.toLowerCase() === "pubg" ? "PUBG" : "LOL";
+  const clansHref = `/clans?game=${gameTitle.toLowerCase()}`;
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
 
@@ -112,6 +116,7 @@ export default function CreateClanPage() {
 
     try {
       const clan = await clanApi.createClan({
+        gameTitle,
         name: name.trim(),
         tag: tag.trim().toUpperCase(),
         description: description.trim() || undefined,
@@ -169,7 +174,7 @@ export default function CreateClanPage() {
         <Button
           variant="ghost"
           className="mb-4"
-          onClick={() => router.push("/clans")}
+          onClick={() => router.push(clansHref)}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           클랜 목록
@@ -179,7 +184,7 @@ export default function CreateClanPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-6 w-6 text-accent-primary" />
-              클랜 만들기
+              {gameTitle === "PUBG" ? "배그 클랜 만들기" : "롤 클랜 만들기"}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -435,13 +440,17 @@ export default function CreateClanPage() {
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => router.push("/clans")}
+                  onClick={() => router.push(clansHref)}
                 >
                   취소
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   <Plus className="h-4 w-4 mr-2" />
-                  {isSubmitting ? "생성 중..." : "클랜 만들기"}
+                  {isSubmitting
+                    ? "생성 중..."
+                    : gameTitle === "PUBG"
+                      ? "배그 클랜 만들기"
+                      : "롤 클랜 만들기"}
                 </Button>
               </div>
             </form>
@@ -449,5 +458,13 @@ export default function CreateClanPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function CreateClanPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[50vh]" />}>
+      <CreateClanPageContent />
+    </Suspense>
   );
 }

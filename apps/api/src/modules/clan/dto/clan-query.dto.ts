@@ -2,12 +2,24 @@ import {
   IsBoolean,
   IsInt,
   IsOptional,
+  IsEnum,
   IsString,
   Max,
   Min,
 } from "class-validator";
+import { GameTitle } from "@nexus/database";
+
+export class ClanGameQueryDto {
+  @IsOptional()
+  @IsEnum(GameTitle)
+  gameTitle: GameTitle = GameTitle.LOL;
+}
 
 export class ListClansQueryDto {
+  @IsOptional()
+  @IsEnum(GameTitle)
+  gameTitle?: GameTitle;
+
   @IsOptional()
   @IsString()
   search?: string;

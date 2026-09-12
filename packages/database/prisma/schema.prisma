@@ -310,46 +310,46 @@ model RiotAccount {
 /// PUBG API 는 소유권을 인증하지 않는다. `verificationStatus` 는 항상 UNVERIFIED 이며
 /// 사칭을 완전히 막을 수단이 없다는 사실을 화면에서 명시한다.
 model PubgAccount {
-  id                 String   @id @default(cuid())
-  userId             String
+  id                      String            @id @default(cuid())
+  userId                  String
   /// PUBG 고유 계정 ID (`account.xxx`). 닉네임을 바꿔도 유지된다.
   /// 같은 계정을 두 사람이 등록하지 못하도록 전역 유니크다.
-  playerId           String   @unique
+  playerId                String            @unique
   /// 등록 시점의 닉네임. PUBG 에서 바뀔 수 있으므로 표시용이다.
-  playerName         String
+  playerName              String
   /// 매치 기록이 나온 샤드. 아직 못 찾았으면 null(미확인이지 오류가 아니다).
-  lastMatchShard     PubgPlatform?
+  lastMatchShard          PubgPlatform?
   /// 샤드를 마지막으로 탐색한 시각. 매치가 없던 계정을 언제 다시 볼지 판단한다.
   lastMatchShardCheckedAt DateTime?
   /// 대표 계정. 로비·프로필에 이 계정을 보여준다.
-  isPrimary          Boolean  @default(false)
-  verificationStatus String   @default("UNVERIFIED")
+  isPrimary               Boolean           @default(false)
+  verificationStatus      String            @default("UNVERIFIED")
   /// PUBG 공식 랭크 스냅샷 (NEXUS 편성 등급과 다른 값이다)
-  pubgTier           String?
+  pubgTier                String?
   /// NEXUS 내부 편성 등급 (운영자 지정 또는 산정)
-  nexusTier          String?
+  nexusTier               String?
   /// 편성 등급이 어디서 나왔는지. "데이터 부족"과 "낮은 등급"은 다르다.
-  nexusTierSource    PubgTierSource @default(NONE)
+  nexusTierSource         PubgTierSource    @default(NONE)
   /// 운영자가 등급을 손으로 고쳤을 때의 메모 (사유·근거)
-  nexusTierNote      String?
+  nexusTierNote           String?
   /// 자동 산정에 쓰인 산식 버전. 버전이 다르면 화면에서 다시 계산한다.
-  balanceVersion     Int?
+  balanceVersion          Int?
   /// 자동 산정에 쓰인 라운드 수. 표본이 적으면 화면에서 그렇게 밝힌다.
-  balanceSampleSize  Int?
+  balanceSampleSize       Int?
   /// 자동 산정 시각
-  balanceComputedAt  DateTime?
-  combatScore       Int?
-  iglScore          Int?
-  teamplayScore     Int?
-  consistencyScore  Int?
-  experienceScore   Int?
-  nexusScore        Int?
-  scoreUpdatedAt    DateTime?
-  lastSyncedAt       DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tierHistory        PubgTierHistory[]
+  balanceComputedAt       DateTime?
+  combatScore             Int?
+  iglScore                Int?
+  teamplayScore           Int?
+  consistencyScore        Int?
+  experienceScore         Int?
+  nexusScore              Int?
+  scoreUpdatedAt          DateTime?
+  lastSyncedAt            DateTime?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tierHistory             PubgTierHistory[]
 
   /// 한 사람이 같은 닉네임을 두 번 넣지 못하게
   @@unique([userId, playerName])
@@ -445,68 +445,70 @@ model ChampionPreference {
 }
 
 model Room {
-  killMatchDurationMinutes Int @default(60)
-  battleRoyaleRounds Int @default(3)
+  killMatchDurationMinutes Int     @default(60)
+  battleRoyaleRounds       Int     @default(3)
   /// 이 방의 모집 공지를 연동된 다른 서버에도 보낼지.
   /// 비공개 방은 이 값과 무관하게 원 서버에만 공지한다.
-  crossGuildAnnounce Boolean @default(true)
+  crossGuildAnnounce       Boolean @default(true)
 
-  id                      String                @id @default(cuid())
+  id                       String                @id @default(cuid())
   /// 이 방이 어떤 게임의 내전인지. 목록·전적·랭킹이 이 값으로 갈린다.
-  gameTitle               GameTitle             @default(LOL)
+  gameTitle                GameTitle             @default(LOL)
   /// 배그 방에서만 채워진다. 이번 경기를 어느 플랫폼에서 하는지는 방 설정으로 확정한다.
-  pubgPlatform            PubgPlatform?
+  pubgPlatform             PubgPlatform?
   /// 배그 방에서만 채워진다. 정원·팀 편성 선택지·결과 처리 방식이 여기서 갈린다.
-  pubgGameMode            PubgGameMode?
-  name                    String
-  hostId                  String
-  password                String?
-  maxParticipants         Int                   @default(10)
-  isPrivate               Boolean               @default(false)
-  status                  RoomStatus            @default(WAITING)
+  pubgGameMode             PubgGameMode?
+  name                     String
+  hostId                   String
+  password                 String?
+  maxParticipants          Int                   @default(10)
+  isPrivate                Boolean               @default(false)
+  status                   RoomStatus            @default(WAITING)
   /// 자동 밸런스를 다시 돌린 횟수. 방장이 마음에 드는 팀이 나올 때까지 돌릴 수
   /// 있으므로, 제한하는 대신 참가자 전원에게 노출해 투명하게 만든다.
-  autoBalanceRerollCount  Int                   @default(0)
-  teamMode                TeamMode              @default(SNAKE_DRAFT)
-  allowSpectators         Boolean               @default(true)
-  startingPoints          Int?
-  minBidIncrement         Int?
-  bidTimeLimit            Int?                  @default(30)
-  pickTimeLimit           Int?                  @default(60)
-  captainSelection        TeamCaptainSelection? @default(RANDOM)
-  bracketFormat           BracketType?          @default(SINGLE_ELIMINATION)
+  autoBalanceRerollCount   Int                   @default(0)
+  teamMode                 TeamMode              @default(SNAKE_DRAFT)
+  allowSpectators          Boolean               @default(true)
+  startingPoints           Int?
+  minBidIncrement          Int?
+  bidTimeLimit             Int?                  @default(30)
+  pickTimeLimit            Int?                  @default(60)
+  captainSelection         TeamCaptainSelection? @default(RANDOM)
+  bracketFormat            BracketType?          @default(SINGLE_ELIMINATION)
   // 다전제 프리셋 키 (@nexus/types의 SeriesPreset). NULL/ALL_BO1 = 전 경기 단판.
   // 룸 사이즈(팀 수)마다 고를 수 있는 프리셋이 달라 대진 생성 시 라운드별 bestOf로 해석된다.
-  seriesPreset            String?
-  discordGuildId          String?
-  discordCategoryId       String?
+  seriesPreset             String?
+  discordGuildId           String?
+  discordCategoryId        String?
   /// 예고제: 내전 예정 시각. NULL이면 지금 바로 여는 방이다.
   /// 예고 중인 방도 status는 WAITING이라 목록·참가·정원 로직은 그대로 쓴다.
-  scheduledAt             DateTime?
+  scheduledAt              DateTime?
   /// 리마인드·시작 알림을 보낸 시각. 재시작이나 크론 중복 실행에도
   /// 같은 알림이 두 번 가지 않게 발송 여부를 DB에 남긴다.
-  scheduledRemind1hAt     DateTime?
-  scheduledRemind10mAt    DateTime?
+  scheduledRemind1hAt      DateTime?
+  scheduledRemind10mAt     DateTime?
   scheduledStartNotifiedAt DateTime?
   /// 정원을 못 채운 채 식어버려 모집 공지를 닫은 시각.
   /// 방 자체는 남긴다 — 호스트가 직접 닫거나 다시 쓸 수 있어야 한다.
-  recruitClosedAt         DateTime?
-  startedAt               DateTime?
-  completedAt             DateTime?
+  recruitClosedAt          DateTime?
+  startedAt                DateTime?
+  completedAt              DateTime?
   // 방송 오버레이: 호스트가 중계 중인 경기(방송 토큰은 User로 이동 — per-streamer 단일 토큰)
-  broadcastFocusMatchId   String?
+  broadcastFocusMatchId    String?
   // 중계 경기를 바꾼 시각. 자동 송출에서 대진표 프리뷰 뒤 경기로 자연스럽게 넘기는 기준이다.
-  broadcastFocusChangedAt DateTime?
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  chatMessages            ChatMessage[]
-  matches                 Match[]
-  matchSeries             MatchSeries[]
-  discordChannels         RoomDiscordChannel[]
-  participants            RoomParticipant[]
-  host                    User                  @relation("RoomHost", fields: [hostId], references: [id])
-  snakeDraftPicks         SnakeDraftPick[]
-  teams                   Team[]
+  broadcastFocusChangedAt  DateTime?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  chatMessages             ChatMessage[]
+  matches                  Match[]
+  matchSeries              MatchSeries[]
+  discordChannels          RoomDiscordChannel[]
+  participants             RoomParticipant[]
+  host                     User                  @relation("RoomHost", fields: [hostId], references: [id])
+  snakeDraftPicks          SnakeDraftPick[]
+  teams                    Team[]
+  // 방 목록은 항상 게임별로 조회한다: WHERE gameTitle=X AND status=Y
+  scrim                    Scrim?
 
   @@index([hostId])
   @@index([status])
@@ -514,9 +516,6 @@ model Room {
   @@index([createdAt])
   // 예약 리마인드 크론: WHERE status='WAITING' AND scheduledAt BETWEEN ...
   @@index([status, scheduledAt])
-  // 방 목록은 항상 게임별로 조회한다: WHERE gameTitle=X AND status=Y
-  scrim                   Scrim?
-
   @@index([gameTitle, status])
   @@map("rooms")
 }
@@ -934,19 +933,19 @@ model MatchParticipant {
 
   // ── 원본 participant 루트에서 추가 추출 ─────────────────────────────────
   // 데미지 유형 분해는 챔피언·빌드 분석의 기본 축인데 총합만 저장하고 있었다.
-  magicDamageToChampions       Int?
-  physicalDamageToChampions    Int?
-  trueDamageToChampions        Int?
-  damageDealtToObjectives      Int?
-  damageDealtToTurrets         Int?
-  timePlayed                   Int?
-  champExperience              Int?
+  magicDamageToChampions    Int?
+  physicalDamageToChampions Int?
+  trueDamageToChampions     Int?
+  damageDealtToObjectives   Int?
+  damageDealtToTurrets      Int?
+  timePlayed                Int?
+  champExperience           Int?
   // 원본을 버린 뒤에도 "이 행이 추출을 거쳤는지" 구분하기 위해 남긴다.
-  challengesExtractedAt        DateTime?
-  createdAt                   DateTime  @default(now())
-  match                       Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  team                        Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  user                        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  challengesExtractedAt     DateTime?
+  createdAt                 DateTime  @default(now())
+  match                     Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team                      Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  user                      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   // 인제스트 멱등성: 동일 매치 내 같은 puuid 중복 방지. (외부/내부 매치 공통)
   @@unique([matchId, puuid])
@@ -1038,8 +1037,9 @@ model MatchTeamStats {
 
 model Clan {
   id                            String             @id @default(cuid())
-  name                          String             @unique
-  tag                           String             @unique
+  name                          String
+  tag                           String
+  gameTitle                     GameTitle          @default(LOL)
   description                   String?
   logo                          String?
   banner                        String?
@@ -1066,7 +1066,10 @@ model Clan {
   discordGuildLinks             DiscordGuildLink[]
   owner                         User               @relation("ClanOwner", fields: [ownerId], references: [id])
 
+  @@unique([gameTitle, name])
+  @@unique([gameTitle, tag])
   @@index([ownerId])
+  @@index([gameTitle])
   @@index([isRecruiting])
   @@index([minTier])
   @@index([lastActiveAt])
@@ -1959,27 +1962,26 @@ model LabCounterSnapshot {
   @@map("lab_counter_snapshots")
 }
 
-
 /// 배틀로얄 스크림. 여러 팀이 한 매치에 들어가 라운드를 반복하고 포인트를 누적한다.
 /// `Match`/`MatchSeries` 는 2팀 고정이라 재사용할 수 없어 따로 판다.
 /// 킬내기(2팀)는 기존 Match 흐름을 그대로 쓴다.
 model Scrim {
-  startsAt DateTime?
-  cutoffAt DateTime?
-  collectorState Json?
+  startsAt        DateTime?
+  cutoffAt        DateTime?
+  collectorState  Json?
   lastCollectedAt DateTime?
   collectionError String?
-  id          String       @id @default(cuid())
-  roomId      String       @unique
+  id              String       @id @default(cuid())
+  roomId          String       @unique
   /// 예정 라운드 수. 실제로 몇 판을 했는지는 rounds 로 센다.
-  totalRounds Int          @default(3)
+  totalRounds     Int          @default(3)
   /// 순위별 포인트 배열 + 킬당 포인트. 대회마다 표가 달라 방마다 고칠 수 있다.
-  pointRule   Json
-  status      ScrimStatus  @default(PENDING)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  rounds      ScrimRound[]
+  pointRule       Json
+  status          ScrimStatus  @default(PENDING)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  room            Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  rounds          ScrimRound[]
 
   @@index([status])
   @@map("scrims")
@@ -1994,21 +1996,21 @@ enum ScrimStatus {
 
 /// 스크림 한 라운드 = 인게임 커스텀 매치 한 판.
 model ScrimRound {
-  id          String            @id @default(cuid())
-  scrimId     String
-  roundNumber Int
+  id           String            @id @default(cuid())
+  scrimId      String
+  roundNumber  Int
   /// 이 라운드에 해당하는 PUBG 매치 ID. 자동 매칭 전이거나 수동 입력이면 비어 있다.
-  pubgMatchId String?
+  pubgMatchId  String?
   /// 라운드 시작 시각. 매치를 특정할 때 기준이 된다.
-  startedAt   DateTime?
-  endedAt     DateTime?
-  status      ScrimRoundStatus  @default(PENDING)
+  startedAt    DateTime?
+  endedAt      DateTime?
+  status       ScrimRoundStatus  @default(PENDING)
   /// 결과를 어떻게 넣었는지. 자동 수집이 붙기 전에는 전부 MANUAL 이다.
   resultSource String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  scrim       Scrim             @relation(fields: [scrimId], references: [id], onDelete: Cascade)
-  results     ScrimTeamResult[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  scrim        Scrim             @relation(fields: [scrimId], references: [id], onDelete: Cascade)
+  results      ScrimTeamResult[]
 
   @@unique([scrimId, roundNumber])
   @@unique([scrimId, pubgMatchId])
@@ -2024,7 +2026,7 @@ enum ScrimRoundStatus {
 /// 한 라운드에서 한 팀이 낸 성적.
 /// 팀이 지워져도 기록은 남겨야 해서 teamId 는 SetNull 이고 이름은 스냅샷으로 둔다.
 model ScrimTeamResult {
-  damage Float @default(0)
+  damage    Float      @default(0)
   id        String     @id @default(cuid())
   roundId   String
   teamId    String?
@@ -2046,13 +2048,11 @@ model ScrimTeamResult {
   @@map("scrim_team_results")
 }
 
-
 /// 배그 킬내기 팀별 총 킬.
 ///
 
 /// 배그 킬내기 개인 킬.
 ///
-
 
 /// 편성 등급이 바뀐 기록.
 ///
