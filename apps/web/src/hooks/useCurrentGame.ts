@@ -19,9 +19,21 @@ import {
  * 헤더가 항상 유효한 링크를 갖는 쪽이 낫다.
  */
 export function useCurrentGame(): GameTitle {
+  return useGameFromPath() ?? DEFAULT_GAME;
+}
+
+/**
+ * 경로에 게임이 **적혀 있는지**.
+ *
+ * `useCurrentGame()` 은 없을 때 기본 게임으로 떨어뜨려서 "롤 화면"과 "게임을
+ * 알 수 없는 화면"을 구분하지 못한다. 종합 홈·클랜·커뮤니티·설정이 후자인데,
+ * 거기서 링크를 기본 게임으로 만들면 사용자에게 묻지 않고 게임을 골라버린다 —
+ * 헤더의 "프로필" 이 배그만 하는 사람에게도 롤 프로필로 가던 이유다.
+ * 게임을 고르게 해야 하는 자리에서는 이 함수로 `null` 을 받아 갈라놓는다.
+ */
+export function useGameFromPath(): GameTitle | null {
   const pathname = usePathname();
-  const first = pathname.split("/")[1];
-  return gameFromSlug(first) ?? DEFAULT_GAME;
+  return gameFromSlug(pathname.split("/")[1]) ?? null;
 }
 
 /**

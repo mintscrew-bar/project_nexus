@@ -1,20 +1,26 @@
-'use client';
+"use client";
 
-import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/stores/auth-store';
-import { Avatar } from './ui/Avatar';
-import { BookOpen, LogOut, User, Settings, ChevronDown } from 'lucide-react';
-import Link from 'next/link';
-import { useState, useRef, useEffect } from 'react';
-import { resetOnboardingGuides } from '@/lib/onboarding';
-import { userApi } from '@/lib/api-client';
-import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth-store";
+import { Avatar } from "./ui/Avatar";
+import { BookOpen, LogOut, User, Settings, ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { useState, useRef, useEffect } from "react";
+import { resetOnboardingGuides } from "@/lib/onboarding";
+import { userApi } from "@/lib/api-client";
+import { useGameFromPath } from "@/hooks/useCurrentGame";
+import { enabledGames, GAMES } from "@nexus/types";
 
 export function UserMenu() {
   const { user, isAuthenticated, isLoading, logout } = useAuthStore();
-  // 프로필은 게임별 화면이다. 기본 게임으로 박아 두면 배그 화면에서
-  // 닉네임을 눌러도 롤 프로필로 넘어간다.
-  const gamePrefix = useGamePrefix();
+  // 프로필은 게임별 화면이다(롤은 Riot 계정·티어·포지션, 배그는 스팀·카카오
+  // 계정 — 겹치지 않는 데이터라 한 화면에 합치면 반쪽이 빈다).
+  //
+  // 그래서 **경로에 게임이 적혀 있을 때만** 그 게임 프로필로 보낸다. 종합
+  // 홈·클랜·커뮤니티·설정처럼 게임이 없는 화면에서 기본 게임으로 떨어뜨리면
+  // 배그만 하는 사람도 롤 프로필로 끌려갔다. 그 자리에서는 게임 이름을 달아
+  // 두 줄로 펼쳐서 사용자가 고르게 한다.
+  const gameInPath = useGameFromPath();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -25,8 +31,8 @@ export function UserMenu() {
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // 인증 초기화 중: 로그인 버튼 대신 스켈레톤을 보여줘서 깜빡임 방지
@@ -66,8 +72,8 @@ export function UserMenu() {
         </span>
         <ChevronDown
           className={cn(
-            'h-4 w-4 text-text-tertiary transition-transform duration-200 hidden sm:block',
-            isOpen && 'rotate-180'
+            "h-4 w-4 text-text-tertiary transition-transform duration-200 hidden sm:block",
+            isOpen && "rotate-180",
           )}
         />
       </button>
@@ -80,14 +86,28 @@ export function UserMenu() {
           </div>
 
           <div className="p-1">
-            <Link
-              href={`${gamePrefix}/profile`}
-              onClick={() => setIsOpen(false)}
-              className="flex items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
-            >
-              <User className="h-4 w-4" />
-              <span>프로필</span>
-            </Link>
+            {gameInPath ? (
+              <Link
+                href={`/${GAMES[gameInPath].slug}/profile`}
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
+              >
+                <User className="h-4 w-4" />
+                <span>프로필</span>
+              </Link>
+            ) : (
+              enabledGames().map((game) => (
+                <Link
+                  key={game.title}
+                  href={`/${game.slug}/profile`}
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
+                >
+                  <User className="h-4 w-4" />
+                  <span>{game.shortLabel} 프로필</span>
+                </Link>
+              ))
+            )}
             <Link
               href="/settings"
               onClick={() => setIsOpen(false)}
@@ -102,8 +122,10 @@ export function UserMenu() {
                 setIsOpen(false);
                 resetOnboardingGuides(user.id);
                 // 계정에 남은 확인 이력도 지워야 안내가 다시 뜬다.
-                await userApi.updateSettings({ onboardingSeen: false }).catch(() => {});
-                window.location.assign('/');
+                await userApi
+                  .updateSettings({ onboardingSeen: false })
+                  .catch(() => {});
+                window.location.assign("/");
               }}
               className="flex w-full items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
             >

@@ -17,14 +17,15 @@ import {
   Users,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { UserMenu } from "@/components/UserMenu";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 import { LandingMobileNav } from "./LandingMobileNav";
 import { LiveStreamersSection } from "@/components/home/LiveStreamersSection";
 import { AutoBalanceDemo } from "./AutoBalanceDemo";
 import { LandingFeatureDemo } from "./LandingFeatureDemo";
 import { DEFAULT_GAME_PREFIX } from "@/lib/game-links";
+import { GUIDE_BASE } from "@/lib/guide-links";
 import { GamePickerCards } from "@/components/games/GamePickerCards";
-import { LandingAuthAction } from "./LandingAuthAction";
 
 const operations: Array<{
   index: string;
@@ -69,19 +70,28 @@ const operations: Array<{
 
 const footerLinks = [
   { href: "/about", label: "서비스 소개" },
-  { href: "/guide", label: "가이드 · 자료" },
+  { href: `${GUIDE_BASE}/guide`, label: "가이드 · 자료" },
   { href: "/community", label: "커뮤니티" },
   { href: "/contact", label: "문의" },
   { href: "/privacy", label: "개인정보처리방침" },
   { href: "/terms", label: "이용약관" },
 ];
 
+/**
+ * 종합 홈 헤더 메뉴.
+ *
+ * 전에는 인페이지 앵커(`#auction`·`#auto-balance`·`#operations`)와 실제 경로를
+ * 섞어 두고 구분을 주지 않아, 누르기 전에는 스크롤인지 이동인지 알 수 없었다.
+ * "내전 방" 은 `/lol/tournaments` 라서 종합 홈에서 누르면 말없이 롤로 갔다.
+ *
+ * 게임을 고르지 않는 경로만 남긴다 — 게임으로 들어가는 입구는 이 페이지
+ * 맨 위의 카드다. 가이드는 게임마다 문안이 갈려서(`guide-links.ts`) 여기
+ * 둘 수 없고, 게임에 들어간 뒤 그 게임 헤더에서 본다.
+ */
 const landingNavLinks = [
-  { href: "#auction", label: "경매" },
-  { href: "#auto-balance", label: "팀 편성 도구" },
-  { href: "#operations", label: "주요 기능" },
-  { href: `${DEFAULT_GAME_PREFIX}/tournaments`, label: "내전 방" },
+  { href: "/about", label: "서비스 소개" },
   { href: "/community", label: "커뮤니티" },
+  { href: "/clans", label: "클랜" },
 ];
 
 const positions = ["TOP", "JGL", "MID", "BOT", "SUP"];
@@ -1158,10 +1168,16 @@ function LandingHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          {/* 로그인한 사람에게는 대시보드로 보내는 버튼이 된다.
-              여기에 "로그인"만 박아 두면 `/` 에서는 앱 헤더도 안 붙기 때문에
-              세션이 멀쩡해도 로그아웃된 것처럼 보인다. */}
-          <LandingAuthAction />
+          {/*
+            앱 헤더와 같은 `UserMenu` 를 쓴다. `/` 에서는 AppShell 이 앱 헤더를
+            감싸지 않아서 여기에 "로그인"만 박아 두면 세션이 멀쩡해도 로그아웃된
+            것처럼 보였고, 그래서 전에는 전용 버튼(`LandingAuthAction`)을 따로
+            뒀다. 그 버튼은 로그인한 사람을 "내 대시보드" 라는 앱에 없는 이름으로
+            `lastGameOrDefault()` 로 보내서, 게임을 고른 적 없는 사람은 롤 홈으로
+            끌려갔다. `UserMenu` 는 아바타·설정·로그아웃을 이미 들고 있고,
+            프로필은 게임을 이름으로 고르게 한다.
+          */}
+          <UserMenu />
         </div>
       </div>
     </header>

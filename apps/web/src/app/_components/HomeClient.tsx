@@ -11,8 +11,8 @@
  * 있으므로 그 분기와 딸린 dynamic import 를 걷어냈다 — 조건이 죽은 코드는
  * 다음 사람이 왜 있는지 알 수 없다.
  *
- * 로그인 상태는 랜딩 헤더(`LandingAuthAction`)가 보여준다. 이 경로에서는
- * AppShell 이 앱 헤더를 감싸지 않기 때문이다.
+ * 로그인 상태는 랜딩 헤더의 `UserMenu` 가 보여준다 — 앱 헤더와 같은 것이다.
+ * 이 경로에서는 AppShell 이 앱 헤더를 감싸지 않기 때문에 랜딩이 직접 든다.
  */
 export default function HomeClient({ landing }: { landing: React.ReactNode }) {
   return <>{landing}</>;
