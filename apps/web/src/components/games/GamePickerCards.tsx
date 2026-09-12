@@ -33,12 +33,31 @@ import { GameEntryLink } from "./GameEntryLink";
  * 남의 CDN 에 맡기면 깨질 때 첫 화면이 빈다. 카드 아트는 CSS 로 짠다.
  */
 
-/** 게임별 카드 아트. 전부 CSS 라 외부 요청이 없다. */
+/**
+ * 게임별 카드 아트.
+ *
+ * 이미지는 **자체 호스팅**한다(`public/images/games`). 전에는 남의 CDN 을
+ * 직접 걸었다가 두 가지로 깨졌다 — 챔피언 아트는 버전 경로에 splash 파일명을
+ * 붙여 403 이 났고(올바른 경로는 버전 없는 `cdn/img/champion/loading/…`),
+ * PUBG 쪽은 경로에 빌드 해시(`main_49267b7`)가 박혀 있어 그쪽이 재배포하면
+ * 그날 첫 화면이 빈다. 합쳐서 50KB 라 받아두는 게 싸다.
+ *
+ * 이미지가 없어도 카드는 성립한다 — `wash` 그라디언트가 밑에 깔려 있어
+ * 배경만 사라지고 글자·태그·CTA 는 그대로다.
+ */
 const CARD_ART: Record<
   string,
-  { wash: string; edge: string; halo: string; mark: string; kicker: string }
+  {
+    image?: string;
+    wash: string;
+    edge: string;
+    halo: string;
+    mark: string;
+    kicker: string;
+  }
 > = {
   LOL: {
+    image: "/images/games/lol.jpg",
     wash: "bg-[radial-gradient(120%_85%_at_20%_0%,rgba(102,126,234,0.34),transparent_62%),radial-gradient(110%_75%_at_85%_18%,rgba(118,75,162,0.28),transparent_58%),linear-gradient(180deg,#161a2e_0%,#0b0c14_72%)]",
     edge: "group-hover:border-[#8b9cf0]/45",
     halo: "group-hover:shadow-[0_28px_90px_rgba(102,126,234,0.18)]",
@@ -46,6 +65,10 @@ const CARD_ART: Record<
     kicker: "LEAGUE OF LEGENDS",
   },
   PUBG: {
+    // 아직 아트가 없다. PUBG 공식 CDN 에서 받아 봤더니 키아트가 아니라
+    // 노랑·검정 단색 패널이었다(782×1483 인데 6KB 인 게 그 뜻이었다).
+    // 아무 그래픽이나 깔면 카드가 망가지므로 `wash` 로 둔다 —
+    // `public/images/games/pubg.webp` 를 넣고 `image` 를 켜면 바로 붙는다.
     wash: "bg-[radial-gradient(120%_85%_at_22%_0%,rgba(242,169,0,0.3),transparent_60%),radial-gradient(110%_70%_at_88%_22%,rgba(255,209,102,0.16),transparent_55%),linear-gradient(180deg,#241c0d_0%,#0b0b0b_74%)]",
     edge: "group-hover:border-[#F2A900]/45",
     halo: "group-hover:shadow-[0_28px_90px_rgba(242,169,0,0.16)]",
@@ -102,7 +125,7 @@ export function GamePickerCards() {
               slug={game.slug}
               className={`group relative aspect-[9/16] overflow-hidden rounded-xl [container-type:inline-size] border border-white/[0.09] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-1 sm:p-6 ${art.wash} ${art.edge} ${art.halo}`}
             >
-              {/* 카드 안쪽 큰 약어. 아트를 대신해 카드에 무게를 준다.
+              {/* 카드 안쪽 큰 약어. 이미지가 없을 때 카드를 받쳐준다.
                   카드 폭 기준(`cqw`)으로 재야 글자가 경계에서 잘리지 않는다 —
                   뷰포트 기준(`vw`)으로 잡았다가 `LOL` 이 `LOI` 로 잘렸다. */}
               <span
@@ -111,6 +134,16 @@ export function GamePickerCards() {
               >
                 {game.title}
               </span>
+
+              {/* 게임 아트. `wash` 위에 덮고, 아래 그라디언트가 다시 눌러
+                  글자 대비를 만든다. 없으면 `wash` 만 보인다. */}
+              {art.image ? (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 bg-cover bg-top transition-transform duration-500 group-hover:scale-[1.03]"
+                  style={{ backgroundImage: `url(${art.image})` }}
+                />
+              ) : null}
 
               {/* 아래쪽을 눌러 글자가 확실히 읽히게 한다. */}
               <span
