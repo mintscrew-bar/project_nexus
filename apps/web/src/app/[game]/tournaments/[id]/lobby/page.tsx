@@ -1081,11 +1081,11 @@ export default function TournamentLobbyPage() {
         )}
 
         {/* ═══ Main Content: Desktop 2-col / Mobile Tabs ═══ */}
-        <div className="flex min-h-0 flex-1 basis-0 overflow-hidden">
+        <div className="flex min-h-0 w-full flex-1 basis-0 overflow-hidden">
           {isAutoBalanceReviewStage ? (
             /* ═══ 편성 확인 전용 데스크톱 레이아웃 ═══
                2:1 분할을 버리고 편성 영역이 폭 전체를 쓴다. 채팅은 좁은 사이드로 유지. */
-            <div className="mx-auto hidden h-full min-h-0 max-w-screen-2xl gap-4 px-6 py-4 lg:flex">
+            <div className="mx-auto hidden h-full min-h-0 w-full max-w-screen-2xl gap-4 px-6 py-4 lg:flex">
               <section className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
                 {autoBalanceReview}
               </section>
@@ -1159,7 +1159,7 @@ export default function TournamentLobbyPage() {
           )}
 
           {/* Mobile layout (< lg) */}
-          <div className="flex h-full min-h-0 flex-col lg:hidden">
+          <div className="flex h-full min-h-0 w-full flex-1 basis-0 flex-col lg:hidden">
             <Tabs
               defaultValue="participants"
               value={mobileTab}

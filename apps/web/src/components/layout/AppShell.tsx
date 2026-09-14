@@ -93,8 +93,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   // 인증된 앱 셸 (또는 마운트 전 기본 셸)
+  //
+  // body가 flex 컨테이너라 `h-full`만 두면 일반 페이지에서 로비로
+  // 클라이언트 이동하는 순간 이전 페이지 높이를 기준으로 이 자식이 축소될 수
+  // 있다. 그때 로비의 flex-1 본문이 0에 가깝게 접혀 참가자·채팅이 사라진다.
+  // 뷰포트 높이와 flex 축소 금지를 함께 명시해 첫 이동과 새로고침을 같게 만든다.
   return (
-    <div className={cn("flex h-full min-h-0 flex-col", themeClass)}>
+    <div
+      className={cn(
+        "flex h-dvh min-h-0 w-full flex-none flex-col",
+        themeClass,
+      )}
+    >
       {/* 필름 그레인 오버레이. 좌표만 넘기므로 리렌더는 없다. */}
       {themeClass && <PubgSurfaceGrain />}
       <Header />
