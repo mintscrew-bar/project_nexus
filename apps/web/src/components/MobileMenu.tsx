@@ -32,6 +32,7 @@ import {
 } from "@/lib/body-scroll-lock";
 import { GameSwitcher } from "@/components/layout/GameSwitcher";
 import { gamePath, useCurrentGame } from "@/hooks/useCurrentGame";
+import { GAMES } from "@nexus/types";
 
 interface MobileMenuProps {
   className?: string;
@@ -130,7 +131,12 @@ export function MobileMenu({ className }: MobileMenuProps) {
       label: "내전 전적",
       icon: Trophy,
     },
-    { href: "/clans", label: "클랜", icon: Users },
+    // 클랜은 게임별로 갈린다. 경로에 프리픽스는 없지만 쿼리로 게임을 넘긴다.
+    {
+      href: `/clans?game=${GAMES[currentGame].slug}`,
+      label: "클랜",
+      icon: Users,
+    },
     { href: "/streamers", label: "스트리머", icon: Radio },
     { href: "/community", label: "커뮤니티", icon: MessageSquare },
     { href: gamePath(currentGame, "/guide"), label: "가이드", icon: BookOpen },

@@ -35,6 +35,7 @@ import {
 import { ClanEmblem, ClanTag } from "@/components/domain/ClanEmblem";
 import { ClansTour } from "@/components/onboarding/PrimaryPageTours";
 import ClanDetailClient from "./[id]/_ClanDetailClient";
+import { useClanGame, type ClanGameTitle } from "@/lib/clan-game";
 
 interface Clan {
   id: string;
@@ -59,8 +60,6 @@ interface Clan {
     members: number;
   };
 }
-
-type ClanGameTitle = "LOL" | "PUBG";
 
 // 정렬 옵션
 type SortOption = "latest" | "members" | "active";
@@ -201,8 +200,7 @@ interface ClanExplorerProps {
 function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const gameTitle: ClanGameTitle =
-    searchParams.get("game")?.toLowerCase() === "pubg" ? "PUBG" : "LOL";
+  const gameTitle = useClanGame();
   const gameQuery = `game=${gameTitle.toLowerCase()}`;
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
@@ -786,8 +784,7 @@ function ClansPageContent() {
   const { isAuthenticated, user } = useAuthStore();
   const searchParams = useSearchParams();
   const forceExplore = searchParams.get("view") === "explore";
-  const gameTitle: ClanGameTitle =
-    searchParams.get("game")?.toLowerCase() === "pubg" ? "PUBG" : "LOL";
+  const gameTitle = useClanGame();
   const { data: myClan, isLoading } = useQuery<{ id: string } | null>({
     queryKey: ["clans", "my", gameTitle, user?.id],
     queryFn: () => clanApi.getMyClan(gameTitle).catch(() => null),

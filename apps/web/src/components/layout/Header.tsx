@@ -12,6 +12,7 @@ import { DiscordIcon } from "@/components/icons/DiscordIcon";
 import { Users, Shield } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useFriendStore } from "@/stores/friend-store";
+import { GAMES } from "@nexus/types";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { GameSwitcher } from "@/components/layout/GameSwitcher";
 import { gamePath, useCurrentGame } from "@/hooks/useCurrentGame";
@@ -27,7 +28,6 @@ const gameNavItems = [
 
 // 게임과 무관한 화면. 프리픽스 없이 그대로 둔다.
 const commonNavItems = [
-  { href: "/clans", label: "클랜" },
   { href: "/streamers", label: "스트리머" },
   { href: "/community", label: "커뮤니티" },
 ];
@@ -40,6 +40,12 @@ export function Header() {
       href: gamePath(currentGame, item.path),
       label: item.label,
     })),
+    /*
+     * 클랜은 게임별로 갈린다(롤 클랜 ≠ 배그 클랜). 경로에 프리픽스는 없지만
+     * 쿼리로 게임을 실어 보낸다 — 전에는 `/clans` 만 보내 놓고 화면이 그걸
+     * 롤로 해석해서, 배그를 보던 사람이 눌러도 롤 클랜이 떴다.
+     */
+    { href: `/clans?game=${GAMES[currentGame].slug}`, label: "클랜" },
     ...commonNavItems,
     { href: gamePath(currentGame, "/guide"), label: "가이드" },
   ];
