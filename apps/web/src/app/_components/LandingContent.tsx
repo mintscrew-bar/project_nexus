@@ -1021,7 +1021,10 @@ export function LandingContentSections() {
                   }`}
                 />
                 <div aria-hidden="true">
-                  <LandingFeatureDemo kind={operation.visual} />
+                  <LandingFeatureDemo
+                    kind={operation.visual}
+                    wide={operation.index === "03"}
+                  />
                 </div>
                 <div className="relative flex h-full flex-col">
                   <div className="flex items-center justify-between">

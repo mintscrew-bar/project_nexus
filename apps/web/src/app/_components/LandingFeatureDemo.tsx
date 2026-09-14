@@ -13,17 +13,28 @@ import {
 
 type DemoKind = "readiness" | "balance" | "records";
 
-export function LandingFeatureDemo({ kind }: { kind: DemoKind }) {
-  if (kind === "readiness") return <ReadinessDemo />;
-  if (kind === "balance") return <BalanceDemo />;
-  return <RecordsDemo />;
+export function LandingFeatureDemo({
+  kind,
+  wide = false,
+}: {
+  kind: DemoKind;
+  /** 전폭 카드(`lg:col-span-12`)에 얹을 때. 카드 글자가 왼쪽 42% 를 쓰므로
+      데모는 오른쪽 절반으로 물러나야 한다 — 전폭으로 두면 글자 위를 덮는다. */
+  wide?: boolean;
+}) {
+  const shell = wide
+    ? "absolute inset-x-6 bottom-5 rounded-2xl border border-white/[0.08] bg-[#101116]/95 p-4 shadow-2xl shadow-black/30 lg:inset-x-auto lg:bottom-8 lg:right-8 lg:w-[48%]"
+    : "absolute inset-x-6 bottom-5 rounded-2xl border border-white/[0.08] bg-[#101116]/95 p-4 shadow-2xl shadow-black/30";
+  if (kind === "readiness") return <ReadinessDemo shell={shell} />;
+  if (kind === "balance") return <BalanceDemo shell={shell} />;
+  return <RecordsDemo shell={shell} />;
 }
 
-function ReadinessDemo() {
+function ReadinessDemo({ shell }: { shell: string }) {
   const [ready, setReady] = useState(false);
   const count = ready ? 9 : 8;
   return (
-    <div className="absolute inset-x-6 bottom-5 rounded-2xl border border-white/[0.08] bg-[#101116]/95 p-4 shadow-2xl shadow-black/30">
+    <div className={shell}>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
@@ -69,9 +80,9 @@ function ReadinessDemo() {
   );
 }
 
-function BalanceDemo() {
+function BalanceDemo({ shell }: { shell: string }) {
   return (
-    <div className="absolute inset-x-6 bottom-5 rounded-2xl border border-white/[0.08] bg-[#101116]/95 p-4 shadow-2xl shadow-black/30">
+    <div className={shell}>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
@@ -118,10 +129,10 @@ function BalanceDemo() {
   );
 }
 
-function RecordsDemo() {
+function RecordsDemo({ shell }: { shell: string }) {
   const [tab, setTab] = useState<"result" | "broadcast">("result");
   return (
-    <div className="absolute inset-x-6 bottom-5 rounded-2xl border border-white/[0.08] bg-[#101116]/95 p-4 shadow-2xl shadow-black/30">
+    <div className={shell}>
       <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
         <div>
           <p className="text-[9px] font-bold tracking-[0.16em] text-white/60">
@@ -138,23 +149,24 @@ function RecordsDemo() {
         </div>
       </div>
       {tab === "result" ? (
+        /* 전에는 KDA·DMG·GOLD 를 72·58·84% 짜리 막대로 그렸다. 무엇에 대한
+           비율인지가 화면 어디에도 없어서 축이 없는 막대였다 — 길이를 봐도
+           읽을 게 없고, 좁은 폭에서는 라벨과 붙어 뭉갰다. 경기 결과에서
+           사람이 실제로 보는 건 값 자체다. 숫자를 그대로 적는다. */
         <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-5">
-          <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2">
             {[
-              ["KDA", 72],
-              ["DMG", 58],
-              ["GOLD", 84],
-            ].map(([label, width]) => (
-              <div key={String(label)} className="flex items-center gap-2">
-                <span className="w-7 text-[8px] font-medium text-white/60">
+              ["KDA", "7.2"],
+              ["딜량", "24.1k"],
+              ["골드", "13.8k"],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <p className="text-[8px] font-medium tracking-[0.08em] text-white/45">
                   {label}
-                </span>
-                <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div
-                    className="h-full rounded-full bg-cyan-300/65"
-                    style={{ width: `${width}%` }}
-                  />
-                </div>
+                </p>
+                <p className="mt-1 text-sm font-black tabular-nums text-cyan-100/85">
+                  {value}
+                </p>
               </div>
             ))}
           </div>
