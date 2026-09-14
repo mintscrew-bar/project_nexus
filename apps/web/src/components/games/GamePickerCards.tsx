@@ -88,9 +88,16 @@ export function GamePickerCards() {
 
   return (
     <section
-      className="relative isolate mx-auto max-w-[1480px] bg-[radial-gradient(125%_85%_at_50%_0%,rgba(118,75,162,0.3),transparent_64%)] px-5 pb-20 pt-10 sm:px-6 md:pb-24 md:pt-20"
+      className="relative isolate mx-auto max-w-[1480px] px-5 pb-20 pt-10 sm:px-6 md:pb-24 md:pt-20"
       aria-label="Nexus game hubs"
     >
+      {/* 로고 퍼플 배경. **화면 전폭**으로 깐다 — 섹션(1480px)에 묶어 두면
+          1920 이상에서 컨테이너 밖이 검정으로 남아 좌우에 세로 경계선이
+          생긴다. `main` 이 `overflow-x-clip` 이라 `w-screen` 이 안전하다. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 -z-20 h-full w-screen -translate-x-1/2 bg-[radial-gradient(125%_85%_at_50%_0%,rgba(118,75,162,0.3),transparent_64%)]"
+      />
       <div
         aria-hidden
         className="pointer-events-none absolute left-[12%] top-20 -z-10 h-48 w-48 rounded-full bg-[#667EEA]/[0.1] blur-[90px]"
@@ -113,12 +120,12 @@ export function GamePickerCards() {
       */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-[clamp(1.5rem,3vw,3.5rem)] z-0 flex items-center justify-center whitespace-nowrap text-[clamp(2rem,9.4vw,13rem)] sm:text-[clamp(3rem,11.5vw,13rem)] font-black italic leading-[0.82] tracking-[-0.02em] text-white/[0.07]"
+        className="pointer-events-none absolute inset-x-0 top-[clamp(1.5rem,3vw,3.5rem)] z-0 flex items-center justify-center whitespace-nowrap text-[clamp(2rem,9.4vw,13rem)] sm:text-[clamp(3rem,11.5vw,11.5rem)] font-black italic leading-[0.82] tracking-[-0.02em] text-white/[0.07]"
       >
         <span>LET HIM COOK</span>
       </div>
 
-      <div className="relative z-10 mx-auto mt-[clamp(0.5rem,3.5vw,4.5rem)] grid max-w-[600px] grid-cols-2 gap-3 sm:gap-4">
+      <div className="relative z-10 mx-auto mt-[clamp(0.5rem,3.5vw,4.5rem)] grid max-w-[600px] grid-cols-2 gap-3 sm:gap-4 xl:max-w-[680px] 2xl:max-w-[780px]">
         {games.map((game) => {
           const art = CARD_ART[game.title] ?? CARD_ART.LOL;
           const copy = CARD_COPY[game.title] ?? CARD_COPY.LOL;

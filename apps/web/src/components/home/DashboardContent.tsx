@@ -398,7 +398,7 @@ export function DashboardHero({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-panel border border-white/[0.08] bg-black/20 backdrop-blur-sm">
+        <div className="w-full overflow-hidden rounded-panel border border-white/[0.08] bg-black/20 backdrop-blur-sm lg:max-w-[560px] lg:justify-self-end">
           <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3">
             <div>
               <p
