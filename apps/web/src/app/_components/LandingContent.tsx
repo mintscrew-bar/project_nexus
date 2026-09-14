@@ -17,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { LandingBodyScroll } from "./LandingBodyScroll";
 import { UserMenu } from "@/components/UserMenu";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 import { LandingMobileNav } from "./LandingMobileNav";
@@ -1190,6 +1191,7 @@ function LandingHeader() {
 export default function LandingContent() {
   return (
     <main className="min-h-screen overflow-x-clip break-keep bg-[#0f0f0f] pt-12 md:pt-16">
+      <LandingBodyScroll />
       <LandingHeader />
       <LandingContentSections />
       <LandingFooter />

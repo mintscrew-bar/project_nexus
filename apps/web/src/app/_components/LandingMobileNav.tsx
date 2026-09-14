@@ -6,12 +6,19 @@
 import { ExternalLink, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  acquireBodyScrollLock,
+  releaseBodyScrollLock,
+} from "@/lib/body-scroll-lock";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { DiscordIcon } from "@/components/icons/DiscordIcon";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 
 type NavLink = { href: string; label: string };
+
+/** 스크롤 잠금 소유자. 렌더마다 새로 만들면 해제가 안 되므로 모듈 수준에 둔다. */
+const SCROLL_LOCK_OWNER = Symbol("landing-mobile-nav");
 
 export function LandingMobileNav({ links }: { links: NavLink[] }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -22,12 +29,24 @@ export function LandingMobileNav({ links }: { links: NavLink[] }) {
     setIsOpen(false);
   }, [pathname]);
 
-  // 열려 있을 때 body 스크롤 잠금
+  /*
+   * 열려 있을 때 body 스크롤 잠금.
+   *
+   * 전에는 `document.body.style.overflow` 에 직접 `"hidden"`/`"unset"` 을
+   * 썼다. 그런데 `body` 는 클래스로 `overflow-hidden` 을 들고 있고 앱 전체의
+   * 높이 계약이 거기 걸려 있다 — 인라인 스타일은 클래스를 이깁니다. 이 컴포넌트는
+   * `md:hidden` 으로 **버튼만** 숨길 뿐 PC 에서도 마운트되므로, 종합 홈을 한 번
+   * 거치기만 하면 그 탭의 body 가 세션 내내 `overflow: unset` 으로 남았다.
+   * 정리 함수마저 원래 값이 아니라 `"unset"` 을 넣어 되돌릴 방법이 없었다.
+   * 그 상태로 로비에 들어가면 참가자·채팅 영역이 안 보였고, 새로고침해야
+   * 인라인 스타일이 사라져 정상으로 돌아왔다.
+   *
+   * 공용 잠금 헬퍼는 이전 값을 저장했다가 그대로 되돌린다.
+   */
   useEffect(() => {
-    document.body.style.overflow = isOpen ? "hidden" : "unset";
-    return () => {
-      document.body.style.overflow = "unset";
-    };
+    if (!isOpen) return;
+    acquireBodyScrollLock(SCROLL_LOCK_OWNER);
+    return () => releaseBodyScrollLock(SCROLL_LOCK_OWNER);
   }, [isOpen]);
 
   return (
@@ -76,7 +95,10 @@ export function LandingMobileNav({ links }: { links: NavLink[] }) {
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-4" aria-label="랜딩 모바일 메뉴">
+        <nav
+          className="flex-1 overflow-y-auto p-4"
+          aria-label="랜딩 모바일 메뉴"
+        >
           <ul className="space-y-1">
             {links.map((link) => (
               <li key={link.href}>
