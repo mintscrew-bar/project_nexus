@@ -125,6 +125,8 @@ export default function PostDetailClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasLiked, setHasLiked] = useState(false);
+  /** 좋아요 요청 진행 중. 연타로 요청이 겹치는 것을 막는다. */
+  const [isLiking, setIsLiking] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [hasBookmarked, setHasBookmarked] = useState(false);
   const [commentText, setCommentText] = useState("");
@@ -246,6 +248,24 @@ export default function PostDetailClient() {
     }
   }, [postId, isAuthenticated]);
 
+  /**
+   * 좋아요 상태만 서버에서 다시 읽는다.
+   *
+   * `fetchPost()` 로 되맞추면 `isLoading` 을 건드려 본문 전체가 스켈레톤으로
+   * 깜빡인다 — 하트 하나 고치자고 글을 다시 그릴 이유가 없다.
+   */
+  const resyncLike = useCallback(async () => {
+    try {
+      const [data] = await Promise.all([
+        communityApi.getPost(postId),
+        checkLikeStatus(),
+      ]);
+      setLikeCount(data?._count?.likes ?? 0);
+    } catch {
+      // 되맞추기 실패는 조용히 넘어간다 — 다음 조작에서 다시 시도된다.
+    }
+  }, [postId, checkLikeStatus]);
+
   const checkBookmarkStatus = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
@@ -262,24 +282,43 @@ export default function PostDetailClient() {
     checkBookmarkStatus();
   }, [fetchPost, checkLikeStatus, checkBookmarkStatus]);
 
+  /*
+   * 좋아요 토글.
+   *
+   * **서버가 돌려주는 `likeCount` 를 그대로 쓴다.** 전에는 응답을 버리고
+   * `c + 1` / `c - 1` 로 직접 셌는데, 그 값은 내가 화면을 연 시점의 수에
+   * 내 클릭만 더한 것이라 그동안 다른 사람이 누른 건 빠져 있었다.
+   *
+   * 상태가 어긋나면 되맞춘다. 다른 탭이나 기기에서 이미 눌러 뒀으면 서버가
+   * 409(이미 누름)·404(누른 적 없음)로 거절하는데, 전에는 토스트만 띄우고
+   * 하트와 숫자를 그대로 뒀다 — 눌러도 아무 일도 안 일어나는 것처럼 보였다.
+   * 그때는 서버 상태를 다시 읽어 화면을 맞춘다.
+   */
   const handleLike = async () => {
     if (!isAuthenticated) {
       router.push("/auth/login");
       return;
     }
 
+    // 연타로 요청이 겹치면 `hasLiked` 가 뒤집히기 전에 같은 요청이 두 번
+    // 나가 서버가 409 로 막는다. 응답이 올 때까지 잠근다.
+    if (isLiking) return;
+    setIsLiking(true);
     try {
-      if (hasLiked) {
-        await communityApi.unlikePost(postId);
-        setHasLiked(false);
-        setLikeCount((c) => c - 1);
-      } else {
-        await communityApi.likePost(postId);
-        setHasLiked(true);
-        setLikeCount((c) => c + 1);
-      }
+      const result = hasLiked
+        ? await communityApi.unlikePost(postId)
+        : await communityApi.likePost(postId);
+      setHasLiked(!hasLiked);
+      if (typeof result?.likeCount === "number") setLikeCount(result.likeCount);
     } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 409 || status === 404) {
+        await resyncLike();
+        return;
+      }
       addToast(getApiErrorMessage(err, "좋아요 처리에 실패했습니다."), "error");
+    } finally {
+      setIsLiking(false);
     }
   };
 
@@ -373,23 +412,30 @@ export default function PostDetailClient() {
     }
     const current = commentLikes[commentId] || { liked: false, count: 0 };
     try {
-      if (current.liked) {
-        await communityApi.unlikeComment(commentId);
-        setCommentLikes((prev) => ({
-          ...prev,
-          [commentId]: { liked: false, count: prev[commentId].count - 1 },
-        }));
-      } else {
-        await communityApi.likeComment(commentId);
-        setCommentLikes((prev) => ({
+      // 게시글과 같은 이유로 서버가 돌려준 수를 그대로 쓴다.
+      const result = current.liked
+        ? await communityApi.unlikeComment(commentId)
+        : await communityApi.likeComment(commentId);
+      setCommentLikes((prev) => {
+        const before = prev[commentId] ?? current;
+        return {
           ...prev,
           [commentId]: {
-            liked: true,
-            count: (prev[commentId]?.count || 0) + 1,
+            liked: !current.liked,
+            count:
+              typeof result?.likeCount === "number"
+                ? result.likeCount
+                : Math.max(0, before.count + (current.liked ? -1 : 1)),
           },
-        }));
-      }
+        };
+      });
     } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 409 || status === 404) {
+        // 이미 다른 곳에서 누른 상태다. 목록을 다시 읽어 맞춘다.
+        await resyncLike();
+        return;
+      }
       addToast(getApiErrorMessage(err, "좋아요 처리에 실패했습니다."), "error");
     }
   };
@@ -577,6 +623,7 @@ export default function PostDetailClient() {
                     variant={hasLiked ? "primary" : "secondary"}
                     size="sm"
                     onClick={handleLike}
+                    disabled={isLiking}
                   >
                     <Heart
                       className={`h-4 w-4 mr-2 ${hasLiked ? "fill-current" : ""}`}

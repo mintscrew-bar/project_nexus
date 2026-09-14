@@ -97,6 +97,34 @@ describe("CommunityService", () => {
   // ============================================================
   // createPost
   // ============================================================
+  describe("getPostById", () => {
+    /**
+     * 게시글 좋아요 수는 상세 응답에 있어야 한다.
+     *
+     * 댓글·대댓글에는 `_count` 를 넣으면서 정작 글에는 빠져 있었다. 화면은
+     * `data._count?.likes || 0` 으로 읽으므로 좋아요가 몇 개든 늘 0 으로
+     * 보였고, 버튼을 누르는 순간 서버가 준 진짜 수로 튀었다.
+     */
+    it("좋아요 수를 함께 내려준다", async () => {
+      prisma.post.findFirst.mockResolvedValue({
+        id: "post-1",
+        isDeleted: false,
+        isBlinded: false,
+        viewCount: 0,
+        comments: [],
+        _count: { likes: 7 },
+      });
+
+      const result = await service.getPostById("post-1");
+
+      expect(result._count.likes).toBe(7);
+      // 쿼리 자체가 게시글의 좋아요 수를 고르고 있는지 — 응답에 값이 실려도
+      // include 가 빠지면 실제 DB 에서는 `_count` 가 오지 않는다.
+      const args = prisma.post.findFirst.mock.calls[0][0];
+      expect(args.include._count).toEqual({ select: { likes: true } });
+    });
+  });
+
   describe("createPost", () => {
     const userId = "user-1";
     const baseDto = {

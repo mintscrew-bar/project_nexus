@@ -10,13 +10,20 @@ import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcuts";
 
 interface PostListFiltersProps {
   popularTags: { name: string; count: number }[];
+  /**
+   * 검색·정렬 줄 오른쪽 끝에 붙는 동작 버튼(글쓰기).
+   *
+   * 버튼 자체는 페이지가 만든다 — 로그인 여부와 이동 경로는 페이지가 알고,
+   * 이 컴포넌트는 자리만 내준다.
+   */
+  action?: React.ReactNode;
 }
 
 /**
  * 검색 입력 + 정렬 토글 + 인기 태그 행 필터바.
  * 검색어 debounce는 page.tsx 에서 처리 (queryKey에 사용).
  */
-export function PostListFilters({ popularTags }: PostListFiltersProps) {
+export function PostListFilters({ popularTags, action }: PostListFiltersProps) {
   const searchQuery = useCommunityStore((s) => s.searchQuery);
   const setSearchQuery = useCommunityStore((s) => s.setSearchQuery);
   const sortBy = useCommunityStore((s) => s.sortBy);
@@ -52,21 +59,25 @@ export function PostListFilters({ popularTags }: PostListFiltersProps) {
             className="pl-10"
           />
         </div>
-        <div className="flex items-center gap-0.5 bg-bg-tertiary rounded-lg p-1 flex-shrink-0">
-          {SORT_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setSortBy(opt.value)}
-              className={cn(
-                "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
-                sortBy === opt.value
-                  ? "bg-bg-secondary text-text-primary shadow-sm"
-                  : "text-text-secondary hover:text-text-primary"
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
+        {/* 정렬 + 글쓰기. 좁은 화면에서는 검색창 아래 한 줄을 같이 쓴다. */}
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <div className="flex flex-grow items-center gap-0.5 rounded-lg bg-bg-tertiary p-1 sm:flex-grow-0">
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setSortBy(opt.value)}
+                className={cn(
+                  "flex-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors sm:flex-none",
+                  sortBy === opt.value
+                    ? "bg-bg-secondary text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {action}
         </div>
       </div>
 

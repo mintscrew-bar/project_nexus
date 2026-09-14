@@ -282,6 +282,15 @@ export class CommunityService {
       where: { id: postId, isDeleted: false },
       include: {
         board: true,
+        /*
+         * 게시글 자신의 좋아요 수.
+         *
+         * 댓글·대댓글에는 `_count` 를 넣으면서 정작 글에는 빠져 있었다.
+         * 화면은 `data._count?.likes || 0` 으로 읽으므로 좋아요가 몇 개든
+         * 늘 0 으로 표시됐고, 누르는 순간 서버가 준 진짜 수로 튀었다.
+         * 목록 쿼리(`getPosts`)에는 이미 들어 있다.
+         */
+        _count: { select: { likes: true } },
         author: {
           select: {
             id: true,
