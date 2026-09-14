@@ -75,9 +75,10 @@ export function buildRandomRungs(
   for (let row = 0; row < rowCount; row++) {
     let left = 0;
     while (left < columnCount - 1) {
-      // 대략 절반 확률로 놓는다. 너무 촘촘하면 선이 뭉치고, 너무 성기면
-      // 사다리를 타는 맛이 없다.
-      if (randomBelow(2) === 0) {
+      // 다섯에 둘 꼴로 놓는다. 절반이었을 때는 거의 모든 행에 가로줄이
+      // 깔려 사다리가 아니라 격자처럼 보였다 — 어느 줄이 언제 꺾이는지가
+      // 안 읽힌다. 성기게 두면 꺾이는 지점이 눈에 들어온다.
+      if (randomBelow(5) < 2) {
         rungs.push({ row, left });
         left += 2; // 바로 옆에는 놓지 않는다
       } else {
@@ -101,8 +102,9 @@ export function buildLadderDraw(
   randomBelow: (maxExclusive: number) => number,
 ): LadderDraw {
   const columnCount = columns.length;
-  // 세로줄이 적으면 가로줄도 적어야 화면이 비지 않는다.
-  const rowCount = Math.max(6, Math.min(24, columnCount * 2));
+  // 행 수. 너무 적으면 사다리가 납작해 보이고(2팀일 때 특히), 너무 많으면
+  // 세로로 길어져 화면을 벗어난다.
+  const rowCount = Math.max(10, Math.min(20, columnCount * 2));
   const rungs = buildRandomRungs(columnCount, rowCount, randomBelow);
   const trace = traceLadder(rungs, columnCount, rowCount);
 
