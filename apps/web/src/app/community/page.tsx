@@ -15,12 +15,19 @@ import { useCommunityStore } from "@/stores/community-store";
 import { communityApi, boardApi, type Board } from "@/lib/api-client";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
+  Button,
   Card,
   CardContent,
   EmptyState,
   PostCardSkeleton,
 } from "@/components/ui";
-import { MessageCircle, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  MessageCircle,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resolveBoardIcon } from "@/lib/board-icons";
 import {
@@ -316,17 +323,42 @@ function CommunityPageContent() {
           onSelect={setSelectedCategory}
         />
 
-        {/* ── 카테고리 헤더 ── */}
-        {categoryTitle && CategoryIcon ? (
-          <div className="flex items-center gap-2 mb-4">
-            <CategoryIcon className={cn("h-5 w-5", categoryColor)} />
-            <h1 className="text-lg font-bold text-text-primary">
-              {categoryTitle}
-            </h1>
-          </div>
-        ) : (
-          <h1 className="sr-only">커뮤니티</h1>
-        )}
+        {/*
+          ── 카테고리 헤더 + 글쓰기 ──
+
+          글쓰기 버튼은 원래 커뮤니티 전용 사이드바에 있었는데, 사이드바를
+          통째로 걷어내면서(c8e434e2) 같이 사라졌다. 그 뒤로 커뮤니티에서
+          글을 쓸 방법은 "게시글이 없습니다" 빈 상태의 CTA 뿐이었다 — 글이
+          하나라도 있으면 그 CTA 도 안 나오므로 사실상 진입점이 없었다.
+        */}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          {categoryTitle && CategoryIcon ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <CategoryIcon
+                className={cn("h-5 w-5 flex-shrink-0", categoryColor)}
+              />
+              <h1 className="truncate text-lg font-bold text-text-primary">
+                {categoryTitle}
+              </h1>
+            </div>
+          ) : (
+            <h1 className="sr-only">커뮤니티</h1>
+          )}
+          <Button
+            size="sm"
+            className="ml-auto flex-shrink-0"
+            onClick={() =>
+              router.push(
+                isAuthenticated
+                  ? "/community/write"
+                  : "/auth/login?redirect=/community/write",
+              )
+            }
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            글쓰기
+          </Button>
+        </div>
 
         {/* ── 검색/정렬/태그 필터바 ── */}
         <div data-tour="community-filters">
