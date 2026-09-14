@@ -1,12 +1,12 @@
-import { create } from 'zustand';
-import { snakeDraftApi, roomApi } from '@/lib/api-client';
+import { create } from "zustand";
+import { snakeDraftApi, roomApi } from "@/lib/api-client";
 import {
   connectSnakeDraftSocket,
   disconnectSnakeDraftSocket,
   snakeDraftSocketHelpers,
-} from '@/lib/socket-client';
-import { useLobbyStore } from '@/stores/lobby-store';
-import type { LadderDraw } from '@nexus/types';
+} from "@/lib/socket-client";
+import { useLobbyStore } from "@/stores/lobby-store";
+import type { LadderDraw } from "@nexus/types";
 
 interface Player {
   id: string;
@@ -40,7 +40,7 @@ interface DraftState {
   currentPickIndex: number;
   currentTeamId: string | null;
   timerEnd: number;
-  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
+  status: "WAITING" | "IN_PROGRESS" | "COMPLETED";
 }
 
 interface SnakeDraftStoreState {
@@ -52,7 +52,10 @@ interface SnakeDraftStoreState {
   sessionAbortMessage: string | null;
 
   // REST API methods
-  startDraft: (roomId: string, captainSelection: 'RANDOM' | 'TIER') => Promise<void>;
+  startDraft: (
+    roomId: string,
+    captainSelection: "RANDOM" | "TIER",
+  ) => Promise<void>;
   makePick: (roomId: string, playerId: string) => Promise<void>;
   getDraftState: (roomId: string) => Promise<void>;
 
@@ -70,14 +73,17 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
   sessionAbortedAt: null,
   sessionAbortMessage: null,
 
-  startDraft: async (roomId: string, captainSelection: 'RANDOM' | 'TIER') => {
+  startDraft: async (roomId: string, captainSelection: "RANDOM" | "TIER") => {
     set({ isLoading: true, error: null });
     try {
       await snakeDraftApi.startDraft(roomId, captainSelection);
       set({ isLoading: false });
     } catch (err: any) {
       set({
-        error: err.response?.data?.message || err.message || "Failed to start draft.",
+        error:
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to start draft.",
         isLoading: false,
       });
     }
@@ -88,9 +94,10 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
     try {
       const response = await snakeDraftSocketHelpers.makePick(roomId, playerId);
       if (response?.error) {
-        const msg = response.error === 'pick_timeout'
-          ? '픽 요청 시간이 초과되었습니다.'
-          : response.error;
+        const msg =
+          response.error === "pick_timeout"
+            ? "픽 요청 시간이 초과되었습니다."
+            : response.error;
         set({ error: msg, isLoading: false });
         setTimeout(() => {
           if (get().error === msg) set({ error: null });
@@ -109,11 +116,17 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
   getDraftState: async (roomId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const state = await snakeDraftApi.getDraftState(roomId);
-      set({ draftState: state, isLoading: false });
+      // 응답은 `{ state }` 로 감싸져 온다. 여기만 래퍼를 안 벗겨서
+      // `draftState.teams` 가 undefined 였다 — 같은 API 를 쓰는 다른 두
+      // 호출부(폴백)는 `.state` 로 풀고 있었다.
+      const response = await snakeDraftApi.getDraftState(roomId);
+      set({ draftState: response?.state ?? null, isLoading: false });
     } catch (err: any) {
       set({
-        error: err.response?.data?.message || err.message || "Failed to get draft state.",
+        error:
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to get draft state.",
         isLoading: false,
       });
     }
@@ -123,8 +136,8 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
     const socket = connectSnakeDraftSocket();
     // Clear existing listeners (game events + raw socket events) to prevent duplication
     snakeDraftSocketHelpers.offAllListeners();
-    socket?.off('connect');
-    socket?.off('disconnect');
+    socket?.off("connect");
+    socket?.off("disconnect");
     set({
       isLoading: true,
       error: null,
@@ -142,7 +155,12 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
           set({ draftState: fallback.state, error: null });
         }
       } catch (err: any) {
-        set({ error: err.response?.data?.message || err.message || "Failed to sync draft state." });
+        set({
+          error:
+            err.response?.data?.message ||
+            err.message ||
+            "Failed to sync draft state.",
+        });
       } finally {
         isRefetchingDraftState = false;
       }
@@ -152,46 +170,50 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
       set({ draftState: data });
     });
 
-    snakeDraftSocketHelpers.onPickMade((data: {
-      teamId: string;
-      player: Player;
-      nextTeamId: string;
-      timerEnd: number;
-    }) => {
-      set((state) => {
-        if (!state.draftState) {
-          void refetchDraftState();
-          return state;
-        }
+    snakeDraftSocketHelpers.onPickMade(
+      (data: {
+        teamId: string;
+        player: Player;
+        nextTeamId: string;
+        timerEnd: number;
+      }) => {
+        set((state) => {
+          if (!state.draftState) {
+            void refetchDraftState();
+            return state;
+          }
 
-        const targetTeam = state.draftState.teams.find((team) => team.id === data.teamId);
-        if (!targetTeam || !data.player?.id) {
-          void refetchDraftState();
-          return state;
-        }
+          const targetTeam = state.draftState.teams.find(
+            (team) => team.id === data.teamId,
+          );
+          if (!targetTeam || !data.player?.id) {
+            void refetchDraftState();
+            return state;
+          }
 
-        const updatedTeams = state.draftState.teams.map((team) =>
-          team.id === data.teamId
-            ? { ...team, members: [...team.members, data.player] }
-            : team
-        );
+          const updatedTeams = state.draftState.teams.map((team) =>
+            team.id === data.teamId
+              ? { ...team, members: [...team.members, data.player] }
+              : team,
+          );
 
-        const updatedPlayers = state.draftState.availablePlayers.filter(
-          (p) => p.id !== data.player.id
-        );
+          const updatedPlayers = state.draftState.availablePlayers.filter(
+            (p) => p.id !== data.player.id,
+          );
 
-        return {
-          draftState: {
-            ...state.draftState,
-            teams: updatedTeams,
-            availablePlayers: updatedPlayers,
-            currentTeamId: data.nextTeamId,
-            currentPickIndex: state.draftState.currentPickIndex + 1,
-            timerEnd: data.timerEnd,
-          },
-        };
-      });
-    });
+          return {
+            draftState: {
+              ...state.draftState,
+              teams: updatedTeams,
+              availablePlayers: updatedPlayers,
+              currentTeamId: data.nextTeamId,
+              currentPickIndex: state.draftState.currentPickIndex + 1,
+              timerEnd: data.timerEnd,
+            },
+          };
+        });
+      },
+    );
 
     snakeDraftSocketHelpers.onDraftComplete((data?: { teams: Team[] }) => {
       set((state) => ({
@@ -199,7 +221,7 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
           ? {
               ...state.draftState,
               ...(data?.teams ? { teams: data.teams } : {}),
-              status: 'COMPLETED' as const,
+              status: "COMPLETED" as const,
             }
           : null,
       }));
@@ -207,25 +229,34 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
 
     // timer-update는 무시 — timerEnd는 next-pick/initial state에서 절대값으로 설정됨.
     // 정수 timeLeft 재계산 시 최대 1초 drift로 표시가 오락가락하는 문제 있음.
-    snakeDraftSocketHelpers.onTimerUpdate((_data: { timeLeft: number }) => { /* no-op */ });
+    snakeDraftSocketHelpers.onTimerUpdate((_data: { timeLeft: number }) => {
+      /* no-op */
+    });
 
     snakeDraftSocketHelpers.onDraftState((data: DraftState) => {
       set({ draftState: data });
     });
 
-    snakeDraftSocketHelpers.onNextPick((data: { currentTeamId: string; currentPickIndex?: number; timerEnd: number }) => {
-      set((state) => {
-        if (!state.draftState) return state;
-        return {
-          draftState: {
-            ...state.draftState,
-            currentTeamId: data.currentTeamId,
-            currentPickIndex: data.currentPickIndex ?? state.draftState.currentPickIndex,
-            timerEnd: data.timerEnd,
-          },
-        };
-      });
-    });
+    snakeDraftSocketHelpers.onNextPick(
+      (data: {
+        currentTeamId: string;
+        currentPickIndex?: number;
+        timerEnd: number;
+      }) => {
+        set((state) => {
+          if (!state.draftState) return state;
+          return {
+            draftState: {
+              ...state.draftState,
+              currentTeamId: data.currentTeamId,
+              currentPickIndex:
+                data.currentPickIndex ?? state.draftState.currentPickIndex,
+              timerEnd: data.timerEnd,
+            },
+          };
+        });
+      },
+    );
 
     snakeDraftSocketHelpers.onAutoPickMade(() => {
       // Auto-pick notification — state already updated via pick-made event
@@ -244,7 +275,7 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
     });
 
     // 재연결 핸들러를 초기 join 전에 등록 (join 성공/실패 모두에서 reconnect 가능)
-    socket?.on('connect', async () => {
+    socket?.on("connect", async () => {
       set({ isConnected: true });
       const response = await snakeDraftSocketHelpers.joinDraft(roomId);
       if (response?.success && response.state) {
@@ -257,18 +288,19 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
         set({
           draftState: null,
           isConnected: false,
-          error: response?.error || 'Failed to rejoin draft after reconnect.',
+          error: response?.error || "Failed to rejoin draft after reconnect.",
         });
       }
     });
-    socket?.on('disconnect', () => set({ isConnected: false }));
+    socket?.on("disconnect", () => set({ isConnected: false }));
 
     let joinResponse = await snakeDraftSocketHelpers.joinDraft(roomId);
 
     // On timeout, retry once if we have no existing state
     if (
       !joinResponse?.success &&
-      (joinResponse?.error === 'join_timeout' || joinResponse?.error === 'connect_timeout')
+      (joinResponse?.error === "join_timeout" ||
+        joinResponse?.error === "connect_timeout")
     ) {
       if (get().draftState && socket?.connected) {
         set({ isConnected: true, isLoading: false, error: null });
@@ -294,9 +326,11 @@ export const useSnakeDraftStore = create<SnakeDraftStoreState>((set, get) => ({
       set({
         isConnected: false,
         isLoading: false,
-        error: joinResponse.error === 'join_timeout' || joinResponse.error === 'connect_timeout'
-          ? '서버 연결에 실패했습니다. 새로고침 해주세요.'
-          : joinResponse.error,
+        error:
+          joinResponse.error === "join_timeout" ||
+          joinResponse.error === "connect_timeout"
+            ? "서버 연결에 실패했습니다. 새로고침 해주세요."
+            : joinResponse.error,
       });
       return;
     }

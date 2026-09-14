@@ -590,6 +590,12 @@ export class SnakeDraftService {
       roomId,
       teams,
       availablePlayers,
+      // 사다리 연출. 전에는 서버가 만들어 검증까지 해놓고 이 응답에 담지
+      // 않아서, 화면의 `draftState.ladder` 가 늘 undefined 였다 —
+      // `LadderDrawBoard` 는 한 번도 그려진 적이 없다. 클라이언트가 상태를
+      // 받는 경로(소켓 draft-started·draft-state, REST)가 전부 이 함수를
+      // 거치므로 여기서 빠지면 어디에도 안 나간다.
+      ladder: state.ladder,
       pickOrder: state.pickOrder,
       currentPickIndex: state.currentTeamIndex,
       currentTeamId: state.pickOrder[state.currentTeamIndex] ?? null,

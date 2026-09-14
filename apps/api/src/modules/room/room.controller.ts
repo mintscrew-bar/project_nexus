@@ -429,7 +429,11 @@ export class RoomController {
 
   @Get(":id/snake-draft/state")
   async getSnakeDraftState(@Param("id") roomId: string) {
-    const state = this.snakeDraftService.getDraftState(roomId);
+    // **클라이언트 모양으로 돌려준다.** 전에는 내부 상태(`getDraftState`)를
+    // 그대로 내보내서 소켓이 보내는 것과 모양이 달랐다 — `teams` 가 없고
+    // `availablePlayers` 가 객체가 아니라 userId 배열이며 `status` 도 없다.
+    // 소켓이 끊겨 이 경로로 떨어지면 드래프트 화면이 빈 팀으로 그려졌다.
+    const state = await this.snakeDraftService.getClientDraftState(roomId);
     if (!state) {
       return { error: "Draft not started" };
     }

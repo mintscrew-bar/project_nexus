@@ -178,6 +178,32 @@ describe("SnakeDraftService", () => {
         roomId,
         result.teams.map((team: any) => ({ id: team.id, name: team.name })),
       );
+
+      /*
+       * **클라이언트가 받는 상태에도 사다리가 실려야 한다.**
+       *
+       * 위 검증은 `startSnakeDraft` 의 반환값만 본다. 그런데 화면이 상태를
+       * 받는 경로(소켓 draft-started·draft-state, REST)는 전부
+       * `getClientDraftState()` 를 거치는데, 거기서 `ladder` 가 빠져 있어
+       * 서버가 사다리를 만들고 검증까지 해놓고도 한 번도 그려진 적이
+       * 없었다. 반환값만 보는 테스트는 이 틈을 그대로 통과한다.
+       */
+      prisma.room.findUnique.mockResolvedValue({
+        id: roomId,
+        hostId,
+        status: RoomStatus.IN_PROGRESS,
+        teamMode: TeamMode.SNAKE_DRAFT,
+        participants: [],
+        teams: result.teams.map((team: any) => ({
+          ...team,
+          color: null,
+          members: [],
+        })),
+      });
+      const clientState = await service.getClientDraftState(roomId);
+      expect(clientState).not.toBeNull();
+      expect(clientState.ladder).toBeDefined();
+      expect(resolveLadderOrder(clientState.ladder)).toEqual([first, second]);
     });
 
     /**
