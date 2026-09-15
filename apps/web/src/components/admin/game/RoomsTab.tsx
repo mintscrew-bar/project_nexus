@@ -11,6 +11,7 @@ import {
 } from "@/components/ui";
 import { XCircle } from "lucide-react";
 import { Pagination, type AddToast } from "../shared";
+import { useAdminGameScope } from "../game-scope";
 
 interface AdminRoom {
   id: string;
@@ -27,6 +28,8 @@ export function RoomsTab({ addToast }: { addToast: AddToast }) {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  // 상단 전역 스위치가 정한 게임. 바뀌면 목록을 다시 읽는다.
+  const { gameParam } = useAdminGameScope();
 
   const limit = 20;
   const totalPages = Math.ceil(total / limit);
@@ -38,6 +41,7 @@ export function RoomsTab({ addToast }: { addToast: AddToast }) {
         page,
         limit,
         status: status || undefined,
+        gameTitle: gameParam,
       });
       setRooms(data.rooms);
       setTotal(data.total);
@@ -46,7 +50,7 @@ export function RoomsTab({ addToast }: { addToast: AddToast }) {
     } finally {
       setLoading(false);
     }
-  }, [page, status, addToast]);
+  }, [page, status, gameParam, addToast]);
 
   useEffect(() => {
     fetchRooms();

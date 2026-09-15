@@ -2483,8 +2483,10 @@ export interface AdminInternalMatchDetail extends Omit<
 
 export const adminApi = {
   // Stats
-  getStats: async () => {
-    const response = await apiClient.get("/admin/stats");
+  // `gameTitle` 을 주면 게임을 가릴 수 있는 지표(방·클랜)만 좁혀진다.
+  // 어느 지표가 좁혀졌는지는 응답의 `scopedByGame` 이 알려준다.
+  getStats: async (params?: { gameTitle?: "LOL" | "PUBG" }) => {
+    const response = await apiClient.get("/admin/stats", { params });
     return response.data;
   },
   getSystemStatus: async () => {
@@ -2663,6 +2665,7 @@ export const adminApi = {
     page?: number;
     limit?: number;
     search?: string;
+    gameTitle?: "LOL" | "PUBG";
   }) => {
     const response = await apiClient.get("/admin/clans", { params });
     return response.data;
@@ -2676,8 +2679,20 @@ export const adminApi = {
     page?: number;
     limit?: number;
     status?: string;
+    gameTitle?: "LOL" | "PUBG";
   }) => {
     const response = await apiClient.get("/admin/rooms", { params });
+    return response.data;
+  },
+
+  // 배그 스크림 기록. 롤 내전(`Match`)과 달리 라운드·포인트 구조라 별도다.
+  getScrims: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+    search?: string;
+  }) => {
+    const response = await apiClient.get("/admin/scrims", { params });
     return response.data;
   },
   // 실제 진행된 내전 기록 (외부 랭크 인제스트 매치는 제외)

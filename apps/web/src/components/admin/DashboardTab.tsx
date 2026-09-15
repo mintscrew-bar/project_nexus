@@ -22,6 +22,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { StatCard, type AddToast } from "./shared";
+import { useAdminGameScope } from "./game-scope";
+import { GAMES } from "@nexus/types";
 
 export function DashboardTab({ addToast }: { addToast: AddToast }) {
   type SystemStatus = {
@@ -39,10 +41,14 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
     string | null
   >(null);
   const [loading, setLoading] = useState(true);
+  const { game, gameParam } = useAdminGameScope();
+  const gameLabel = game ? GAMES[game].shortLabel : "";
 
   const fetchDashboardStats = useCallback(async () => {
     setLoading(true);
-    const statsResult = await Promise.resolve(adminApi.getStats())
+    const statsResult = await Promise.resolve(
+      adminApi.getStats({ gameTitle: gameParam }),
+    )
       .then((value) => ({ status: "fulfilled" as const, value }))
       .catch((reason) => ({ status: "rejected" as const, reason }));
 
@@ -65,7 +71,7 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
     }
 
     setLoading(false);
-  }, [addToast]);
+  }, [addToast, gameParam]);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -110,7 +116,20 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-text-primary">대시보드</h2>
+      <div>
+        <h2 className="text-lg font-semibold text-text-primary">대시보드</h2>
+        {/*
+          게임을 고르면 **나눌 수 있는 지표만** 좁혀진다. 유저·신고는 게임과
+          무관하고 매치는 게임 컬럼이 아예 없다(배그 내전은 `Scrim` 에 따로
+          쌓인다). 어느 숫자가 전체인지 적어 두지 않으면 합계를 오해한다.
+        */}
+        {game && (
+          <p className="mt-1 text-xs text-text-tertiary">
+            방·클랜은 {gameLabel} 기준입니다. 유저·신고·매치는 게임과 무관해
+            전체 수치입니다.
+          </p>
+        )}
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
           icon={<Users className="h-5 w-5" />}
@@ -124,18 +143,19 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
         />
         <StatCard
           icon={<Home className="h-5 w-5" />}
-          label="전체 방"
+          label={game ? `${gameLabel} 방` : "전체 방"}
           value={stats.totalRooms}
         />
         <StatCard
           icon={<Activity className="h-5 w-5" />}
-          label="활성 방"
+          label={game ? `${gameLabel} 활성 방` : "활성 방"}
           value={stats.activeRooms}
         />
         <StatCard
           icon={<Sword className="h-5 w-5" />}
-          label="전체 매치"
+          label="롤 내전 기록"
           value={stats.totalMatches}
+          sub={`배그 스크림 ${(stats.totalScrims ?? 0).toLocaleString()}건`}
         />
         <StatCard
           icon={<Flag className="h-5 w-5" />}
@@ -145,7 +165,7 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
         />
         <StatCard
           icon={<Shield className="h-5 w-5" />}
-          label="전체 클랜"
+          label={game ? `${gameLabel} 클랜` : "전체 클랜"}
           value={stats.totalClans}
         />
       </div>
@@ -211,7 +231,6 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
           </p>
         </CardContent>
       </Card>
-
     </div>
   );
 }

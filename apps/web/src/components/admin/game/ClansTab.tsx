@@ -11,6 +11,7 @@ import {
 } from "@/components/ui";
 import { Search, Trash2 } from "lucide-react";
 import { Pagination, type AddToast } from "../shared";
+import { useAdminGameScope } from "../game-scope";
 
 interface AdminClan {
   id: string;
@@ -28,6 +29,8 @@ export function ClansTab({ addToast }: { addToast: AddToast }) {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
+  // 상단 전역 스위치가 정한 게임. 바뀌면 목록을 다시 읽는다.
+  const { gameParam } = useAdminGameScope();
 
   const limit = 20;
   const totalPages = Math.ceil(total / limit);
@@ -39,6 +42,7 @@ export function ClansTab({ addToast }: { addToast: AddToast }) {
         page,
         limit,
         search: search || undefined,
+        gameTitle: gameParam,
       });
       setClans(data.clans);
       setTotal(data.total);
@@ -47,7 +51,7 @@ export function ClansTab({ addToast }: { addToast: AddToast }) {
     } finally {
       setLoading(false);
     }
-  }, [page, search, addToast]);
+  }, [page, search, gameParam, addToast]);
 
   useEffect(() => {
     fetchClans();

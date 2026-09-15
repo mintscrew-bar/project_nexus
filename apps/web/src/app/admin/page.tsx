@@ -15,6 +15,11 @@ import { StreamersTab } from "@/components/admin/content/StreamersTab";
 import { ClansTab } from "@/components/admin/game/ClansTab";
 import { RoomsTab } from "@/components/admin/game/RoomsTab";
 import { MatchesTab } from "@/components/admin/game/MatchesTab";
+import { ScrimsTab } from "@/components/admin/game/ScrimsTab";
+import {
+  AdminGameScopeProvider,
+  AdminGameSwitch,
+} from "@/components/admin/game-scope";
 import { DiscordGuildLinksTab } from "@/components/admin/system/DiscordGuildLinksTab";
 import { ErrorLogsTab } from "@/components/admin/system/ErrorLogsTab";
 import {
@@ -30,6 +35,7 @@ import {
   Megaphone,
   Radio,
   Bot,
+  Crosshair,
   Bug,
 } from "lucide-react";
 
@@ -41,6 +47,7 @@ type Tab =
   | "clans"
   | "rooms"
   | "matches"
+  | "scrims"
   | "chatlogs"
   | "announcements"
   | "streamers"
@@ -68,6 +75,7 @@ const MODERATOR_TABS: Tab[] = [
   "reports",
   "community",
   "matches",
+  "scrims",
   "chatlogs",
   "appeals",
 ];
@@ -123,8 +131,13 @@ const TAB_GROUPS: TabGroup[] = [
       { id: "clans", label: "클랜 관리", icon: <Shield className="h-4 w-4" /> },
       { id: "rooms", label: "방 관리", icon: <Home className="h-4 w-4" /> },
       {
+        id: "scrims",
+        label: "스크림 기록 (배그)",
+        icon: <Crosshair className="h-4 w-4" />,
+      },
+      {
         id: "matches",
-        label: "내전 기록",
+        label: "내전 기록 (롤)",
         icon: <Swords className="h-4 w-4" />,
       },
     ],
@@ -151,7 +164,7 @@ const ALL_TABS: TabItem[] = TAB_GROUPS.flatMap((group) => group.tabs);
 const isAdminTab = (value: string | null): value is Tab =>
   !!value && ALL_TABS.some((tab) => tab.id === value);
 
-export default function AdminPage() {
+function AdminPageInner() {
   // 권한 가드는 admin/layout.tsx에서 처리 (미인증/USER → notFound)
   const { user } = useAuthStore();
   const { addToast } = useToast();
@@ -175,35 +188,60 @@ export default function AdminPage() {
     [visibleGroups],
   );
 
+  /**
+   * 탭을 URL 에 싣되 **다른 쿼리는 보존한다.**
+   *
+   * 전에는 `/admin?tab=…` 으로 통째로 갈아치웠다. 게임 범위(`?game=`)도 같은
+   * URL 에 있으므로 그대로 두면 탭을 옮길 때마다 범위가 전체로 풀린다 —
+   * 그러면 "전역" 스위치가 아니다.
+   */
+  const buildHref = useCallback(
+    (tab: Tab) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (tab === "dashboard") params.delete("tab");
+      else params.set("tab", tab);
+      const query = params.toString();
+      return query ? `/admin?${query}` : "/admin";
+    },
+    [searchParams],
+  );
+
   useEffect(() => {
     const tab = searchParams.get("tab");
     const nextTab =
       isAdminTab(tab) && visibleTabIds.includes(tab) ? tab : "dashboard";
     setActiveTab(nextTab);
     if (tab && tab !== nextTab) {
-      router.replace("/admin", { scroll: false });
+      router.replace(buildHref("dashboard"), { scroll: false });
     }
-  }, [searchParams, router, visibleTabIds]);
+  }, [searchParams, router, visibleTabIds, buildHref]);
 
   const handleTabChange = useCallback(
     (tab: Tab) => {
       setActiveTab(tab);
-      router.replace(tab === "dashboard" ? "/admin" : `/admin?tab=${tab}`, {
-        scroll: false,
-      });
+      router.replace(buildHref(tab), { scroll: false });
     },
-    [router],
+    [router, buildHref],
   );
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)]">
       {/* 사이드바 — 모바일에서는 상단 가로 스크롤 탭바, 데스크톱에서는 세로 사이드바 */}
       <aside className="flex flex-shrink-0 flex-col border-b border-bg-tertiary bg-bg-secondary md:w-52 md:border-b-0 md:border-r">
-        <div className="hidden items-center gap-2 border-b border-bg-tertiary/80 px-4 py-4 md:flex">
-          <Shield className="h-5 w-5 text-accent-primary" />
-          <span className="font-bold text-text-primary text-sm">
-            관리자 패널
-          </span>
+        <div className="hidden flex-col gap-3 border-b border-bg-tertiary/80 px-4 py-4 md:flex">
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-accent-primary" />
+            <span className="font-bold text-text-primary text-sm">
+              관리자 패널
+            </span>
+          </div>
+          {/* 전역 게임 범위. 여기서 한 번 정하면 아래 탭들이 따라간다 —
+              탭을 옮길 때마다 다시 고르지 않아도 된다. */}
+          <AdminGameSwitch />
+        </div>
+        {/* 모바일에서는 가로 탭바 위에 한 줄로 */}
+        <div className="flex items-center justify-end border-b border-bg-tertiary/80 px-3 py-2 md:hidden">
+          <AdminGameSwitch />
         </div>
         <nav
           className="scrollbar-none flex gap-1 overflow-x-auto p-1.5 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:p-2"
@@ -266,11 +304,26 @@ export default function AdminPage() {
         {activeTab === "streamers" && <StreamersTab addToast={addToast} />}
         {activeTab === "clans" && <ClansTab addToast={addToast} />}
         {activeTab === "rooms" && <RoomsTab addToast={addToast} />}
+        {activeTab === "scrims" && <ScrimsTab addToast={addToast} />}
         {activeTab === "matches" && <MatchesTab addToast={addToast} />}
         {activeTab === "discord" && (
           <DiscordGuildLinksTab addToast={addToast} />
         )}
       </main>
     </div>
+  );
+}
+
+/**
+ * 게임 범위를 관리자 화면 전체에 깔아 준다.
+ *
+ * 탭마다 드롭다운을 두면 탭을 옮길 때마다 다시 고르게 된다. 운영자는 보통
+ * "지금은 배그를 본다" 상태로 여러 탭을 오간다.
+ */
+export default function AdminPage() {
+  return (
+    <AdminGameScopeProvider>
+      <AdminPageInner />
+    </AdminGameScopeProvider>
   );
 }
