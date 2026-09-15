@@ -258,7 +258,15 @@ export default function SnakeDraftPage() {
         {draftState.ladder &&
           showLadder &&
           draftState.currentPickIndex === 0 && (
-            <div className="mb-5 rounded-2xl border border-bg-tertiary bg-bg-secondary p-4">
+            <div
+              className={`mb-5 rounded-2xl border border-bg-tertiary bg-bg-secondary p-4 ${
+                draftState.ladder.columns.length <= 2
+                  ? "mx-auto w-full max-w-2xl"
+                  : draftState.ladder.columns.length <= 4
+                    ? "mx-auto w-full max-w-4xl"
+                    : ""
+              }`}
+            >
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-sm font-bold text-text-primary">
@@ -284,7 +292,7 @@ export default function SnakeDraftPage() {
                 onFinished={() => {
                   if (ladderDoneRef.current) return;
                   ladderDoneRef.current = true;
-                  setTimeout(() => setShowLadder(false), 2500);
+                  setTimeout(() => setShowLadder(false), 8000);
                 }}
               />
             </div>

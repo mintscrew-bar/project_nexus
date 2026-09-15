@@ -71,8 +71,8 @@ export default function DevLadder() {
     <div className="container mx-auto max-w-6xl space-y-10 p-6">
       <div className="flex items-center justify-between">
         <p className="text-xs text-text-tertiary">
-          세로줄을 눌러 타고 내려간다. 안 누르면 2.6초마다 한 줄씩 알아서
-          공개된다.
+          세로줄을 눌러 타고 내려간다. 안 누르면 팀 수에 맞는 속도로 한 줄씩
+          알아서 공개된다.
         </p>
         <Button size="sm" onClick={redraw}>
           다시 뽑기
@@ -83,7 +83,15 @@ export default function DevLadder() {
           <p className="mb-3 text-xs font-bold text-text-tertiary">
             {label} · 가로줄 {draw.rungs.length}개 · {draw.rowCount}행
           </p>
-          <div className="rounded-2xl border border-bg-tertiary bg-bg-secondary p-4">
+          <div
+            className={`rounded-2xl border border-bg-tertiary bg-bg-secondary p-4 ${
+              count <= 2
+                ? "mx-auto max-w-2xl"
+                : count <= 4
+                  ? "mx-auto max-w-4xl"
+                  : ""
+            }`}
+          >
             <LadderDrawBoard
               key={`${label}-${seed}`}
               draw={draw as LadderDraw}

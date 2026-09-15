@@ -25,8 +25,12 @@ const SIDE_PAD = 24;
 
 /** 한 팀이 사다리를 타고 내려가는 데 걸리는 시간 */
 const TRACE_MS = 900;
-/** 아무도 안 누르면 이만큼 기다렸다가 한 줄씩 알아서 공개한다 */
-const AUTO_REVEAL_MS = 2600;
+/** 팀 수가 많을수록 자동 공개를 빠르게 해 25팀 연출이 1분 넘게 늘어지지 않게 한다. */
+function autoRevealDelay(columnCount: number) {
+  if (columnCount <= 4) return 2600;
+  if (columnCount <= 8) return 1400;
+  return 450;
+}
 
 interface TeamLabel {
   id: string;
@@ -61,6 +65,7 @@ export function LadderDrawBoard({
 }) {
   const columnCount = draw.columns.length;
   const [revealed, setRevealed] = useState<number[]>([]);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [boxWidth, setBoxWidth] = useState(0);
   const boxRef = useRef<HTMLDivElement | null>(null);
   const finishedRef = useRef(false);
@@ -98,6 +103,23 @@ export function LadderDrawBoard({
     [teams],
   );
 
+  // 팀 색이 겹치면 많은 팀의 경로가 같은 선처럼 보인다. 고유 색은 그대로
+  // 존중하고, 중복된 색만 황금각 색상으로 분산해 25팀에서도 구분한다.
+  const visualColors = useMemo(() => {
+    const provided = draw.columns.map(
+      (teamId) => teamById.get(teamId)?.color?.toLowerCase() || null,
+    );
+    const counts = new Map<string, number>();
+    for (const color of provided) {
+      if (color) counts.set(color, (counts.get(color) ?? 0) + 1);
+    }
+    return provided.map((color, index) => {
+      if (color && counts.get(color) === 1) return color;
+      const hue = Math.round((212 + index * 137.508) % 360);
+      return `hsl(${hue} 72% 60%)`;
+    });
+  }, [draw.columns, teamById]);
+
   // 각 세로줄이 도착하는 칸. 서버가 보낸 사다리를 그대로 따라간다.
   const trace = useMemo(
     () => traceLadder(draw.rungs, columnCount, draw.rowCount),
@@ -105,6 +127,7 @@ export function LadderDrawBoard({
   );
 
   const reveal = useCallback((index: number) => {
+    setActiveIndex(index);
     setRevealed((list) => (list.includes(index) ? list : [...list, index]));
   }, []);
 
@@ -113,7 +136,7 @@ export function LadderDrawBoard({
     if (revealed.length >= columnCount) return;
     const next = draw.columns.findIndex((_, i) => !revealed.includes(i));
     if (next < 0) return;
-    const timer = setTimeout(() => reveal(next), AUTO_REVEAL_MS);
+    const timer = setTimeout(() => reveal(next), autoRevealDelay(columnCount));
     return () => clearTimeout(timer);
   }, [revealed, columnCount, draw.columns, reveal]);
 
@@ -127,6 +150,8 @@ export function LadderDrawBoard({
   const width = Math.max(1, columnCount - 1) * gap;
   const height = draw.rowCount * rowHeight + TOP_PAD * 2;
   const allRevealed = revealed.length >= columnCount;
+  const needsHorizontalScroll =
+    boxWidth > 0 && columnCount * MIN_GAP + SIDE_PAD * 2 > boxWidth;
 
   /** 한 팀이 지나가는 경로를 SVG path 로 만든다. */
   const pathFor = (startColumn: number) => {
@@ -166,6 +191,22 @@ export function LadderDrawBoard({
 
   return (
     <div ref={boxRef}>
+      <div className="mb-2 flex min-h-6 items-center justify-between gap-3 px-1 text-[11px]">
+        <p className="font-semibold text-text-secondary" aria-live="polite">
+          <span className="text-accent-primary">{revealed.length}</span>
+          <span className="text-text-muted"> / {columnCount}</span>
+          <span className="ml-2 text-text-tertiary">
+            {revealed.length === 0
+              ? "팀을 눌러 경로를 확인하세요"
+              : `${teamById.get(draw.columns[activeIndex ?? 0])?.name ?? "팀"} 경로 강조 중`}
+          </span>
+        </p>
+        {needsHorizontalScroll && (
+          <span className="shrink-0 text-text-muted">
+            좌우로 밀어 전체 보기
+          </span>
+        )}
+      </div>
       <div className="overflow-x-auto">
         <div
           className="mx-auto"
@@ -184,21 +225,22 @@ export function LadderDrawBoard({
                   key={teamId}
                   type="button"
                   onClick={() => reveal(index)}
-                  disabled={isOpen}
                   title={team?.name ?? teamId}
                   aria-label={`${team?.name ?? "팀"} 줄 타기`}
+                  aria-pressed={activeIndex === index}
                   className={`min-w-0 rounded-md px-1 py-1.5 text-center text-[11px] font-bold transition-colors ${
-                    isOpen
-                      ? "text-text-primary"
-                      : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
+                    activeIndex === index && isOpen
+                      ? "bg-bg-tertiary text-text-primary"
+                      : isOpen
+                        ? "text-text-primary"
+                        : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
                   }`}
                   style={{ width: gap }}
                 >
                   <span
                     className="mx-auto mb-1 block h-1.5 w-1.5 rounded-full"
                     style={{
-                      backgroundColor:
-                        team?.color || "rgb(var(--color-accent-primary))",
+                      backgroundColor: visualColors[index],
                       opacity: isOpen ? 1 : 0.45,
                     }}
                   />
@@ -241,14 +283,14 @@ export function LadderDrawBoard({
             {/* 공개된 팀의 경로. 누른 순서대로 그려진다. */}
             {revealed.map((columnIndex) => {
               const teamId = draw.columns[columnIndex];
-              const team = teamById.get(teamId);
+              const isActive = activeIndex === columnIndex;
               return (
                 <path
                   key={`p-${teamId}`}
                   d={pathFor(columnIndex)}
                   fill="none"
-                  stroke={team?.color || "rgb(var(--color-accent-primary))"}
-                  strokeWidth={3}
+                  stroke={visualColors[columnIndex]}
+                  strokeWidth={isActive ? 4 : 2.5}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   style={{
@@ -256,6 +298,11 @@ export function LadderDrawBoard({
                     strokeDasharray: 4000,
                     strokeDashoffset: 0,
                     animation: `ladder-trace ${TRACE_MS}ms ease-out both`,
+                    opacity: isActive ? 1 : allRevealed ? 0.24 : 0.34,
+                    filter: isActive
+                      ? `drop-shadow(0 0 5px ${visualColors[columnIndex]})`
+                      : "none",
+                    transition: "opacity 180ms ease, filter 180ms ease",
                   }}
                 />
               );
@@ -292,30 +339,41 @@ export function LadderDrawBoard({
 
       {/* 다 타고 내려온 뒤의 결과. 사다리에서 눈으로 읽지 않아도 되게 한 줄로 적는다. */}
       {allRevealed && (
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 border-t border-bg-tertiary pt-3">
-          {finalOrder.map(({ position, teamId }) => {
-            const team = teamById.get(teamId);
-            return (
-              <span
-                key={teamId}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-text-primary"
-              >
-                <span className="tabular-nums text-text-tertiary">
-                  {position + 1}
-                </span>
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{
-                    backgroundColor:
-                      team?.color || "rgb(var(--color-accent-primary))",
-                  }}
-                />
-                <span className="max-w-[10rem] truncate">
-                  {team?.name ?? "팀"}
-                </span>
-              </span>
-            );
-          })}
+        <div className="mt-4 rounded-xl border border-bg-tertiary bg-bg-primary/45 p-3">
+          <p className="mb-2 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-text-tertiary">
+            최종 픽 순서
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {finalOrder.map(({ position, teamId }) => {
+              const team = teamById.get(teamId);
+              const columnIndex = draw.columns.indexOf(teamId);
+              return (
+                <button
+                  type="button"
+                  key={teamId}
+                  onClick={() => reveal(columnIndex)}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-colors ${
+                    activeIndex === columnIndex
+                      ? "border-accent-primary/60 bg-accent-primary/10 text-text-primary"
+                      : "border-bg-tertiary bg-bg-secondary text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  <span className="tabular-nums text-accent-primary">
+                    {position + 1}
+                  </span>
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{
+                      backgroundColor: visualColors[columnIndex],
+                    }}
+                  />
+                  <span className="max-w-[10rem] truncate">
+                    {team?.name ?? "팀"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -326,6 +384,11 @@ export function LadderDrawBoard({
           }
           to {
             stroke-dashoffset: 0;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          path {
+            animation: none !important;
           }
         }
       `}</style>
