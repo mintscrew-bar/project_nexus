@@ -22,6 +22,8 @@ import { TasksService } from "../tasks/tasks.service";
 import { RoomGateway } from "../room/room.gateway";
 import { RoomService } from "../room/room.service";
 import {
+  AdminGameQueryDto,
+  AdminScrimsQueryDto,
   AdminPageQueryDto,
   AdminReportsQueryDto,
   AdminChatLogsQueryDto,
@@ -47,8 +49,8 @@ export class AdminController {
   // ── Stats ──────────────────────────────────────────────────────────────────
   @Get("stats")
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
-  getStats() {
-    return this.adminService.getStats();
+  getStats(@Query() query: AdminGameQueryDto) {
+    return this.adminService.getStats({ gameTitle: query.gameTitle });
   }
 
   @Post("matches/recompute-stats")
@@ -80,6 +82,19 @@ export class AdminController {
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   getInternalMatchDetail(@Param("id") matchId: string) {
     return this.adminService.getInternalMatchDetail(matchId);
+  }
+
+  // ── 스크림 기록 (배그) ─────────────────────────────────────────────────────
+  // 배그 내전 결과는 `Match` 가 아니라 `Scrim` 에 쌓인다(라운드·포인트 구조).
+  @Get("scrims")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  getScrims(@Query() query: AdminScrimsQueryDto) {
+    return this.adminService.getScrims({
+      page: query.page,
+      limit: query.limit,
+      status: query.status,
+      search: query.search,
+    });
   }
 
   // ── Users ────────────────────────────────────────────────────────────────
@@ -271,6 +286,7 @@ export class AdminController {
       page: query.page,
       limit: query.limit,
       search: query.search,
+      gameTitle: query.gameTitle,
     });
   }
 
@@ -288,6 +304,7 @@ export class AdminController {
       page: query.page,
       limit: query.limit,
       status: query.status,
+      gameTitle: query.gameTitle,
     });
   }
 

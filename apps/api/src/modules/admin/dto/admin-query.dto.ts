@@ -1,4 +1,4 @@
-import { MatchStatus, UserRole } from "@nexus/database";
+import { GameTitle, MatchStatus, UserRole } from "@nexus/database";
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
@@ -16,7 +16,19 @@ import {
 } from "class-validator";
 
 // 공통 관리자 목록 페이지네이션
-export class AdminPageQueryDto {
+/**
+ * 게임 필터.
+ *
+ * 롤·배그는 방도 클랜도 완전히 다른 집단이라 섞어 보면 운영 판단이 틀린다.
+ * 비우면 전체를 본다 — 관리자는 "둘 다" 를 봐야 할 때가 있다.
+ */
+export class AdminGameQueryDto {
+  @IsOptional()
+  @IsEnum(GameTitle, { message: "gameTitle은 LOL 또는 PUBG여야 합니다." })
+  gameTitle?: GameTitle;
+}
+
+export class AdminPageQueryDto extends AdminGameQueryDto {
   @IsOptional()
   @IsInt({ message: "page는 정수여야 합니다." })
   @Min(1, { message: "page는 1 이상이어야 합니다." })
@@ -98,7 +110,7 @@ export class AdminChatLogsQueryDto {
 }
 
 // 방 목록 조회
-export class AdminRoomsQueryDto {
+export class AdminRoomsQueryDto extends AdminGameQueryDto {
   @IsOptional()
   @IsInt({ message: "page는 정수여야 합니다." })
   @Min(1, { message: "page는 1 이상이어야 합니다." })
@@ -189,4 +201,29 @@ export class AdminRecomputeStatsQueryDto {
   @IsOptional()
   @IsString()
   puuid?: string;
+}
+
+// 배그 스크림 목록 조회.
+// 롤 내전(`Match`)과 달리 라운드·포인트 구조라 별도 모델(`Scrim`)이다.
+export class AdminScrimsQueryDto {
+  @IsOptional()
+  @IsInt({ message: "page는 정수여야 합니다." })
+  @Min(1, { message: "page는 1 이상이어야 합니다." })
+  page: number = 1;
+
+  @IsOptional()
+  @IsInt({ message: "limit는 정수여야 합니다." })
+  @Min(1, { message: "limit는 1 이상이어야 합니다." })
+  @Max(100, { message: "limit는 100 이하여야 합니다." })
+  limit: number = 20;
+
+  @IsOptional()
+  @IsIn(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"], {
+    message: "유효한 스크림 상태를 선택해주세요.",
+  })
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

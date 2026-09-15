@@ -12,6 +12,7 @@ import {
   AdminAction,
   MatchStatus,
   Prisma,
+  GameTitle,
 } from "@nexus/database";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
@@ -88,9 +89,21 @@ export class AdminService {
 
   // ── Stats ─────────────────────────────────────────────────────────────────
 
-  async getStats() {
+  /**
+   * 대시보드 통계.
+   *
+   * `gameTitle` 을 주면 **게임을 가릴 수 있는 지표만** 그 게임으로 좁힌다.
+   * 방과 클랜은 `gameTitle` 컬럼이 있어 나눌 수 있지만, 유저·신고는 게임과
+   * 무관하고 `Match` 에는 게임 컬럼이 아예 없다(방이 지워지면 스냅샷만 남는데
+   * 거기에도 없다). 그래서 그 셋은 게임을 골라도 전체 수를 그대로 돌려주고,
+   * 어느 지표가 좁혀졌는지 `scopedByGame` 로 알려준다 — 화면이 "이 숫자는
+   * 전체입니다" 를 표시할 수 있어야 사용자가 합계를 오해하지 않는다.
+   */
+  async getStats(params: { gameTitle?: GameTitle } = {}) {
+    const { gameTitle } = params;
     // 테스트 봇은 실제 이용자 수에서 제외한다 (대시보드 "전체 유저"는 봇 미포함)
     const botWhere = this.getTestBotWhere();
+    const gameWhere = gameTitle ? { gameTitle } : {};
 
     const [
       totalUsers,
@@ -101,17 +114,20 @@ export class AdminService {
       pendingUserReports,
       pendingPostReports,
       totalClans,
+      totalScrims,
     ] = await Promise.all([
       this.prisma.user.count({ where: { NOT: botWhere } }),
       this.prisma.user.count({ where: botWhere }),
-      this.prisma.room.count(),
+      this.prisma.room.count({ where: gameWhere }),
       this.prisma.room.count({
-        where: { status: { in: ["WAITING", "IN_PROGRESS"] } },
+        where: { ...gameWhere, status: { in: ["WAITING", "IN_PROGRESS"] } },
       }),
       this.prisma.match.count(),
       this.prisma.userReport.count({ where: { status: "PENDING" } }),
       this.prisma.postReport.count({ where: { status: "PENDING" } }),
-      this.prisma.clan.count(),
+      this.prisma.clan.count({ where: gameWhere }),
+      // 배그 내전 결과는 `Match` 가 아니라 `Scrim` 에 쌓인다.
+      this.prisma.scrim.count(),
     ]);
 
     return {
@@ -120,10 +136,15 @@ export class AdminService {
       totalRooms,
       activeRooms,
       totalMatches,
+      totalScrims,
       pendingReports: pendingUserReports + pendingPostReports,
       pendingUserReports,
       pendingPostReports,
       totalClans,
+      /** 지금 적용된 게임 필터. 없으면 전체. */
+      gameTitle: gameTitle ?? null,
+      /** 위 숫자 중 게임으로 좁혀진 것 */
+      scopedByGame: ["totalRooms", "activeRooms", "totalClans"],
     };
   }
 
@@ -1146,14 +1167,23 @@ export class AdminService {
 
   // ── Clans ─────────────────────────────────────────────────────────────────
 
-  async getClans(params: { page: number; limit: number; search?: string }) {
-    const { page, search } = params;
+  async getClans(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    /** 롤·배그 클랜은 완전히 다른 집단이다. 비우면 전체를 본다. */
+    gameTitle?: GameTitle;
+  }) {
+    const { page, search, gameTitle } = params;
     const limit = clampLimit(params.limit);
     const skip = (page - 1) * limit;
 
-    const where = search
-      ? { name: { contains: search, mode: "insensitive" as const } }
-      : {};
+    const where: Prisma.ClanWhereInput = {
+      ...(search
+        ? { name: { contains: search, mode: "insensitive" as const } }
+        : {}),
+      ...(gameTitle ? { gameTitle } : {}),
+    };
 
     const [clans, total] = await Promise.all([
       this.prisma.clan.findMany({
@@ -1187,12 +1217,21 @@ export class AdminService {
 
   // ── Rooms ─────────────────────────────────────────────────────────────────
 
-  async getRooms(params: { page: number; limit: number; status?: string }) {
-    const { page, status } = params;
+  async getRooms(params: {
+    page: number;
+    limit: number;
+    status?: string;
+    /** 비우면 전체를 본다. */
+    gameTitle?: GameTitle;
+  }) {
+    const { page, status, gameTitle } = params;
     const limit = clampLimit(params.limit);
     const skip = (page - 1) * limit;
 
-    const where = status ? { status: status as any } : {};
+    const where: Prisma.RoomWhereInput = {
+      ...(status ? { status: status as any } : {}),
+      ...(gameTitle ? { gameTitle } : {}),
+    };
 
     const [rooms, total] = await Promise.all([
       this.prisma.room.findMany({
@@ -1209,6 +1248,69 @@ export class AdminService {
     ]);
 
     return { rooms, total, page, limit };
+  }
+
+  // ── 스크림 기록 (배그) ────────────────────────────────────────────────────
+  //
+  // 롤 내전은 `Match` 에 쌓이지만 배그는 라운드·포인트 구조라 `Scrim` 으로
+  // 따로 쌓인다. 대진표 대 리더보드로 모양이 아예 달라 한 화면에 합치면
+  // 둘 다 어정쩡해진다. 그래서 관리자에서도 탭을 나눈다.
+
+  async getScrims(params: {
+    page: number;
+    limit: number;
+    status?: string;
+    search?: string;
+  }) {
+    const { page, status, search } = params;
+    const limit = clampLimit(params.limit);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ScrimWhereInput = {
+      ...(status ? { status: status as Prisma.EnumScrimStatusFilter } : {}),
+      // 방 이름으로 찾는다 — 운영자가 아는 건 스크림 id 가 아니라 방 이름이다.
+      ...(search
+        ? { room: { name: { contains: search, mode: "insensitive" as const } } }
+        : {}),
+    };
+
+    const [scrims, total] = await Promise.all([
+      this.prisma.scrim.findMany({
+        where,
+        include: {
+          room: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              pubgGameMode: true,
+              maxParticipants: true,
+              host: { select: { id: true, username: true } },
+            },
+          },
+          // 라운드는 개수와 진행 상태만 본다. 상세는 방 화면에서 본다.
+          rounds: {
+            select: { id: true, roundNumber: true, status: true },
+            orderBy: { roundNumber: "asc" },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      this.prisma.scrim.count({ where }),
+    ]);
+
+    return {
+      scrims: scrims.map((scrim) => ({
+        ...scrim,
+        completedRounds: scrim.rounds.filter((r) => r.status === "COMPLETED")
+          .length,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   // ── 내전 기록 (실제 진행된 내부 토너먼트 매치) ─────────────────────────────
