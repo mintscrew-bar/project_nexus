@@ -726,7 +726,17 @@ export default function TournamentLobbyPage() {
         const result = await roomSocketHelpers.confirmAutoBalance(room.id);
         if (!result.success) {
           addToast(result.error ?? "확정에 실패했습니다.", "error");
+          return;
         }
+
+        // 서버는 자동 편성 확정과 동시에 대진표를 생성한다.
+        // game-starting 소켓 이벤트만 기다리면 이벤트가 유실될 때 로비에
+        // 그대로 남을 수 있으므로, 성공 응답을 받은 즉시 대진표로 넘긴다.
+        const bracketPath = getRoomStagePath(
+          { ...room, status: "IN_PROGRESS" },
+          gamePrefix,
+        );
+        if (bracketPath) navigateToGameStage(bracketPath);
       }}
       rerollCount={room.autoBalanceRerollCount ?? 0}
       undoDepth={room.undoDepth ?? 0}

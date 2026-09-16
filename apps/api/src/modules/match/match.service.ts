@@ -1577,6 +1577,9 @@ export class MatchService {
       ...match,
       teamA: resolvedTeamA,
       teamB: resolvedTeamB,
+      // 방 정리 후에는 FK인 winnerId가 null이 되고 스냅샷만 남는다.
+      // 투표 화면이 승패 팀을 계속 올바르게 나누도록 복원한다.
+      winnerId: match.winnerId ?? match.winnerIdSnapshot,
       participants: match.participants.map((participant) => ({
         ...participant,
         teamId: participant.teamId ?? participant.teamIdSnapshot,
