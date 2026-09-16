@@ -133,12 +133,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           */}
           <div
             className={cn(
-              // flex-1만으로는 모바일 브라우저가 콘텐츠 높이를 기준으로
-              // 부모를 늘려 스크롤 영역을 잃을 수 있다. h-0을 함께 줘서
-              // 남은 뷰포트 높이를 명확히 차지하게 한다.
-              "h-0 min-h-0 flex-1 flex flex-col",
+              // 대시보드는 뷰포트 안에 고정해야 하므로 h-full을 사용한다.
+              // 일반 페이지는 모바일 브라우저가 콘텐츠 높이를 기준으로
+              // 스크롤 영역을 계산할 수 있게 고정 h-0을 두지 않는다.
+              "min-h-0 flex-1 flex flex-col",
               isDashboardRoute
-                ? "overflow-hidden"
+                ? "h-full overflow-hidden"
                 : "overflow-y-auto overflow-x-hidden overscroll-y-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch]",
             )}
           >
