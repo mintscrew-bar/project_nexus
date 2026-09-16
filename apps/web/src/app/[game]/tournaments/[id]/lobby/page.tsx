@@ -428,7 +428,18 @@ export default function TournamentLobbyPage() {
   useEffect(() => {
     if (hasRedirected.current || !room) return;
     if (gameStarting) {
-      navigateToGameStage(getTeamModeStagePath(room, gamePrefix));
+      // 자동 밸런스의 game-starting 은 확정 → 역할 자동 배정 → 대진표 생성이
+      // 전부 끝난 뒤에만 온다. 그런데 getTeamModeStagePath 는 편성 직후 기준이라
+      // 롤 방을 역할 선택 화면으로 보낸다. 이미 끝난 역할 선택 화면에 들어가면
+      // 역할 선택 소켓 연결·입장을 한 번 더 거치고, 폴링으로 대진표를 찾을
+      // 때까지 머문다. 게다가 방장은 확정 응답으로 대진표 이동을 시작하는데,
+      // 목적지가 다르면 navigateToGameStage 가 먼저 시작된 이동을 취소해서
+      // 결국 역할 선택 화면이 이긴다. 진행 중 경로로 바로 보내 목적지를 하나로 맞춘다.
+      const target =
+        room.teamMode === "AUTO_BALANCE"
+          ? getRoomStagePath({ ...room, status: "IN_PROGRESS" }, gamePrefix)
+          : getTeamModeStagePath(room, gamePrefix);
+      if (target) navigateToGameStage(target);
       return;
     }
     // IN_PROGRESS인 경우에만 bracket으로 리다이렉트.
