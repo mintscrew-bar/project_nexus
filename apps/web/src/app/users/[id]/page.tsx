@@ -137,6 +137,7 @@ interface ProfileUser {
       id: string;
       name: string;
       tag: string;
+      gameTitle: GameTitle;
     };
   }>;
   stats: {
@@ -531,7 +532,9 @@ export default function UserProfilePage() {
   const primary =
     profile.riotAccounts?.find((a) => a.isPrimary) ||
     profile.riotAccounts?.[0];
-  const clan = profile.clanMemberships?.[0]?.clan;
+  const clan = profile.clanMemberships?.find(
+    (membership) => membership.clan.gameTitle === activeGame,
+  )?.clan;
   const preferredChampions = getPreferredChampionsByRole();
   const friendBtn = getFriendButtonConfig();
   const settings = profile.settings;

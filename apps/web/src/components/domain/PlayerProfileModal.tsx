@@ -25,6 +25,7 @@ import {
 import { ClanTag } from "@/components/domain/ClanEmblem";
 import { matchApi, reputationApi, userApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
+import { useCurrentGame } from "@/hooks/useCurrentGame";
 import { getChampionIcon } from "@/components/matches/match-utils";
 import {
   ChampionIcon,
@@ -195,6 +196,7 @@ export function PlayerProfileModal({
   onClose,
 }: PlayerProfileModalProps) {
   const router = useRouter();
+  const currentGame = useCurrentGame();
   const {
     data: profile,
     isLoading: profileLoading,
@@ -293,7 +295,10 @@ export function PlayerProfileModal({
   const championGroups = getChampionGroups(champions, mainRole, subRole);
   const recentMatches = Array.isArray(history) ? history : [];
   const recent = getRecentMetrics(recentMatches);
-  const clan = profile?.clanMemberships?.[0]?.clan || null;
+  const clan =
+    profile?.clanMemberships?.find(
+      (membership: any) => membership.clan?.gameTitle === currentGame,
+    )?.clan || null;
   const wins = stats?.wins ?? 0;
   const losses = stats?.losses ?? 0;
   const gamesPlayed = stats?.gamesPlayed ?? wins + losses;

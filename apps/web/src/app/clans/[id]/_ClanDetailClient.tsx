@@ -37,6 +37,7 @@ import {
 } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { cn } from "@/lib/utils";
+import { clanGameFromLocation } from "@/lib/clan-game";
 
 const RECRUIT_ROLE_OPTIONS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
 
@@ -117,6 +118,7 @@ interface Clan {
   id: string;
   name: string;
   tag: string;
+  gameTitle: "LOL" | "PUBG";
   description: string | null;
   logo: string | null;
   banner: string | null;
@@ -623,7 +625,9 @@ export default function ClanDetailClient({
       await clanApi.leaveClan(clanId);
       await queryClient.invalidateQueries({ queryKey: ["clans", "my"] });
       addToast("클랜을 탈퇴했습니다.", "info");
-      router.push("/clans");
+      router.push(
+        `/clans?game=${clan?.gameTitle.toLowerCase() ?? clanGameFromLocation().toLowerCase()}`,
+      );
     } catch (err: any) {
       addToast(err.message || "클랜 탈퇴에 실패했습니다.", "error");
     }
@@ -647,7 +651,11 @@ export default function ClanDetailClient({
         <Button
           variant="secondary"
           className="mt-4"
-          onClick={() => router.push("/clans")}
+          onClick={() =>
+            router.push(
+              `/clans?game=${clanGameFromLocation().toLowerCase()}`,
+            )
+          }
         >
           클랜 목록으로
         </Button>
@@ -692,7 +700,11 @@ export default function ClanDetailClient({
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => router.push("/clans/explore")}
+              onClick={() =>
+                router.push(
+                  `/clans?game=${clan.gameTitle.toLowerCase()}&view=explore`,
+                )
+              }
             >
               <Compass className="mr-2 h-4 w-4" />
               클랜 둘러보기

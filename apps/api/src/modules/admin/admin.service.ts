@@ -13,6 +13,7 @@ import {
   MatchStatus,
   Prisma,
   GameTitle,
+  ScrimStatus,
 } from "@nexus/database";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
@@ -1267,7 +1268,7 @@ export class AdminService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.ScrimWhereInput = {
-      ...(status ? { status: status as Prisma.EnumScrimStatusFilter } : {}),
+      ...(status ? { status: status as ScrimStatus } : {}),
       // 방 이름으로 찾는다 — 운영자가 아는 건 스크림 id 가 아니라 방 이름이다.
       ...(search
         ? { room: { name: { contains: search, mode: "insensitive" as const } } }

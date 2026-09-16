@@ -9,6 +9,7 @@ import { ClanTag } from "@/components/domain/ClanEmblem";
 import { LoadingSpinner, Modal } from "@/components/ui";
 import { matchApi, reputationApi, userApi } from "@/lib/api-client";
 import { getChampionIcon } from "@/components/matches/match-utils";
+import { useCurrentGame } from "@/hooks/useCurrentGame";
 import { ChampionIcon, PositionIcon, POSITION_LABELS } from "./icons";
 
 interface PlayerProfileModalProps {
@@ -66,6 +67,7 @@ function getPrimaryRiot(profile: any) {
 }
 
 export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps) {
+  const currentGame = useCurrentGame();
   const { data: profile, isLoading: profileLoading, isError } = useQuery({
     queryKey: ["userProfile", userId],
     queryFn: () => userApi.getProfile(userId!),
@@ -98,7 +100,10 @@ export function PlayerProfileModal({ userId, onClose }: PlayerProfileModalProps)
   const mainRole = riot?.mainRole || null;
   const subRole = riot?.subRole || null;
   const champions = [...(riot?.championPreferences || [])].sort((a: any, b: any) => a.order - b.order);
-  const clan = profile?.clanMemberships?.[0]?.clan || null;
+  const clan =
+    profile?.clanMemberships?.find(
+      (membership: any) => membership.clan?.gameTitle === currentGame,
+    )?.clan || null;
 
   return (
     <Modal isOpen={Boolean(userId)} onClose={onClose} size="full" showCloseButton>

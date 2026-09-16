@@ -93,7 +93,7 @@ export class UserService {
         clanMemberships: {
           include: {
             clan: {
-              select: { id: true, name: true, tag: true },
+              select: { id: true, name: true, tag: true, gameTitle: true },
             },
           },
         },
@@ -282,9 +282,12 @@ export class UserService {
           },
         },
         clanMemberships: {
+          where: { clan: { gameTitle: game } },
           take: 1,
           select: {
-            clan: { select: { name: true, tag: true } },
+            clan: {
+              select: { id: true, name: true, tag: true, gameTitle: true },
+            },
           },
         },
         streamerProfiles: {

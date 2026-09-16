@@ -131,10 +131,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             여기 판정은 경로 정규식이라 라우팅이 바뀌어도 컴파일 에러가
             안 난다. 대시보드형 페이지는 `h-full` 도 같이 들고 있어야 한다.
           */}
-          <div className={cn(
-            "flex-1 flex flex-col min-h-0",
-            isDashboardRoute ? "overflow-hidden" : "overflow-auto"
-          )}>
+          <div
+            className={cn(
+              // flex-1만으로는 모바일 브라우저가 콘텐츠 높이를 기준으로
+              // 부모를 늘려 스크롤 영역을 잃을 수 있다. h-0을 함께 줘서
+              // 남은 뷰포트 높이를 명확히 차지하게 한다.
+              "h-0 min-h-0 flex-1 flex flex-col",
+              isDashboardRoute
+                ? "overflow-hidden"
+                : "overflow-y-auto overflow-x-hidden overscroll-y-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch]",
+            )}
+          >
             {isDashboardRoute ? children : (
               <div className="grid min-h-full grid-rows-[1fr_auto]">
                 <div className="min-w-0">{children}</div>

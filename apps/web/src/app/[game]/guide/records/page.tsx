@@ -32,7 +32,7 @@ function LolRecordsGuidePage() {
         <div className="grid gap-3 md:grid-cols-3">
           <InfoCard href="/lol/matches" icon={BarChart3} title="내전 전적" description="승패, KDA, 챔피언과 역할 기록을 경기별로 확인합니다." />
           <InfoCard href="/lol/ranking" icon={Trophy} title="랭킹" description="누적된 경기 기록을 기준으로 참가자 순위를 살펴봅니다." />
-          <InfoCard href="/clans" icon={Shield} title="클랜" description="함께 플레이할 커뮤니티를 찾고 구성원의 활동을 확인합니다." />
+          <InfoCard href="/clans?game=lol" icon={Shield} title="클랜" description="함께 플레이할 커뮤니티를 찾고 구성원의 활동을 확인합니다." />
         </div>
       </GuideSection>
 

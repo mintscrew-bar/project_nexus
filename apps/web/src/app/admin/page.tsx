@@ -19,7 +19,9 @@ import { ScrimsTab } from "@/components/admin/game/ScrimsTab";
 import {
   AdminGameScopeProvider,
   AdminGameSwitch,
+  useAdminGameScope,
 } from "@/components/admin/game-scope";
+import type { GameTitle } from "@nexus/types";
 import { DiscordGuildLinksTab } from "@/components/admin/system/DiscordGuildLinksTab";
 import { ErrorLogsTab } from "@/components/admin/system/ErrorLogsTab";
 import {
@@ -59,6 +61,14 @@ interface TabItem {
   id: Tab;
   label: string;
   icon: React.ReactNode;
+  /**
+   * 이 탭이 다루는 게임. 있으면 전역 스위치가 다른 게임일 때 숨긴다.
+   *
+   * 롤 내전(`Match`)과 배그 스크림(`Scrim`)은 진행 방식도 데이터도 달라
+   * 탭이 갈렸다. "롤을 보는 중" 인데 배그 전용 탭이 남아 있으면 전역
+   * 스위치가 전역이 아니게 된다. 비우면 게임과 무관한 탭이다.
+   */
+  game?: GameTitle;
 }
 
 /** 사이드바 그룹 — label이 null이면 헤더 없이 단독으로 표시한다. */
@@ -134,9 +144,11 @@ const TAB_GROUPS: TabGroup[] = [
         id: "scrims",
         label: "스크림 기록 (배그)",
         icon: <Crosshair className="h-4 w-4" />,
+        game: "PUBG",
       },
       {
         id: "matches",
+        game: "LOL",
         label: "내전 기록 (롤)",
         icon: <Swords className="h-4 w-4" />,
       },
@@ -165,6 +177,7 @@ const isAdminTab = (value: string | null): value is Tab =>
   !!value && ALL_TABS.some((tab) => tab.id === value);
 
 function AdminPageInner() {
+  const { game } = useAdminGameScope();
   // 권한 가드는 admin/layout.tsx에서 처리 (미인증/USER → notFound)
   const { user } = useAuthStore();
   const { addToast } = useToast();
@@ -174,14 +187,18 @@ function AdminPageInner() {
 
   const isAdmin = user?.role === "ADMIN";
 
-  // 권한에 따라 탭을 걸러내고, 남은 탭이 없는 그룹은 통째로 숨긴다.
+  // 권한과 게임 범위로 탭을 걸러내고, 남은 탭이 없는 그룹은 통째로 숨긴다.
   const visibleGroups = useMemo(() => {
-    if (isAdmin) return TAB_GROUPS;
     return TAB_GROUPS.map((group) => ({
       ...group,
-      tabs: group.tabs.filter((tab) => MODERATOR_TABS.includes(tab.id)),
+      tabs: group.tabs.filter(
+        (tab) =>
+          (isAdmin || MODERATOR_TABS.includes(tab.id)) &&
+          // 게임 전용 탭은 그 게임을 보는 중이거나 전체일 때만 보인다.
+          (!tab.game || !game || tab.game === game),
+      ),
     })).filter((group) => group.tabs.length > 0);
-  }, [isAdmin]);
+  }, [isAdmin, game]);
 
   const visibleTabIds = useMemo(
     () => visibleGroups.flatMap((group) => group.tabs.map((tab) => tab.id)),

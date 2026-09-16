@@ -89,6 +89,7 @@ interface Clan {
   id: string;
   name: string;
   tag: string;
+  gameTitle: "LOL" | "PUBG";
   description: string | null;
   logo: string | null;
   banner: string | null;
@@ -578,7 +579,9 @@ export default function ClanSettingsPage() {
       await clanApi.deleteClan(clanId);
       await queryClient.invalidateQueries({ queryKey: ["clans", "my"] });
       addToast("클랜이 해체되었습니다.", "info");
-      router.push("/clans");
+      router.push(
+        `/clans?game=${clan?.gameTitle.toLowerCase() ?? "lol"}`,
+      );
     } catch (err: any) {
       addToast(
         err.response?.data?.message || "클랜 해체에 실패했습니다.",

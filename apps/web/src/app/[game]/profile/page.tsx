@@ -1870,7 +1870,9 @@ function LolProfilePage() {
       : profileData?.riotAccounts?.length
         ? profileData.riotAccounts
         : (user?.riotAccounts ?? []);
-  const clan = profileData?.clanMemberships?.[0]?.clan;
+  const clan = profileData?.clanMemberships?.find(
+    (membership: any) => membership.clan?.gameTitle === "LOL",
+  )?.clan;
   const preferredChampions = getPreferredChampionsByRole();
   const highlightChampionId = profileData?.settings?.highlightChampionId;
   const stats = profileData?.stats ?? user?.stats ?? null;

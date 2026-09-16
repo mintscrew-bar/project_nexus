@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
@@ -204,6 +204,7 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
   const gameQuery = `game=${gameTitle.toLowerCase()}`;
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
+  const clanRequestIdRef = useRef(0);
 
   const [clans, setClans] = useState<Clan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -226,6 +227,7 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const fetchClans = useCallback(async () => {
+    const requestId = ++clanRequestIdRef.current;
     setIsLoading(true);
     setError(null);
     try {
@@ -240,11 +242,13 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
             : undefined,
         sort: sortOption,
       });
-      setClans(data);
+      if (requestId === clanRequestIdRef.current) setClans(data);
     } catch (err: any) {
-      setError(err.message || "클랜 목록을 불러오는데 실패했습니다.");
+      if (requestId === clanRequestIdRef.current) {
+        setError(err.message || "클랜 목록을 불러오는데 실패했습니다.");
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === clanRequestIdRef.current) setIsLoading(false);
     }
   }, [
     debouncedSearchQuery,

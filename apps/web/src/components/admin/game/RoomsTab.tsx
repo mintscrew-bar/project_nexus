@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { adminApi } from "@/lib/api-client";
 import {
   Card,
@@ -28,6 +28,7 @@ export function RoomsTab({ addToast }: { addToast: AddToast }) {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  const requestIdRef = useRef(0);
   // 상단 전역 스위치가 정한 게임. 바뀌면 목록을 다시 읽는다.
   const { gameParam } = useAdminGameScope();
 
@@ -35,6 +36,7 @@ export function RoomsTab({ addToast }: { addToast: AddToast }) {
   const totalPages = Math.ceil(total / limit);
 
   const fetchRooms = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const data = await adminApi.getRooms({
@@ -43,14 +45,28 @@ export function RoomsTab({ addToast }: { addToast: AddToast }) {
         status: status || undefined,
         gameTitle: gameParam,
       });
-      setRooms(data.rooms);
-      setTotal(data.total);
+      if (requestId === requestIdRef.current) {
+        setRooms(data.rooms);
+        setTotal(data.total);
+      }
     } catch {
-      addToast("방 목록 로드 실패", "error");
+      if (requestId === requestIdRef.current) {
+        addToast("방 목록 로드 실패", "error");
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [page, status, gameParam, addToast]);
+
+  /*
+   * 게임이 바뀌면 첫 페이지로 돌아간다.
+   *
+   * 페이지 번호는 게임마다 다른 목록에 매겨진 값이다. 롤 5페이지를 보다가
+   * 배그로 바꾸면 배그에 5페이지가 없어 빈 화면이 된다.
+   */
+  useEffect(() => {
+    setPage(1);
+  }, [gameParam]);
 
   useEffect(() => {
     fetchRooms();

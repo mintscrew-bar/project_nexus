@@ -260,7 +260,7 @@ function LolRankingPage() {
             description="활동 중인 클랜을 찾아 가입하고 클랜원들과 내전 기록을 쌓아보세요."
             action={{
               label: "클랜 둘러보기",
-              onClick: () => router.push("/clans"),
+              onClick: () => router.push("/clans?game=lol"),
             }}
           />
         )}
