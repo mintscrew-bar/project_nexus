@@ -7,12 +7,29 @@ import {
   calculatePlayerBalanceScores,
   type BalanceLaneEdgeInput,
 } from "./balance-score.util";
+import { TEST_BOT_USER_WHERE } from "./test-bot.util";
 
 /** 솔로랭크 큐 ID — 자유랭크(440)는 라인 실력 신호가 약해 쓰지 않는다 */
 const RANKED_SOLO_QUEUE_ID = 420;
 
 /** 이보다 짧은 경기는 리메이크·조기 종료라 지표가 실력을 반영하지 않는다 */
 const MIN_RATED_GAME_SECONDS = 600;
+
+/**
+ * 라인 대결 표본의 반감기(일).
+ *
+ * 이 값이 들어오기 전에는 전 기간을 같은 무게로 평균냈다. 실측 분포가
+ * 0~3개월 14,717쌍 / 3~6개월 16,636쌍 / 6~12개월 15,442쌍이라, 표본의 68%가
+ * 3개월 이상 된 경기였다. 작년 실버 시절 경기와 지난주 에메랄드 경기가 같은
+ * 무게를 가지면, 한 해 동안 한 티어 올린 사람은 현재 실력이 2~3점 낮게
+ * 잡힌다 — 라인 보정의 상한(±6)의 절반이라 무시할 수 없다.
+ *
+ * 윈도우로 자르지 않고 감쇠를 쓰는 이유는 판수가 적은 계정 때문이다. 대결
+ * 표본은 계정당 중앙값 180쌍이지만 하위 25%는 62쌍뿐이라, "최근 100경기"로
+ * 자르면 그쪽이 표본을 통째로 잃는다. 감쇠는 표본을 버리지 않고 무게만
+ * 낮추므로 저판수 계정이 손해를 보지 않는다.
+ */
+const LANE_EDGE_HALF_LIFE_DAYS = 90;
 
 /** 라인별 점수 맵 ({ TOP: 24.4, ... }) */
 export type BalanceScoreMap = Record<Role, number>;
@@ -119,6 +136,11 @@ export class BalanceScoreService {
    * 별도 보정 없이도 "이 사람이 이 라인에서 얼마나 앞서는가"를 잴 수 있다.
    *
    * 리메이크·조기 종료는 지표가 무의미하므로 10분 미만 경기는 뺀다.
+   *
+   * 오래된 경기는 반감기 LANE_EDGE_HALF_LIFE_DAYS 일로 무게를 줄인다. 평균이
+   * 가중평균이 되므로, 신뢰도에 넘기는 판수도 단순 COUNT 가 아니라 유효표본수
+   * (Kish ESS)여야 한다 — 그러지 않으면 10개월 전 200판이 최근 200판과 같은
+   * 신뢰도를 받아 감쇠가 절반만 걸린다.
    */
   private async loadLaneEdges(
     puuid: string | null,
@@ -129,7 +151,8 @@ export class BalanceScoreService {
       const rows = await this.prisma.$queryRaw<
         {
           position: string;
-          games: bigint;
+          games: number | bigint | null;
+          rawGames: number | bigint | null;
           gold: number | null;
           cs: number | null;
           damage: number | null;
@@ -140,6 +163,15 @@ export class BalanceScoreService {
         WITH me AS (
           SELECT p."matchId", p.position, p."riotTeamId",
                  m."gameDuration" / 60.0 AS mins,
+                 -- 지수 감쇠 가중치. 90일 전 0.5배, 180일 전 0.25배.
+                 -- completedAt 이 빈 행은 실측 0건이지만, 생기더라도 표본에서
+                 -- 빠지지 않도록 "방금 끝난 경기"(가중치 1)로 취급한다.
+                 POWER(
+                   0.5::numeric,
+                   EXTRACT(
+                     EPOCH FROM (NOW() - COALESCE(m."completedAt", NOW()))
+                   )::numeric / 86400.0 / ${LANE_EDGE_HALF_LIFE_DAYS}::numeric
+                 ) AS w,
                  p."goldEarned"::numeric AS gold,
                  (p."totalMinionsKilled" + p."neutralMinionsKilled")::numeric AS cs,
                  p."totalDamageDealtToChampions"::numeric AS damage,
@@ -153,12 +185,14 @@ export class BalanceScoreService {
             AND p.position = ANY(${BALANCE_ROLES}::text[])
         )
         SELECT me.position,
-               COUNT(*) AS games,
-               AVG((me.gold - o."goldEarned") / me.mins)::float8 AS gold,
-               AVG((me.cs - (o."totalMinionsKilled" + o."neutralMinionsKilled")) / me.mins)::float8 AS cs,
-               AVG((me.damage - o."totalDamageDealtToChampions") / me.mins)::float8 AS damage,
-               AVG((me.vision - o."visionScore") / me.mins)::float8 AS vision,
-               AVG(me.net - (o.kills + o.assists - o.deaths))::float8 AS net
+               -- Kish 유효표본수. 가중치가 고르면 COUNT(*) 와 같아진다.
+               (POWER(SUM(me.w), 2) / NULLIF(SUM(me.w * me.w), 0))::float8 AS games,
+               COUNT(*) AS "rawGames",
+               (SUM(me.w * (me.gold - o."goldEarned") / me.mins) / SUM(me.w))::float8 AS gold,
+               (SUM(me.w * (me.cs - (o."totalMinionsKilled" + o."neutralMinionsKilled")) / me.mins) / SUM(me.w))::float8 AS cs,
+               (SUM(me.w * (me.damage - o."totalDamageDealtToChampions") / me.mins) / SUM(me.w))::float8 AS damage,
+               (SUM(me.w * (me.vision - o."visionScore") / me.mins) / SUM(me.w))::float8 AS vision,
+               (SUM(me.w * (me.net - (o.kills + o.assists - o.deaths))) / SUM(me.w))::float8 AS net
         FROM me
         JOIN match_participants o
           ON o."matchId" = me."matchId"
@@ -169,7 +203,8 @@ export class BalanceScoreService {
 
       return rows.map((row) => ({
         role: row.position as Role,
-        games: Number(row.games),
+        games: Number(row.games ?? 0),
+        rawGames: Number(row.rawGames ?? 0),
         goldPerMin: row.gold ?? 0,
         csPerMin: row.cs ?? 0,
         damagePerMin: row.damage ?? 0,
@@ -290,7 +325,11 @@ export class BalanceScoreService {
 
   /** 주기적 복구용 전체 재계산. 한 계정 실패가 나머지 계정을 막지 않는다. */
   async refreshAllAccounts(): Promise<{ updated: number; failed: number }> {
+    // 봇 계정(실측 150개)은 제외한다. 가짜 puuid라 라인 대결 표본이 0이고
+    // 티어 점수만 나오는데, 그 값이 랭킹·팀장 선정에 섞여서 좋을 게 없다.
+    // 실계정 208개만 남으므로 이 크론의 일감도 40% 줄어든다.
     const accounts = await this.prisma.riotAccount.findMany({
+      where: { user: { NOT: TEST_BOT_USER_WHERE } },
       select: { id: true },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });

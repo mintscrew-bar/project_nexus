@@ -15,6 +15,10 @@ import {
   GameTitle,
   ScrimStatus,
 } from "@nexus/database";
+import {
+  TEST_BOT_USER_WHERE,
+  isTestBotUser as isTestBotUserUtil,
+} from "../common/test-bot.util";
 import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
@@ -178,42 +182,7 @@ export class AdminService {
   // ── Users ─────────────────────────────────────────────────────────────────
 
   private getTestBotWhere(): Prisma.UserWhereInput {
-    return {
-      OR: [
-        {
-          username: {
-            startsWith: "testbot_",
-            mode: "insensitive",
-          },
-        },
-        // email은 nullable이고, 암호화 백필로 대부분의 유저가 null이다.
-        // NULL에 LIKE를 걸면 결과가 false가 아니라 NULL(unknown)이 되고,
-        // 이 조건이 `NOT: botWhere` 형태로 뒤집히면 NOT NULL도 NULL이라
-        // 해당 행이 통째로 결과에서 탈락한다(= 일반 유저 목록/카운트가 0).
-        // IS NOT NULL 가드로 NULL을 명시적으로 false로 떨어뜨린다.
-        {
-          AND: [
-            { email: { not: null } },
-            {
-              email: {
-                endsWith: "@nexus.test",
-                mode: "insensitive",
-              },
-            },
-          ],
-        },
-        {
-          riotAccounts: {
-            some: {
-              OR: [
-                { puuid: { startsWith: "bot_puuid_" } },
-                { tagLine: { equals: "BOT", mode: "insensitive" } },
-              ],
-            },
-          },
-        },
-      ],
-    };
+    return TEST_BOT_USER_WHERE;
   }
 
   private isTestBotUser(user: {
@@ -224,16 +193,7 @@ export class AdminService {
       tagLine?: string | null;
     }>;
   }): boolean {
-    return (
-      user.username?.toLowerCase().startsWith("testbot_") ||
-      user.email?.toLowerCase().endsWith("@nexus.test") ||
-      user.riotAccounts?.some(
-        (account) =>
-          account.puuid?.startsWith("bot_puuid_") ||
-          account.tagLine?.toUpperCase() === "BOT",
-      ) ||
-      false
-    );
+    return isTestBotUserUtil(user);
   }
 
   async getUsers(params: {

@@ -7,6 +7,10 @@ describe("RankingService", () => {
 
   beforeEach(() => {
     prisma = {
+      // 기본은 "봇 아님". 봇 제외 테스트에서만 유저를 돌려준다.
+      user: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       matchParticipant: {
         findMany: jest.fn(),
       },
@@ -261,6 +265,18 @@ describe("RankingService", () => {
     expect(prisma.nexusRanking.upsert.mock.invocationCallOrder[0]).toBeLessThan(
       balanceScores.refreshUser.mock.invocationCallOrder[0],
     );
+  });
+
+  it("테스트 봇은 랭킹·라인기록·밸런스 점수 어디에도 쌓지 않는다", async () => {
+    // 내전 테스트에 참여한 봇이 리더보드를 차지하던 문제의 회귀 방지.
+    prisma.user.findFirst.mockResolvedValue({ id: "bot-1" });
+
+    await service.updateRanking("bot-1");
+
+    expect(prisma.matchRosterSnapshot.findMany).not.toHaveBeenCalled();
+    expect(prisma.nexusRanking.upsert).not.toHaveBeenCalled();
+    expect(prisma.nexusRoleRecord.upsert).not.toHaveBeenCalled();
+    expect(balanceScores.refreshUser).not.toHaveBeenCalled();
   });
 
   describe("recalculateAllRankings", () => {

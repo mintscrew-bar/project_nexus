@@ -3,6 +3,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { Role } from "@nexus/database";
 import { resolveWinnerSlot } from "../match/match-roster.util";
+import { TEST_BOT_USER_WHERE } from "../common/test-bot.util";
 
 @Injectable()
 export class RankingService {
@@ -16,10 +17,30 @@ export class RankingService {
   ) {}
 
   /**
+   * 테스트 봇인지 확인한다.
+   *
+   * 봇은 내전 테스트에 그대로 참여하므로(실측: 내전 19경기 중 3경기) 막지 않으면
+   * 일반 유저와 같은 경로로 랭킹에 쌓인다. 실제로 리더보드 58행 중 19행이
+   * 봇이었다. 판별 기준은 admin 화면과 같은 것을 쓴다 — 갈라지면 "관리자
+   * 화면에선 봇인데 리더보드엔 올라와 있는" 상태가 다시 생긴다.
+   */
+  private async isTestBot(userId: string): Promise<boolean> {
+    const hit = await this.prisma.user.findFirst({
+      where: { id: userId, ...TEST_BOT_USER_WHERE },
+      select: { id: true },
+    });
+    return hit !== null;
+  }
+
+  /**
    * Update ranking for a user after match completion
    */
   async updateRanking(userId: string): Promise<void> {
     try {
+      // 봇은 전적·라인기록·클랜랭킹·밸런스점수 어디에도 쌓지 않는다.
+      // updateRanking 이 이 네 가지의 유일한 입구라 여기 한 곳만 막으면 된다.
+      if (await this.isTestBot(userId)) return;
+
       const {
         totalGames,
         wins,

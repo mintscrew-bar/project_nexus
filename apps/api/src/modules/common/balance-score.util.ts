@@ -1,6 +1,7 @@
 import { Role } from "@nexus/database";
 
-export const BALANCE_SCORE_VERSION = "2026-08-v2";
+// v3: 라인 대결 표본에 반감기 90일 지수 감쇠 + 신뢰도를 유효표본수(Kish ESS)로.
+export const BALANCE_SCORE_VERSION = "2026-09-v3";
 
 const TIER_POINTS: Record<string, number> = {
   UNRANKED: 10,
@@ -147,10 +148,16 @@ export interface PlayerBalanceScoreInput {
   laneEdges?: BalanceLaneEdgeInput[] | null;
 }
 
-/** 라인 상대 대비 지표 차이의 평균 (분당 기준, netKills 만 경기당) */
+/** 라인 상대 대비 지표 차이의 가중평균 (분당 기준, netKills 만 경기당) */
 export interface BalanceLaneEdgeInput {
   role: Role;
+  /**
+   * 유효표본수(Kish ESS). 최근 경기에 무게를 더 주므로 실제 판수보다 작다.
+   * 신뢰도 수축에 쓰는 값이라 실제 판수(rawGames)가 아니라 이쪽을 써야 한다.
+   */
   games: number;
+  /** 감쇠 전 실제 대결 판수. 점수에는 안 쓰고 표시·진단용으로만 남긴다. */
+  rawGames?: number;
   goldPerMin: number;
   csPerMin: number;
   damagePerMin: number;
@@ -179,8 +186,10 @@ export interface PlayerRoleBalanceScore {
   laneEdgeZ: number | null;
   /** 라인 우위로 티어 점수에 더해진 값 */
   laneEdgeBonus: number;
-  /** 라인 우위 계산에 쓴 대결 판수 */
+  /** 라인 우위 계산에 쓴 유효표본수 (감쇠 반영) */
   laneEdgeGames: number;
+  /** 감쇠 전 실제 대결 판수. 둘의 차이가 표본이 얼마나 오래됐는지를 보여준다 */
+  laneEdgeRawGames: number;
   adjustedSoloWinRate: number;
   adjustedNexusWinRate: number;
   version: string;
@@ -257,6 +266,9 @@ export function calculatePlayerRoleBalanceScore(
   const laneEdge = input.laneEdges?.find((entry) => entry.role === role);
   const laneDeviation = LANE_METRIC_DEVIATIONS[role];
   const laneEdgeGames = normalizedCount(laneEdge?.games);
+  const laneEdgeRawGames = normalizedCount(
+    laneEdge?.rawGames ?? laneEdge?.games,
+  );
   const laneEdgeZ =
     laneEdge && laneDeviation && laneEdgeGames > 0
       ? (laneEdge.goldPerMin / laneDeviation.goldPerMin +
@@ -347,6 +359,7 @@ export function calculatePlayerRoleBalanceScore(
     laneEdgeZ,
     laneEdgeBonus,
     laneEdgeGames,
+    laneEdgeRawGames,
     adjustedSoloWinRate,
     adjustedNexusWinRate,
     version: BALANCE_SCORE_VERSION,
