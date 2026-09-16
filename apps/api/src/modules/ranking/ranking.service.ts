@@ -410,7 +410,15 @@ export class RankingService {
   /**
    * Recalculate all rankings (admin/cron)
    */
-  async recalculateAllRankings(): Promise<{ processed: number }> {
+  async recalculateAllRankings(): Promise<{
+    processed: number;
+    purgedBotRows: number;
+  }> {
+    // updateRanking 은 봇을 건너뛰기만 하므로, 봇 차단 이전에 쌓인 행은
+    // 재계산으로도 0 이 되지 않고 리더보드에 그대로 남는다(실측 58행 중 19행).
+    // 재계산 전에 봇 행을 지워 둬야 순위 번호도 봇을 뺀 기준으로 매겨진다.
+    const purgedBotRows = await this.purgeTestBotRankings();
+
     // 기존에 외부 인제스트 매치로 오염된 ranking row도 0으로 재계산되도록
     // 현재 랭킹 테이블 사용자와 내전 참여자를 모두 대상으로 삼는다.
     const [customParticipants, existingRankings] = await Promise.all([
@@ -448,8 +456,34 @@ export class RankingService {
     // Update global rank numbers
     await this.updateGlobalRankNumbers();
 
-    this.logger.log(`Recalculation complete: ${processed} users processed`);
-    return { processed };
+    this.logger.log(
+      `Recalculation complete: ${processed} users processed, ${purgedBotRows} bot rows purged`,
+    );
+    return { processed, purgedBotRows };
+  }
+
+  /**
+   * 테스트 봇이 남긴 랭킹·라인기록·클랜랭킹 행을 지운다.
+   *
+   * 셋 다 봇 자신의 집계값이라 보존할 이력이 아니다. 봇 계정 자체와 봇이 참여한
+   * 경기 기록(로스터 스냅샷 등)은 건드리지 않는다 — 내전 테스트 재현에 쓰인다.
+   * 이 뒤에 existingRankings 를 읽으므로 반드시 먼저 실행해야 한다.
+   */
+  private async purgeTestBotRankings(): Promise<number> {
+    const where = { user: TEST_BOT_USER_WHERE };
+    const [rankings, roleRecords, clanRankings] = await Promise.all([
+      this.prisma.nexusRanking.deleteMany({ where }),
+      this.prisma.nexusRoleRecord.deleteMany({ where }),
+      this.prisma.clanRanking.deleteMany({ where }),
+    ]);
+    const total = rankings.count + roleRecords.count + clanRankings.count;
+
+    if (total > 0) {
+      this.logger.log(
+        `Purged test bot rows: ranking=${rankings.count} role=${roleRecords.count} clan=${clanRankings.count}`,
+      );
+    }
+    return total;
   }
 
   /**

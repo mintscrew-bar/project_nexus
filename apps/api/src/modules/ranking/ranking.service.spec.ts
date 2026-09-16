@@ -22,16 +22,18 @@ describe("RankingService", () => {
         findMany: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       clanMember: {
         findMany: jest.fn(),
       },
       clanRanking: {
         upsert: jest.fn(),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       nexusRoleRecord: {
         upsert: jest.fn(),
-        deleteMany: jest.fn(),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
@@ -296,7 +298,7 @@ describe("RankingService", () => {
 
       const result = await service.recalculateAllRankings();
 
-      expect(result).toEqual({ processed: 2 });
+      expect(result).toEqual({ processed: 2, purgedBotRows: 0 });
       expect(prisma.nexusRanking.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userId: "stale-user" },
@@ -315,6 +317,29 @@ describe("RankingService", () => {
           }),
         }),
       );
+    });
+
+    it("재계산 전에 봇이 남긴 랭킹·라인기록·클랜랭킹 행을 먼저 지운다", async () => {
+      // 봇 차단 이전에 쌓인 행은 updateRanking 이 건너뛰므로 스스로 사라지지 않는다.
+      prisma.nexusRanking.deleteMany.mockResolvedValue({ count: 19 });
+      prisma.nexusRoleRecord.deleteMany.mockResolvedValue({ count: 30 });
+      prisma.clanRanking.deleteMany.mockResolvedValue({ count: 2 });
+      prisma.matchParticipant.findMany.mockResolvedValue([]);
+      prisma.nexusRanking.findMany.mockResolvedValue([]);
+      prisma.nexusRanking.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.recalculateAllRankings();
+
+      expect(result).toEqual({ processed: 0, purgedBotRows: 51 });
+      for (const model of ["nexusRanking", "nexusRoleRecord", "clanRanking"]) {
+        expect(prisma[model].deleteMany).toHaveBeenCalledWith({
+          where: { user: expect.objectContaining({ OR: expect.any(Array) }) },
+        });
+      }
+      // 지운 뒤에 기존 랭킹 사용자를 읽어야 봇이 재계산 대상에 다시 안 들어간다.
+      expect(
+        prisma.nexusRanking.deleteMany.mock.invocationCallOrder[0],
+      ).toBeLessThan(prisma.nexusRanking.findMany.mock.invocationCallOrder[0]);
     });
   });
 });
