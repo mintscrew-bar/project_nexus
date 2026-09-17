@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  BGM_DUCKED_VOLUME,
   BGM_TRACKS,
   BGM_VOLUME,
   pickNextTrack,
@@ -25,10 +26,30 @@ const FADE_IN_MS = 1200;
 const FADE_OUT_MS = 800;
 /** 게임 시작 순간 곡을 바꿀 때 앞 곡을 줄이는 시간. 짧아야 "전환"으로 들린다. */
 const SWITCH_FADE_MS = 500;
+/** 게임 진행 구간에 들어가거나 나올 때 볼륨을 옮기는 시간 */
+const DUCK_FADE_MS = 700;
 /** 볼륨을 한 칸 바꾸는 간격 */
 const FADE_TICK_MS = 50;
 
 const CHANNEL_NAME = "nexus:bgm";
+
+/**
+ * 볼륨을 줄이는 방 상태.
+ *
+ * 방장이 게임을 시작한 뒤부터 방이 끝날 때까지다. 경매·드래프트(`DRAFT`),
+ * 자동 편성 확인(`DRAFT_COMPLETED`), 역할 선택, 대진표(`IN_PROGRESS`)가 모두
+ * 들어간다. 이 구간에는 입찰·카운트다운·편성 효과음이 나오므로 음악이 그
+ * 아래로 내려가야 한다. 대기(`WAITING`)와 완료(`COMPLETED`)는 원래 볼륨이다.
+ *
+ * 실제 내 경기 중에는 여기가 아니라 `useMyMatchInProgress` 가 음악을 아예 끈다.
+ */
+const DUCKED_ROOM_STATUSES = new Set([
+  "TEAM_SELECTION",
+  "DRAFT",
+  "DRAFT_COMPLETED",
+  "ROLE_SELECTION",
+  "IN_PROGRESS",
+]);
 
 /**
  * 사이트 배경음악 플레이어.
@@ -51,6 +72,7 @@ function BgmEngine() {
   const hydrate = useBgmStore((s) => s.hydrate);
   const syncMuted = useBgmStore((s) => s.syncMuted);
   const gameStarting = useLobbyStore((s) => s.gameStarting);
+  const roomStatus = useLobbyStore((s) => s.room?.status);
   const inMatch = useMyMatchInProgress();
 
   /**
@@ -73,6 +95,12 @@ function BgmEngine() {
   // 사용자 입력과 무관하게 지금 화면·상황에서 음악이 나와도 되는가
   const allowedHere = hydrated && !silentPath && !inMatch;
   const shouldPlay = allowedHere && unlocked && !muted && ownsAudio;
+  // 방장이 게임 시작 버튼을 누른 순간에도 줄인다. 방 상태 갱신이 조금 늦게
+  // 오기 때문에, 이것 없이는 경매 첫 입찰 소리가 원래 볼륨 음악에 묻힐 수 있다.
+  const ducked =
+    gameStarting ||
+    (roomStatus !== undefined && DUCKED_ROOM_STATUSES.has(roomStatus));
+  const targetVolume = ducked ? BGM_DUCKED_VOLUME : BGM_VOLUME;
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const trackRef = useRef<BgmTrack | null>(null);
@@ -82,8 +110,16 @@ function BgmEngine() {
   // 비동기 콜백(재생 시작·페이드 완료)에서 최신 판단을 읽기 위한 사본
   const shouldPlayRef = useRef(shouldPlay);
   const allowedHereRef = useRef(allowedHere);
+  const targetVolumeRef = useRef(targetVolume);
+  /**
+   * 게임 시작 곡 전환(앞 곡 줄이기 → 새 곡 걸기)이 진행 중인가.
+   * 전환 도중에 볼륨 조정이 끼어들면 앞 곡 페이드가 취소돼 전환이 통째로
+   * 사라진다. 게임 시작 순간은 방 상태도 같이 바뀌므로 실제로 겹친다.
+   */
+  const switchingRef = useRef(false);
   shouldPlayRef.current = shouldPlay;
   allowedHereRef.current = allowedHere;
+  targetVolumeRef.current = targetVolume;
 
   const getAudio = useCallback(() => {
     if (!audioRef.current) {
@@ -112,6 +148,9 @@ function BgmEngine() {
       if (fadeTimerRef.current !== null) {
         window.clearInterval(fadeTimerRef.current);
       }
+      // 이전 페이드가 곡 전환이었다면 여기서 취소된 것이다. 전환 표시를
+      // 남겨 두면 이후 볼륨 조정이 영영 막힌다. 전환은 이 호출 뒤에 다시 켠다.
+      switchingRef.current = false;
       const from = audio.volume;
       const startedAt = performance.now();
 
@@ -152,7 +191,7 @@ function BgmEngine() {
           return;
         }
         claim();
-        fadeTo(BGM_VOLUME, FADE_IN_MS);
+        fadeTo(targetVolumeRef.current, FADE_IN_MS);
       },
       (error: unknown) => {
         const name = error instanceof DOMException ? error.name : "";
@@ -281,7 +320,7 @@ function BgmEngine() {
     if (shouldPlay) {
       if (!audio.paused) {
         // 페이드아웃 도중에 다시 켜진 경우. 멈추지 않고 볼륨만 되돌린다.
-        fadeTo(BGM_VOLUME, FADE_IN_MS);
+        fadeTo(targetVolumeRef.current, FADE_IN_MS);
       } else if (audio.src) {
         // 멈췄던 곡을 그 자리에서 이어서 튼다
         playLoaded();
@@ -315,9 +354,24 @@ function BgmEngine() {
     if (!shouldPlayRef.current || audio.paused) return;
 
     fadeTo(0, SWITCH_FADE_MS, () => {
+      switchingRef.current = false;
+      // 새 곡은 그 시점의 목표 볼륨(대개 줄인 볼륨)까지 올라온다.
       if (shouldPlayRef.current) startNextTrack({ hype: true });
     });
+    switchingRef.current = true;
   }, [gameStarting, fadeTo, getAudio, startNextTrack]);
+
+  /**
+   * 게임 진행 구간에 들어가거나 나오면 볼륨만 옮긴다.
+   *
+   * 재생 중일 때만 한다. 멈춰 있거나 끄는 중(페이드아웃)이면 건드리지 않는다 —
+   * 다음에 재생을 시작할 때 `targetVolumeRef` 로 알아서 맞춰진다.
+   */
+  useEffect(() => {
+    const audio = getAudio();
+    if (!shouldPlayRef.current || audio.paused || switchingRef.current) return;
+    fadeTo(targetVolume, DUCK_FADE_MS);
+  }, [targetVolume, fadeTo, getAudio]);
 
   // 정리. Providers 는 사실상 내려가지 않지만 개발 중 핫 리로드 대비.
   useEffect(() => {
