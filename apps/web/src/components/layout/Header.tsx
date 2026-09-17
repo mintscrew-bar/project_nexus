@@ -15,6 +15,7 @@ import { useFriendStore } from "@/stores/friend-store";
 import { GAMES } from "@nexus/types";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { GameSwitcher } from "@/components/layout/GameSwitcher";
+import { BgmToggle } from "@/components/bgm/BgmToggle";
 import { gamePath, useCurrentGame } from "@/hooks/useCurrentGame";
 
 // 게임별 화면은 `/lol/*` 처럼 현재 게임 프리픽스가 붙는다.
@@ -122,6 +123,8 @@ export function Header() {
           <DiscordIcon className="h-5 w-5" />
           <span>Discord</span>
         </a>
+        {/* 배경음악 토글: 경매·드래프트 중에도 바로 끌 수 있게 모든 너비에서 노출 */}
+        <BgmToggle />
         {/* 어드민/모더레이터 전용 링크: 마운트 후에만 표시하여 hydration 불일치 방지 */}
         {clientIsAuthenticated &&
           (clientUser?.role === "ADMIN" ||

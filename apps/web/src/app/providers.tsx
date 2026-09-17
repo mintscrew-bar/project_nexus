@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { RiotAccountChecker } from "@/components/RiotAccountChecker";
 import { ToastProvider } from "@/components/ui/Toast";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcuts";
+import { BgmPlayer } from "@/components/bgm/BgmPlayer";
 
 function AuthInitializer({ children }: { children: ReactNode }) {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
@@ -39,6 +40,8 @@ export function Providers({ children }: { children: ReactNode }) {
           <KeyboardShortcutsProvider>
             <AuthInitializer>
               <RiotAccountChecker>{children}</RiotAccountChecker>
+              {/* 배경음악. 최상위에 한 번만 둬야 화면을 옮겨도 곡이 이어진다. */}
+              <BgmPlayer />
             </AuthInitializer>
           </KeyboardShortcutsProvider>
         </ToastProvider>

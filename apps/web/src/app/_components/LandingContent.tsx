@@ -19,6 +19,7 @@ import {
 import { Logo } from "@/components/Logo";
 import { LandingBodyScroll } from "./LandingBodyScroll";
 import { UserMenu } from "@/components/UserMenu";
+import { BgmToggle } from "@/components/bgm/BgmToggle";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 import { LandingMobileNav } from "./LandingMobileNav";
 import { LiveStreamersSection } from "@/components/home/LiveStreamersSection";
@@ -1181,6 +1182,8 @@ function LandingHeader() {
             끌려갔다. `UserMenu` 는 아바타·설정·로그아웃을 이미 들고 있고,
             프로필은 게임을 이름으로 고르게 한다.
           */}
+          {/* 랜딩에서도 배경음악이 나오므로 끄는 버튼을 같이 둔다 */}
+          <BgmToggle />
           <UserMenu />
         </div>
       </div>
