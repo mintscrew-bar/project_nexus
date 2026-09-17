@@ -22,8 +22,19 @@ export interface BgmTrack {
 }
 
 export const BGM_TRACKS: BgmTrack[] = [
-  // 예시:
-  // { id: "lobby-01", title: "로비 1", src: "/audio/bgm/lobby-01.mp3" },
+  // 어두운 패드 위로 베이스가 박동하며 긴장을 쌓는 곡
+  {
+    id: "pulsing-tension",
+    title: "Pulsing Tension",
+    src: "/audio/bgm/pulsing-tension.mp3",
+  },
+  // 디튠된 업라이트 피아노 모티프 중심의 가라앉은 곡
+  {
+    id: "detuned-focus",
+    title: "Detuned Focus",
+    src: "/audio/bgm/detuned-focus.mp3",
+  },
+  // 게임 시작 순간용 곡은 `hype: true` 를 붙인다. 예:
   // { id: "hype-01", title: "게임 시작", src: "/audio/bgm/hype-01.mp3", hype: true },
 ];
 
