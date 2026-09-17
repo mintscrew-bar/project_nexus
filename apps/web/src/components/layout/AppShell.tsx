@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 import { Header } from './Header';
@@ -88,7 +88,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     gamePathname.endsWith('/bracket');
   const showCreatorPromo = pathname !== '/' && !isDashboardRoute;
 
-  if (isAuthRoute || isLandingFullscreen || isBroadcastRoute) {
+  const usesShell = !(isAuthRoute || isLandingFullscreen || isBroadcastRoute);
+
+  // ---------------------------------------------------------------
+  // AdSense 높이 강제 방어.
+  //
+  // AdSense 는 광고 슬롯이 로드되면 광고부터 조상 요소를 거슬러 올라가며
+  // `style="height: auto !important"` 를 박는다. 광고가 부모 높이에 잘리지
+  // 않게 하려는 동작인데, 이 셸은 화면 높이(h-dvh)를 고정하고 그 안의
+  // 영역만 스크롤하는 구조라 틀이 콘텐츠 길이만큼 늘어나 버린다. body 가
+  // overflow-hidden 이므로 넘친 부분은 잘리고 스크롤할 곳이 사라진다.
+  // (2026-09-17 운영에서 확인: 게시글 상세·커뮤니티 목록에서 댓글·하단까지
+  //  못 내려감. 광고 요청을 막으면 정상.)
+  //
+  // 인라인 !important 는 스타일시트로 이길 수 없어서, 높이가 고정돼야 하는
+  // 셸 요소 세 개에 한해 들어오는 즉시 지운다. 그 아래 콘텐츠 요소들은 원래
+  // 높이가 auto 라 AdSense 가 건드려도 결과가 같다.
+  // 지운 뒤 AdSense 가 다시 넣어도 매번 지울 뿐이고, 운영 실측에서 서로
+  // 반복해서 싸우는 일은 없었다(페이지당 3~6회 후 멈춤).
+  // ---------------------------------------------------------------
+  const shellRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const contentFrameRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!usesShell) return;
+    const targets = [shellRef.current, mainRef.current, contentFrameRef.current]
+      .filter((el): el is HTMLElement => el !== null);
+
+    const stripHeight = () => {
+      for (const el of targets) {
+        if (el.style.height) el.style.removeProperty('height');
+      }
+    };
+    stripHeight();
+
+    const observer = new MutationObserver(stripHeight);
+    for (const el of targets) {
+      observer.observe(el, { attributes: true, attributeFilter: ['style'] });
+    }
+    return () => observer.disconnect();
+  }, [usesShell]);
+
+  if (!usesShell) {
     return <>{children}</>;
   }
 
@@ -100,6 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // 뷰포트 높이와 flex 축소 금지를 함께 명시해 첫 이동과 새로고침을 같게 만든다.
   return (
     <div
+      ref={shellRef}
       className={cn(
         "flex h-dvh min-h-0 w-full flex-none flex-col",
         themeClass,
@@ -108,13 +150,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* 필름 그레인 오버레이. 좌표만 넘기므로 리렌더는 없다. */}
       {themeClass && <PubgSurfaceGrain />}
       <Header />
-      <main className="flex min-h-0 min-w-0 flex-grow">
+      <main ref={mainRef} className="flex min-h-0 min-w-0 flex-grow">
         {/*
           배그 테마에서는 바탕을 비운다. 여기에 불투명한 배경을 깔면
           body 의 그레인과 광원이 통째로 가려진다 — 질감은 콘텐츠 뒤에
           있어야 하고, 카드들이 그 위를 덮는 게 맞다.
         */}
-        <div className={cn(
+        <div ref={contentFrameRef} className={cn(
           "flex min-h-0 min-w-0 flex-grow flex-col overflow-hidden",
           themeClass ? "bg-transparent" : "bg-bg-primary",
         )}>
