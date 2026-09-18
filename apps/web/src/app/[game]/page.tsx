@@ -32,5 +32,8 @@ export default function GameHome() {
     );
   }
 
-  return <div className="container mx-auto flex w-full max-w-[1480px] flex-1 animate-fade-in p-4 md:p-6 lg:py-8"><ErrorBoundary><DashboardContent gameTitle={title} /></ErrorBoundary></div>;
+    // 가로 flex 였을 때는 대시보드 본문이 flex 아이템이라 폭을 채우지 않고
+  // 내용 크기(약 1224px)로 줄어든 뒤 왼쪽에 붙었다 — 틀은 가운데인데 내용만
+  // 왼쪽으로 쏠려 보였다. 세로 방향이면 교차축 stretch 로 폭을 다 쓴다.
+  return <div className="container mx-auto flex w-full max-w-[1480px] flex-1 flex-col animate-fade-in p-4 md:p-6 lg:py-8"><ErrorBoundary><DashboardContent gameTitle={title} /></ErrorBoundary></div>;
 }
