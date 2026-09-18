@@ -107,6 +107,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // 지운 뒤 AdSense 가 다시 넣어도 매번 지울 뿐이고, 운영 실측에서 서로
   // 반복해서 싸우는 일은 없었다(페이지당 3~6회 후 멈춤).
   // ---------------------------------------------------------------
+  // ---------------------------------------------------------------
+  // 스크롤 주체.
+  //
+  // 대시보드형 화면(로비·경매·드래프트·역할 선택·대진표)은 뷰포트에 딱 맞고
+  // 안쪽 영역만 스크롤해야 한다 — 참가자 목록과 채팅이 각자 자리를 지켜야
+  // 하기 때문이다. 그 외 일반 페이지는 **문서 자체가 스크롤**한다.
+  //
+  // 전에는 모든 화면이 대시보드 방식이었다. 그래서 높이가 body 부터 본문까지
+  // 한 줄로 이어졌고, 한 곳을 고치면 다른 화면이 깨졌다. 외부 스크립트가
+  // 높이를 건드려도 사이트 전체 스크롤이 죽었다(AdSense 가 실제로 그랬다).
+  // 일반 페이지를 문서 스크롤로 되돌리면 그 사슬이 끊긴다.
+  // ---------------------------------------------------------------
+  useEffect(() => {
+    if (!usesShell || !isDashboardRoute) return;
+    // 대시보드 화면에서만 body 를 뷰포트에 고정한다.
+    document.body.classList.add('h-dvh', 'overflow-hidden');
+    return () => document.body.classList.remove('h-dvh', 'overflow-hidden');
+  }, [usesShell, isDashboardRoute]);
+
   const shellRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const contentFrameRef = useRef<HTMLDivElement>(null);
@@ -143,52 +162,57 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div
       ref={shellRef}
       className={cn(
-        "flex h-dvh min-h-0 w-full flex-none flex-col",
+        "flex w-full flex-col",
+        // 대시보드: 뷰포트 높이에 못 박고 안쪽에서만 스크롤한다.
+        // 일반 페이지: 최소 한 화면만 채우고 내용만큼 길어진다.
+        isDashboardRoute ? "h-dvh min-h-0 flex-none" : "min-h-dvh",
         themeClass,
       )}
     >
       {/* 필름 그레인 오버레이. 좌표만 넘기므로 리렌더는 없다. */}
       {themeClass && <PubgSurfaceGrain />}
       <Header />
-      <main ref={mainRef} className="flex min-h-0 min-w-0 flex-grow">
+      <main
+        ref={mainRef}
+        className={cn(
+          "flex min-w-0 flex-grow",
+          isDashboardRoute && "min-h-0",
+        )}
+      >
         {/*
           배그 테마에서는 바탕을 비운다. 여기에 불투명한 배경을 깔면
           body 의 그레인과 광원이 통째로 가려진다 — 질감은 콘텐츠 뒤에
           있어야 하고, 카드들이 그 위를 덮는 게 맞다.
         */}
         <div ref={contentFrameRef} className={cn(
-          "flex min-h-0 min-w-0 flex-grow flex-col overflow-hidden",
+          "flex min-w-0 flex-grow flex-col",
+          // 넘치는 부분을 잘라내는 건 뷰포트에 고정된 대시보드에서만 맞다.
+          // 일반 페이지에서 자르면 문서가 길어져도 아래를 볼 수 없다.
+          isDashboardRoute && "min-h-0 overflow-hidden",
           themeClass ? "bg-transparent" : "bg-bg-primary",
         )}>
           {showCreatorPromo && <CreatorPromoStrip />}
           <ActiveRoomBanner />
           {/*
-            - isDashboardRoute: 페이지 전체가 viewport에 맞게 고정되어야 함 (h-full)
-            - 일반 페이지: 내용에 따라 전체 스크롤 가능 (overflow-auto)
-
             두 갈래가 **구조가 다른 부모**를 준다. 대시보드는 children 이
-            flex column 의 자식이 되고, 일반은 grid item 안에 들어간다.
-            그래서 `flex-1` 에만 기대는 페이지는 이 판정이 뒤집히는 순간
-            높이가 0 으로 접힌다 — 로비가 그래서 두 번 깨졌다.
-            여기 판정은 경로 정규식이라 라우팅이 바뀌어도 컴파일 에러가
+            높이가 못 박힌 flex column 의 자식이 되고, 일반 페이지는 내용만큼
+            늘어나는 column 의 자식이 된다. 그래서 `flex-1` 에만 기대는 페이지는
+            이 판정이 뒤집히는 순간 높이가 0 으로 접힌다 — 로비가 그래서 두 번
+            깨졌다. 여기 판정은 경로 정규식이라 라우팅이 바뀌어도 컴파일 에러가
             안 난다. 대시보드형 페이지는 `h-full` 도 같이 들고 있어야 한다.
           */}
           <div
             className={cn(
-              // 대시보드는 뷰포트 안에 고정해야 하므로 h-full을 사용한다.
-              // 일반 페이지는 모바일 브라우저가 콘텐츠 높이를 기준으로
-              // 스크롤 영역을 계산할 수 있게 고정 h-0을 두지 않는다.
-              "min-h-0 flex-1 flex flex-col",
-              isDashboardRoute
-                ? "h-full overflow-hidden"
-                : "overflow-y-auto overflow-x-hidden overscroll-y-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch]",
+              "flex flex-1 flex-col",
+              isDashboardRoute && "h-full min-h-0 overflow-hidden",
             )}
           >
             {isDashboardRoute ? children : (
-              <div className="grid min-h-full grid-rows-[1fr_auto]">
-                <div className="min-w-0">{children}</div>
+              <>
+                {/* 내용이 짧아도 푸터가 화면 아래에 붙도록 본문이 남은 높이를 먹는다. */}
+                <div className="min-w-0 flex-1">{children}</div>
                 <Footer />
-              </div>
+              </>
             )}
           </div>
         </div>

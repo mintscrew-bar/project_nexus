@@ -117,9 +117,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" suppressHydrationWarning>
-      <body
-        className="font-sans h-screen flex flex-col overflow-hidden"
-      >
+      {/*
+        body 는 기본적으로 스크롤한다. 로비·경매 같은 대시보드 화면에서만
+        AppShell 이 `h-dvh overflow-hidden` 을 덧붙여 뷰포트에 고정한다.
+        전에는 여기서 전 화면을 고정해 두고 랜딩만 예외로 풀었는데, 그 탓에
+        모든 페이지의 스크롤이 셸 안쪽 한 군데에 묶여 있었다.
+      */}
+      <body className="font-sans min-h-dvh flex flex-col">
         {/*
           JSON-LD 를 수동 `<head>` 에 넣지 않는다. App Router 는 head 를 직접
           관리하고, 서드파티 스크립트가 그 안으로 끼어들면 하이드레이션 때
