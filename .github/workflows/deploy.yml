@@ -196,16 +196,25 @@ jobs:
             RUNNING_NGINX_HASH=$($COMPOSE exec -T nginx sha256sum /etc/nginx/nginx.conf | awk '{print $1}')
           fi
 
+          NGINX_RECREATED=0
           if [ "$CHECKOUT_NGINX_HASH" != "$RUNNING_NGINX_HASH" ]; then
             echo "nginx.conf 변경 감지 — nginx 컨테이너 재생성"
             $COMPOSE up -d --no-deps --force-recreate nginx
+            NGINX_RECREATED=1
           else
             $COMPOSE up -d --no-deps nginx
           fi
 
-          $COMPOSE exec -T nginx nginx -t
-          $COMPOSE exec -T nginx nginx -s reload
           wait_for_health nexus-nginx 60
+          $COMPOSE exec -T nginx nginx -t
+
+          # 방금 재생성한 컨테이너는 이미 새 설정으로 시작했으므로 reload 가 필요 없다.
+          # 오히려 master 가 /run/nginx.pid 를 쓰기 전에 신호를 보내게 돼
+          # `invalid PID number "" in "/run/nginx.pid"` 로 배포가 실패한다
+          # (2026-09-18 CD 실패 원인. 컨테이너는 이미 정상이었는데 이 줄에서 죽었다).
+          if [ "$NGINX_RECREATED" = "0" ]; then
+            $COMPOSE exec -T nginx nginx -s reload
+          fi
 
           # cloudflared는 이미지나 설정이 바뀐 경우에만 compose가 재생성한다.
           $COMPOSE up -d --no-deps cloudflared
