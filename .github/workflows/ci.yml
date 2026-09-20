@@ -51,21 +51,16 @@ jobs:
       - name: 테스트
         run: pnpm test -- -- --passWithNoTests
 
-  # Docker 이미지 빌드 + GHCR 푸시
-  # - main 브랜치 push 일 때만 실행 (PR 에서는 스킵)
-  # - GitHub-hosted runner 에서 빌드 → 운영 서버 부하 0
-  docker:
-    name: Docker Build & Push
+  # 버전 자동 범프 — 반드시 단일 잡에서만 돈다.
+  # 이미지 빌드를 matrix 로 병렬화했기 때문에, 범프가 빌드 잡 안에 있으면
+  # api/web 두 레그가 동시에 push-back 을 시도해 커밋이 꼬인다.
+  bump:
+    name: 버전 자동 범프
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
-    env:
-      REGISTRY: ghcr.io
-      # ghcr.io 는 lowercase 강제 — 소유자/저장소가 이미 lowercase 라 그대로 사용
-      IMAGE_PREFIX: ghcr.io/mintscrew-bar/project_nexus
 
     steps:
       - name: 코드 체크아웃
@@ -95,6 +90,114 @@ jobs:
           git push origin HEAD:main \
             || echo "push-back 실패(비치명) — 이번 이미지엔 ${NEW} 반영됨"
 
+      # 빌드 잡은 이 커밋(github.sha)을 체크아웃하므로 범프 결과가 들어있지 않다.
+      # ref 를 넘기지 않고 파일로 넘기는 이유: push-back 이 실패하면 그 커밋은
+      # 원격에 없어서 빌드 잡의 체크아웃이 깨진다.
+      - name: 버전 파일 전달
+        uses: actions/upload-artifact@v4
+        with:
+          name: version-files
+          path: |
+            package.json
+            apps/api/package.json
+            apps/web/package.json
+          retention-days: 1
+
+  # 어떤 이미지를 새로 빌드해야 하는지 판별한다.
+  # 안 바뀐 앱은 빌드 대신 직전 이미지를 이번 SHA 로 재태그한다(수 초).
+  # CD 가 api/web 양쪽을 IMAGE_TAG=<sha> 로 pull 하므로 태그는 항상 존재해야 한다.
+  changes:
+    name: 변경 범위 판별
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 변경 경로 분류
+        id: filter
+        env:
+          BASE_REF: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          build_both() {
+            echo "$1"
+            echo "api=true" >> "$GITHUB_OUTPUT"
+            echo "web=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          # 기준 커밋을 모르면(첫 push, force-push 등) 판별을 포기하고 둘 다 빌드한다.
+          # 덜 빌드해서 낡은 이미지가 나가는 것보다 더 빌드해서 느린 편이 안전하다.
+          if [ -z "${BASE_REF:-}" ] \
+            || [ "$BASE_REF" = "0000000000000000000000000000000000000000" ] \
+            || ! git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null; then
+            build_both "기준 커밋 불명 → api/web 둘 다 빌드"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE_REF" "$GITHUB_SHA")
+          echo "변경 파일:"; echo "$CHANGED" | sed 's/^/  /'
+
+          # 이미지에 안 들어가는 경로. 여기만 바뀌었으면 어느 이미지도 새로 만들 필요가 없다.
+          # nginx.conf 는 bind mount, systemd/scripts 는 호스트 파일이다.
+          IGNORE_RE='^(docs|scripts|systemd|nginx|load-test|tools|\.github)/|\.md$'
+
+          # apps/api, apps/web 어느 쪽도 아니면서 무시 대상도 아닌 것 = 공용
+          # (packages/, pnpm-lock.yaml, package.json, turbo.json 등) → 둘 다 영향
+          SHARED=$(echo "$CHANGED" | grep -Ev '^apps/(api|web)/' | grep -Ev "$IGNORE_RE" || true)
+          if [ -n "$SHARED" ]; then
+            echo "공용 파일 변경:"; echo "$SHARED" | sed 's/^/  /'
+            build_both "→ api/web 둘 다 빌드"
+          fi
+
+          API=false; WEB=false
+          echo "$CHANGED" | grep -qE '^apps/api/' && API=true
+          echo "$CHANGED" | grep -qE '^apps/web/' && WEB=true
+
+          echo "api=$API" >> "$GITHUB_OUTPUT"
+          echo "web=$WEB" >> "$GITHUB_OUTPUT"
+          echo "판별 결과 — api 빌드: $API / web 빌드: $WEB"
+
+  # Docker 이미지 빌드 + GHCR 푸시
+  # - main 브랜치 push 일 때만 실행 (PR 에서는 스킵)
+  # - GitHub-hosted runner 에서 빌드 → 운영 서버 부하 0
+  # - api/web 을 matrix 로 병렬 실행한다. 직렬일 때 3.6분 + 4.9분 이던 것이
+  #   느린 쪽 하나(약 4.9분)로 줄어든다.
+  docker:
+    name: Docker (${{ matrix.app }})
+    needs: [bump, changes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      # 한쪽이 깨져도 다른 쪽은 끝까지 간다. 어느 이미지가 문제인지 바로 보인다.
+      fail-fast: false
+      matrix:
+        app: [api, web]
+    env:
+      REGISTRY: ghcr.io
+      # ghcr.io 는 lowercase 강제 — 소유자/저장소가 이미 lowercase 라 그대로 사용
+      IMAGE_PREFIX: ghcr.io/mintscrew-bar/project_nexus
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v6
+
+      - name: 버전 파일 적용
+        uses: actions/download-artifact@v4
+        with:
+          name: version-files
+
       - name: Docker Buildx 설정
         uses: docker/setup-buildx-action@v4
 
@@ -105,7 +208,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # 변경이 없으면 레지스트리 안에서 manifest 만 복사한다. 내려받지도 다시 올리지도
+      # 않으므로 수 초면 끝난다. 실패하면(예: latest 가 아직 없음) 아래 빌드로 넘어간다.
+      - name: 변경 없음 — 직전 이미지를 이번 SHA 로 재태그
+        id: retag
+        if: >-
+          (matrix.app == 'api' && needs.changes.outputs.api != 'true') ||
+          (matrix.app == 'web' && needs.changes.outputs.web != 'true')
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          SRC="${IMAGE_PREFIX}/${{ matrix.app }}:latest"
+          DST="${IMAGE_PREFIX}/${{ matrix.app }}:${GITHUB_SHA}"
+          echo "재태그: $SRC → $DST"
+          docker buildx imagetools create -t "$DST" "$SRC"
+
       - name: API 이미지 빌드 & 푸시
+        if: >-
+          matrix.app == 'api' &&
+          (needs.changes.outputs.api == 'true' || steps.retag.outcome == 'failure')
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -120,6 +241,9 @@ jobs:
           cache-to: type=gha,mode=max,scope=api
 
       - name: Web 이미지 빌드 & 푸시
+        if: >-
+          matrix.app == 'web' &&
+          (needs.changes.outputs.web == 'true' || steps.retag.outcome == 'failure')
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -143,10 +267,20 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
-      # 이미지 빌드가 깨지면 CD 자체가 돌지 않아 조용히 배포가 멈춘다.
-      # 배포 실패와 같은 채널로 알려 "왜 반영이 안 되지"를 없앤다.
+  # 이미지 빌드가 깨지면 CD 자체가 돌지 않아 조용히 배포가 멈춘다.
+  # 배포 실패와 같은 채널로 알려 "왜 반영이 안 되지"를 없앤다.
+  # 별도 잡으로 뺀 이유: matrix 안에 두면 api/web 양쪽이 깨질 때 알림이 두 번 간다.
+  notify-failure:
+    name: 빌드 실패 알림
+    needs: [ci, bump, changes, docker]
+    if: >-
+      failure() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
       - name: 실패 알림 (Discord)
-        if: failure()
         env:
           WEBHOOK: ${{ secrets.DEPLOY_ALERT_DISCORD_WEBHOOK }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
