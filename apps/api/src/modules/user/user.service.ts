@@ -714,20 +714,39 @@ export class UserService {
       if (trimmed.length < 2 || trimmed.length > 20) {
         throw new BadRequestException("유저네임은 2~20자여야 합니다.");
       }
-      if (!/^[a-zA-Z0-9가-힣_]+$/.test(trimmed)) {
+      // 허용 문자.
+      //
+      // 전에는 영문·숫자·완성형 한글·밑줄만 받았다. 그래서 디스코드 이름을
+      // 그대로 쓰는 사람들이 프로필을 아예 저장할 수 없었다 — 공백이나
+      // 마침표가 들어간 이름, "ㅇㅈ" 같은 자모 이름이 전부 막혔다.
+      // (2026-09-20 운영에서 프로필 저장 400 연속 발생)
+      //
+      // 이제 공백·마침표·하이픈·자모까지 받는다. 양끝 공백은 위에서 이미
+      // 잘라냈고, 연속 공백은 한 칸으로 취급해 목록에서 이름이 벌어져 보이는
+      // 것만 막는다. 이모지·제어문자는 계속 막는다 — 목록·채팅에서 읽기 어렵다.
+      if (!/^[a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ_.\- ]+$/.test(trimmed)) {
         throw new BadRequestException(
-          "유저네임은 영문, 숫자, 한글, 밑줄(_)만 사용 가능합니다.",
+          "유저네임은 영문, 숫자, 한글, 밑줄(_), 마침표(.), 하이픈(-), 공백만 사용 가능합니다.",
         );
       }
-      // 중복 확인
+      // 글자가 하나도 없는 이름(예: "...", "---")은 사람을 가리키지 못한다.
+      if (!/[a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ]/.test(trimmed)) {
+        throw new BadRequestException(
+          "유저네임에는 문자나 숫자가 최소 하나는 들어가야 합니다.",
+        );
+      }
+      // 연속 공백은 한 칸으로 줄인다. 중복 확인도 저장할 값 기준이어야 한다 —
+      // 그러지 않으면 "김  철수"로 우회 가입이 가능해진다.
+      const normalized = trimmed.replace(/\s{2,}/g, " ");
+
       const existing = await this.prisma.user.findFirst({
-        where: { username: trimmed, id: { not: userId } },
+        where: { username: normalized, id: { not: userId } },
         select: { id: true },
       });
       if (existing) {
         throw new BadRequestException("이미 사용 중인 유저네임입니다.");
       }
-      data.username = trimmed;
+      data.username = normalized;
     }
 
     return this.prisma.user.update({

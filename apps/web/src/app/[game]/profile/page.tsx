@@ -23,6 +23,7 @@ import {
 import { PubgMatchHistory } from "@/components/pubg/PubgMatchHistory";
 import { AddAccountModal } from "@/components/domain/AddAccountModal";
 import { EditAccountModal } from "@/components/domain/EditAccountModal";
+import { getApiErrorMessage } from "@/lib/utils";
 import { ChampionImage } from "@/components/ChampionImage";
 import {
   PositionIcon,
@@ -864,8 +865,10 @@ function PubgProfilePage() {
       await userApi.updateProfile({ username: editUsername.trim(), bio: editBio.trim() });
       await fetchUser();
       setProfileDirty(false);
-    } catch {
-      setError("프로필 저장에 실패했습니다.");
+    } catch (err) {
+      // 서버가 "이미 사용 중인 유저네임입니다" 같은 이유를 주는데 여기서 삼키면
+      // 사용자는 왜 안 되는지 알 수 없다. 받은 이유를 그대로 보여준다.
+      setError(getApiErrorMessage(err, "프로필 저장에 실패했습니다."));
     } finally {
       setProfileSaving(false);
     }
@@ -1514,8 +1517,9 @@ function LolProfilePage() {
       await fetchProfile();
       setProfileDirty(false);
       addToast("프로필이 저장되었습니다.", "success");
-    } catch {
-      addToast("프로필 저장에 실패했습니다.", "error");
+    } catch (err) {
+      // 위와 같은 이유로 서버 메시지를 그대로 노출한다.
+      addToast(getApiErrorMessage(err, "프로필 저장에 실패했습니다."), "error");
     } finally {
       setIsSaving(false);
     }
