@@ -37,6 +37,35 @@
       OOM 이력 0건. 지금 잡힌 WSL 기본 스왑 2G 로 충분하다.
       메모리를 크게 먹는 작업을 호스트에서 다시 돌리게 되면 그때
       `sudo bash scripts/ops/setup-swap.sh` 한 줄로 되살린다. 스크립트는 남겨 둔다.
+      **2026-09-21 정정** — 이 종결 근거("빌드가 빠져서 메모리 스파이크 자체가 사라졌다")는
+      틀렸다. 빌드는 나갔지만 **로컬 `pnpm dev`** 라는 더 큰 상시 소비자가 남아 있었고,
+      2026-09-16·09-20 두 번 VM 을 얼려 사이트를 1033 으로 내렸다. Task 17 참고.
+
+- [x] Task 17: 로컬 dev 메모리 캡 + WSL 메모리 상향 (2026-09-21 완료)
+      **트리거**: 2026-09-20 17:13~17:18 사이트 Cloudflare 1033. WSL2 VM 이 메모리·스왑
+      고갈로 굳었다가 재부팅됐고, 그동안 cloudflared 가 없어 터널이 끊겼다.
+      2026-09-16 19:10 에도 동일 서명(`Free swap = 0kB`, order:7 할당 실패)으로 발생했다.
+      **핵심**: `syslog` 에 `oom-kill` 이 0건이었다. 아무도 안 죽어서 다 같이 죽었다.
+      운영 컨테이너는 범인이 아니다(mem_limit 합계 5.7GB, 실사용 700MB).
+      anon 11.3GB 는 대부분 컨테이너 밖 dev 프로세스였다(`next dev` 하나가 30분에 2GB).
+  - **대책 1 — dev 캡**: `scripts/dev-capped.sh`. systemd 사용자 스코프에 넣어
+    하드 상한 초과 시 dev 만 OOM kill, 스왑은 0 으로 차단. 상한은 `MemTotal - 7GB`
+    자동 계산(2~10GB clamp)이라 `.wslconfig` 를 올리면 같이 올라간다.
+    `pnpm dev` / `dev:web` / `dev:api` 가 전부 이 래퍼를 탄다.
+  - **대책 2 — WSL 상향**: `.wslconfig` memory 12GB → 20GB, swap 2GB → 4GB.
+    호스트 물리 RAM 32GB 중 12GB 가 놀고 있었다. swap 을 더 안 키운 건 swap vhdx 가
+    `C:` 에 생기는데 C: 여유가 37GB 뿐이기 때문.
+  - **한계(알고 있어야 할 것)**:
+    - 슬라이스 단위 캡은 불가능했다. WSL 이 셸을 `/init.scope` 에서 띄워
+      `user-1000.slice` 가 비어 있고, `user.slice` 는 root 가 필요한데
+      이 호스트엔 passwordless sudo 가 없다.
+    - 따라서 **래퍼를 안 거친 dev 명령은 캡이 안 걸린다.**
+      `pnpm --filter @nexus/web exec next dev` 를 직접 치면 무방비다.
+      `scripts/dev-capped.sh <명령>` 으로 감쌀 것.
+    - `nexus-oom-alert.service` 는 `docker events` 만 본다. 이번 같은 호스트 전체
+      메모리 고갈은 구조상 감지 못 한다.
+  - **미적용**: `.wslconfig` 는 `wsl --shutdown` 후에 반영된다. 운영이 내려가므로
+    한가한 시간에 수동으로 할 것.
 
 ## 핵심 인프라 (중간 작업량)
 
@@ -135,10 +164,7 @@
   - **효과**: 배포 실패 즉시 인지
 
 - [x] Task 14: 핵심 메트릭 노출 — **별도 스택 없이 종결 (2026-09-03)**
-      원래 Grafana + node_exporter 를 검토했지만, 실제로 필요한 세 가지가 이미 커버된다.
-      - 컨테이너 healthcheck 상태 → Uptime Kuma 모니터 6개 (Task 12)
-      - 디스크 사용률 → `disk-alert.sh` 30분 주기 임계 알림 (Task 3)
-      - 메모리 → 현재 여유 10Gi, 빌드가 호스트를 떠나 스파이크 요인이 없음 (Task 4 참고)
+      원래 Grafana + node_exporter 를 검토했지만, 실제로 필요한 세 가지가 이미 커버된다. - 컨테이너 healthcheck 상태 → Uptime Kuma 모니터 6개 (Task 12) - 디스크 사용률 → `disk-alert.sh` 30분 주기 임계 알림 (Task 3) - 메모리 → 현재 여유 10Gi, 빌드가 호스트를 떠나 스파이크 요인이 없음 (Task 4 참고)
       운영자 1인·컨테이너 7개 규모에 Grafana 를 얹으면 그 자체가 또 하나의 관리 대상이 된다.
       필요해지는 시점은 "왜 느린지"를 사후에 봐야 할 때이고, 그때 다시 연다.
 
@@ -162,6 +188,7 @@
 
 발생: 2026-05-09 오전, push 후 self-hosted runner 가 web 빌드 진행 중 디스크 I/O 에러 (`mkdir ... input/output error`) → web/nginx 다운 → 사이트 502.
 복구 차단 요인:
+
 - Tailscale 응답 없음 → SSH 불가
 - docker.sock 봇에 미마운트 → Discord 통한 복구 불가
 - self-hosted runner 도 같은 서버에서 죽음 → workflow 발동 불가

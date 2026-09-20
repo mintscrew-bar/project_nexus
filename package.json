@@ -8,7 +8,10 @@
   ],
   "scripts": {
     "bump": "node scripts/bump-version.mjs",
-    "dev": "turbo dev",
+    "dev": "bash scripts/dev-capped.sh turbo dev",
+    "dev:web": "bash scripts/dev-capped.sh pnpm --filter @nexus/web dev",
+    "dev:api": "bash scripts/dev-capped.sh pnpm --filter @nexus/api dev",
+    "dev:raw": "turbo dev",
     "build": "turbo build",
     "start": "turbo start",
     "lint": "turbo lint",
