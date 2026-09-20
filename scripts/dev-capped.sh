@@ -55,41 +55,16 @@ if ! command -v systemd-run >/dev/null 2>&1 \
 fi
 
 # --- 상한 자동 계산 ---------------------------------------------------------
-# 운영 컨테이너 mem_limit 합계가 약 5.7GiB, 커널·도커·셸 오버헤드를 1.3GiB로 잡아
-# 7GiB를 떼어놓고 나머지를 dev 몫으로 준다. .wslconfig의 memory를 올리면
-# 이 값도 자동으로 따라 올라가므로 손댈 곳이 없다.
-readonly RESERVED_GIB=7
-readonly MIN_GIB=2
-readonly MAX_GIB=10
+# 계산은 scripts/dev-mem-limits.sh 한 곳에만 둔다. scripts/dev-server.sh 와
+# 숫자가 갈라지면 한쪽만 보호되는 상황이 생긴다.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/dev-mem-limits.sh
+source "$REPO_ROOT/scripts/dev-mem-limits.sh"
+nexus_dev_compute_limits
 
-compute_default_max_gib() {
-  local total_kb total_gib budget
-  total_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
-  total_gib=$((total_kb / 1024 / 1024))
-  budget=$((total_gib - RESERVED_GIB))
-  (( budget < MIN_GIB )) && budget=$MIN_GIB
-  (( budget > MAX_GIB )) && budget=$MAX_GIB
-  echo "$budget"
-}
-
-MEM_MAX="${NEXUS_DEV_MEM_MAX:-$(compute_default_max_gib)G}"
-
-# 소프트 상한은 하드 상한의 75%. 여기서 먼저 스로틀이 걸리며 페이지를 회수하므로,
-# 일시적인 스파이크는 죽지 않고 넘어간다.
-if [[ -n "${NEXUS_DEV_MEM_HIGH:-}" ]]; then
-  MEM_HIGH="$NEXUS_DEV_MEM_HIGH"
-else
-  # "8G"/"2048M" 같은 문자열에서 숫자와 단위를 분리해 75%를 계산한다.
-  # 단위를 그대로 보존하지 않으면 2048M → 1536G 처럼 사실상 무제한이 되어
-  # 소프트 상한이 꺼져버린다.
-  _max_num="${MEM_MAX//[^0-9]/}"
-  _max_unit="${MEM_MAX//[0-9]/}"
-  _high_num=$(( _max_num * 3 / 4 ))
-  (( _high_num < 1 )) && _high_num=1
-  MEM_HIGH="${_high_num}${_max_unit}"
-fi
-
-CPU_QUOTA="${NEXUS_DEV_CPU_QUOTA:-600%}"
+MEM_MAX="$NEXUS_DEV_MEM_MAX"
+MEM_HIGH="$NEXUS_DEV_MEM_HIGH"
+CPU_QUOTA="$NEXUS_DEV_CPU_QUOTA"
 
 # 스코프 이름에 PID를 붙여 여러 dev를 동시에 띄워도 충돌하지 않게 한다.
 SCOPE_NAME="nexus-dev-$$"

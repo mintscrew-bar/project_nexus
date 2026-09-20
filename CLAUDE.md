@@ -6,7 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Package manager: pnpm (v8+), Node >= 20
-pnpm dev              # Run all apps (API + Web) in watch mode via Turborepo
+pnpm dev              # 개발 서버 켜기 — 포트 3010 고정, 메모리 상한 적용
+pnpm dev:stop         # 끄기
+pnpm dev:status       # 켜짐/꺼짐, PID, 메모리, 포트 점유 확인
+pnpm dev:logs         # 로그 (journalctl)
 pnpm build            # Build all workspaces
 pnpm lint             # Lint all workspaces
 pnpm test             # Run all tests (Jest)
@@ -19,15 +22,24 @@ pnpm db:push          # Push schema to DB (preferred over migrate dev)
 pnpm db:studio        # Open Prisma Studio GUI on :5555
 
 # Per-app commands
-cd apps/api && pnpm dev       # NestJS watch mode on :4000
 cd apps/api && pnpm test      # Jest tests for API
-cd apps/web && pnpm dev       # Next.js dev on :3000
 
 # Infrastructure (Docker)
 docker compose -f docker-compose.dev.yml up -d   # Start PostgreSQL + Redis
 ```
 
 **Dev startup sequence**: Docker (postgres+redis) → `pnpm db:generate` → `pnpm db:push` → `pnpm dev`
+
+### ⚠ 개발 서버는 포트 하나만 쓴다
+
+`pnpm dev`는 `scripts/dev-server.sh`를 통해 **3010 한 포트**로만 뜬다. 포트를 추가하지 않는다.
+
+- 이 호스트는 운영 상주 서버다. dev 인스턴스가 늘어난 만큼 메모리를 먹고,
+  그게 2026-09-16·09-20 두 번 WSL VM을 얼려 사이트를 Cloudflare 1033으로 내렸다.
+- 유닛도 포트도 하나라 중복 기동이 구조적으로 막힌다. 띄우기 전 `pnpm dev:status`로 확인한다.
+- `cd apps/web && pnpm dev` 같은 직접 실행은 **메모리 상한을 우회한다.** 쓰지 마라.
+  일회성으로 다른 명령을 돌려야 하면 `scripts/dev-capped.sh <명령>`으로 감싼다.
+- 상세: `docs/setup/OPERATIONS_RECOVERY.md`의 "Local dev is not covered" 항목
 
 ## Project Architecture
 
@@ -45,6 +57,7 @@ packages/
 ### Backend (apps/api)
 
 NestJS modules in `apps/api/src/modules/`, each following the pattern:
+
 - `*.module.ts` — DI registration
 - `*.controller.ts` — HTTP endpoints
 - `*.service.ts` — Business logic
@@ -70,16 +83,16 @@ NestJS modules in `apps/api/src/modules/`, each following the pattern:
 
 8 namespace-separated gateways, each with JWT auth:
 
-| Namespace | Gateway file | Purpose |
-|-----------|-------------|---------|
-| `/room` | room.gateway.ts | Room chat, join/leave, typing |
-| `/auction` | auction.gateway.ts | Live bidding, timer, auto-bid |
-| `/match` | match.gateway.ts | Match events, results |
-| `/role-selection` | role-selection.gateway.ts | Post-auction role assignment |
-| `/clan` | clan.gateway.ts | Clan chat |
-| `/dm` | dm.gateway.ts | Direct messages |
-| `/notification` | notification.gateway.ts | Real-time alerts |
-| `/presence` | presence.gateway.ts | Online status |
+| Namespace         | Gateway file              | Purpose                       |
+| ----------------- | ------------------------- | ----------------------------- |
+| `/room`           | room.gateway.ts           | Room chat, join/leave, typing |
+| `/auction`        | auction.gateway.ts        | Live bidding, timer, auto-bid |
+| `/match`          | match.gateway.ts          | Match events, results         |
+| `/role-selection` | role-selection.gateway.ts | Post-auction role assignment  |
+| `/clan`           | clan.gateway.ts           | Clan chat                     |
+| `/dm`             | dm.gateway.ts             | Direct messages               |
+| `/notification`   | notification.gateway.ts   | Real-time alerts              |
+| `/presence`       | presence.gateway.ts       | Online status                 |
 
 Client connects per-namespace via `connect*Socket()` functions in `socket-client.ts`. Transport: WebSocket only (no polling fallback). Auth: callback-based token passing.
 

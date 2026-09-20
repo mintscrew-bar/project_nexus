@@ -48,11 +48,19 @@
       **핵심**: `syslog` 에 `oom-kill` 이 0건이었다. 아무도 안 죽어서 다 같이 죽었다.
       운영 컨테이너는 범인이 아니다(mem_limit 합계 5.7GB, 실사용 700MB).
       anon 11.3GB 는 대부분 컨테이너 밖 dev 프로세스였다(`next dev` 하나가 30분에 2GB).
-  - **대책 1 — dev 캡**: `scripts/dev-capped.sh`. systemd 사용자 스코프에 넣어
+  - **대책 1 — dev 서버 단일화**: `scripts/dev-server.sh`. transient systemd 사용자
+    서비스(`nexus-dev.service`)로 **포트 3010 하나만** 쓴다. 유닛이 하나라 중복 기동이
+    구조적으로 막히고, 포트가 하나라 "껐다고 생각했는데 살아있는" 프로세스가 안 생긴다.
+    실제로 PID 193735 가 그렇게 3010 을 캡 없이 몇 시간 잡고 있었다.
+    `pnpm dev` / `dev:stop` / `dev:status` / `dev:logs` / `dev:restart`.
+    `stop --force` 는 유닛 밖 잔류 프로세스까지 정리한다.
+    **포트를 추가하지 않는다** — 바꿔야 하면 `DEV_PORT` 한 줄을 고친다.
+  - **대책 2 — 메모리 캡**: 위 서비스와 `scripts/dev-capped.sh`(일회성 명령 래퍼)가
+    같은 상한을 쓴다. 계산은 `scripts/dev-mem-limits.sh` 한 곳에만 둬서 갈라지지 않게 했다.
     하드 상한 초과 시 dev 만 OOM kill, 스왑은 0 으로 차단. 상한은 `MemTotal - 7GB`
     자동 계산(2~10GB clamp)이라 `.wslconfig` 를 올리면 같이 올라간다.
-    `pnpm dev` / `dev:web` / `dev:api` 가 전부 이 래퍼를 탄다.
-  - **대책 2 — WSL 상향**: `.wslconfig` memory 12GB → 20GB, swap 2GB → 4GB.
+    `loginctl enable-linger haru` 적용 — 로그인 세션 없이도 유저 매니저가 유지된다.
+  - **대책 3 — WSL 상향**: `.wslconfig` memory 12GB → 20GB, swap 2GB → 4GB.
     호스트 물리 RAM 32GB 중 12GB 가 놀고 있었다. swap 을 더 안 키운 건 swap vhdx 가
     `C:` 에 생기는데 C: 여유가 37GB 뿐이기 때문.
   - **한계(알고 있어야 할 것)**:

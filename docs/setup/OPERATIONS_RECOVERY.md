@@ -143,28 +143,50 @@ Production containers were not the cause. Their `mem_limit` total is 5.7 GB and
 real usage sits around 700 MB. The 11.3 GB of anonymous memory was almost entirely
 host-side dev processes; a single `next dev` reaches ~2 GB within half an hour.
 
-The guardrail is `scripts/dev-capped.sh`. It runs the dev command inside a systemd
-user scope with a hard memory cap and swap disabled, so dev is OOM-killed before
-the VM is. `pnpm dev`, `pnpm dev:web`, and `pnpm dev:api` all route through it.
+The guardrail has two parts.
+
+**One dev server, one port.** `scripts/dev-server.sh` runs the dev server as a
+transient systemd user service (`nexus-dev.service`) on a single fixed port,
+**3010**. One unit means systemd structurally prevents a second instance; one port
+means there is never an "I thought I stopped it" process left behind. That is not
+hypothetical — PID 193735 sat on 3010 uncapped for hours before this was written.
+
+```bash
+pnpm dev          # start (no-op if already running)
+pnpm dev:status   # on/off, PID, memory vs cap, who holds the port
+pnpm dev:stop     # stop  (--force also clears a stray holder of the port)
+pnpm dev:logs     # journalctl --user -u nexus-dev
+```
+
+Do not add a second port. If 3010 must change, edit `DEV_PORT` in
+`scripts/dev-server.sh` — one line, still one port. `start` rejects arguments so a
+port cannot be slipped in at the call site.
+
+**The cap itself.** Both the service above and `scripts/dev-capped.sh` (a generic
+wrapper for ad-hoc commands) apply the same limits, computed in one shared place,
+`scripts/dev-mem-limits.sh`, so the two cannot drift apart.
 
 - The cap is derived from `MemTotal` minus 7 GB (container limits plus
   kernel/docker overhead), clamped to 2-10 GB. Raising `memory` in `.wslconfig`
   raises the cap automatically — there is no second number to keep in sync.
-- Swap is pinned to 0 inside the scope. Swapping is what turns a memory problem
-  into a frozen VM, so failing fast is the point.
-- Override with `NEXUS_DEV_MEM_MAX=8G pnpm dev`. Bypass with `NEXUS_DEV_NO_CAP=1`.
-- The scope lives under `user@1000.service/app.slice`. Docker containers run under
+- Swap is pinned to 0. Swapping is what turns a memory problem into a frozen VM,
+  so failing fast is the point.
+- Override with `NEXUS_DEV_MEM_MAX=8G pnpm dev`. `dev-capped.sh` also honours
+  `NEXUS_DEV_NO_CAP=1` as an escape hatch.
+- Everything runs under `user@1000.service/app.slice`. Docker containers run under
   `system.slice`, so production is never inside this cap.
+- `loginctl enable-linger haru` is set, so the user manager (and therefore the dev
+  service) survives without an open login session.
 
 Slice-level capping is not an option here. WSL starts shells from `/init.scope`
 without a systemd login session, so `user-1000.slice` stays empty and capping it
 would catch nothing; `user.slice` itself needs root, which this host does not have
-passwordless. The wrapper therefore has to be invoked explicitly, which is why the
-`dev*` package scripts point at it. A dev command typed directly (for example
-`pnpm --filter @nexus/web exec next dev`) is **not** capped — wrap it:
+passwordless. The guardrail therefore has to be entered explicitly, which is why
+the `dev*` package scripts are the only blessed path. A dev command typed directly
+(for example `cd apps/web && pnpm dev`) is **not** capped — wrap it:
 
 ```bash
-scripts/dev-capped.sh pnpm --filter @nexus/web exec next dev -p 3010
+scripts/dev-capped.sh <command>
 ```
 
 ### OOM alerting
