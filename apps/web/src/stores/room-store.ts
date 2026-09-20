@@ -1,11 +1,11 @@
-import { create } from 'zustand';
-import { roomApi } from '@/lib/api-client';
+import { create } from "zustand";
+import { roomApi } from "@/lib/api-client";
 import {
   connectRoomSocket,
   disconnectRoomSocket,
   roomSocketHelpers,
   type RoomListDelta,
-} from '@/lib/socket-client';
+} from "@/lib/socket-client";
 
 interface Room {
   id: string;
@@ -14,7 +14,14 @@ interface Room {
   host?: { id: string; username: string; avatar?: string };
   maxParticipants: number;
   isPrivate: boolean;
-  status: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "DRAFT" | "DRAFT_COMPLETED" | "ROLE_SELECTION" | "TEAM_SELECTION";
+  status:
+    | "WAITING"
+    | "IN_PROGRESS"
+    | "COMPLETED"
+    | "DRAFT"
+    | "DRAFT_COMPLETED"
+    | "ROLE_SELECTION"
+    | "TEAM_SELECTION";
   teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   gameTitle?: "LOL" | "PUBG";
   pubgPlatform?: "STEAM" | "KAKAO";
@@ -54,6 +61,7 @@ interface RoomCreationData {
   teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   password?: string;
   allowSpectators?: boolean;
+  hostAsSpectator?: boolean;
   discordGuildId?: string;
   // Auction settings
   startingPoints?: number;
@@ -78,12 +86,20 @@ interface RoomStoreState {
   isSubscribedToRoomList: boolean;
 
   // REST API methods
-  fetchRooms: (params?: { gameTitle?: "LOL" | "PUBG"; status?: string; teamMode?: string; search?: string }) => Promise<void>;
+  fetchRooms: (params?: {
+    gameTitle?: "LOL" | "PUBG";
+    status?: string;
+    teamMode?: string;
+    search?: string;
+  }) => Promise<void>;
   createRoom: (data: RoomCreationData) => Promise<Room | null>;
   joinRoom: (roomId: string, password?: string) => Promise<void>;
   leaveRoom: (roomId: string) => Promise<void>;
   toggleReady: (roomId: string) => Promise<void>;
-  fetchChatMessages: (roomId: string, options?: { offset?: number; append?: boolean }) => Promise<void>;
+  fetchChatMessages: (
+    roomId: string,
+    options?: { offset?: number; append?: boolean },
+  ) => Promise<void>;
 
   // WebSocket methods
   connectToRoom: (roomId: string) => void;
@@ -130,7 +146,10 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       return room;
     } catch (err: any) {
       set({
-        error: err.response?.data?.message || err.message || "Failed to create room.",
+        error:
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to create room.",
         isLoading: false,
       });
       return null;
@@ -144,7 +163,8 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       set({ currentRoom: room, isLoading: false });
     } catch (err: any) {
       set({
-        error: err.response?.data?.message || err.message || "Failed to join room.",
+        error:
+          err.response?.data?.message || err.message || "Failed to join room.",
         isLoading: false,
       });
     }
@@ -158,7 +178,10 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
         set({ currentRoom: null, participants: [] });
       }
     } catch (err: any) {
-      set({ error: err.response?.data?.message || err.message || "Failed to leave room." });
+      set({
+        error:
+          err.response?.data?.message || err.message || "Failed to leave room.",
+      });
     }
   },
 
@@ -166,19 +189,30 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     try {
       await roomApi.toggleReady(roomId);
     } catch (err: any) {
-      set({ error: err.response?.data?.message || err.message || "Failed to toggle ready." });
+      set({
+        error:
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to toggle ready.",
+      });
     }
   },
 
   fetchChatMessages: async (roomId: string, options) => {
     try {
-      const messages = await roomApi.getChatMessages(roomId, 50, options?.offset ?? 0);
+      const messages = await roomApi.getChatMessages(
+        roomId,
+        50,
+        options?.offset ?? 0,
+      );
       set((state) => {
         if (!options?.append) {
           return { chatMessages: messages };
         }
         const seen = new Set(state.chatMessages.map((message) => message.id));
-        const olderMessages = messages.filter((message: ChatMessage) => !seen.has(message.id));
+        const olderMessages = messages.filter(
+          (message: ChatMessage) => !seen.has(message.id),
+        );
         return { chatMessages: [...olderMessages, ...state.chatMessages] };
       });
     } catch (err: any) {
@@ -194,8 +228,8 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     roomSocketHelpers.offAllListeners();
 
     // 소켓 이벤트 리스너도 정리 (reconnect 핸들러 중복 방지)
-    socket.off('connect');
-    socket.off('disconnect');
+    socket.off("connect");
+    socket.off("disconnect");
 
     // 이벤트 리스너 등록 함수 — 재연결 시에도 동일하게 호출
     const setupListeners = () => {
@@ -206,16 +240,23 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       });
 
       // Server emits { userId, username, isReady, participant } for user-joined
-      roomSocketHelpers.onParticipantJoined((data: { userId: string; username: string; isReady?: boolean; participant?: Participant }) => {
-        const participant = {
-          id: data.userId,
-          username: data.participant?.username ?? data.username,
-          isReady: data.participant?.isReady ?? data.isReady ?? false,
-        };
-        set((state) => ({
-          participants: [...state.participants, participant],
-        }));
-      });
+      roomSocketHelpers.onParticipantJoined(
+        (data: {
+          userId: string;
+          username: string;
+          isReady?: boolean;
+          participant?: Participant;
+        }) => {
+          const participant = {
+            id: data.userId,
+            username: data.participant?.username ?? data.username,
+            isReady: data.participant?.isReady ?? data.isReady ?? false,
+          };
+          set((state) => ({
+            participants: [...state.participants, participant],
+          }));
+        },
+      );
 
       // Server emits { userId, username } for user-left
       roomSocketHelpers.onParticipantLeft((data: { userId: string }) => {
@@ -225,29 +266,35 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       });
 
       // Server emits { userId, isReady } for ready-status-changed
-      roomSocketHelpers.onParticipantReady((data: { userId: string; isReady: boolean }) => {
-        set((state) => ({
-          participants: state.participants.map((p) =>
-            p.id === data.userId ? { ...p, isReady: data.isReady } : p
-          ),
-        }));
-      });
+      roomSocketHelpers.onParticipantReady(
+        (data: { userId: string; isReady: boolean }) => {
+          set((state) => ({
+            participants: state.participants.map((p) =>
+              p.id === data.userId ? { ...p, isReady: data.isReady } : p,
+            ),
+          }));
+        },
+      );
 
       roomSocketHelpers.onNewMessage((message: ChatMessage) => {
         set((state) => {
           const updated = [...state.chatMessages, message];
           // 메모리 누수 방지: 최대 500개 유지 (오래된 메시지부터 제거)
-          return { chatMessages: updated.length > 500 ? updated.slice(-500) : updated };
+          return {
+            chatMessages: updated.length > 500 ? updated.slice(-500) : updated,
+          };
         });
       });
 
-      roomSocketHelpers.onUserTyping((data: { userId: string; username: string }) => {
-        set((state) => {
-          const newTypingUsers = new Map(state.typingUsers);
-          newTypingUsers.set(data.userId, data.username);
-          return { typingUsers: newTypingUsers };
-        });
-      });
+      roomSocketHelpers.onUserTyping(
+        (data: { userId: string; username: string }) => {
+          set((state) => {
+            const newTypingUsers = new Map(state.typingUsers);
+            newTypingUsers.set(data.userId, data.username);
+            return { typingUsers: newTypingUsers };
+          });
+        },
+      );
 
       roomSocketHelpers.onUserStoppedTyping((data: { userId: string }) => {
         set((state) => {
@@ -263,12 +310,12 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     roomSocketHelpers.joinRoom(roomId);
 
     // 재연결 시: 이벤트 리스너 전체 재등록 + 방 재입장
-    socket.on('connect', () => {
+    socket.on("connect", () => {
       set({ isConnected: true });
       setupListeners();
       roomSocketHelpers.joinRoom(roomId);
     });
-    socket.on('disconnect', () => set({ isConnected: false }));
+    socket.on("disconnect", () => set({ isConnected: false }));
 
     set({ isConnected: socket.connected });
   },
@@ -316,16 +363,17 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     // 방 목록 delta update 수신 — 변경된 방만 패치
     roomSocketHelpers.onRoomListUpdated((delta: RoomListDelta) => {
       const current = get().rooms;
-      if (delta.type === 'add' || delta.type === 'update') {
+      if (delta.type === "add" || delta.type === "update") {
         // add: 중복 방지를 위해 이미 존재하면 갱신, 없으면 추가
         // update: 목록에 없으면 추가 (재구독 없이 놓친 add 복구)
         // → 두 케이스 모두 동일 로직(upsert)이므로 하나로 처리
         const exists = current.some((r) => r.id === delta.room.id);
-        set({ rooms: exists
-          ? current.map((r) => r.id === delta.room.id ? delta.room : r)
-          : [...current, delta.room],
+        set({
+          rooms: exists
+            ? current.map((r) => (r.id === delta.room.id ? delta.room : r))
+            : [...current, delta.room],
         });
-      } else if (delta.type === 'remove') {
+      } else if (delta.type === "remove") {
         set({ rooms: current.filter((r) => r.id !== delta.roomId) });
       }
     });
@@ -345,10 +393,10 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     // Remove any previously attached reconnect handler (stored reference)
     const prev = (socket as any).__roomListReconnectHandler;
     if (prev) {
-      socket.off('connect', prev);
+      socket.off("connect", prev);
     }
     (socket as any).__roomListReconnectHandler = reconnectHandler;
-    socket.on('connect', reconnectHandler);
+    socket.on("connect", reconnectHandler);
   },
 
   unsubscribeFromRoomList: () => {

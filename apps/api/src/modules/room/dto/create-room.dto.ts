@@ -82,6 +82,14 @@ export class CreateRoomDto {
   @IsBoolean()
   allowSpectators?: boolean;
 
+  /**
+   * 방장이 선수 슬롯을 차지하지 않고 운영자(관전자)로 방을 진행할지 여부.
+   * 방장 권한은 Room.hostId가 소유하므로 참가 역할과 독립적이다.
+   */
+  @IsOptional()
+  @IsBoolean()
+  hostAsSpectator?: boolean;
+
   @IsOptional()
   @IsString()
   @MaxLength(32)

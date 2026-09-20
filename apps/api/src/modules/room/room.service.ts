@@ -66,6 +66,8 @@ export interface CreateRoomDto {
   maxParticipants: number;
   teamMode: TeamMode;
   allowSpectators?: boolean;
+  /** 방장은 유지하되 선수 명단에서는 제외하고 운영자로 참가한다. */
+  hostAsSpectator?: boolean;
   discordGuildId?: string;
   /** 어떤 게임의 내전인지. 생략하면 롤이다. */
   gameTitle?: GameTitle;
@@ -984,6 +986,7 @@ export class RoomService {
     // 게임마다 팀 인원·계정 요구사항이 다르다.
     const gameTitle = dto.gameTitle ?? GameTitle.LOL;
     const game = getGame(gameTitle);
+    const hostAsSpectator = dto.hostAsSpectator === true;
     // 플랫폼 접두사(`[스배]`)는 저장하지 않고 보여줄 때 붙인다.
     // 저장해 두면 방장이 제목을 고칠 때마다 겹쳐 붙거나 사라진다.
     const roomName = dto.name.trim();
@@ -1007,7 +1010,9 @@ export class RoomService {
         );
       }
 
-      if (gameTitle === GameTitle.PUBG) {
+      // 운영자 방장은 선수 명단·팀 편성에 들어가지 않으므로 게임 계정이
+      // 없어도 된다. Discord는 채널 운영과 신원 확인에 계속 필요하다.
+      if (!hostAsSpectator && gameTitle === GameTitle.PUBG) {
         const pubgAccount = await this.prisma.pubgAccount.findFirst({
           where: { userId: hostId },
         });
@@ -1016,7 +1021,7 @@ export class RoomService {
             "PUBG_NOT_LINKED::PUBG 계정 등록이 필요합니다. PUBG 프로필에서 닉네임으로 계정을 등록해주세요.",
           );
         }
-      } else {
+      } else if (!hostAsSpectator) {
         const riotAccount = await this.prisma.riotAccount.findFirst({
           where: { userId: hostId, isPrimary: true },
         });
@@ -1162,8 +1167,8 @@ export class RoomService {
             participants: {
               create: {
                 userId: hostId,
-                role: "PLAYER",
-                isReady: true,
+                role: hostAsSpectator ? "SPECTATOR" : "PLAYER",
+                isReady: !hostAsSpectator,
               },
             },
           },
@@ -1747,8 +1752,6 @@ export class RoomService {
   }
 
   async joinRoom(userId: string, dto: JoinRoomDto) {
-    const joinAsSpectator = dto.asSpectator === true;
-
     const switchResult = await this.runSerializableTx(async (tx) => {
       const room = await tx.room.findUnique({
         where: { id: dto.roomId },
@@ -1761,16 +1764,23 @@ export class RoomService {
         throw new NotFoundException("Room not found");
       }
 
-      if (joinAsSpectator && !room.allowSpectators) {
-        throw new BadRequestException("이 방은 관전을 허용하지 않습니다.");
-      }
-
       // 정원 체크: PLAYER만 카운트 (관전자는 정원에 포함되지 않음)
       const playerCount = room.participants.filter(
         (p: (typeof room.participants)[number]) => p.role === "PLAYER",
       ).length;
-      if (!joinAsSpectator && playerCount >= room.maxParticipants) {
-        throw new BadRequestException("Room is full");
+      const playerSlotsFull = playerCount >= room.maxParticipants;
+      const spectatorsAllowed = room.allowSpectators !== false;
+      // 관전 허용 방이 만석이면 직접 링크·방 카드 어느 경로로 들어오더라도
+      // 실패시키지 않고 관전자로 자동 입장시킨다.
+      const joinAsSpectator =
+        dto.asSpectator === true || (playerSlotsFull && spectatorsAllowed);
+
+      if (joinAsSpectator && !spectatorsAllowed) {
+        throw new BadRequestException("이 방은 관전을 허용하지 않습니다.");
+      }
+
+      if (!joinAsSpectator && playerSlotsFull) {
+        throw new BadRequestException("참가 인원이 가득 찼습니다.");
       }
 
       if (room.status !== RoomStatus.WAITING) {
@@ -1806,14 +1816,27 @@ export class RoomService {
         );
       }
 
-      const riotAccount = await tx.riotAccount.findFirst({
-        where: { userId, isPrimary: true },
-      });
-
-      if (!riotAccount) {
-        throw new BadRequestException(
-          "RIOT_NOT_LINKED::Riot 계정 연동이 필요합니다. 프로필 페이지에서 Riot 계정을 연동해주세요.",
-        );
+      // 관전자는 편성·전적 대상이 아니므로 게임 계정을 요구하지 않는다.
+      if (!joinAsSpectator) {
+        if (room.gameTitle === GameTitle.PUBG) {
+          const pubgAccount = await tx.pubgAccount.findFirst({
+            where: { userId },
+          });
+          if (!pubgAccount) {
+            throw new BadRequestException(
+              "PUBG_NOT_LINKED::PUBG 계정 등록이 필요합니다. PUBG 프로필에서 닉네임으로 계정을 등록해주세요.",
+            );
+          }
+        } else {
+          const riotAccount = await tx.riotAccount.findFirst({
+            where: { userId, isPrimary: true },
+          });
+          if (!riotAccount) {
+            throw new BadRequestException(
+              "RIOT_NOT_LINKED::Riot 계정 연동이 필요합니다. 프로필 페이지에서 Riot 계정을 연동해주세요.",
+            );
+          }
+        }
       }
 
       const otherParticipations = await tx.roomParticipant.findMany({
@@ -1894,6 +1917,7 @@ export class RoomService {
 
       return {
         joinedRoomId: room.id,
+        joinedAsSpectator: joinAsSpectator,
         previousRoomIds: previousWaitingParticipations.map(
           (participation: any) => participation.roomId,
         ),
@@ -1923,7 +1947,9 @@ export class RoomService {
         this.refreshDiscordRoomNotification(previousRoomId);
       }
     }
-    this.warmRankedScanForUser(userId);
+    if (!switchResult.joinedAsSpectator) {
+      this.warmRankedScanForUser(userId);
+    }
 
     return {
       ...roomData,
@@ -2017,9 +2043,38 @@ export class RoomService {
         if (playerCount >= room.maxParticipants) {
           throw new BadRequestException("플레이어 정원이 가득 찼습니다.");
         }
+
+        // 관전 입장에는 게임 계정이 필요 없지만 선수로 전환할 때는 방의
+        // 게임에 맞는 계정이 반드시 있어야 한다. 그렇지 않으면 편성 단계에서
+        // 계정 정보가 비어 진행이 막힌다.
+        if (room.gameTitle === GameTitle.PUBG) {
+          const pubgAccount = await tx.pubgAccount.findFirst({
+            where: { userId },
+          });
+          if (!pubgAccount) {
+            throw new BadRequestException(
+              "PUBG_NOT_LINKED::PUBG 계정 등록이 필요합니다. PUBG 프로필에서 닉네임으로 계정을 등록해주세요.",
+            );
+          }
+        } else {
+          const riotAccount = await tx.riotAccount.findFirst({
+            where: { userId, isPrimary: true },
+          });
+          if (!riotAccount) {
+            throw new BadRequestException(
+              "RIOT_NOT_LINKED::Riot 계정 연동이 필요합니다. 프로필 페이지에서 Riot 계정을 연동해주세요.",
+            );
+          }
+        }
       }
 
-      if (nextRole === "SPECTATOR" && !room.allowSpectators) {
+      // 관전 비허용은 일반 참가자에게만 적용한다. 방장은 선수 여부와
+      // 무관하게 운영자 역할로 전환할 수 있어야 한다.
+      if (
+        nextRole === "SPECTATOR" &&
+        !room.allowSpectators &&
+        room.hostId !== userId
+      ) {
         throw new BadRequestException("이 방은 관전을 허용하지 않습니다.");
       }
 
@@ -3512,15 +3567,15 @@ export class RoomService {
     });
 
     if (!room) {
-      throw new NotFoundException("Room not found");
+      throw new NotFoundException("방을 찾을 수 없습니다.");
     }
 
     if (room.hostId !== hostId) {
-      throw new ForbiddenException("Only host can start the game");
+      throw new ForbiddenException("방장만 내전을 시작할 수 있습니다.");
     }
 
     if (room.status !== RoomStatus.WAITING) {
-      throw new BadRequestException("Room has already started");
+      throw new BadRequestException("이미 시작된 방입니다.");
     }
 
     // Check if all players are ready
@@ -3528,7 +3583,15 @@ export class RoomService {
       (p: (typeof room.participants)[number]) => p.isReady,
     );
     if (!allReady) {
-      throw new BadRequestException("Not all players are ready");
+      // 문구는 한국어여야 한다. 화면의 토스트는 영어 메시지를 기술 오류로 보고
+      // "요청을 처리하지 못했습니다"로 덮어써서, 방장이 왜 시작이 안 되는지
+      // 알 수 없었다 (2026-09-20 제보).
+      const notReady = room.participants.filter(
+        (p: (typeof room.participants)[number]) => !p.isReady,
+      ).length;
+      throw new BadRequestException(
+        `아직 준비하지 않은 참가자가 ${notReady}명 있습니다.`,
+      );
     }
 
     if (

@@ -172,7 +172,7 @@ export default function TournamentsPage({
                   className="h-4 w-4 cursor-pointer rounded accent-accent-primary"
                 />
                 <span className="whitespace-nowrap text-xs font-medium text-text-secondary">
-                  참가 가능한 방만
+                  입장 가능한 방만
                 </span>
               </label>
 

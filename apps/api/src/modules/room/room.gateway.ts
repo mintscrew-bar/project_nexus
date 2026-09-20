@@ -676,7 +676,7 @@ export class RoomGateway
     let coreStartSucceeded = false;
     try {
       if (!client.userId) {
-        return { error: "Unauthorized" };
+        return { error: "로그인이 필요합니다. 다시 로그인해주세요." };
       }
 
       // 서버 종료 진행 중이면 게임 시작 차단
@@ -686,7 +686,7 @@ export class RoomGateway
 
       // Prevent concurrent start-game calls (double-click, race condition)
       if (this.startingRooms.has(data.roomId)) {
-        return { error: "Game is already starting" };
+        return { error: "이미 시작 처리 중입니다. 잠시만 기다려주세요." };
       }
       this.startingRooms.add(data.roomId);
 
@@ -865,6 +865,13 @@ export class RoomGateway
         "missingVoiceUsers" in errorResponse
           ? errorResponse.missingVoiceUsers
           : undefined;
+
+      // 실패를 반드시 남긴다. 전에는 아무 기록도 없어서, 방장이 "시작이 안 된다"고
+      // 해도 서버에서는 원인을 확인할 방법이 없었다 (2026-09-20).
+      console.error(
+        `[Room] start-game failed (room ${data.roomId}, user ${client.userId}): ${errorMessage}`,
+        error?.stack ?? error,
+      );
 
       return {
         error: errorMessage,

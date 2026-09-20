@@ -767,6 +767,15 @@ export default function TournamentLobbyPage() {
           addToast(result.error ?? "자리 교체에 실패했습니다.", "error");
         }
       }}
+      onMemberHover={(userId, anchorRect) => {
+        cancelHoverClose();
+        scheduleHoverOpen({
+          id: userId,
+          rect: anchorRect,
+          participant: players.find((player: any) => player.userId === userId),
+        });
+      }}
+      onMemberHoverLeave={scheduleHoverClose}
     />
   ) : null;
 
@@ -1105,28 +1114,17 @@ export default function TournamentLobbyPage() {
         <div className="flex min-h-0 w-full flex-1 basis-0 overflow-hidden">
           {isAutoBalanceReviewStage ? (
             /* ═══ 편성 확인 전용 데스크톱 레이아웃 ═══
-               2:1 분할을 버리고 편성 영역이 폭 전체를 쓴다. 채팅은 좁은 사이드로 유지. */
-            <div className="mx-auto hidden h-full min-h-0 w-full max-w-screen-2xl gap-4 px-6 py-4 lg:flex">
-              <section className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+               팀 배치가 곧 참가자 목록이므로 중복 패널은 없애고 화면 폭을 전부 쓴다. */
+            <div className="hidden h-full min-h-0 w-full gap-4 px-4 py-4 lg:flex xl:px-6">
+              <section
+                data-tour="lobby-participants"
+                className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain"
+              >
                 {autoBalanceReview}
               </section>
               <aside
-                data-tour="lobby-participants"
-                className="flex min-h-0 w-72 flex-shrink-0 flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
-              >
-                <div className="border-b border-bg-tertiary px-4 py-2.5">
-                  <h2 className="flex items-center gap-2 text-sm font-bold text-text-primary">
-                    <Users className="h-4 w-4 text-text-secondary" />
-                    참가자 <span className="text-xs font-normal text-text-tertiary">{totalPlayers}/{room.maxParticipants}</span>
-                  </h2>
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                  {participantsList}
-                </div>
-              </aside>
-              <aside
                 data-tour="lobby-chat"
-                className="flex min-h-0 w-80 flex-shrink-0 flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
+                className="flex min-h-0 w-80 flex-shrink-0 flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary 2xl:w-96"
               >
                 <div className="border-b border-bg-tertiary px-4 py-2.5">
                   <h2 className="flex items-center gap-2 text-sm font-bold text-text-primary">
@@ -1230,7 +1228,7 @@ export default function TournamentLobbyPage() {
               >
                 {autoBalanceReview}
                 {/* 편성 확인 중엔 팀 배치가 곧 참가자 목록이라 숨긴다 */}
-                {participantsList}
+                {!isAutoBalanceReviewStage && participantsList}
               </TabsContent>
               <TabsContent
                 value="chat"
@@ -1326,17 +1324,23 @@ export default function TournamentLobbyPage() {
                       disabled={!canStart}
                       onClick={() =>
                         startGame((err) => {
-                          // 음성채널 미참가 유저가 있는 경우 구체적인 메시지 표시
+                          // 시작이 막히는 이유는 방장이 직접 해결할 수 있는 것들이다
+                          // (준비 안 한 사람, 음성채널 미참가 등). actionable 을 붙여
+                          // "요청을 처리하지 못했습니다"로 덮이지 않게 한다.
                           if (
                             err.missingVoiceUsers &&
                             err.missingVoiceUsers.length > 0
                           ) {
                             addToast(
-                              `음성채널 미참가: ${err.missingVoiceUsers.join(", ")}`,
+                              `디스코드 음성채널에 없는 참가자: ${err.missingVoiceUsers.join(", ")}`,
                               "error",
+                              8000,
+                              { actionable: true },
                             );
                           } else {
-                            addToast(err.message, "error");
+                            addToast(err.message, "error", 8000, {
+                              actionable: true,
+                            });
                           }
                         })
                       }

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Users } from "lucide-react";
+import { Crown, Users } from "lucide-react";
 import { useState } from "react";
 import { teamSizeForRoom } from "@nexus/types";
 import { CompactParticipantCard } from "./CompactParticipantCard";
@@ -26,7 +26,9 @@ interface LobbyParticipantsListProps {
   friendUserIds: Set<string>;
   sentFriendIds: Set<string>;
   addingFriend: string | null;
-  setHoveredPlayer: (value: { id: string; rect: DOMRect; participant: any } | null) => void;
+  setHoveredPlayer: (
+    value: { id: string; rect: DOMRect; participant: any } | null,
+  ) => void;
   scheduleHoverClose: () => void;
   cancelHoverClose: () => void;
   handleAddFriend: (userId: string) => void;
@@ -37,7 +39,10 @@ interface LobbyParticipantsListProps {
     onError?: (message: string) => void,
     onSuccess?: () => void,
   ) => void;
-  addToast: (message: string, type: "success" | "error" | "info" | "warning") => void;
+  addToast: (
+    message: string,
+    type: "success" | "error" | "info" | "warning",
+  ) => void;
 }
 
 export function LobbyParticipantsList({
@@ -81,7 +86,7 @@ export function LobbyParticipantsList({
     pubgGameMode: room.pubgGameMode,
     maxParticipants: room.maxParticipants,
   });
-  const manualTeams = room.teamMode === "MANUAL_TEAM" ? room.teams ?? [] : [];
+  const manualTeams = room.teamMode === "MANUAL_TEAM" ? (room.teams ?? []) : [];
   const isManualTeamMode = manualTeams.length > 0 && room.status === "WAITING";
   const waitingPlayers = isManualTeamMode
     ? players.filter((player: any) => !player.teamId)
@@ -107,25 +112,41 @@ export function LobbyParticipantsList({
   return (
     <div>
       {/* 관전자 전환 버튼 */}
-      {room.allowSpectators && room.status === "WAITING" && currentUserParticipant && (
-        <button
-          onClick={() => toggleSpectator((err) => addToast(err, "error"))}
-          className={`w-full mb-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${
-            currentUserIsSpectator
-              ? "border-accent-primary/30 bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
-              : "border-bg-tertiary bg-bg-tertiary/50 text-text-secondary hover:bg-bg-tertiary"
-          }`}
-        >
-          {currentUserIsSpectator ? "플레이어로 전환" : "관전자로 전환"}
-        </button>
-      )}
+      {(room.allowSpectators || isCurrentUserHost) &&
+        room.status === "WAITING" &&
+        currentUserParticipant && (
+          <button
+            onClick={() =>
+              toggleSpectator((err) =>
+                addToast(
+                  err.includes("::") ? (err.split("::")[1] ?? err) : err,
+                  "error",
+                ),
+              )
+            }
+            className={`w-full mb-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${
+              currentUserIsSpectator
+                ? "border-accent-primary/30 bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20"
+                : "border-bg-tertiary bg-bg-tertiary/50 text-text-secondary hover:bg-bg-tertiary"
+            }`}
+          >
+            {currentUserIsSpectator
+              ? isCurrentUserHost
+                ? "선수로 참여"
+                : "플레이어로 전환"
+              : isCurrentUserHost
+                ? "운영자로 전환"
+                : "관전자로 전환"}
+          </button>
+        )}
 
       {isManualTeamMode && (
         <div className="mb-4 rounded-xl border border-bg-tertiary bg-bg-tertiary/25 p-3">
           <div className="mb-3">
             <p className="text-sm font-semibold text-text-primary">팀 선택</p>
             <p className="text-xs text-text-tertiary">
-              팀을 이동하면 준비가 해제됩니다. 선택한 팀 카드에서 「팀 나가기」로 대기석으로 돌아올 수 있어요.
+              팀을 이동하면 준비가 해제됩니다. 선택한 팀 카드에서 「팀
+              나가기」로 대기석으로 돌아올 수 있어요.
             </p>
           </div>
           {/* 팀이 많아지면 2열로는 카드가 세로로 끝없이 늘어난다(배그 16팀). */}
@@ -139,7 +160,9 @@ export function LobbyParticipantsList({
             }
           >
             {manualTeams.map((team: any) => {
-              const members = players.filter((player: any) => player.teamId === team.id);
+              const members = players.filter(
+                (player: any) => player.teamId === team.id,
+              );
               const selected = currentUserParticipant?.teamId === team.id;
               const full = members.length >= teamSize;
               return (
@@ -205,7 +228,11 @@ export function LobbyParticipantsList({
                         : "bg-bg-tertiary text-text-secondary hover:bg-bg-elevated"
                     }`}
                   >
-                    {selected ? "팀 나가기" : full ? "가득 참" : "이 팀으로 이동"}
+                    {selected
+                      ? "팀 나가기"
+                      : full
+                        ? "가득 참"
+                        : "이 팀으로 이동"}
                   </button>
                 </div>
               );
@@ -222,7 +249,9 @@ export function LobbyParticipantsList({
               아직 팀을 고르지 않았거나 팀을 바꾸려는 플레이어
             </p>
           </div>
-          <span className="text-xs text-text-tertiary">{waitingPlayers.length}명</span>
+          <span className="text-xs text-text-tertiary">
+            {waitingPlayers.length}명
+          </span>
         </div>
       )}
 
@@ -258,8 +287,12 @@ export function LobbyParticipantsList({
       {spectators.length > 0 && (
         <div className="mt-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">관전자</span>
-            <span className="text-xs text-text-muted">{spectators.length}명</span>
+            <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+              관전자
+            </span>
+            <span className="text-xs text-text-muted">
+              {spectators.length}명
+            </span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {spectators.map((p: any) => (
@@ -268,15 +301,29 @@ export function LobbyParticipantsList({
                 className="flex items-center gap-1.5 px-2.5 py-1.5 bg-bg-tertiary/50 rounded-lg text-sm text-text-secondary"
               >
                 {p.avatar ? (
-                  <Image src={p.avatar} alt="" width={20} height={20} className="rounded-full" />
+                  <Image
+                    src={p.avatar}
+                    alt=""
+                    width={20}
+                    height={20}
+                    className="rounded-full"
+                  />
                 ) : (
                   <div className="w-5 h-5 rounded-full bg-bg-elevated flex items-center justify-center text-[10px] font-bold text-text-muted">
                     {p.username?.[0]?.toUpperCase()}
                   </div>
                 )}
                 <span className="truncate max-w-[80px]">{p.username}</span>
+                {p.isHost && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-accent-gold/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent-gold">
+                    <Crown className="h-3 w-3" />
+                    운영자
+                  </span>
+                )}
                 {p.userId === currentUser?.id && (
-                  <span className="text-[10px] text-accent-primary font-semibold">(나)</span>
+                  <span className="text-[10px] text-accent-primary font-semibold">
+                    (나)
+                  </span>
                 )}
               </div>
             ))}

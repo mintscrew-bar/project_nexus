@@ -1096,6 +1096,34 @@ export class DiscordVoiceService {
     }
   }
 
+  /**
+   * 음성채널 접속자 조회 — 실패와 "아무도 없음"을 구분한다.
+   *
+   * 조회에 실패했는데 빈 배열을 돌려주면 전원이 미참가로 보인다. 내전 시작
+   * 검증이 그걸 그대로 믿으면 봇 권한 문제 하나로 방이 영영 시작되지 않는다.
+   * 확인이 불가능하면 null 을 돌려주고, 호출하는 쪽이 검증을 건너뛴다.
+   */
+  private async tryGetUsersInVoiceChannel(
+    channelId: string,
+  ): Promise<string[] | null> {
+    const guildId = await this.resolveChannelGuildId(channelId);
+    if (!guildId || !this.isDiscordReady()) return null;
+
+    try {
+      const guild = await this.client.guilds.fetch(guildId);
+      const channel = (await guild.channels.fetch(channelId)) as VoiceChannel;
+      if (!channel || channel.type !== ChannelType.GuildVoice) return null;
+      return Array.from(channel.members.keys());
+    } catch (error) {
+      this.logger.warn(
+        `[validateVoicePresence] 음성채널 ${channelId} 조회 실패 — 검증을 건너뜁니다: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
   async getDiscordUserIdByNexusUserId(
     nexusUserId: string,
   ): Promise<string | null> {
@@ -1165,10 +1193,15 @@ export class DiscordVoiceService {
       return { valid: true, missingUsernames: [] };
     }
 
-    // Lobby 채널에 현재 접속 중인 Discord 유저 ID 목록
-    const voiceUserIds = await this.getUsersInVoiceChannel(
+    // Lobby 채널에 현재 접속 중인 Discord 유저 ID 목록.
+    // 조회 자체가 안 되면(봇 권한·연결 문제) 검증을 건너뛴다 — 확인하지 못한 것을
+    // 근거로 내전을 막으면 방장은 손쓸 방법이 없다.
+    const voiceUserIds = await this.tryGetUsersInVoiceChannel(
       lobbyChannel.channelId,
     );
+    if (voiceUserIds === null) {
+      return { valid: true, missingUsernames: [] };
+    }
     const voiceUserIdSet = new Set(voiceUserIds);
 
     // 방 참가자 중 Discord 연동 유저 목록 조회

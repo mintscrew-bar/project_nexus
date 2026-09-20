@@ -1,10 +1,21 @@
 "use client";
 
-import React from 'react';
-import { Card, CardContent, CardFooter, Badge } from '@/components/ui';
-import { cn, getRelativeTime } from '@/lib/utils';
-import { ArrowRight, ArrowLeftRight, Eye, EyeOff, Gavel, ListOrdered, LockKeyhole, Scale, Server, Users } from 'lucide-react';
-import { PUBG_PLATFORM_LABELS, getPubgGameMode } from '@nexus/types';
+import React from "react";
+import { Card, CardContent, CardFooter, Badge } from "@/components/ui";
+import { cn, getRelativeTime } from "@/lib/utils";
+import {
+  ArrowRight,
+  ArrowLeftRight,
+  Eye,
+  EyeOff,
+  Gavel,
+  ListOrdered,
+  LockKeyhole,
+  Scale,
+  Server,
+  Users,
+} from "lucide-react";
+import { PUBG_PLATFORM_LABELS, getPubgGameMode } from "@nexus/types";
 
 interface Room {
   id: string;
@@ -14,17 +25,24 @@ interface Room {
   host?: { id: string; username: string; avatar?: string };
   maxParticipants: number;
   isPrivate: boolean;
-  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'DRAFT' | 'DRAFT_COMPLETED' | 'TEAM_SELECTION' | 'ROLE_SELECTION';
-  teamMode: 'AUCTION' | 'SNAKE_DRAFT' | 'AUTO_BALANCE' | 'MANUAL_TEAM';
+  status:
+    | "WAITING"
+    | "IN_PROGRESS"
+    | "COMPLETED"
+    | "DRAFT"
+    | "DRAFT_COMPLETED"
+    | "TEAM_SELECTION"
+    | "ROLE_SELECTION";
+  teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   createdAt: string;
   discordGuildId?: string | null;
   allowSpectators?: boolean;
   participants?: any[];
   /** 호스트가 방송 중이면 채워진다. 라이브 조회 실패 시에는 null이라 뱃지가 숨는다. */
   hostLive?: { platform: string; channelUrl: string } | null;
-  gameTitle?: 'LOL' | 'PUBG';
-  pubgPlatform?: 'STEAM' | 'KAKAO' | null;
-  pubgGameMode?: 'KILL_MATCH' | 'BATTLE_ROYALE' | 'FREE_MATCH' | null;
+  gameTitle?: "LOL" | "PUBG";
+  pubgPlatform?: "STEAM" | "KAKAO" | null;
+  pubgGameMode?: "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH" | null;
 }
 
 interface RoomCardProps {
@@ -56,14 +74,14 @@ function HostLiveBadge({ channelUrl }: { channelUrl: string }) {
 
 const getModeLabel = (mode: string): string => {
   switch (mode) {
-    case 'AUCTION':
-      return '경매';
-    case 'SNAKE_DRAFT':
-      return '스네이크 드래프트';
-    case 'AUTO_BALANCE':
-      return '자동 밸런스';
-    case 'MANUAL_TEAM':
-      return '자유 팀 선택';
+    case "AUCTION":
+      return "경매";
+    case "SNAKE_DRAFT":
+      return "스네이크 드래프트";
+    case "AUTO_BALANCE":
+      return "자동 밸런스";
+    case "MANUAL_TEAM":
+      return "자유 팀 선택";
     default:
       return mode;
   }
@@ -71,43 +89,52 @@ const getModeLabel = (mode: string): string => {
 
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case 'WAITING':
+    case "WAITING":
       return <Badge variant="default">대기 중</Badge>;
-    case 'IN_PROGRESS':
+    case "IN_PROGRESS":
       return <Badge variant="primary">진행 중</Badge>;
-    case 'COMPLETED':
+    case "COMPLETED":
       return <Badge variant="success">완료</Badge>;
     default:
       return <Badge variant="default">{status}</Badge>;
   }
 };
 
-const getModeIcon = (mode: Room['teamMode']) => {
+const getModeIcon = (mode: Room["teamMode"]) => {
   switch (mode) {
-    case 'AUCTION':
+    case "AUCTION":
       return Gavel;
-    case 'SNAKE_DRAFT':
+    case "SNAKE_DRAFT":
       return ListOrdered;
-    case 'AUTO_BALANCE':
+    case "AUTO_BALANCE":
       return Scale;
     default:
       return ArrowLeftRight;
   }
 };
 
-export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick, className }) => {
+export const RoomCard: React.FC<RoomCardProps> = ({
+  room,
+  currentUserId,
+  onClick,
+  className,
+}) => {
   const currentPlayers = (room.participants ?? []).filter(
-    (participant: any) => participant.role !== 'SPECTATOR'
+    (participant: any) => participant.role !== "SPECTATOR",
   ).length;
   const isFull = currentPlayers >= room.maxParticipants;
   const isParticipant =
-    !!currentUserId && (room.participants ?? []).some((p: any) => p.userId === currentUserId);
-  const canJoin = room.status === 'WAITING' && !isFull;
+    !!currentUserId &&
+    (room.participants ?? []).some((p: any) => p.userId === currentUserId);
+  const canJoinAsPlayer = room.status === "WAITING" && !isFull;
+  const canWatch =
+    room.status === "WAITING" && isFull && room.allowSpectators !== false;
+  const canJoin = canJoinAsPlayer || canWatch;
   const canEnter = canJoin || isParticipant;
   const ModeIcon = getModeIcon(room.teamMode);
   const occupancy = Math.max(
     0,
-    Math.min(100, (currentPlayers / Math.max(room.maxParticipants, 1)) * 100)
+    Math.min(100, (currentPlayers / Math.max(room.maxParticipants, 1)) * 100),
   );
 
   return (
@@ -115,10 +142,11 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
       hoverable={canEnter}
       onClick={canEnter ? onClick : undefined}
       className={cn(
-        'group relative flex h-full flex-col overflow-hidden rounded-2xl border-bg-tertiary/45 bg-bg-secondary p-0 shadow-[0_8px_24px_rgb(0_0_0/0.10)] transition-all duration-200',
-        canEnter && 'hover:-translate-y-1 hover:border-accent-primary/30 hover:shadow-[0_18px_42px_rgb(0_0_0/0.20)]',
-        !canEnter && 'opacity-70 cursor-not-allowed',
-        className
+        "group relative flex h-full flex-col overflow-hidden rounded-2xl border-bg-tertiary/45 bg-bg-secondary p-0 shadow-[0_8px_24px_rgb(0_0_0/0.10)] transition-all duration-200",
+        canEnter &&
+          "hover:-translate-y-1 hover:border-accent-primary/30 hover:shadow-[0_18px_42px_rgb(0_0_0/0.20)]",
+        !canEnter && "opacity-70 cursor-not-allowed",
+        className,
       )}
     >
       <div
@@ -138,22 +166,29 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
                 <h3 className="truncate text-base font-bold tracking-[-0.02em] text-text-primary md:text-lg">
                   {room.name}
                 </h3>
-{/* 스배/카배는 같이 플레이할 수 없어서 제목 옆에 항상 붙인다. */}
-                {room.gameTitle === 'PUBG' && room.pubgPlatform && (
+                {/* 스배/카배는 같이 플레이할 수 없어서 제목 옆에 항상 붙인다. */}
+                {room.gameTitle === "PUBG" && room.pubgPlatform && (
                   <span className="flex-shrink-0 rounded-full bg-accent-primary/10 px-2 py-0.5 text-[10px] font-bold text-accent-primary">
                     {PUBG_PLATFORM_LABELS[room.pubgPlatform].short}
                   </span>
                 )}
-                {room.gameTitle === 'PUBG' && room.pubgGameMode && (
+                {room.gameTitle === "PUBG" && room.pubgGameMode && (
                   <span className="flex-shrink-0 rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-bold text-text-primary">
                     {getPubgGameMode(room.pubgGameMode).label}
                   </span>
                 )}
-                {room.isPrivate && <LockKeyhole className="h-3.5 w-3.5 flex-shrink-0 text-accent-warning" />}
-                {room.hostLive && <HostLiveBadge channelUrl={room.hostLive.channelUrl} />}
+                {room.isPrivate && (
+                  <LockKeyhole className="h-3.5 w-3.5 flex-shrink-0 text-accent-warning" />
+                )}
+                {room.hostLive && (
+                  <HostLiveBadge channelUrl={room.hostLive.channelUrl} />
+                )}
               </div>
               <p className="mt-1.5 truncate text-xs text-text-tertiary">
-                {room.host?.username || room.hostName || `User ${room.hostId.slice(0, 8)}`} 방장 · {getRelativeTime(room.createdAt)}
+                {room.host?.username ||
+                  room.hostName ||
+                  `User ${room.hostId.slice(0, 8)}`}{" "}
+                방장 · {getRelativeTime(room.createdAt)}
               </p>
             </div>
           </div>
@@ -169,8 +204,10 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
             롤은 경기 모드가 하나뿐이라 지금처럼 팀 편성이 이 칸을 쓴다.
           */}
           <div className="rounded-xl border border-bg-elevated/30 bg-bg-elevated/20 px-3.5 py-4">
-            <p className="mb-2.5 text-[10px] font-semibold tracking-[0.1em] text-text-tertiary">MODE</p>
-            {room.gameTitle === 'PUBG' && room.pubgGameMode ? (
+            <p className="mb-2.5 text-[10px] font-semibold tracking-[0.1em] text-text-tertiary">
+              MODE
+            </p>
+            {room.gameTitle === "PUBG" && room.pubgGameMode ? (
               <>
                 <p className="truncate text-xs font-semibold text-text-primary">
                   {getPubgGameMode(room.pubgGameMode).label}
@@ -180,16 +217,20 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
                 </p>
               </>
             ) : (
-              <p className="truncate text-xs font-semibold text-text-secondary">{getModeLabel(room.teamMode)}</p>
+              <p className="truncate text-xs font-semibold text-text-secondary">
+                {getModeLabel(room.teamMode)}
+              </p>
             )}
           </div>
           <div className="rounded-xl border border-bg-elevated/30 bg-bg-elevated/20 px-3.5 py-4">
             <div className="mb-2.5 flex items-center gap-1.5 text-text-tertiary">
               <Server className="h-3 w-3" />
-              <p className="text-[10px] font-semibold tracking-[0.1em]">생성 서버</p>
+              <p className="text-[10px] font-semibold tracking-[0.1em]">
+                생성 서버
+              </p>
             </div>
             <p className="truncate text-xs font-semibold text-text-secondary">
-              {room.discordGuildId ? 'Discord 서버' : '넥서스 서버'}
+              {room.discordGuildId ? "Discord 서버" : "넥서스 서버"}
             </p>
           </div>
           <div className="rounded-xl border border-bg-elevated/30 bg-bg-elevated/20 px-3.5 py-4">
@@ -199,13 +240,19 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
               ) : (
                 <Eye className="h-3 w-3" />
               )}
-              <p className="text-[10px] font-semibold tracking-[0.1em]">관전 허용</p>
+              <p className="text-[10px] font-semibold tracking-[0.1em]">
+                관전 허용
+              </p>
             </div>
-            <p className={cn(
-              'truncate text-xs font-semibold',
-              room.allowSpectators === false ? 'text-text-tertiary' : 'text-accent-success'
-            )}>
-              {room.allowSpectators === false ? '비허용' : '허용'}
+            <p
+              className={cn(
+                "truncate text-xs font-semibold",
+                room.allowSpectators === false
+                  ? "text-text-tertiary"
+                  : "text-accent-success",
+              )}
+            >
+              {room.allowSpectators === false ? "비허용" : "허용"}
             </p>
           </div>
         </div>
@@ -216,29 +263,52 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, currentUserId, onClick
           <div className="flex w-28 max-w-full items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 text-text-tertiary">
               <Users className="h-3 w-3" />
-              <p className="text-[10px] font-semibold tracking-[0.1em]">참가 인원</p>
+              <p className="text-[10px] font-semibold tracking-[0.1em]">
+                참가 인원
+              </p>
             </div>
-            <span className={cn('flex-none text-xs font-bold tabular-nums', isFull ? 'text-accent-danger' : 'text-accent-success')}>
+            <span
+              className={cn(
+                "flex-none text-xs font-bold tabular-nums",
+                isFull ? "text-accent-danger" : "text-accent-success",
+              )}
+            >
               {currentPlayers}/{room.maxParticipants}
             </span>
           </div>
           <div className="mt-2.5 h-1 w-28 max-w-full overflow-hidden rounded-full bg-bg-elevated">
             <div
-              className={cn('h-full rounded-full', isFull ? 'bg-accent-danger' : 'bg-accent-success')}
+              className={cn(
+                "h-full rounded-full",
+                isFull ? "bg-accent-danger" : "bg-accent-success",
+              )}
               style={{ width: `${occupancy}%` }}
             />
           </div>
         </div>
-        {canJoin && (
+        {!isParticipant && canJoinAsPlayer && (
           <div className="ml-auto flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5 text-accent-primary" />
-            <span className="text-xs font-semibold text-accent-primary">참가 가능</span>
+            <span className="text-xs font-semibold text-accent-primary">
+              참가 가능
+            </span>
             <ArrowRight className="h-3.5 w-3.5 text-accent-primary transition-transform group-hover:translate-x-1" />
           </div>
         )}
-        {!canJoin && isParticipant && (
+        {!isParticipant && canWatch && (
           <div className="ml-auto flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-accent-primary">재입장</span>
+            <Eye className="h-3.5 w-3.5 text-accent-primary" />
+            <span className="text-xs font-semibold text-accent-primary">
+              관전 가능
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 text-accent-primary transition-transform group-hover:translate-x-1" />
+          </div>
+        )}
+        {isParticipant && (
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-accent-primary">
+              재입장
+            </span>
             <ArrowRight className="h-3.5 w-3.5 text-accent-primary transition-transform group-hover:translate-x-1" />
           </div>
         )}

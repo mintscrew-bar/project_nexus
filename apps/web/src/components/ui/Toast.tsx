@@ -14,6 +14,8 @@ interface Toast {
   message: string;
   variant: ToastVariant;
   duration?: number;
+  /** 사용자가 직접 해결할 수 있는 안내 — 덮어쓰지 않는다 */
+  actionable?: boolean;
 }
 
 // 기존 useToast() 호환성 유지 — 내부적으로 toast-store 사용
@@ -126,7 +128,7 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
 
 /** 일반 사용자에게 서버 원문이나 기술 오류를 노출하지 않는다. */
 function normalizeToastForViewer(toast: Toast, isStaff: boolean): Toast {
-  if (toast.variant !== "error" || isStaff) return toast;
+  if (toast.variant !== "error" || isStaff || toast.actionable) return toast;
 
   return {
     ...toast,

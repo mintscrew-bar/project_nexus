@@ -852,6 +852,7 @@ export const roomApi = {
     teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
     password?: string;
     allowSpectators?: boolean;
+    hostAsSpectator?: boolean;
     discordGuildId?: string;
     startingPoints?: number;
     minBidIncrement?: number;

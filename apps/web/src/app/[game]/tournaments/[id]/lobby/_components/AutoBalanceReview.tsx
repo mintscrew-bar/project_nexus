@@ -87,6 +87,9 @@ interface AutoBalanceReviewProps {
    * 뜨는데, 없는 개념을 0으로 보여주면 뭔가 잘못된 것처럼 읽힌다.
    */
   showRoles?: boolean;
+  /** 편성 결과의 선수 행에서도 로비와 같은 프로필 호버를 연다. */
+  onMemberHover?: (userId: string, anchorRect: DOMRect) => void;
+  onMemberHoverLeave?: () => void;
 }
 
 /**
@@ -106,6 +109,8 @@ export function AutoBalanceReview({
   undoDepth,
   rerollCount,
   showRoles = true,
+  onMemberHover,
+  onMemberHoverLeave,
 }: AutoBalanceReviewProps) {
   const [pinned, setPinned] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<
@@ -617,9 +622,21 @@ export function AutoBalanceReview({
                     <li
                       key={member.userId}
                       data-swap-user={isHost ? member.userId : undefined}
+                      onMouseEnter={(event) => {
+                        // 드래그 중에는 프로필 카드가 교체 대상 위를 가리지 않게 한다.
+                        if (draggingRef.current) return;
+                        onMemberHover?.(
+                          member.userId,
+                          event.currentTarget.getBoundingClientRect(),
+                        );
+                      }}
+                      onMouseLeave={onMemberHoverLeave}
                       onPointerDown={
                         isHost
-                          ? (event) => handlePointerDown(event, member.userId)
+                          ? (event) => {
+                              onMemberHoverLeave?.();
+                              handlePointerDown(event, member.userId);
+                            }
                           : undefined
                       }
                       onPointerMove={isHost ? handlePointerMove : undefined}

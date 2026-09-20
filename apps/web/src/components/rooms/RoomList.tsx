@@ -10,7 +10,18 @@ import { cn } from "@/lib/utils";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { RoomCard } from "@/components/domain";
 import { EmptyState, RoomCardSkeleton } from "@/components/ui";
-import { RefreshCcw, Home, Search, Gavel, ListOrdered, Scale, ArrowLeftRight, LayoutGrid, Crosshair, Trophy } from "lucide-react";
+import {
+  RefreshCcw,
+  Home,
+  Search,
+  Gavel,
+  ListOrdered,
+  Scale,
+  ArrowLeftRight,
+  LayoutGrid,
+  Crosshair,
+  Trophy,
+} from "lucide-react";
 import {
   GAMES,
   PUBG_PLATFORMS,
@@ -21,7 +32,8 @@ import {
 } from "@nexus/types";
 
 export type StatusFilter = "ALL" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
-type ModeFilter = "ALL" | "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
+type ModeFilter =
+  "ALL" | "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
 export type SortOption = "newest" | "oldest" | "mostPlayers" | "leastPlayers";
 
 const IN_PROGRESS_STATUSES = new Set([
@@ -152,56 +164,83 @@ export function RoomList({
   // Debounce search query to improve performance
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  const roomQuery = useMemo(() => ({
-    gameTitle,
-    status: statusFilter === "ALL" ? undefined : statusFilter,
-    teamMode: modeFilter === "ALL" ? undefined : modeFilter,
-    pubgPlatform:
-      gameTitle === "PUBG" && platformFilter !== "ALL"
-        ? platformFilter
-        : undefined,
-    pubgGameMode:
-      gameTitle === "PUBG" && gameModeFilter !== "ALL"
-        ? gameModeFilter
-        : undefined,
-    search: debouncedSearchQuery || undefined,
-    sort: sortBy,
-    limit: 24,
-  }), [gameTitle, statusFilter, modeFilter, platformFilter, gameModeFilter, debouncedSearchQuery, sortBy]);
+  const roomQuery = useMemo(
+    () => ({
+      gameTitle,
+      status: statusFilter === "ALL" ? undefined : statusFilter,
+      teamMode: modeFilter === "ALL" ? undefined : modeFilter,
+      pubgPlatform:
+        gameTitle === "PUBG" && platformFilter !== "ALL"
+          ? platformFilter
+          : undefined,
+      pubgGameMode:
+        gameTitle === "PUBG" && gameModeFilter !== "ALL"
+          ? gameModeFilter
+          : undefined,
+      search: debouncedSearchQuery || undefined,
+      sort: sortBy,
+      limit: 24,
+    }),
+    [
+      gameTitle,
+      statusFilter,
+      modeFilter,
+      platformFilter,
+      gameModeFilter,
+      debouncedSearchQuery,
+      sortBy,
+    ],
+  );
 
-  const loadRooms = useCallback(async (append = false) => {
-    const cursor = nextCursorRef.current;
-    if (append && !cursor) return;
-    append ? setIsLoadingMore(true) : setIsLoading(true);
-    setError(null);
-    try {
-      const page = await roomApi.getRooms({
-        ...roomQuery,
-        ...(append ? { cursor: cursor ?? undefined } : {}),
-      });
-      setRooms((current) => {
-        if (!append) return page.items;
-        const ids = new Set(current.map((room: any) => room.id));
-        return [...current, ...page.items.filter((room: any) => !ids.has(room.id))];
-      });
-      setTotalRooms(page.total);
-      setNextCursor(page.nextCursor);
-      nextCursorRef.current = page.nextCursor;
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? err?.message ?? "방 목록을 불러오지 못했습니다.");
-    } finally {
-      append ? setIsLoadingMore(false) : setIsLoading(false);
-    }
-  }, [roomQuery]);
+  const loadRooms = useCallback(
+    async (append = false) => {
+      const cursor = nextCursorRef.current;
+      if (append && !cursor) return;
+      append ? setIsLoadingMore(true) : setIsLoading(true);
+      setError(null);
+      try {
+        const page = await roomApi.getRooms({
+          ...roomQuery,
+          ...(append ? { cursor: cursor ?? undefined } : {}),
+        });
+        setRooms((current) => {
+          if (!append) return page.items;
+          const ids = new Set(current.map((room: any) => room.id));
+          return [
+            ...current,
+            ...page.items.filter((room: any) => !ids.has(room.id)),
+          ];
+        });
+        setTotalRooms(page.total);
+        setNextCursor(page.nextCursor);
+        nextCursorRef.current = page.nextCursor;
+      } catch (err: any) {
+        setError(
+          err?.response?.data?.message ??
+            err?.message ??
+            "방 목록을 불러오지 못했습니다.",
+        );
+      } finally {
+        append ? setIsLoadingMore(false) : setIsLoading(false);
+      }
+    },
+    [roomQuery],
+  );
 
   const visibleRooms = useMemo(() => {
     if (!showOnlyJoinable) return rooms;
     return rooms.filter((room) => {
-        const currentPlayers = room.participants?.length || 0;
-        const isFull = currentPlayers >= room.maxParticipants;
-        const isParticipant = !!currentUserId && (room.participants ?? []).some((p: any) => p.userId === currentUserId);
-        const isJoinable = room.status === "WAITING" && !isFull;
-        return isJoinable || isParticipant;
+      const currentPlayers = (room.participants ?? []).filter(
+        (participant: any) => participant.role !== "SPECTATOR",
+      ).length;
+      const isFull = currentPlayers >= room.maxParticipants;
+      const isParticipant =
+        !!currentUserId &&
+        (room.participants ?? []).some((p: any) => p.userId === currentUserId);
+      const isJoinable =
+        room.status === "WAITING" &&
+        (!isFull || room.allowSpectators !== false);
+      return isJoinable || isParticipant;
     });
   }, [rooms, showOnlyJoinable, currentUserId]);
 
@@ -266,7 +305,10 @@ export function RoomList({
     <div className="space-y-8">
       <section aria-labelledby="room-mode-heading">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 id="room-mode-heading" className="text-sm font-bold text-text-primary">
+          <h2
+            id="room-mode-heading"
+            className="text-sm font-bold text-text-primary"
+          >
             {gameTitle === "PUBG" ? "경기 모드" : "모드 선택"}
           </h2>
           {gameTitle === "PUBG" && (
@@ -284,9 +326,7 @@ export function RoomList({
                       : "bg-bg-tertiary/60 text-text-secondary hover:text-text-primary",
                   )}
                 >
-                  {value === "ALL"
-                    ? "전체"
-                    : PUBG_PLATFORM_LABELS[value].short}
+                  {value === "ALL" ? "전체" : PUBG_PLATFORM_LABELS[value].short}
                 </button>
               ))}
             </div>
@@ -310,22 +350,26 @@ export function RoomList({
                   "group flex min-w-0 items-center gap-3 rounded-xl border p-4 text-left transition-all duration-150",
                   isSelected
                     ? "border-accent-primary/40 bg-accent-primary/10 shadow-[0_8px_24px_rgb(var(--color-accent-primary)/0.08)]"
-                    : "border-bg-tertiary/60 bg-bg-secondary/55 hover:border-bg-elevated hover:bg-bg-secondary"
+                    : "border-bg-tertiary/60 bg-bg-secondary/55 hover:border-bg-elevated hover:bg-bg-secondary",
                 )}
               >
-                <span className={cn(
-                  "flex h-10 w-10 flex-none items-center justify-center rounded-lg transition-colors",
-                  isSelected
-                    ? "bg-accent-primary text-accent-on"
-                    : "bg-bg-elevated/50 text-text-secondary group-hover:text-text-primary"
-                )}>
+                <span
+                  className={cn(
+                    "flex h-10 w-10 flex-none items-center justify-center rounded-lg transition-colors",
+                    isSelected
+                      ? "bg-accent-primary text-accent-on"
+                      : "bg-bg-elevated/50 text-text-secondary group-hover:text-text-primary",
+                  )}
+                >
                   <Icon className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className={cn(
-                    "block truncate text-sm font-bold",
-                    isSelected ? "text-accent-primary" : "text-text-primary"
-                  )}>
+                  <span
+                    className={cn(
+                      "block truncate text-sm font-bold",
+                      isSelected ? "text-accent-primary" : "text-text-primary",
+                    )}
+                  >
                     {option.label}
                   </span>
                   <span className="mt-1 block truncate text-xs text-text-tertiary">
@@ -394,8 +438,8 @@ export function RoomList({
             title="아직 열린 내전 방이 없습니다"
             description={
               <>
-                첫 방을 만들면 이 목록 맨 위에 바로 노출됩니다. 처음이라면 가이드에서 팀 구성
-                방식을 먼저 확인해 보세요.{" "}
+                첫 방을 만들면 이 목록 맨 위에 바로 노출됩니다. 처음이라면
+                가이드에서 팀 구성 방식을 먼저 확인해 보세요.{" "}
                 <a
                   href={NEXUS_DISCORD_INVITE_URL}
                   target="_blank"
@@ -406,8 +450,15 @@ export function RoomList({
                 </a>
               </>
             }
-            action={onCreateRoom ? { label: "방 만들기", onClick: onCreateRoom } : undefined}
-            secondaryAction={{ label: "가이드 보기", href: `/${GAMES[gameTitle].slug}/guide` }}
+            action={
+              onCreateRoom
+                ? { label: "방 만들기", onClick: onCreateRoom }
+                : undefined
+            }
+            secondaryAction={{
+              label: "가이드 보기",
+              href: `/${GAMES[gameTitle].slug}/guide`,
+            }}
             className="py-16 md:py-24"
           />
         ) : (
@@ -445,7 +496,9 @@ export function RoomList({
       {rooms.length > 0 && (
         <div className="flex flex-col items-center gap-3 pt-2">
           <p className="text-center text-sm text-text-tertiary">
-            {showOnlyJoinable ? `현재 불러온 방 중 ${visibleRooms.length}개 표시 · ` : ""}
+            {showOnlyJoinable
+              ? `현재 불러온 방 중 ${visibleRooms.length}개 표시 · `
+              : ""}
             {rooms.length}/{totalRooms}개 불러옴
           </p>
           {nextCursor && (

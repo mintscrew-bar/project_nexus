@@ -78,7 +78,7 @@ export function PubgStartGuide() {
 
       <GuideSection
         title="2. 방 열기"
-        description="배그 방은 플랫폼과 경기 모드를 방 단위로 확정합니다. 스배 방에 카배 사람이 들어와도 같이 할 수 없기 때문입니다."
+        description="배그 방은 플랫폼과 경기 모드를 방 단위로 확정합니다. 방장은 선수로 참가하거나 선수 슬롯 없이 운영자로 진행할 수 있습니다."
       >
         <div className="grid gap-3 md:grid-cols-3">
           <InfoCard
@@ -94,17 +94,28 @@ export function PubgStartGuide() {
           <InfoCard
             icon={Users}
             title="정원"
-            description="인게임 스쿼드가 4인이라 정원은 항상 4의 배수입니다. 킬내기 8·12·16명, 배틀로얄 32~100명."
+            description="인게임 스쿼드가 4인이라 정원은 항상 4의 배수입니다. 운영자 방장은 이 정원에서 제외됩니다."
           />
         </div>
       </GuideSection>
 
       <GuideSection title="시작 전 체크리스트">
         <BulletList>
-          <Bullet>참가자 전원이 PUBG 계정을 등록했습니다. 등록하지 않은 인원이 많으면 결과 자동 수집이 어렵습니다.</Bullet>
-          <Bullet>방 플랫폼(스배·카배)과 참가자들이 실제로 플레이하는 플랫폼이 같습니다.</Bullet>
-          <Bullet>Discord 연동을 쓴다면 봇이 음성 채널을 만들 권한을 갖고 있습니다.</Bullet>
-          <Bullet>정원이 다 찼습니다 — 자동 밸런스와 자유 팀 선택은 자리가 모두 채워져야 시작됩니다.</Bullet>
+          <Bullet>
+            참가자 전원이 PUBG 계정을 등록했습니다. 등록하지 않은 인원이 많으면
+            결과 자동 수집이 어렵습니다.
+          </Bullet>
+          <Bullet>
+            방 플랫폼(스배·카배)과 참가자들이 실제로 플레이하는 플랫폼이
+            같습니다.
+          </Bullet>
+          <Bullet>
+            Discord 연동을 쓴다면 봇이 음성 채널을 만들 권한을 갖고 있습니다.
+          </Bullet>
+          <Bullet>
+            정원이 다 찼습니다 — 자동 밸런스와 자유 팀 선택은 자리가 모두
+            채워져야 시작됩니다.
+          </Bullet>
         </BulletList>
       </GuideSection>
     </GuidePageLayout>
@@ -123,8 +134,14 @@ export function PubgTeamModesGuide() {
         description="인게임 스쿼드 정원이 4명이라 팀 단위도 4명입니다. 16명 방이면 4스쿼드가 나오고, 그 넷을 2대2로 붙일지 1대1대1대1로 붙일지는 방에서 정합니다."
       >
         <BulletList>
-          <Bullet>정원이 4의 배수인 이유입니다. 6명·14명 같은 정원은 인게임에서 3인·2인 스쿼드를 만들어 실제 판과 어긋납니다.</Bullet>
-          <Bullet>롤과 달리 라인(포지션) 선택 단계가 없습니다. 팀이 정해지면 바로 경기로 넘어갑니다.</Bullet>
+          <Bullet>
+            정원이 4의 배수인 이유입니다. 6명·14명 같은 정원은 인게임에서
+            3인·2인 스쿼드를 만들어 실제 판과 어긋납니다.
+          </Bullet>
+          <Bullet>
+            롤과 달리 라인(포지션) 선택 단계가 없습니다. 팀이 정해지면 바로
+            경기로 넘어갑니다.
+          </Bullet>
         </BulletList>
       </GuideSection>
 
@@ -158,9 +175,18 @@ export function PubgTeamModesGuide() {
         description="공식 PUBG 랭크가 아니라 내전 팀을 맞추기 위한 별도 값입니다."
       >
         <BulletList>
-          <Bullet>전투력·오더·팀 기여·안정성·경험 다섯 항목을 합산합니다. 프로필에서 직접 입력할 수 있습니다.</Bullet>
-          <Bullet>내전 기록이 쌓이면 자동으로 산정됩니다. 사람이 입력한 값과 운영자 보정은 자동 산정이 덮지 않습니다.</Bullet>
-          <Bullet>점수가 없는 참가자는 자동 밸런스에서 참가자 평균으로 놓입니다. 몇 명이 그랬는지 편성 결과에 표시됩니다.</Bullet>
+          <Bullet>
+            전투력·오더·팀 기여·안정성·경험 다섯 항목을 합산합니다. 프로필에서
+            직접 입력할 수 있습니다.
+          </Bullet>
+          <Bullet>
+            내전 기록이 쌓이면 자동으로 산정됩니다. 사람이 입력한 값과 운영자
+            보정은 자동 산정이 덮지 않습니다.
+          </Bullet>
+          <Bullet>
+            점수가 없는 참가자는 자동 밸런스에서 참가자 평균으로 놓입니다. 몇
+            명이 그랬는지 편성 결과에 표시됩니다.
+          </Bullet>
         </BulletList>
       </GuideSection>
     </GuidePageLayout>
@@ -197,14 +223,15 @@ export function PubgMatchFlowGuide() {
       <GuideSection title="배틀로얄 스크림">
         <ol className="grid gap-3 lg:grid-cols-3">
           <GuideStep number={1} title="라운드 시작">
-            방장이 라운드를 시작하면 그 시각이 기록됩니다. 결과를 인게임 기록에서
-            찾을 때 이 시각을 기준으로 씁니다.
+            방장이 라운드를 시작하면 그 시각이 기록됩니다. 결과를 인게임
+            기록에서 찾을 때 이 시각을 기준으로 씁니다.
           </GuideStep>
           <GuideStep number={2} title="경기">
             여러 팀이 같은 커스텀 매치에 들어가 한 판을 치릅니다.
           </GuideStep>
           <GuideStep number={3} title="결과 누적">
-            순위 점수와 킬 점수를 합산해 리더보드에 쌓습니다. 라운드를 반복합니다.
+            순위 점수와 킬 점수를 합산해 리더보드에 쌓습니다. 라운드를
+            반복합니다.
           </GuideStep>
         </ol>
       </GuideSection>
@@ -214,10 +241,22 @@ export function PubgMatchFlowGuide() {
         description="자동으로 찾아오는 경로와 직접 넣는 경로가 둘 다 있습니다."
       >
         <BulletList>
-          <Bullet>방장이 「결과 가져오기」를 누르면 최근 커스텀 매치에서 이 라운드의 경기를 찾아 채웁니다.</Bullet>
-          <Bullet>애매하면 아무것도 쓰지 않고 이유를 알려줍니다. 잘못 주워 온 결과를 나중에 찾아 고치는 편이 더 오래 걸리기 때문입니다.</Bullet>
-          <Bullet>자동이 실패해도 「결과 수정」으로 직접 넣을 수 있습니다. 자동 수집이 라운드를 잠그지 않습니다.</Bullet>
-          <Bullet>PUBG는 커스텀 매치 기록을 2주만 보관합니다. 라운드를 끝냈으면 그 안에 결과를 넣어주세요.</Bullet>
+          <Bullet>
+            방장이 「결과 가져오기」를 누르면 최근 커스텀 매치에서 이 라운드의
+            경기를 찾아 채웁니다.
+          </Bullet>
+          <Bullet>
+            애매하면 아무것도 쓰지 않고 이유를 알려줍니다. 잘못 주워 온 결과를
+            나중에 찾아 고치는 편이 더 오래 걸리기 때문입니다.
+          </Bullet>
+          <Bullet>
+            자동이 실패해도 「결과 수정」으로 직접 넣을 수 있습니다. 자동 수집이
+            라운드를 잠그지 않습니다.
+          </Bullet>
+          <Bullet>
+            PUBG는 커스텀 매치 기록을 2주만 보관합니다. 라운드를 끝냈으면 그
+            안에 결과를 넣어주세요.
+          </Bullet>
         </BulletList>
       </GuideSection>
     </GuidePageLayout>
@@ -298,9 +337,13 @@ export function PubgDiscordGuide() {
 
       <GuideSection title="권한 확인">
         <BulletList>
-          <Bullet>봇에게 채널 관리 권한이 없으면 방을 만들 때 실패합니다.</Bullet>
+          <Bullet>
+            봇에게 채널 관리 권한이 없으면 방을 만들 때 실패합니다.
+          </Bullet>
           <Bullet>음성 채널 이동을 쓰려면 멤버 이동 권한도 필요합니다.</Bullet>
-          <Bullet>참가자는 로비 대기실에 들어와 있어야 시작 시 팀 채널로 옮겨집니다.</Bullet>
+          <Bullet>
+            참가자는 로비 대기실에 들어와 있어야 시작 시 팀 채널로 옮겨집니다.
+          </Bullet>
         </BulletList>
       </GuideSection>
     </GuidePageLayout>
@@ -336,9 +379,17 @@ export function PubgRecordsGuide() {
 
       <GuideSection title="알아둘 것">
         <BulletList>
-          <Bullet>팀이 지워져도 기록은 남습니다. 기록 시점의 팀 이름을 함께 저장하기 때문입니다.</Bullet>
-          <Bullet>결과를 넣지 않은 라운드는 리더보드에서 빈 칸으로 남습니다. 0점과 구분됩니다.</Bullet>
-          <Bullet>점수 규칙을 바꾸면 이미 넣은 결과가 새 규칙으로 다시 계산됩니다.</Bullet>
+          <Bullet>
+            팀이 지워져도 기록은 남습니다. 기록 시점의 팀 이름을 함께 저장하기
+            때문입니다.
+          </Bullet>
+          <Bullet>
+            결과를 넣지 않은 라운드는 리더보드에서 빈 칸으로 남습니다. 0점과
+            구분됩니다.
+          </Bullet>
+          <Bullet>
+            점수 규칙을 바꾸면 이미 넣은 결과가 새 규칙으로 다시 계산됩니다.
+          </Bullet>
         </BulletList>
       </GuideSection>
     </GuidePageLayout>
@@ -387,7 +438,9 @@ export function PubgFaqGuide() {
         <div className="space-y-4">
           {items.map((item) => (
             <div key={item.q} className="rounded-2xl bg-bg-primary/35 p-5">
-              <h3 className="text-base font-bold text-text-primary">{item.q}</h3>
+              <h3 className="text-base font-bold text-text-primary">
+                {item.q}
+              </h3>
               <p className="mt-2 text-sm leading-7 text-text-secondary">
                 {item.a}
               </p>

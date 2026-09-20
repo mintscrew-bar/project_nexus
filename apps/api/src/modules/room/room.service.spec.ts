@@ -44,6 +44,7 @@ describe("RoomService", () => {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      pubgAccount: { findFirst: jest.fn() },
       discordGuildLink: { findFirst: jest.fn().mockResolvedValue(null) },
       room: {
         create: jest.fn(),
@@ -224,6 +225,103 @@ describe("RoomService", () => {
         data: { hostId: "user-2" },
       });
       expect(result.switchedFromRoomIds).toEqual(["old-room"]);
+    });
+
+    it("관전 허용 방이 만석이면 게임 계정 없이 관전자로 자동 입장한다", async () => {
+      const fullRoom = {
+        ...targetRoom,
+        participants: Array.from({ length: 10 }, (_, index) => ({
+          id: `participant-${index}`,
+          userId: `player-${index}`,
+          role: "PLAYER",
+        })),
+      };
+      prisma.room.findUnique.mockResolvedValue(fullRoom);
+      prisma.roomParticipant.findMany.mockResolvedValue([]);
+      jest.spyOn(service, "getRoomById").mockResolvedValue(fullRoom as any);
+
+      await service.joinRoom("viewer-1", { roomId: "target-room" });
+
+      expect(prisma.roomParticipant.create).toHaveBeenCalledWith({
+        data: {
+          roomId: "target-room",
+          userId: "viewer-1",
+          role: "SPECTATOR",
+        },
+      });
+      expect(prisma.riotAccount.findFirst).not.toHaveBeenCalled();
+      expect(prisma.pubgAccount.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("관전 비허용 방이 만석이면 입장을 거절한다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        ...targetRoom,
+        allowSpectators: false,
+        participants: Array.from({ length: 10 }, (_, index) => ({
+          id: `participant-${index}`,
+          userId: `player-${index}`,
+          role: "PLAYER",
+        })),
+      });
+
+      await expect(
+        service.joinRoom("viewer-1", { roomId: "target-room" }),
+      ).rejects.toThrow("참가 인원이 가득 찼습니다.");
+      expect(prisma.roomParticipant.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("toggleSpectator — 운영자 방장", () => {
+    it("관전 비허용 방에서도 방장은 운영자로 전환할 수 있다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        id: "room-1",
+        hostId: "host-1",
+        gameTitle: "LOL",
+        status: RoomStatus.WAITING,
+        allowSpectators: false,
+        maxParticipants: 10,
+        participants: [
+          { id: "host-participant", userId: "host-1", role: "PLAYER" },
+        ],
+      });
+      prisma.roomParticipant.update.mockResolvedValue({});
+      jest
+        .spyOn(service, "getRoomById")
+        .mockResolvedValue({ id: "room-1" } as any);
+
+      await expect(
+        service.toggleSpectator("host-1", "room-1"),
+      ).resolves.toMatchObject({ newRole: "SPECTATOR" });
+
+      expect(prisma.roomParticipant.update).toHaveBeenCalledWith({
+        where: { id: "host-participant" },
+        data: {
+          role: "SPECTATOR",
+          isReady: false,
+          teamId: null,
+          isCaptain: false,
+        },
+      });
+    });
+
+    it("게임 계정이 없는 관전자는 선수로 전환할 수 없다", async () => {
+      prisma.room.findUnique.mockResolvedValue({
+        id: "room-1",
+        hostId: "host-1",
+        gameTitle: "LOL",
+        status: RoomStatus.WAITING,
+        allowSpectators: true,
+        maxParticipants: 10,
+        participants: [
+          { id: "viewer-participant", userId: "viewer-1", role: "SPECTATOR" },
+        ],
+      });
+      prisma.riotAccount.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.toggleSpectator("viewer-1", "room-1"),
+      ).rejects.toThrow("RIOT_NOT_LINKED");
+      expect(prisma.roomParticipant.update).not.toHaveBeenCalled();
     });
   });
 
@@ -462,6 +560,36 @@ describe("RoomService", () => {
 
       await expect(service.createRoom("host-1", baseDto)).rejects.toThrow(
         BadRequestException,
+      );
+    });
+
+    it("운영자 방장은 게임 계정 없이 관전자 역할로 방을 생성한다", async () => {
+      prisma.user.findUnique.mockResolvedValue({ role: "USER" });
+      prisma.authProvider.findFirst.mockResolvedValue({
+        id: "discord-provider",
+      });
+      prisma.room.create.mockResolvedValue({ id: "room-1", name: "운영 방" });
+
+      await expect(
+        service.createRoom("host-1", {
+          ...baseDto,
+          hostAsSpectator: true,
+        }),
+      ).resolves.toBeDefined();
+
+      expect(prisma.riotAccount.findFirst).not.toHaveBeenCalled();
+      expect(prisma.room.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            participants: {
+              create: {
+                userId: "host-1",
+                role: "SPECTATOR",
+                isReady: false,
+              },
+            },
+          }),
+        }),
       );
     });
 

@@ -16,6 +16,7 @@ import {
   Server,
   Scale,
   ArrowLeftRight,
+  Eye,
 } from "lucide-react";
 import Link from "next/link";
 import { discordApi } from "@/lib/api-client";
@@ -140,6 +141,7 @@ export function RoomCreationForm({
   const [isPrivate, setIsPrivate] = useState(false);
   const [password, setPassword] = useState("");
   const [allowSpectators, setAllowSpectators] = useState(true);
+  const [hostAsSpectator, setHostAsSpectator] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedDiscordGuildId, setSelectedDiscordGuildId] = useState("");
   const [discordGuilds, setDiscordGuilds] = useState<DiscordGuildOption[]>([]);
@@ -273,6 +275,7 @@ export function RoomCreationForm({
       teamMode: teamMode,
       password: isPrivate ? password : undefined,
       allowSpectators: allowSpectators,
+      hostAsSpectator,
       discordGuildId: selectedDiscordGuildId || undefined,
       // Auction settings
       startingPoints,
@@ -327,537 +330,594 @@ export function RoomCreationForm({
       */}
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <div className="space-y-6">
-      {/* 기본 정보 */}
-      <div className="space-y-4">
-        <div>
-          <label
-            htmlFor="name"
-            className="block text-text-primary text-sm font-semibold mb-2"
-          >
-            방 제목 <span className="text-accent-danger">*</span>
-          </label>
-          <input
-            type="text"
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="예: 다이아+ 경매 내전, 즐겜팟 모집"
-            className="w-full input"
-            maxLength={50}
-            required
-          />
-          <p className="text-text-tertiary text-xs mt-1">{name.length}/50자</p>
-        </div>
-        {gameTitle === "PUBG" && (
-          <div>
-            <label
-              htmlFor="pubgPlatform"
-              className="block text-text-primary text-sm font-semibold mb-2"
-            >
-              플랫폼
-            </label>
-            <select
-              id="pubgPlatform"
-              value={pubgPlatform}
-              onChange={(e) =>
-                setPubgPlatform(e.target.value as "STEAM" | "KAKAO")
-              }
-              className="w-full input"
-            >
-              <option value="STEAM">Steam (스팀 배틀그라운드)</option>
-              <option value="KAKAO">Kakao (카카오 배틀그라운드)</option>
-            </select>
-            <p className="mt-1 text-xs text-text-tertiary">
-              목록·공지에 [{PUBG_PLATFORM_LABELS[pubgPlatform].short}] 표시가
-              붙습니다. 스배와 카배는 같이 플레이할 수 없습니다.
-            </p>
-          </div>
-        )}
-        {gameTitle === "PUBG" && (
-          <div>
-            <label
-              htmlFor="pubgGameMode"
-              className="block text-text-primary text-sm font-semibold mb-2"
-            >
-              경기 모드
-            </label>
-            {/*
+          {/* 기본 정보 */}
+          <div className="space-y-4">
+            <div>
+              <label
+                htmlFor="name"
+                className="block text-text-primary text-sm font-semibold mb-2"
+              >
+                방 제목 <span className="text-accent-danger">*</span>
+              </label>
+              <input
+                type="text"
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="예: 다이아+ 경매 내전, 즐겜팟 모집"
+                className="w-full input"
+                maxLength={50}
+                required
+              />
+              <p className="text-text-tertiary text-xs mt-1">
+                {name.length}/50자
+              </p>
+            </div>
+            {gameTitle === "PUBG" && (
+              <div>
+                <label
+                  htmlFor="pubgPlatform"
+                  className="block text-text-primary text-sm font-semibold mb-2"
+                >
+                  플랫폼
+                </label>
+                <select
+                  id="pubgPlatform"
+                  value={pubgPlatform}
+                  onChange={(e) =>
+                    setPubgPlatform(e.target.value as "STEAM" | "KAKAO")
+                  }
+                  className="w-full input"
+                >
+                  <option value="STEAM">Steam (스팀 배틀그라운드)</option>
+                  <option value="KAKAO">Kakao (카카오 배틀그라운드)</option>
+                </select>
+                <p className="mt-1 text-xs text-text-tertiary">
+                  목록·공지에 [{PUBG_PLATFORM_LABELS[pubgPlatform].short}]
+                  표시가 붙습니다. 스배와 카배는 같이 플레이할 수 없습니다.
+                </p>
+              </div>
+            )}
+            {gameTitle === "PUBG" && (
+              <div>
+                <label
+                  htmlFor="pubgGameMode"
+                  className="block text-text-primary text-sm font-semibold mb-2"
+                >
+                  경기 모드
+                </label>
+                {/*
               경기 모드는 참가 인원과 같은 카드로 고른다.
               드롭다운은 열기 전까지 선택지가 안 보여서, 배그에서 가장 먼저
               정해야 하는 값을 정작 가장 안 보이게 둔다. 모드마다 정원과
               결과 처리가 통째로 달라지므로 설명을 함께 보여야 한다.
             */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {pubgGameModes().map((mode) => (
+                    <button
+                      key={mode.mode}
+                      type="button"
+                      onClick={() => handlePubgModeChange(mode.mode)}
+                      aria-pressed={pubgGameMode === mode.mode}
+                      className={`rounded-lg border-2 p-3 text-left transition-all ${
+                        pubgGameMode === mode.mode
+                          ? "border-accent-primary bg-accent-primary/10"
+                          : "border-bg-tertiary bg-bg-tertiary/50 hover:border-bg-elevated"
+                      }`}
+                    >
+                      <div className="font-bold text-text-primary">
+                        {mode.label}
+                      </div>
+                      <div className="mt-1 text-xs leading-5 text-text-secondary">
+                        {mode.description}
+                      </div>
+                      <div className="mt-1 text-xs text-accent-primary">
+                        {mode.roomSizes[0]}~
+                        {mode.roomSizes[mode.roomSizes.length - 1]}명
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Discord 서버 선택 */}
+          <div>
+            <label
+              htmlFor="discordGuildId"
+              className="block text-text-primary text-sm font-semibold mb-2"
+            >
+              <Server className="w-4 h-4 inline mr-2" />
+              Discord 서버
+            </label>
+            <select
+              id="discordGuildId"
+              value={selectedDiscordGuildId}
+              onChange={(e) => setSelectedDiscordGuildId(e.target.value)}
+              className="w-full input"
+              disabled={isLoadingGuilds}
+            >
+              <option value="">넥서스 서버</option>
+              {discordGuilds.map((guild) => (
+                <option key={guild.guildId} value={guild.guildId}>
+                  {guild.guildName || `Discord 서버 (${guild.guildId})`}
+                </option>
+              ))}
+            </select>
+            {isLoadingGuilds ? (
+              <p className="text-text-tertiary text-xs mt-1">
+                연동 서버 목록을 불러오는 중입니다.
+              </p>
+            ) : guildLoadError ? (
+              <p className="text-accent-danger text-xs mt-1">
+                {guildLoadError}
+              </p>
+            ) : (
+              <p className="text-text-tertiary text-xs mt-1">
+                선택한 서버에 내전 음성 채널이 생성됩니다.
+              </p>
+            )}
+          </div>
+
+          {/* 방장 권한과 선수 참가 여부는 별개다. 중계·대회 운영자는 선수 슬롯을 차지하지 않는다. */}
+          <div>
+            <label className="mb-3 block text-sm font-semibold text-text-primary">
+              방장 참여 방식
+            </label>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {pubgGameModes().map((mode) => (
+              <button
+                type="button"
+                onClick={() => setHostAsSpectator(false)}
+                aria-pressed={!hostAsSpectator}
+                className={`rounded-lg border-2 p-3 text-left transition-all ${
+                  !hostAsSpectator
+                    ? "border-accent-primary bg-accent-primary/10"
+                    : "border-bg-tertiary bg-bg-tertiary/50 hover:border-bg-elevated"
+                }`}
+              >
+                <span className="flex items-center gap-2 font-bold text-text-primary">
+                  <Users className="h-4 w-4 text-accent-primary" />
+                  선수로 참가
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-text-secondary">
+                  방장도 선수 정원과 팀 편성에 포함됩니다.
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHostAsSpectator(true)}
+                aria-pressed={hostAsSpectator}
+                className={`rounded-lg border-2 p-3 text-left transition-all ${
+                  hostAsSpectator
+                    ? "border-accent-primary bg-accent-primary/10"
+                    : "border-bg-tertiary bg-bg-tertiary/50 hover:border-bg-elevated"
+                }`}
+              >
+                <span className="flex items-center gap-2 font-bold text-text-primary">
+                  <Eye className="h-4 w-4 text-accent-primary" />
+                  운영자로 진행
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-text-secondary">
+                  선수 슬롯 없이 관전하며 방을 운영합니다.
+                </span>
+              </button>
+            </div>
+            {hostAsSpectator && (
+              <p className="mt-2 text-xs text-accent-primary">
+                게임 계정 없이도 생성할 수 있으며, 시작·편성·결과 입력 권한은
+                그대로 유지됩니다.
+              </p>
+            )}
+          </div>
+
+          {/* 참가 인원 */}
+          <div>
+            <label className="block text-text-primary text-sm font-semibold mb-3">
+              <Users className="w-4 h-4 inline mr-2" />
+              참가 인원
+            </label>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+              {playerOptions.map((option) => (
                 <button
-                  key={mode.mode}
+                  key={option.value}
                   type="button"
-                  onClick={() => handlePubgModeChange(mode.mode)}
-                  aria-pressed={pubgGameMode === mode.mode}
-                  className={`rounded-lg border-2 p-3 text-left transition-all ${
-                    pubgGameMode === mode.mode
+                  onClick={() => handleParticipantChange(option.value)}
+                  className={`p-3 rounded-lg border-2 transition-all text-left ${
+                    maxParticipants === option.value
                       ? "border-accent-primary bg-accent-primary/10"
-                      : "border-bg-tertiary bg-bg-tertiary/50 hover:border-bg-elevated"
+                      : "border-bg-tertiary hover:border-bg-elevated bg-bg-tertiary/50"
                   }`}
                 >
                   <div className="font-bold text-text-primary">
-                    {mode.label}
+                    {option.label}
                   </div>
-                  <div className="mt-1 text-xs leading-5 text-text-secondary">
-                    {mode.description}
+                  <div className="text-xs text-text-secondary">
+                    {option.description}
                   </div>
-                  <div className="mt-1 text-xs text-accent-primary">
-                    {mode.roomSizes[0]}~
-                    {mode.roomSizes[mode.roomSizes.length - 1]}명
+                  <div className="text-xs text-accent-primary mt-1">
+                    {option.format}
                   </div>
                 </button>
               ))}
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Discord 서버 선택 */}
-      <div>
-        <label
-          htmlFor="discordGuildId"
-          className="block text-text-primary text-sm font-semibold mb-2"
-        >
-          <Server className="w-4 h-4 inline mr-2" />
-          Discord 서버
-        </label>
-        <select
-          id="discordGuildId"
-          value={selectedDiscordGuildId}
-          onChange={(e) => setSelectedDiscordGuildId(e.target.value)}
-          className="w-full input"
-          disabled={isLoadingGuilds}
-        >
-          <option value="">넥서스 서버</option>
-          {discordGuilds.map((guild) => (
-            <option key={guild.guildId} value={guild.guildId}>
-              {guild.guildName || `Discord 서버 (${guild.guildId})`}
-            </option>
-          ))}
-        </select>
-        {isLoadingGuilds ? (
-          <p className="text-text-tertiary text-xs mt-1">
-            연동 서버 목록을 불러오는 중입니다.
-          </p>
-        ) : guildLoadError ? (
-          <p className="text-accent-danger text-xs mt-1">{guildLoadError}</p>
-        ) : (
-          <p className="text-text-tertiary text-xs mt-1">
-            선택한 서버에 내전 음성 채널이 생성됩니다.
-          </p>
-        )}
-      </div>
-
-      {/* 참가 인원 */}
-      <div>
-        <label className="block text-text-primary text-sm font-semibold mb-3">
-          <Users className="w-4 h-4 inline mr-2" />
-          참가 인원
-        </label>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          {playerOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => handleParticipantChange(option.value)}
-              className={`p-3 rounded-lg border-2 transition-all text-left ${
-                maxParticipants === option.value
-                  ? "border-accent-primary bg-accent-primary/10"
-                  : "border-bg-tertiary hover:border-bg-elevated bg-bg-tertiary/50"
-              }`}
-            >
-              <div className="font-bold text-text-primary">{option.label}</div>
-              <div className="text-xs text-text-secondary">
-                {option.description}
-              </div>
-              <div className="text-xs text-accent-primary mt-1">
-                {option.format}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 더블 일리미네이션 옵션 (4/8팀 전용) */}
-      {selectedPlayerOption?.supportsDE && (
-        <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <GitBranch className="w-5 h-5 text-accent-primary" />
-              <div>
-                <div
-                  id="double-elimination-label"
-                  className="text-text-primary font-medium"
-                >
-                  더블 일리미네이션
+          {/* 더블 일리미네이션 옵션 (4/8팀 전용) */}
+          {selectedPlayerOption?.supportsDE && (
+            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <GitBranch className="w-5 h-5 text-accent-primary" />
+                  <div>
+                    <div
+                      id="double-elimination-label"
+                      className="text-text-primary font-medium"
+                    >
+                      더블 일리미네이션
+                    </div>
+                    <div className="text-text-secondary text-xs">
+                      패자도 패자조에서 재도전 가능 (총 경기 수 증가)
+                    </div>
+                  </div>
                 </div>
-                <div className="text-text-secondary text-xs">
-                  패자도 패자조에서 재도전 가능 (총 경기 수 증가)
-                </div>
+                <Switch
+                  checked={useDoubleElim}
+                  onCheckedChange={setUseDoubleElim}
+                  aria-labelledby="double-elimination-label"
+                />
               </div>
+              {useDoubleElim && (
+                <p className="text-xs text-accent-primary mt-2">
+                  {selectedPlayerOption.teams === 4
+                    ? "4팀 DE: 승자조(3경기) + 패자조(2경기) + 그랜드파이널(1경기) = 총 6경기"
+                    : "8팀 DE: 승자조(7경기) + 패자조(6경기) + 그랜드파이널(1경기) = 총 14경기"}
+                </p>
+              )}
             </div>
-            <Switch
-              checked={useDoubleElim}
-              onCheckedChange={setUseDoubleElim}
-              aria-labelledby="double-elimination-label"
-            />
-          </div>
-          {useDoubleElim && (
-            <p className="text-xs text-accent-primary mt-2">
-              {selectedPlayerOption.teams === 4
-                ? "4팀 DE: 승자조(3경기) + 패자조(2경기) + 그랜드파이널(1경기) = 총 6경기"
-                : "8팀 DE: 승자조(7경기) + 패자조(6경기) + 그랜드파이널(1경기) = 총 14경기"}
-            </p>
           )}
-        </div>
-      )}
 
-      {/* 다전제 프리셋 — 더블 일리미네이션은 아직 단판만 지원한다 */}
-      {gameTitle === "LOL" &&
-        !(selectedPlayerOption?.supportsDE && useDoubleElim) && (
-          <SeriesPresetSelector
-            teamCount={selectedPlayerOption?.teams ?? 0}
-            value={seriesPreset}
-            onChange={setSeriesPreset}
-          />
-        )}
+          {/* 다전제 프리셋 — 더블 일리미네이션은 아직 단판만 지원한다 */}
+          {gameTitle === "LOL" &&
+            !(selectedPlayerOption?.supportsDE && useDoubleElim) && (
+              <SeriesPresetSelector
+                teamCount={selectedPlayerOption?.teams ?? 0}
+                value={seriesPreset}
+                onChange={setSeriesPreset}
+              />
+            )}
 
-      {/* 팀 구성 방식 */}
-      {gameTitle === "PUBG" && pubgGameMode === "BATTLE_ROYALE" && (
-        <label className="block text-sm text-text-primary">
-          총 경기 수
-          <input
-            type="number"
-            min={1}
-            max={20}
-            className="input mt-2"
-            value={battleRoyaleRounds}
-            onChange={(e) => setBattleRoyaleRounds(e.target.value)}
-            aria-invalid={!roundsValid}
-          />
-          {roundsValid ? (
-            <span className="mt-2 block text-text-secondary">
-              {maxParticipants}명 · {maxParticipants / 4}팀이 탈락 없이{" "}
-              {parsedRounds}판 모두 참가합니다. 킬·순위 점수를 합산해 최종
-              순위를 정합니다.
-            </span>
-          ) : (
-            <span className="mt-2 block text-accent-danger">
-              {battleRoyaleRounds.trim() === ""
-                ? "총 경기 수를 입력해야 방을 만들 수 있습니다."
-                : "총 경기 수는 1~20 사이의 정수로 입력해주세요."}
-            </span>
+          {/* 팀 구성 방식 */}
+          {gameTitle === "PUBG" && pubgGameMode === "BATTLE_ROYALE" && (
+            <label className="block text-sm text-text-primary">
+              총 경기 수
+              <input
+                type="number"
+                min={1}
+                max={20}
+                className="input mt-2"
+                value={battleRoyaleRounds}
+                onChange={(e) => setBattleRoyaleRounds(e.target.value)}
+                aria-invalid={!roundsValid}
+              />
+              {roundsValid ? (
+                <span className="mt-2 block text-text-secondary">
+                  {maxParticipants}명 · {maxParticipants / 4}팀이 탈락 없이{" "}
+                  {parsedRounds}판 모두 참가합니다. 킬·순위 점수를 합산해 최종
+                  순위를 정합니다.
+                </span>
+              ) : (
+                <span className="mt-2 block text-accent-danger">
+                  {battleRoyaleRounds.trim() === ""
+                    ? "총 경기 수를 입력해야 방을 만들 수 있습니다."
+                    : "총 경기 수는 1~20 사이의 정수로 입력해주세요."}
+                </span>
+              )}
+            </label>
           )}
-        </label>
-      )}
-      {gameTitle === "PUBG" && pubgGameMode === "KILL_MATCH" && (
-        <label className="block text-sm text-text-primary">
-          킬내기 진행시간
-          <select
-            className="input mt-2"
-            value={killMatchDurationMinutes}
-            onChange={(e) =>
-              setKillMatchDurationMinutes(Number(e.target.value))
-            }
-          >
-            {[30, 60, 90, 120, 180, 240].map((minutes) => (
-              <option key={minutes} value={minutes}>
-                {minutes}분
-              </option>
-            ))}
-          </select>
-          <span className="mt-2 block text-text-secondary">
-            제한시간 안에 시작한 경기는 종료 후에도 자동 집계합니다.
-          </span>
-        </label>
-      )}
+          {gameTitle === "PUBG" && pubgGameMode === "KILL_MATCH" && (
+            <label className="block text-sm text-text-primary">
+              킬내기 진행시간
+              <select
+                className="input mt-2"
+                value={killMatchDurationMinutes}
+                onChange={(e) =>
+                  setKillMatchDurationMinutes(Number(e.target.value))
+                }
+              >
+                {[30, 60, 90, 120, 180, 240].map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes}분
+                  </option>
+                ))}
+              </select>
+              <span className="mt-2 block text-text-secondary">
+                제한시간 안에 시작한 경기는 종료 후에도 자동 집계합니다.
+              </span>
+            </label>
+          )}
         </div>
 
         <div className="space-y-6">
-      <div>
-        <label className="block text-text-primary text-sm font-semibold mb-3">
-          <Trophy className="w-4 h-4 inline mr-2" />팀 구성 방식
-        </label>
-        <div className="space-y-3">
-          {/* 배그는 경기 모드가 팀 편성 선택지를 더 좁힌다(자유 매치는 수동 배정만). */}
-          {TEAM_MODES.filter((mode) =>
-            gameTitle === "PUBG"
-              ? getPubgGameMode(pubgGameMode).teamModes.includes(mode.value)
-              : game.teamModes.includes(mode.value),
-          ).map((mode) => (
-            <div
-              key={mode.value}
-              className={`flex w-full items-start gap-1 rounded-lg border-2 p-2 transition-all ${
-                teamMode === mode.value
-                  ? "border-accent-primary bg-accent-primary/10"
-                  : "border-bg-tertiary hover:border-bg-elevated bg-bg-tertiary/50"
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => setTeamMode(mode.value)}
-                aria-pressed={teamMode === mode.value}
-                className="flex min-w-0 flex-1 items-start gap-4 rounded-md p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
-              >
+          <div>
+            <label className="block text-text-primary text-sm font-semibold mb-3">
+              <Trophy className="w-4 h-4 inline mr-2" />팀 구성 방식
+            </label>
+            <div className="space-y-3">
+              {/* 배그는 경기 모드가 팀 편성 선택지를 더 좁힌다(자유 매치는 수동 배정만). */}
+              {TEAM_MODES.filter((mode) =>
+                gameTitle === "PUBG"
+                  ? getPubgGameMode(pubgGameMode).teamModes.includes(mode.value)
+                  : game.teamModes.includes(mode.value),
+              ).map((mode) => (
                 <div
-                  className={`p-2 rounded-lg ${teamMode === mode.value ? "bg-accent-primary text-accent-on" : "bg-bg-elevated text-text-secondary"}`}
-                >
-                  {mode.icon}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-bold text-text-primary">
-                    {mode.label}
-                  </div>
-                  <div className="text-sm text-text-secondary mt-1">
-                    {mode.description}
-                  </div>
-                </div>
-                <div
-                  className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 ${
+                  key={mode.value}
+                  className={`flex w-full items-start gap-1 rounded-lg border-2 p-2 transition-all ${
                     teamMode === mode.value
-                      ? "border-accent-primary bg-accent-primary"
-                      : "border-text-tertiary"
+                      ? "border-accent-primary bg-accent-primary/10"
+                      : "border-bg-tertiary hover:border-bg-elevated bg-bg-tertiary/50"
                   }`}
                 >
-                  {teamMode === mode.value && (
-                    <div className="h-2 w-2 rounded-full bg-white" />
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setTeamMode(mode.value)}
+                    aria-pressed={teamMode === mode.value}
+                    className="flex min-w-0 flex-1 items-start gap-4 rounded-md p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+                  >
+                    <div
+                      className={`p-2 rounded-lg ${teamMode === mode.value ? "bg-accent-primary text-accent-on" : "bg-bg-elevated text-text-secondary"}`}
+                    >
+                      {mode.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-text-primary">
+                        {mode.label}
+                      </div>
+                      <div className="text-sm text-text-secondary mt-1">
+                        {mode.description}
+                      </div>
+                    </div>
+                    <div
+                      className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 ${
+                        teamMode === mode.value
+                          ? "border-accent-primary bg-accent-primary"
+                          : "border-text-tertiary"
+                      }`}
+                    >
+                      {teamMode === mode.value && (
+                        <div className="h-2 w-2 rounded-full bg-white" />
+                      )}
+                    </div>
+                  </button>
+                  <TeamModeHelp mode={mode.value} />
                 </div>
-              </button>
-              <TeamModeHelp mode={mode.value} />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 경매 드래프트 상세 설정 */}
-      {teamMode === "AUCTION" && (
-        <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated space-y-4">
-          <div className="flex items-center gap-2 text-text-primary font-semibold">
-            <Info className="w-4 h-4" />
-            경매 설정
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-text-secondary text-xs mb-1">
-                시작 포인트
-              </label>
-              <select
-                value={startingPoints}
-                onChange={(e) => setStartingPoints(Number(e.target.value))}
-                className="w-full input text-sm"
-              >
-                <option value={500}>500 포인트</option>
-                <option value={1000}>1,000 포인트</option>
-                <option value={1500}>1,500 포인트</option>
-                <option value={2000}>2,000 포인트</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-text-secondary text-xs mb-1">
-                최소 입찰 단위
-              </label>
-              <select
-                value={minBidIncrement}
-                onChange={(e) => setMinBidIncrement(Number(e.target.value))}
-                className="w-full input text-sm"
-              >
-                <option value={10}>10 포인트</option>
-                <option value={25}>25 포인트</option>
-                <option value={50}>50 포인트</option>
-                <option value={100}>100 포인트</option>
-              </select>
+              ))}
             </div>
           </div>
 
-          <div>
-            <label className="block text-text-secondary text-xs mb-1">
-              입찰 제한 시간
-            </label>
-            <select
-              value={bidTimeLimit}
-              onChange={(e) => setBidTimeLimit(Number(e.target.value))}
-              className="w-full input text-sm"
-            >
-              <option value={15}>15초</option>
-              <option value={30}>30초</option>
-              <option value={45}>45초</option>
-              <option value={60}>60초</option>
-            </select>
-          </div>
+          {/* 경매 드래프트 상세 설정 */}
+          {teamMode === "AUCTION" && (
+            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated space-y-4">
+              <div className="flex items-center gap-2 text-text-primary font-semibold">
+                <Info className="w-4 h-4" />
+                경매 설정
+              </div>
 
-          <div>
-            <label className="block text-text-secondary text-xs mb-1">
-              팀장 선정 방식
-            </label>
-            <select
-              value={auctionCaptainSelection}
-              onChange={(e) =>
-                setAuctionCaptainSelection(
-                  e.target.value as "TIER" | "MANUAL" | "VOLUNTEER",
-                )
-              }
-              className="w-full input text-sm"
-            >
-              <option value="TIER">자동 (고도화 점수 기준 상위 N명)</option>
-              <option value="MANUAL">방장 직접 지명</option>
-              <option value="VOLUNTEER">자원 모집 (30초 타이머)</option>
-            </select>
-            {auctionCaptainSelection === "VOLUNTEER" && (
-              <p className="text-xs text-text-tertiary mt-1">
-                경매 시작 시 30초 동안 자원자를 모집합니다. 방장은 조기 마감
-                가능. 아무도 안 하면 고도화 점수 기준으로 자동 선정합니다.
-              </p>
-            )}
-            {auctionCaptainSelection === "MANUAL" && (
-              <p className="text-xs text-text-tertiary mt-1">
-                경매 시작 전 방장이 참가자 중 팀장을 직접 지명합니다.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 스네이크 드래프트 상세 설정 */}
-      {teamMode === "SNAKE_DRAFT" && (
-        <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated space-y-4">
-          <div className="flex items-center gap-2 text-text-primary font-semibold">
-            <Info className="w-4 h-4" />
-            스네이크 드래프트 설정
-          </div>
-
-          <div>
-            <label className="block text-text-secondary text-xs mb-1">
-              팀장 선정 방식
-            </label>
-            <select
-              value={captainSelection}
-              onChange={(e) =>
-                setCaptainSelection(
-                  e.target.value as "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER",
-                )
-              }
-              className="w-full input text-sm"
-            >
-              <option value="RANDOM">랜덤 선정</option>
-              <option value="TIER">
-                {gameTitle === "PUBG"
-                  ? "등록 점수 기준 (상위 N명)"
-                  : "고도화 점수 기준 (상위 N명)"}
-              </option>
-              {gameTitle === "PUBG" && (
-                <>
-                  <option value="MANUAL">방장 직접 지명</option>
-                  <option value="VOLUNTEER">자원 모집</option>
-                </>
-              )}
-            </select>
-            {gameTitle === "PUBG" && (
-              <p className="mt-1 text-xs text-text-tertiary">
-                팀장은 고도화 점수 기준으로 정하거나 방장이 직접 지정합니다.
-                점수가 없는 계정은 자동 선정 점수에서 제외됩니다.
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-text-secondary text-xs mb-1">
-              픽 제한 시간
-            </label>
-            <select
-              value={pickTimeLimit}
-              onChange={(e) => setPickTimeLimit(Number(e.target.value))}
-              className="w-full input text-sm"
-            >
-              <option value={30}>30초</option>
-              <option value={45}>45초</option>
-              <option value={60}>60초</option>
-              <option value={90}>90초</option>
-            </select>
-          </div>
-        </div>
-      )}
-
-      {/* 상세 설정 */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
-        {/* 비공개 설정 */}
-        <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              {isPrivate ? (
-                <Lock className="w-5 h-5 text-accent-gold" />
-              ) : (
-                <Unlock className="w-5 h-5 text-text-secondary" />
-              )}
-              <div>
-                <div
-                  id="private-room-label"
-                  className="text-text-primary font-medium"
-                >
-                  비공개 방
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-text-secondary text-xs mb-1">
+                    시작 포인트
+                  </label>
+                  <select
+                    value={startingPoints}
+                    onChange={(e) => setStartingPoints(Number(e.target.value))}
+                    className="w-full input text-sm"
+                  >
+                    <option value={500}>500 포인트</option>
+                    <option value={1000}>1,000 포인트</option>
+                    <option value={1500}>1,500 포인트</option>
+                    <option value={2000}>2,000 포인트</option>
+                  </select>
                 </div>
-                <div className="text-text-secondary text-xs">
-                  비밀번호를 사용합니다
+                <div>
+                  <label className="block text-text-secondary text-xs mb-1">
+                    최소 입찰 단위
+                  </label>
+                  <select
+                    value={minBidIncrement}
+                    onChange={(e) => setMinBidIncrement(Number(e.target.value))}
+                    className="w-full input text-sm"
+                  >
+                    <option value={10}>10 포인트</option>
+                    <option value={25}>25 포인트</option>
+                    <option value={50}>50 포인트</option>
+                    <option value={100}>100 포인트</option>
+                  </select>
                 </div>
               </div>
-            </div>
-            <Switch
-              checked={isPrivate}
-              onCheckedChange={setIsPrivate}
-              aria-labelledby="private-room-label"
-            />
-          </div>
 
-          {isPrivate && (
-            <div className="mt-4">
-              <label
-                htmlFor="password"
-                className="block text-text-secondary text-xs mb-1"
-              >
-                비밀번호
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="비밀번호를 입력하세요"
-                className="w-full input"
-                required={isPrivate}
-                minLength={4}
-              />
+              <div>
+                <label className="block text-text-secondary text-xs mb-1">
+                  입찰 제한 시간
+                </label>
+                <select
+                  value={bidTimeLimit}
+                  onChange={(e) => setBidTimeLimit(Number(e.target.value))}
+                  className="w-full input text-sm"
+                >
+                  <option value={15}>15초</option>
+                  <option value={30}>30초</option>
+                  <option value={45}>45초</option>
+                  <option value={60}>60초</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-text-secondary text-xs mb-1">
+                  팀장 선정 방식
+                </label>
+                <select
+                  value={auctionCaptainSelection}
+                  onChange={(e) =>
+                    setAuctionCaptainSelection(
+                      e.target.value as "TIER" | "MANUAL" | "VOLUNTEER",
+                    )
+                  }
+                  className="w-full input text-sm"
+                >
+                  <option value="TIER">자동 (고도화 점수 기준 상위 N명)</option>
+                  <option value="MANUAL">방장 직접 지명</option>
+                  <option value="VOLUNTEER">자원 모집 (30초 타이머)</option>
+                </select>
+                {auctionCaptainSelection === "VOLUNTEER" && (
+                  <p className="text-xs text-text-tertiary mt-1">
+                    경매 시작 시 30초 동안 자원자를 모집합니다. 방장은 조기 마감
+                    가능. 아무도 안 하면 고도화 점수 기준으로 자동 선정합니다.
+                  </p>
+                )}
+                {auctionCaptainSelection === "MANUAL" && (
+                  <p className="text-xs text-text-tertiary mt-1">
+                    경매 시작 전 방장이 참가자 중 팀장을 직접 지명합니다.
+                  </p>
+                )}
+              </div>
             </div>
           )}
-        </div>
-        {/* 관전 허용 설정 */}
-        <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
-          <div className="flex h-full items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div
-                id="allow-spectators-label"
-                className="text-text-primary font-medium"
-              >
-                관전 허용
+
+          {/* 스네이크 드래프트 상세 설정 */}
+          {teamMode === "SNAKE_DRAFT" && (
+            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated space-y-4">
+              <div className="flex items-center gap-2 text-text-primary font-semibold">
+                <Info className="w-4 h-4" />
+                스네이크 드래프트 설정
               </div>
-              <div className="text-text-secondary text-xs">
-                다른 유저가 관전할 수 있습니다
+
+              <div>
+                <label className="block text-text-secondary text-xs mb-1">
+                  팀장 선정 방식
+                </label>
+                <select
+                  value={captainSelection}
+                  onChange={(e) =>
+                    setCaptainSelection(
+                      e.target.value as
+                        "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER",
+                    )
+                  }
+                  className="w-full input text-sm"
+                >
+                  <option value="RANDOM">랜덤 선정</option>
+                  <option value="TIER">
+                    {gameTitle === "PUBG"
+                      ? "등록 점수 기준 (상위 N명)"
+                      : "고도화 점수 기준 (상위 N명)"}
+                  </option>
+                  {gameTitle === "PUBG" && (
+                    <>
+                      <option value="MANUAL">방장 직접 지명</option>
+                      <option value="VOLUNTEER">자원 모집</option>
+                    </>
+                  )}
+                </select>
+                {gameTitle === "PUBG" && (
+                  <p className="mt-1 text-xs text-text-tertiary">
+                    팀장은 고도화 점수 기준으로 정하거나 방장이 직접 지정합니다.
+                    점수가 없는 계정은 자동 선정 점수에서 제외됩니다.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-text-secondary text-xs mb-1">
+                  픽 제한 시간
+                </label>
+                <select
+                  value={pickTimeLimit}
+                  onChange={(e) => setPickTimeLimit(Number(e.target.value))}
+                  className="w-full input text-sm"
+                >
+                  <option value={30}>30초</option>
+                  <option value={45}>45초</option>
+                  <option value={60}>60초</option>
+                  <option value={90}>90초</option>
+                </select>
               </div>
             </div>
-            <Switch
-              checked={allowSpectators}
-              onCheckedChange={setAllowSpectators}
-              aria-labelledby="allow-spectators-label"
-            />
-          </div>
-        </div>
-      </div>
+          )}
 
+          {/* 상세 설정 */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+            {/* 비공개 설정 */}
+            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  {isPrivate ? (
+                    <Lock className="w-5 h-5 text-accent-gold" />
+                  ) : (
+                    <Unlock className="w-5 h-5 text-text-secondary" />
+                  )}
+                  <div>
+                    <div
+                      id="private-room-label"
+                      className="text-text-primary font-medium"
+                    >
+                      비공개 방
+                    </div>
+                    <div className="text-text-secondary text-xs">
+                      비밀번호를 사용합니다
+                    </div>
+                  </div>
+                </div>
+                <Switch
+                  checked={isPrivate}
+                  onCheckedChange={setIsPrivate}
+                  aria-labelledby="private-room-label"
+                />
+              </div>
+
+              {isPrivate && (
+                <div className="mt-4">
+                  <label
+                    htmlFor="password"
+                    className="block text-text-secondary text-xs mb-1"
+                  >
+                    비밀번호
+                  </label>
+                  <input
+                    type="password"
+                    id="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="비밀번호를 입력하세요"
+                    className="w-full input"
+                    required={isPrivate}
+                    minLength={4}
+                  />
+                </div>
+              )}
+            </div>
+            {/* 관전 허용 설정 */}
+            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+              <div className="flex h-full items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    id="allow-spectators-label"
+                    className="text-text-primary font-medium"
+                  >
+                    관전 허용
+                  </div>
+                  <div className="text-text-secondary text-xs">
+                    다른 유저가 관전자로 입장할 수 있습니다
+                  </div>
+                </div>
+                <Switch
+                  checked={allowSpectators}
+                  onCheckedChange={setAllowSpectators}
+                  aria-labelledby="allow-spectators-label"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -891,6 +951,7 @@ export function RoomCreationForm({
             {isPrivate ? "비공개" : "공개"}
           </span>
           • <span>{allowSpectators ? "관전 허용" : "관전 비허용"}</span> •{" "}
+          <span>{hostAsSpectator ? "운영자 방장" : "선수 방장"}</span> •{" "}
           <span className="font-semibold text-text-primary">
             {selectedDiscordServerLabel}
           </span>
