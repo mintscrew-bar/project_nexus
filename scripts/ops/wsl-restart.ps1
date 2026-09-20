@@ -22,8 +22,20 @@
 #   It MUST run outside WSL. Launched from inside, it dies at step 1.
 #   Everything is logged, because the caller is gone by step 2.
 #
-# USAGE (from Windows)
-#   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ops\wsl-restart.ps1
+# HOW TO LAUNCH IT (this part is not optional)
+#   Register it as a scheduled task and run that. Do NOT launch it with
+#   Start-Process from inside WSL: verified 2026-09-21, an interop-launched
+#   child survives the parent but never executes its body, so the restart
+#   silently never happens and the site stays down. Task Scheduler runs under
+#   its own service and is unaffected by the VM going away.
+#
+#     $s = Join-Path $env:APPDATA 'CodexWslKeepAlive\wsl-restart.ps1'
+#     schtasks /Create /TN NexusWslPlannedRestart /F /SC ONCE /ST 23:59 /IT ^
+#       /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"$s\" -ResumeSession <id>"
+#     schtasks /Run /TN NexusWslPlannedRestart
+#
+#   /IT is required for step 6 to be able to open a window. The task deletes
+#   itself at the end.
 #
 # NOTE ON ENCODING
 #   ASCII only, matching scripts/wsl-compact.ps1. Windows PowerShell 5.1 reads
@@ -40,6 +52,7 @@ param(
     [string]$ResumePrompt = "/rc",
     [string]$ProjectDir = "/home/haru/projects/nexus",
     [int]$ContainerTimeoutSeconds = 240,
+    [string]$TaskName = "NexusWslPlannedRestart",
     [switch]$NoResumeWindow
 )
 
@@ -184,6 +197,14 @@ by itself, the session is still interactive - just type it as the first message.
     }
 } else {
     Write-Log "  no -ResumeSession given, skipping"
+}
+
+# --- 7. clean up ------------------------------------------------------------
+# One-shot task. Leaving it registered would keep a stale -ResumeSession id
+# around and invite someone to re-run it by accident.
+if ($TaskName) {
+    & schtasks /Delete /TN $TaskName /F 2>&1 | Out-Null
+    Write-Log "step 7/7: removed scheduled task $TaskName"
 }
 
 Write-Log "=== done (containers $running/$ExpectedContainers, site ok=$siteOk) ==="

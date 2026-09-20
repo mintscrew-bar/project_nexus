@@ -37,11 +37,20 @@ It shuts down, starts back up, waits for the containers, verifies the public URL
 restarts the watchdog, and reopens the Claude Code session with `/rc` so remote
 control returns:
 
+It must be launched through Task Scheduler, not `Start-Process`. Verified
+2026-09-21: a child launched by interop from inside WSL survives its parent but
+never executes its body, so the restart silently never happens. Task Scheduler
+runs under its own service and is unaffected by the VM going away.
+
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass `
-  -File "$env:APPDATA\CodexWslKeepAlive\wsl-restart.ps1" `
-  -ResumeSession <session-id>
+$s = Join-Path $env:APPDATA 'CodexWslKeepAlive\wsl-restart.ps1'
+schtasks /Create /TN NexusWslPlannedRestart /F /SC ONCE /ST 23:59 /IT `
+  /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"$s\" -ResumeSession <id>"
+schtasks /Run /TN NexusWslPlannedRestart
 ```
+
+`/IT` is required so the script can open the Claude resume window. The task
+deletes itself when it finishes.
 
 The watchdog runs a 60 second heartbeat. It logs only startup, recovery, errors,
 and the 12 hour full status check so the log stays readable. If WSL returns an
