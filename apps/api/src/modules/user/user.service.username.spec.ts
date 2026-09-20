@@ -36,10 +36,15 @@ describe("UserService 유저네임 검증", () => {
   it.each([
     ["하루마룬", "완성형 한글"],
     ["ㅇㅈ", "자모만 쓴 이름"],
+    ["ㅡㅡ하루", "가로줄 자모(ㅡ)가 섞인 이름"],
     ["haru maroon", "공백이 들어간 이름"],
     ["haru.maroon", "마침표가 들어간 이름"],
     ["haru-maroon", "하이픈이 들어간 이름"],
     ["haru_maroon", "밑줄이 들어간 이름"],
+    ["★하루마룬★", "장식 기호가 들어간 이름"],
+    ["하루!?~", "느낌표·물음표·물결"],
+    ["Haru(주)", "괄호가 들어간 이름"],
+    ["하루@마룬", "골뱅이가 들어간 이름"],
   ])("%s 는 허용한다 (%s)", async (username) => {
     const { service, update } = makeService();
     await service.updateProfile("user-1", { username });
@@ -62,7 +67,21 @@ describe("UserService 유저네임 검증", () => {
     const { service } = makeService();
     await expect(
       service.updateProfile("user-1", { username: "하루마룬🔥" }),
-    ).rejects.toThrow("사용 가능합니다");
+    ).rejects.toThrow("이모지");
+  });
+
+  it("보이지 않는 문자는 막는다 (사칭 방지)", async () => {
+    const { service } = makeService();
+    await expect(
+      service.updateProfile("user-1", { username: "하루\u200b마룬" }),
+    ).rejects.toThrow("보이지 않는 문자");
+  });
+
+  it("줄바꿈 같은 제어문자는 막는다", async () => {
+    const { service } = makeService();
+    await expect(
+      service.updateProfile("user-1", { username: "하루\n마룬" }),
+    ).rejects.toThrow("제어문자");
   });
 
   it("문자가 하나도 없는 이름은 막는다", async () => {
