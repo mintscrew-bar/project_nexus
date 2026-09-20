@@ -14,8 +14,34 @@ Windows is responsible only for starting and keeping `Ubuntu-24.04` alive.
 - Archived startup shortcut: `C:\Users\mango\AppData\Roaming\CodexWslKeepAlive\archive\keep-wsl-ubuntu-24.04.vbs.disabled-20260806`
 - WSL keepalive process: `/home/haru/.local/bin/codex-wsl-keepalive`
 - Watchdog log: `C:\Users\mango\AppData\Roaming\CodexWslKeepAlive\wsl-watchdog.log`
+- Planned-restart script: `C:\Users\mango\AppData\Roaming\CodexWslKeepAlive\wsl-restart.ps1`
+  (source of truth: `scripts/ops/wsl-restart.ps1`; the Windows copy is what runs,
+  because the repo lives inside the VM this script shuts down)
+- Restart log: `C:\Users\mango\AppData\Roaming\CodexWslKeepAlive\wsl-restart.log`
 - Legacy Task Scheduler wrapper: `C:\scripts\start-nexus.ps1`
 - Legacy wrapper backup: `C:\scripts\start-nexus.legacy-20260730.ps1`
+
+**The watchdog is not self-starting after a crash.** On 2026-09-21 it was found
+dead — the `HKCU\...\Run` entry was present but no `wsl-watchdog.ps1` process was
+running and its log stopped at 2026-09-17. Nothing else restarts WSL, so a bare
+`wsl --shutdown` would have left the site on Cloudflare 1033 until a human
+noticed. Check it before any planned restart:
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
+  Where-Object { $_.CommandLine -like '*wsl-watchdog.ps1*' }
+```
+
+Use `wsl-restart.ps1` for planned restarts rather than `wsl --shutdown` directly.
+It shuts down, starts back up, waits for the containers, verifies the public URL,
+restarts the watchdog, and reopens the Claude Code session with `/rc` so remote
+control returns:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File "$env:APPDATA\CodexWslKeepAlive\wsl-restart.ps1" `
+  -ResumeSession <session-id>
+```
 
 The watchdog runs a 60 second heartbeat. It logs only startup, recovery, errors,
 and the 12 hour full status check so the log stays readable. If WSL returns an
