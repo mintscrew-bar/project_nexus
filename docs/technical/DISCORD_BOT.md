@@ -72,6 +72,28 @@ Nexus 내전 플랫폼과 연동되는 Discord 슬래시 봇입니다. 웹과 �
 
 ## 명령어
 
+| 명령어                                | 권한      | 설명                                                |
+| ------------------------------------- | --------- | --------------------------------------------------- |
+| `/nexus setuproles`                   | 서버 관리 | 인증·티어·라인 역할을 생성 또는 동기화합니다.       |
+| `/nexus setupverifypanel`             | 서버 관리 | 명령을 실행한 텍스트 채널에 인증 패널을 게시합니다. |
+| `/nexus setannounce`                  | 서버 관리 | 현재 채널을 내전 모집 공지 채널로 지정합니다.       |
+| `/nexus setannounce channel:#채널`    | 서버 관리 | 선택한 텍스트 채널을 모집 공지 채널로 지정합니다.   |
+| `/nexus setannounce role:@역할`       | 서버 관리 | 모집 공지에 멘션할 역할을 함께 지정합니다.          |
+| `/nexus setannounce crossguild:false` | 서버 관리 | 다른 연동 서버에서 열린 내전 공지를 받지 않습니다.  |
+| `/nexus schedule`                     | 일반      | Discord에서 내전을 예약하고 모집 공지를 게시합니다. |
+| `/nexus bracket`                      | 일반      | 참가 중인 롤 내전의 대진표를 확인합니다.            |
+
+서버 최초 설정은 `setuproles` → `setupverifypanel` → `setannounce` 순서로
+진행합니다. `setannounce`를 옵션 없이 실행하면 현재 채널을 사용합니다. 봇은
+대상 채널의 `ViewChannel`, `SendMessages` 권한을 모두 가져야 합니다.
+
+### 슬래시 명령어 등록
+
+`DISCORD_GUILD_ID`가 설정돼 있으면 개발·홈 길드 명령을 먼저 갱신한 뒤 전역
+명령도 항상 갱신합니다. 길드 등록에 성공했다고 전역 등록을 건너뛰면 다른 연동
+서버에서 새 하위 명령과 옵션이 보이지 않으므로, `registerCommands()`는 두 등록을
+모두 수행해야 합니다.
+
 ## 대진표 (`/nexus bracket`)
 
 ## 자동화 기능

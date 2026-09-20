@@ -1205,15 +1205,16 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           { body: commands },
         );
         console.log(`[DiscordBot] Guild commands registered: ${guildId}`);
-        return;
       } catch (error) {
         console.warn(
-          `[DiscordBot] Guild command registration failed (${guildId}), fallback to global commands`,
+          `[DiscordBot] Guild command registration failed (${guildId}); global registration continues`,
           error instanceof Error ? error.message : error,
         );
       }
     }
 
+    // 길드 등록은 해당 서버에서 즉시 확인하기 위한 빠른 경로일 뿐이다.
+    // 전역 등록을 생략하면 다른 연동 서버에는 새 명령과 옵션이 배포되지 않는다.
     await this.rest.put(Routes.applicationCommands(applicationId), {
       body: commands,
     });

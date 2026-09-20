@@ -253,9 +253,46 @@ export function PubgDiscordGuide() {
 
       <GuideSection title="봇으로 방 열기">
         <BulletList>
-          <Bullet><code>/nexus schedule</code> 로 Discord에서 바로 배그 방을 예약할 수 있습니다.</Bullet>
+          <Bullet>
+            <code>/nexus schedule</code> 로 Discord에서 바로 배그 방을 예약할 수
+            있습니다.
+          </Bullet>
           <Bullet>게임·경기 모드·플랫폼·정원을 명령 옵션으로 고릅니다.</Bullet>
-          <Bullet>예약한 방은 시간이 되면 자동으로 열리고 공지가 나갑니다.</Bullet>
+          <Bullet>
+            예약한 방은 시간이 되면 자동으로 열리고 공지가 나갑니다.
+          </Bullet>
+        </BulletList>
+      </GuideSection>
+
+      <GuideSection
+        title="서버 관리자 최초 설정"
+        description="서버 관리 또는 관리자 권한이 있는 계정으로 아래 순서대로 실행합니다."
+      >
+        <ol className="grid gap-3 lg:grid-cols-3">
+          <GuideStep number={1} title="역할 준비">
+            <code>/nexus setuproles</code>로 서버 기본 역할을 생성합니다. 봇
+            역할은 지급할 역할보다 위에 있어야 합니다.
+          </GuideStep>
+          <GuideStep number={2} title="인증 패널 게시">
+            패널을 둘 채널에서 <code>/nexus setupverifypanel</code>을
+            실행합니다.
+          </GuideStep>
+          <GuideStep number={3} title="모집 공지 채널 지정">
+            공지를 받을 채널에서 <code>/nexus setannounce</code>를 실행하거나,
+            <code> channel</code> 옵션으로 다른 텍스트 채널을 고릅니다.
+          </GuideStep>
+        </ol>
+        <BulletList>
+          <Bullet>
+            <code>role</code> 옵션을 고르면 모집 공지에 해당 역할을 멘션합니다.
+          </Bullet>
+          <Bullet>
+            <code>crossguild</code> 옵션으로 다른 서버에서 열린 내전 공지를
+            받을지 정합니다.
+          </Bullet>
+          <Bullet>
+            봇은 지정한 채널에서 채널 보기와 메시지 보내기 권한이 필요합니다.
+          </Bullet>
         </BulletList>
       </GuideSection>
 

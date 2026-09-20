@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bot, Link2, MessageSquareText, ShieldCheck } from "lucide-react";
+import { Bot, Link2, Megaphone, MessageSquareText, ShieldCheck } from "lucide-react";
 import { guideGame, guideUrl } from "@/lib/guide-links";
 import { GuidePageLayout, GuideSection, GuideStep, InfoCard } from "../_components/GuidePageLayout";
 import { PubgDiscordGuide } from "../_content/pubg";
@@ -62,10 +62,61 @@ function LolDiscordGuidePage() {
       </GuideSection>
 
       <GuideSection title="관리자 명령어">
-        <div className="grid gap-3 md:grid-cols-3">
-          <InfoCard icon={ShieldCheck} title="/nexus rules" description="서버의 내전 운영 규칙을 관리합니다." />
-          <InfoCard icon={Link2} title="/nexus verify" description="연동과 인증 상태를 확인합니다." />
-          <InfoCard icon={MessageSquareText} title="/nexus setuproles" description="역할과 인증 패널 설정을 준비합니다. 인증 패널은 /nexus setupverifypanel로 설정합니다." />
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <InfoCard
+            icon={ShieldCheck}
+            title="/nexus rules"
+            description="서버의 내전 운영 규칙을 관리합니다."
+          />
+          <InfoCard
+            icon={Link2}
+            title="/nexus verify"
+            description="인증된 멤버에게 서버 기본 역할을 지급합니다."
+          />
+          <InfoCard
+            icon={MessageSquareText}
+            title="/nexus setuproles"
+            description="역할과 인증 패널 설정을 준비합니다. 인증 패널은 /nexus setupverifypanel로 설정합니다."
+          />
+          <InfoCard
+            icon={Megaphone}
+            title="/nexus setannounce"
+            description="내전 모집 공지를 받을 텍스트 채널을 지정합니다. 채널을 생략하면 현재 채널로 설정됩니다."
+          />
+        </div>
+      </GuideSection>
+
+      <GuideSection
+        title="서버 관리자 최초 설정"
+        description="서버 관리 또는 관리자 권한이 있는 계정으로 아래 순서대로 실행합니다."
+      >
+        <ol className="grid gap-3 lg:grid-cols-3">
+          <GuideStep number={1} title="역할 준비">
+            <code>/nexus setuproles</code>로 인증·티어·라인 역할을 생성합니다.
+            봇 역할은 지급할 역할보다 위에 있어야 합니다.
+          </GuideStep>
+          <GuideStep number={2} title="인증 패널 게시">
+            패널을 둘 채널에서 <code>/nexus setupverifypanel</code>을
+            실행합니다.
+          </GuideStep>
+          <GuideStep number={3} title="모집 공지 채널 지정">
+            공지를 받을 채널에서 <code>/nexus setannounce</code>를 실행하거나,
+            <code> channel</code> 옵션으로 다른 텍스트 채널을 고릅니다.
+          </GuideStep>
+        </ol>
+        <div className="mt-4 rounded-2xl bg-bg-primary/35 p-4 text-sm leading-7 text-text-secondary">
+          <p>
+            <code className="font-bold text-accent-primary">channel</code>은
+            공지 채널,{" "}
+            <code className="font-bold text-accent-primary">role</code>은 공지에
+            멘션할 역할,{" "}
+            <code className="font-bold text-accent-primary">crossguild</code>는
+            다른 서버에서 열린 내전 공지 수신 여부입니다.
+          </p>
+          <p className="mt-2">
+            명령어가 갱신되지 않으면 Discord를 새로고침한 뒤 다시 입력하세요.
+            봇은 지정한 채널에서 채널 보기와 메시지 보내기 권한이 필요합니다.
+          </p>
         </div>
       </GuideSection>
     </GuidePageLayout>
