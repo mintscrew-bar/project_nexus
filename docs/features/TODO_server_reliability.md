@@ -58,11 +58,23 @@
   - **대책 2 — 메모리 캡**: 위 서비스와 `scripts/dev-capped.sh`(일회성 명령 래퍼)가
     같은 상한을 쓴다. 계산은 `scripts/dev-mem-limits.sh` 한 곳에만 둬서 갈라지지 않게 했다.
     하드 상한 초과 시 dev 만 OOM kill, 스왑은 0 으로 차단. 상한은 `MemTotal - 7GB`
-    자동 계산(2~10GB clamp)이라 `.wslconfig` 를 올리면 같이 올라간다.
+    자동 계산(2~12GB clamp)이라 `.wslconfig` 를 올리면 같이 올라간다.
     `loginctl enable-linger haru` 적용 — 로그인 세션 없이도 유저 매니저가 유지된다.
-  - **대책 3 — WSL 상향**: `.wslconfig` memory 12GB → 20GB, swap 2GB → 4GB.
-    호스트 물리 RAM 32GB 중 12GB 가 놀고 있었다. swap 을 더 안 키운 건 swap vhdx 가
-    `C:` 에 생기는데 C: 여유가 37GB 뿐이기 때문.
+  - **대책 3 — WSL 자원 상향**: `.wslconfig` memory 12GB → **24GB**,
+    processors 8 → **12**, swap 2GB → 4GB. 호스트는 Ryzen 7 5700X3D(8C/16T)에
+    RAM 32GB 인데 RAM 도 논리코어 절반도 놀고 있었다.
+    `memory` 는 예약이 아니라 상한이다 — `autoMemoryReclaim=gradual` 이 안 쓰는 만큼
+    Windows 에 돌려준다(상한 12GB 일 때 vmmemWSL 실사용 1.6GB 실측). 그래서 올려도
+    Windows 가 굶지 않는다. swap 을 더 안 키운 건 swap vhdx 가 `C:` 에 생기는데
+    C: 여유가 37GB 뿐이기 때문.
+  - **대책 4 — Turbopack**: dev 서버를 `next dev --turbopack` 으로 띄운다.
+    Rust 멀티스레드라 webpack 보다 CPU·메모리를 적게 쓰고 코어를 실제로 나눠 쓴다.
+    `next.config.mjs` 에 커스텀 webpack 설정이 없어 호환된다.
+    문제가 생기면 `NEXUS_DEV_NO_TURBO=1`.
+  - **GPU 는 이 부하를 못 가져간다** (검토 후 기각): GTX 1080 + CUDA 12.8 이
+    `/dev/dxg` 로 올라와 있지만, V8 힙·Postgres 버퍼·번들러는 전부 CPU/RAM 전용이고
+    GPU 백엔드가 없다. VRAM 은 시스템 RAM 의 대체재가 아니다(프로세스 힙을 VRAM 에
+    올리는 API 자체가 없다). 부하 분산의 실제 수단은 위 대책 3·4 다.
   - **한계(알고 있어야 할 것)**:
     - 슬라이스 단위 캡은 불가능했다. WSL 이 셸을 `/init.scope` 에서 띄워
       `user-1000.slice` 가 비어 있고, `user.slice` 는 root 가 필요한데

@@ -14,7 +14,7 @@
 # 이 값도 자동으로 따라 올라가므로 손댈 곳이 없다.
 NEXUS_DEV_RESERVED_GIB=7
 NEXUS_DEV_MIN_GIB=2
-NEXUS_DEV_MAX_GIB=10
+NEXUS_DEV_MAX_GIB=12
 
 # 호출 후 NEXUS_DEV_MEM_MAX / NEXUS_DEV_MEM_HIGH 가 채워진다.
 # 환경변수로 이미 지정돼 있으면 그것을 존중한다.

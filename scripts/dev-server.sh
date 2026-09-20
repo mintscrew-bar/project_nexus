@@ -145,7 +145,19 @@ cmd_start() {
     exit 1
   fi
 
-  say "개발 서버를 띄운다 — 포트 $DEV_PORT, 메모리 상한 $NEXUS_DEV_MEM_MAX, 스왑 차단"
+  # Turbopack(Rust, 멀티스레드)을 기본으로 쓴다. webpack 대비 CPU·메모리가 적게 들고
+  # 코어를 실제로 나눠 쓴다 — 이 호스트에서 "부하 분산"의 실질적 수단이다.
+  # next.config.mjs 에 커스텀 webpack 설정이 없어 호환된다(headers/redirects/
+  # rewrites/images/transpilePackages 만 사용).
+  # 문제가 생기면 NEXUS_DEV_NO_TURBO=1 로 webpack 으로 되돌린다.
+  local -a dev_cmd=(pnpm --filter @nexus/web exec next dev -p "$DEV_PORT" -H "$DEV_HOST")
+  local bundler="webpack"
+  if [[ "${NEXUS_DEV_NO_TURBO:-}" != "1" ]]; then
+    dev_cmd+=(--turbopack)
+    bundler="Turbopack"
+  fi
+
+  say "개발 서버를 띄운다 — 포트 $DEV_PORT, $bundler, 메모리 상한 $NEXUS_DEV_MEM_MAX, 스왑 차단"
 
   systemd-run --user --unit="$UNIT" --collect --quiet \
     -p "Description=Nexus dev server (web, port $DEV_PORT)" \
@@ -157,7 +169,7 @@ cmd_start() {
     -p "Restart=no" \
     --setenv="PATH=$PATH" \
     --setenv="HOME=$HOME" \
-    -- pnpm --filter @nexus/web exec next dev -p "$DEV_PORT" -H "$DEV_HOST"
+    -- "${dev_cmd[@]}"
 
   # 포트가 열릴 때까지 기다린다. 그냥 돌아가면 떴는지 안 떴는지 알 수 없다.
   local waited=0

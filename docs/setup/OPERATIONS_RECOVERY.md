@@ -167,7 +167,7 @@ wrapper for ad-hoc commands) apply the same limits, computed in one shared place
 `scripts/dev-mem-limits.sh`, so the two cannot drift apart.
 
 - The cap is derived from `MemTotal` minus 7 GB (container limits plus
-  kernel/docker overhead), clamped to 2-10 GB. Raising `memory` in `.wslconfig`
+  kernel/docker overhead), clamped to 2-12 GB. Raising `memory` in `.wslconfig`
   raises the cap automatically — there is no second number to keep in sync.
 - Swap is pinned to 0. Swapping is what turns a memory problem into a frozen VM,
   so failing fast is the point.
@@ -206,8 +206,8 @@ Windows WSL limits are set in `C:\Users\mango\.wslconfig`:
 
 ```ini
 [wsl2]
-memory=20GB
-processors=8
+memory=24GB
+processors=12
 swap=4GB
 vmIdleTimeout=-1
 
@@ -218,10 +218,22 @@ instanceIdleTimeout=-1
 autoMemoryReclaim=gradual
 ```
 
-Raised from 12GB/2GB on 2026-09-21 after the second freeze. The host has 32 GB
-physical, so 12 GB of it was sitting unused while the VM starved. Swap is capped
-at 4 GB rather than higher because the swap vhdx lives on `C:`, which has only
-~37 GB free.
+Raised from 12GB/8cpu/2GB on 2026-09-21 after the second freeze. Host is a Ryzen 7
+5700X3D (8C/16T) with 32 GB, so both RAM and half the logical CPUs were sitting
+unused while the VM starved.
+
+`memory` is a **ceiling, not a reservation**. With `autoMemoryReclaim=gradual` the
+VM hands unused pages back to Windows — measured at a 12 GB ceiling, `vmmemWSL`
+was holding only 1.6 GB. Raising the ceiling therefore does not starve Windows.
+
+Swap stays at 4 GB because the swap vhdx lives on `C:`, which has only ~37 GB free.
+
+**The GPU cannot absorb any of this load.** A GTX 1080 is present and CUDA 12.8
+works through `/dev/dxg`, but V8 heaps, Postgres buffers and the bundler are all
+CPU/RAM-only — there is no GPU backend to switch on, and VRAM is not a substitute
+for system RAM. The real levers are the two numbers above plus Turbopack (see
+`scripts/dev-server.sh`), which is Rust and multi-threaded and so actually spreads
+work across the cores this file hands out.
 
 These WSL settings apply after `wsl --shutdown`. **That shuts production down** —
 `wsl --shutdown` kills the VM, and recovery takes about 90 seconds (Docker restart
