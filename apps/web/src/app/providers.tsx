@@ -8,6 +8,17 @@ import { RiotAccountChecker } from "@/components/RiotAccountChecker";
 import { ToastProvider } from "@/components/ui/Toast";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcuts";
 import { BgmPlayer } from "@/components/bgm/BgmPlayer";
+import { useSfxStore } from "@/stores/sfx-store";
+
+function SfxSettingsInitializer() {
+  const hydrate = useSfxStore((state) => state.hydrate);
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
+  return null;
+}
 
 function AuthInitializer({ children }: { children: ReactNode }) {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
@@ -30,13 +41,14 @@ export function Providers({ children }: { children: ReactNode }) {
             refetchOnWindowFocus: false,
           },
         },
-      })
+      }),
   );
 
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
+          <SfxSettingsInitializer />
           <KeyboardShortcutsProvider>
             <AuthInitializer>
               <RiotAccountChecker>{children}</RiotAccountChecker>

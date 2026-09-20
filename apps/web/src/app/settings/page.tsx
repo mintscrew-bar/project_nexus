@@ -41,6 +41,8 @@ import {
   Loader2,
   Server,
   Radio,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { AddAccountModal } from "@/components/domain/AddAccountModal";
 import { BroadcastTokenSection } from "./_components/BroadcastTokenSection";
@@ -49,6 +51,8 @@ import { useRiotStore } from "@/stores/riot-store";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { enabledGames } from "@nexus/types";
 import { pubgApi } from "@/lib/api-client";
+import { useSfxStore } from "@/stores/sfx-store";
+import { GAME_SFX, playSfx } from "@/lib/sfx";
 
 type SettingsTab =
   | "accounts"
@@ -118,6 +122,10 @@ export default function SettingsPage() {
   const { champions, championMap, fetchChampions } = useDdragonStore();
   const { setTheme: setNextTheme } = useTheme();
   const { fetchAccounts } = useRiotStore();
+  const sfxEnabled = useSfxStore((state) => state.enabled);
+  const sfxVolume = useSfxStore((state) => state.volume);
+  const setSfxEnabled = useSfxStore((state) => state.setEnabled);
+  const setSfxVolume = useSfxStore((state) => state.setVolume);
   const [showRiotModal, setShowRiotModal] = useState(false);
   // 배그 계정 수. 등록 화면이 따로라 여기서는 개수만 확인한다.
   const [pubgAccountCount, setPubgAccountCount] = useState(0);
@@ -524,7 +532,9 @@ export default function SettingsPage() {
                       }`}
                     >
                       <tab.icon className="h-4 w-4 shrink-0" />
-                      <span className="truncate text-xs font-medium sm:text-sm">{tab.label}</span>
+                      <span className="truncate text-xs font-medium sm:text-sm">
+                        {tab.label}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -803,7 +813,9 @@ export default function SettingsPage() {
                             <Button
                               size="sm"
                               variant={hasRoles ? "outline" : "primary"}
-                              onClick={() => router.push(`${gamePrefix}/profile`)}
+                              onClick={() =>
+                                router.push(`${gamePrefix}/profile`)
+                              }
                             >
                               {hasRoles ? "수정" : "설정하기"}
                             </Button>
@@ -1350,6 +1362,79 @@ export default function SettingsPage() {
                       >
                         <div className="h-8 bg-gradient-to-r from-[#0f0f0f] to-[#f0f0f0] rounded mb-2" />
                         <p className="text-sm text-text-primary">시스템</p>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="border-t border-bg-tertiary pt-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-lg bg-bg-tertiary p-2 text-text-secondary">
+                          {sfxEnabled ? (
+                            <Volume2 className="h-4 w-4" />
+                          ) : (
+                            <VolumeX className="h-4 w-4" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-text-primary">
+                            게임 효과음
+                          </p>
+                          <p className="mt-1 text-sm text-text-secondary">
+                            입찰, 카운트다운, 팀 편성 동작의 효과음을 조절합니다
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={sfxEnabled}
+                        onClick={() => setSfxEnabled(!sfxEnabled)}
+                        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                          sfxEnabled ? "bg-accent-primary" : "bg-bg-elevated"
+                        }`}
+                      >
+                        <span
+                          className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white transition-transform ${
+                            sfxEnabled ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                        <span className="sr-only">
+                          게임 효과음 켜기 또는 끄기
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className={`mt-5 ${sfxEnabled ? "" : "opacity-45"}`}>
+                      <div className="mb-2 flex items-center justify-between">
+                        <Label htmlFor="sfx-volume">효과음 크기</Label>
+                        <span className="text-sm font-semibold text-text-secondary">
+                          {Math.round(sfxVolume * 100)}%
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <VolumeX className="h-4 w-4 shrink-0 text-text-muted" />
+                        <input
+                          id="sfx-volume"
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={Math.round(sfxVolume * 100)}
+                          disabled={!sfxEnabled}
+                          onChange={(event) =>
+                            setSfxVolume(Number(event.target.value) / 100)
+                          }
+                          className="h-2 w-full cursor-pointer accent-accent-primary disabled:cursor-not-allowed"
+                        />
+                        <Volume2 className="h-4 w-4 shrink-0 text-text-muted" />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!sfxEnabled}
+                        onClick={() => void playSfx(GAME_SFX.bid)}
+                        className="mt-3 rounded-lg border border-bg-elevated px-3 py-2 text-xs font-semibold text-text-secondary transition-colors hover:border-accent-primary/50 hover:text-text-primary disabled:cursor-not-allowed"
+                      >
+                        현재 크기로 미리듣기
                       </button>
                     </div>
                   </div>
