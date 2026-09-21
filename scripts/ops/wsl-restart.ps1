@@ -17,7 +17,8 @@
 #     3. wait for the seven containers to return
 #     4. verify the public URL actually answers
 #     5. restart the watchdog so the next unplanned reboot self-heals
-#     6. reopen the Claude Code session that was killed along with the VM
+#     6. reopen the Claude Code session that was killed along with the VM,
+#        and verify it actually came back instead of assuming it did
 #
 #   It MUST run outside WSL. Launched from inside, it dies at step 1.
 #   Everything is logged, because the caller is gone by step 2.
@@ -172,28 +173,91 @@ if ($alive) {
 # --- 6. bring the Claude session back ---------------------------------------
 # The session lived inside WSL and died with it. The transcript survives on
 # disk, so it can be resumed by id.
+#
+# The resume command goes into a .cmd launcher instead of being handed to
+# Start-Process directly. Measured 2026-09-21 under Task Scheduler - the same
+# context this script really runs in - old launch vs new launch: old=False,
+# new=True. The old form was
+#   -ArgumentList "-NoExit","-Command","& '$Wsl' ... bash -lc `"$resumeCmd`""
+# and it never ran anything. Win32_Process shows a command line that still has
+# the quotes, which is what makes this so easy to misdiagnose, but by the time
+# the child PowerShell re-parses everything after -Command the CRT has already
+# eaten them, so it sees a bare
+#   bash -lc cd /home/haru/projects/nexus && claude --resume <id> '/rc'
+# and dies with "'&&' is not a valid statement separator in this version".
+# A window opens, shows a parse error, and that is all. Meanwhile this script
+# logged "opened a terminal running: ..." because nothing ever checked.
+#
+# cmd.exe has no such re-parse and keeps the quotes. The file also stays on
+# disk, so a failed launch is one double click away from being fixed by hand.
 Write-Log "step 6/6: Claude session"
 if ($ResumeSession) {
     $resumeCmd = "cd $ProjectDir && claude --resume $ResumeSession '$ResumePrompt'"
-    $hintPath = Join-Path $LogDir "claude-resume.txt"
-    Set-Content -Path $hintPath -Value @"
-Resume the Claude Code session that was killed by this restart:
+    $cmdPath   = Join-Path $LogDir "claude-resume.cmd"
+    $hintPath  = Join-Path $LogDir "claude-resume.txt"
 
+    # ASCII on purpose - cmd.exe is fussier about encoding than PowerShell is.
+    $cmdBody = @"
+@echo off
+title Nexus - resume Claude session
+"$Wsl" -d $Distro -- bash -lc "$resumeCmd"
+echo.
+echo Session ended. Press any key to close.
+pause >nul
+"@
+    Set-Content -Path $cmdPath -Value $cmdBody -Encoding ASCII
+
+    Set-Content -Path $hintPath -Value @"
+Resume the Claude Code session that was killed by this restart.
+
+Easiest: double click
+  $cmdPath
+
+Or from a Windows shell:
   wsl -d $Distro -- bash -lc "$resumeCmd"
 
 Or from a shell already inside WSL:
+  $resumeCmd
 
-  cd $ProjectDir && claude --resume $ResumeSession '$ResumePrompt'
-
-The trailing '$ResumePrompt' turns remote control back on. If it does not run
-by itself, the session is still interactive - just type it as the first message.
+The trailing '$ResumePrompt' turns remote control back on - the operator drives
+this box from another device, so a session that resumes without it is
+unreachable to them. If the session comes up without it, just type it as the
+first message.
 "@
-    Write-Log "  resume command written to $hintPath"
+    Write-Log "  resume command written to $cmdPath"
 
-    if (-not $NoResumeWindow) {
-        Start-Process -FilePath "powershell.exe" `
-            -ArgumentList "-NoExit", "-Command", "& '$Wsl' -d $Distro -- bash -lc `"$resumeCmd`""
-        Write-Log "  opened a terminal running: $resumeCmd"
+    if ($NoResumeWindow) {
+        Write-Log "  -NoResumeWindow given, not launching. See $hintPath"
+    } else {
+        # Claude stores transcripts per project, encoding the path by turning
+        # / and . into -. Note the launch time first: the check below is "did
+        # any transcript get written after this moment", which also catches the
+        # case where claude forks to a new id instead of appending.
+        $slug   = ($ProjectDir -replace '[/.]', '-')
+        $txDir  = "`$HOME/.claude/projects/$slug"
+        $marker = "$(Invoke-InWsl 'date +%s' | Select-Object -First 1)".Trim()
+
+        Start-Process -FilePath $cmdPath -WorkingDirectory $LogDir
+        Write-Log "  launched $cmdPath (transcript dir $txDir, marker $marker)"
+
+        # Do NOT report success just because Start-Process returned. That is
+        # exactly the lie the old version told. A live session appends to its
+        # .jsonl within a couple of seconds of answering the first prompt.
+        $resumed = $false
+        $waited  = 0
+        for ($i = 1; $i -le 12; $i++) {
+            Start-Sleep -Seconds 5
+            $waited = $i * 5
+            $hits = "$(Invoke-InWsl "find $txDir -maxdepth 1 -name '*.jsonl' -newermt '@$marker' 2>/dev/null | wc -l" | Select-Object -First 1)".Trim()
+            if (($hits -as [int]) -gt 0) { $resumed = $true; break }
+        }
+        if ($resumed) {
+            Write-Log "  session resumed - transcript activity after ${waited}s"
+        } else {
+            Write-Log "  FAIL: no transcript activity in ${waited}s. The session did NOT resume."
+            Write-Log "        Everything else is up; this is the one step that needs a hand."
+            Write-Log "        Re-run by hand: $cmdPath   (details in $hintPath)"
+        }
     }
 } else {
     Write-Log "  no -ResumeSession given, skipping"
