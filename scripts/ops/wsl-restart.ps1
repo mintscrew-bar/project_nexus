@@ -192,7 +192,27 @@ if ($alive) {
 # disk, so a failed launch is one double click away from being fixed by hand.
 Write-Log "step 6/6: Claude session"
 if ($ResumeSession) {
-    $resumeCmd = "cd $ProjectDir && claude --resume $ResumeSession '$ResumePrompt'"
+    # claude has to be called by absolute path. Measured 2026-09-21: a shell
+    # that wsl.exe starts from Windows gets
+    #   PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:...
+    # and nothing else - no ~/.npm-global/bin, no nvm - so plain `claude` is
+    # "command not found" there. It looks fine when tested from a shell that
+    # already had it on PATH, which is exactly why this was missed. The binary
+    # is native, so the absolute path is enough on its own.
+    $probe = 'for p in "$HOME/.npm-global/bin/claude" "$HOME/.local/bin/claude" "$HOME/.claude/local/claude" /usr/local/bin/claude /usr/bin/claude; do [ -x "$p" ] && { echo "$p"; exit 0; }; done; command -v claude 2>/dev/null'
+    $claudeBin = "$(Invoke-InWsl $probe | Select-Object -First 1)".Trim()
+    if ($claudeBin) {
+        Write-Log "  claude binary: $claudeBin"
+    } else {
+        $claudeBin = "claude"
+        Write-Log "  WARNING: could not resolve the claude binary, falling back to a PATH lookup"
+    }
+    $claudeDir = $claudeBin -replace '/[^/]+$', ''
+
+    # No double quotes in here - the whole string sits inside a double quoted
+    # bash -lc argument in the .cmd below. Single quotes are safe, cmd.exe does
+    # not treat them specially.
+    $resumeCmd = "export PATH=${claudeDir}:`$PATH; cd $ProjectDir && exec $claudeBin --resume $ResumeSession '$ResumePrompt'"
     $cmdPath   = Join-Path $LogDir "claude-resume.cmd"
     $hintPath  = Join-Path $LogDir "claude-resume.txt"
 
@@ -217,7 +237,7 @@ Or from a Windows shell:
   wsl -d $Distro -- bash -lc "$resumeCmd"
 
 Or from a shell already inside WSL:
-  $resumeCmd
+  cd $ProjectDir && claude --resume $ResumeSession '$ResumePrompt'
 
 The trailing '$ResumePrompt' turns remote control back on - the operator drives
 this box from another device, so a session that resumes without it is
@@ -230,31 +250,41 @@ first message.
         Write-Log "  -NoResumeWindow given, not launching. See $hintPath"
     } else {
         # Claude stores transcripts per project, encoding the path by turning
-        # / and . into -. Note the launch time first: the check below is "did
-        # any transcript get written after this moment", which also catches the
-        # case where claude forks to a new id instead of appending.
+        # / and . into -.
         $slug   = ($ProjectDir -replace '[/.]', '-')
         $txDir  = "`$HOME/.claude/projects/$slug"
-        $marker = "$(Invoke-InWsl 'date +%s' | Select-Object -First 1)".Trim()
+        $target = "$txDir/$ResumeSession.jsonl"
+
+        # Snapshot before launching. "Any .jsonl touched since now" is NOT a
+        # valid check: another Claude session in this project writes its own
+        # transcript continuously and marks a dead resume as a success. The
+        # first version of this check did exactly that, and a rehearsal on
+        # 2026-09-21 caught it reporting success while nothing had started.
+        # What counts is this session's own file growing, or a brand new file
+        # appearing (claude forks to a new id when the id is already running).
+        $sizeBefore  = "$(Invoke-InWsl "stat -c %s $target 2>/dev/null || echo 0" | Select-Object -First 1)".Trim()
+        $countBefore = "$(Invoke-InWsl "ls -1 $txDir/*.jsonl 2>/dev/null | wc -l" | Select-Object -First 1)".Trim()
 
         Start-Process -FilePath $cmdPath -WorkingDirectory $LogDir
-        Write-Log "  launched $cmdPath (transcript dir $txDir, marker $marker)"
+        Write-Log "  launched $cmdPath (target $sizeBefore bytes, $countBefore transcripts)"
 
-        # Do NOT report success just because Start-Process returned. That is
-        # exactly the lie the old version told. A live session appends to its
-        # .jsonl within a couple of seconds of answering the first prompt.
         $resumed = $false
         $waited  = 0
         for ($i = 1; $i -le 12; $i++) {
             Start-Sleep -Seconds 5
             $waited = $i * 5
-            $hits = "$(Invoke-InWsl "find $txDir -maxdepth 1 -name '*.jsonl' -newermt '@$marker' 2>/dev/null | wc -l" | Select-Object -First 1)".Trim()
-            if (($hits -as [int]) -gt 0) { $resumed = $true; break }
+            $sizeNow  = "$(Invoke-InWsl "stat -c %s $target 2>/dev/null || echo 0" | Select-Object -First 1)".Trim()
+            $countNow = "$(Invoke-InWsl "ls -1 $txDir/*.jsonl 2>/dev/null | wc -l" | Select-Object -First 1)".Trim()
+            if ((($sizeNow -as [long]) -gt ($sizeBefore -as [long])) -or
+                (($countNow -as [int]) -gt ($countBefore -as [int]))) {
+                $resumed = $true
+                break
+            }
         }
         if ($resumed) {
-            Write-Log "  session resumed - transcript activity after ${waited}s"
+            Write-Log "  session resumed - transcript grew after ${waited}s"
         } else {
-            Write-Log "  FAIL: no transcript activity in ${waited}s. The session did NOT resume."
+            Write-Log "  FAIL: the session did NOT resume within ${waited}s."
             Write-Log "        Everything else is up; this is the one step that needs a hand."
             Write-Log "        Re-run by hand: $cmdPath   (details in $hintPath)"
         }
