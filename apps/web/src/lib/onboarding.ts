@@ -1,7 +1,11 @@
 export const ONBOARDING_MODAL_STORAGE_KEY = "nexus:onboarding-seen-v1";
 export const HOME_TOUR_STORAGE_KEY = "nexus:home-tour-seen-v1";
 export const TOURNAMENTS_TOUR_STORAGE_KEY = "nexus:tournaments-tour-seen-v1";
-export const LOBBY_TOUR_STORAGE_KEY = "nexus:lobby-tour-seen-v1";
+// v2: 음성 채널·시작 조건·입장 규칙 단계를 추가했다. 이미 v1 을 본 사람도
+// 새 내용을 한 번은 보도록 키를 올린다.
+export const LOBBY_TOUR_STORAGE_KEY = "nexus:lobby-tour-seen-v2";
+export const ROOM_CREATION_TOUR_STORAGE_KEY =
+  "nexus:room-creation-tour-seen-v1";
 export const MATCHES_TOUR_STORAGE_KEY = "nexus:matches-tour-seen-v1";
 export const RANKING_TOUR_STORAGE_KEY = "nexus:ranking-tour-seen-v1";
 export const CLANS_TOUR_STORAGE_KEY = "nexus:clans-tour-seen-v1";
@@ -20,6 +24,7 @@ export function resetOnboardingGuides(userId?: string) {
     HOME_TOUR_STORAGE_KEY,
     TOURNAMENTS_TOUR_STORAGE_KEY,
     LOBBY_TOUR_STORAGE_KEY,
+    ROOM_CREATION_TOUR_STORAGE_KEY,
     MATCHES_TOUR_STORAGE_KEY,
     RANKING_TOUR_STORAGE_KEY,
     CLANS_TOUR_STORAGE_KEY,

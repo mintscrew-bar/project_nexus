@@ -42,6 +42,7 @@ import {
   type PubgPlatform,
 } from "@nexus/types";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { RoomCreationTour } from "@/components/onboarding/RoomCreationTour";
 
 interface RoomCreationFormProps {
   gameTitle?: GameTitle;
@@ -319,6 +320,8 @@ export function RoomCreationForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* 처음 여는 사람에게 항목별 안내. 아래 data-tour 표시가 대상이다. */}
+      <RoomCreationTour gameTitle={gameTitle} />
       {/*
         데스크톱에서는 좌우로 편다.
 
@@ -332,7 +335,7 @@ export function RoomCreationForm({
         <div className="space-y-6">
           {/* 기본 정보 */}
           <div className="space-y-4">
-            <div>
+            <div data-tour="room-create-name">
               <label
                 htmlFor="name"
                 className="block text-text-primary text-sm font-semibold mb-2"
@@ -354,7 +357,7 @@ export function RoomCreationForm({
               </p>
             </div>
             {gameTitle === "PUBG" && (
-              <div>
+              <div data-tour="room-create-platform">
                 <label
                   htmlFor="pubgPlatform"
                   className="block text-text-primary text-sm font-semibold mb-2"
@@ -379,7 +382,7 @@ export function RoomCreationForm({
               </div>
             )}
             {gameTitle === "PUBG" && (
-              <div>
+              <div data-tour="room-create-game-mode">
                 <label
                   htmlFor="pubgGameMode"
                   className="block text-text-primary text-sm font-semibold mb-2"
@@ -423,7 +426,7 @@ export function RoomCreationForm({
           </div>
 
           {/* Discord 서버 선택 */}
-          <div>
+          <div data-tour="room-create-discord">
             <label
               htmlFor="discordGuildId"
               className="block text-text-primary text-sm font-semibold mb-2"
@@ -461,7 +464,7 @@ export function RoomCreationForm({
           </div>
 
           {/* 방장 권한과 선수 참가 여부는 별개다. 중계·대회 운영자는 선수 슬롯을 차지하지 않는다. */}
-          <div>
+          <div data-tour="room-create-host-role">
             <label className="mb-3 block text-sm font-semibold text-text-primary">
               방장 참여 방식
             </label>
@@ -512,7 +515,7 @@ export function RoomCreationForm({
           </div>
 
           {/* 참가 인원 */}
-          <div>
+          <div data-tour="room-create-size">
             <label className="block text-text-primary text-sm font-semibold mb-3">
               <Users className="w-4 h-4 inline mr-2" />
               참가 인원
@@ -580,16 +583,21 @@ export function RoomCreationForm({
           {/* 다전제 프리셋 — 더블 일리미네이션은 아직 단판만 지원한다 */}
           {gameTitle === "LOL" &&
             !(selectedPlayerOption?.supportsDE && useDoubleElim) && (
-              <SeriesPresetSelector
-                teamCount={selectedPlayerOption?.teams ?? 0}
-                value={seriesPreset}
-                onChange={setSeriesPreset}
-              />
+              <div data-tour="room-create-series">
+                <SeriesPresetSelector
+                  teamCount={selectedPlayerOption?.teams ?? 0}
+                  value={seriesPreset}
+                  onChange={setSeriesPreset}
+                />
+              </div>
             )}
 
           {/* 팀 구성 방식 */}
           {gameTitle === "PUBG" && pubgGameMode === "BATTLE_ROYALE" && (
-            <label className="block text-sm text-text-primary">
+            <label
+              data-tour="room-create-length"
+              className="block text-sm text-text-primary"
+            >
               총 경기 수
               <input
                 type="number"
@@ -616,7 +624,10 @@ export function RoomCreationForm({
             </label>
           )}
           {gameTitle === "PUBG" && pubgGameMode === "KILL_MATCH" && (
-            <label className="block text-sm text-text-primary">
+            <label
+              data-tour="room-create-length"
+              className="block text-sm text-text-primary"
+            >
               킬내기 진행시간
               <select
                 className="input mt-2"
@@ -639,7 +650,7 @@ export function RoomCreationForm({
         </div>
 
         <div className="space-y-6">
-          <div>
+          <div data-tour="room-create-team-mode">
             <label className="block text-text-primary text-sm font-semibold mb-3">
               <Trophy className="w-4 h-4 inline mr-2" />팀 구성 방식
             </label>
@@ -697,7 +708,10 @@ export function RoomCreationForm({
 
           {/* 경매 드래프트 상세 설정 */}
           {teamMode === "AUCTION" && (
-            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated space-y-4">
+            <div
+              data-tour="room-create-team-settings"
+              className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated space-y-4"
+            >
               <div className="flex items-center gap-2 text-text-primary font-semibold">
                 <Info className="w-4 h-4" />
                 경매 설정
@@ -786,7 +800,10 @@ export function RoomCreationForm({
 
           {/* 스네이크 드래프트 상세 설정 */}
           {teamMode === "SNAKE_DRAFT" && (
-            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated space-y-4">
+            <div
+              data-tour="room-create-team-settings"
+              className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated space-y-4"
+            >
               <div className="flex items-center gap-2 text-text-primary font-semibold">
                 <Info className="w-4 h-4" />
                 스네이크 드래프트 설정
@@ -846,7 +863,10 @@ export function RoomCreationForm({
           )}
 
           {/* 상세 설정 */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+          <div
+            data-tour="room-create-options"
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6"
+          >
             {/* 비공개 설정 */}
             <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
               <div className="flex items-center justify-between gap-4">
@@ -922,7 +942,10 @@ export function RoomCreationForm({
       </div>
 
       {/* 요약 */}
-      <div className="p-4 bg-accent-primary/5 rounded-lg border border-accent-primary/20">
+      <div
+        data-tour="room-create-submit"
+        className="p-4 bg-accent-primary/5 rounded-lg border border-accent-primary/20"
+      >
         <div className="text-sm text-text-secondary">
           <span className="font-semibold text-text-primary">
             {selectedPlayerOption?.label}

@@ -815,7 +815,7 @@ export default function TournamentLobbyPage() {
 
   return (
     <>
-      <LobbyTour />
+      <LobbyTour gameTitle={room.gameTitle as GameTitle} />
       {/* 참가자 호버 툴팁 — overflow-hidden 탈출을 위해 페이지 최상위에서 렌더링 */}
       {hoveredPlayer && (
         <PlayerHoverCard

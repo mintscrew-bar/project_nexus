@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
@@ -21,23 +27,27 @@ type GuidedTourProps = {
   startOnMount?: boolean;
 };
 
-const TOOLTIP_HEIGHT = 240;
+// 말풍선 배치(위/아래)를 정할 때 쓰는 높이 추정치. 방 만들기·로비 안내처럼
+// 설명이 서너 줄로 길어지면 240 으로는 화면 아래로 넘쳐서 넉넉히 잡는다.
+const TOOLTIP_HEIGHT = 300;
 const VIEWPORT_GAP = 16;
 
 function findVisibleTarget(selector?: string) {
   if (!selector) return null;
 
   return (
-    Array.from(document.querySelectorAll<HTMLElement>(selector)).find((element) => {
-      const rect = element.getBoundingClientRect();
-      const style = window.getComputedStyle(element);
-      return (
-        rect.width > 0 &&
-        rect.height > 0 &&
-        style.display !== "none" &&
-        style.visibility !== "hidden"
-      );
-    }) ?? null
+    Array.from(document.querySelectorAll<HTMLElement>(selector)).find(
+      (element) => {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== "none" &&
+          style.visibility !== "hidden"
+        );
+      },
+    ) ?? null
   );
 }
 
@@ -171,10 +181,7 @@ export function GuidedTour({
             targetRect.bottom + VIEWPORT_GAP,
             viewportHeight - TOOLTIP_HEIGHT - VIEWPORT_GAP,
           )
-        : Math.max(
-            VIEWPORT_GAP,
-            targetRect.top - TOOLTIP_HEIGHT - VIEWPORT_GAP,
-          )
+        : Math.max(VIEWPORT_GAP, targetRect.top - TOOLTIP_HEIGHT - VIEWPORT_GAP)
       : Math.max(VIEWPORT_GAP, (viewportHeight - TOOLTIP_HEIGHT) / 2);
     const tooltipLeft = targetRect
       ? Math.min(
@@ -236,7 +243,9 @@ export function GuidedTour({
               {step.eyebrow ?? "NEXUS 사용 가이드"} · {stepIndex + 1}/
               {steps.length}
             </p>
-            <h2 className="text-lg font-bold text-text-primary">{step.title}</h2>
+            <h2 className="text-lg font-bold text-text-primary">
+              {step.title}
+            </h2>
           </div>
           <button
             type="button"
