@@ -917,7 +917,8 @@ export default function TournamentLobbyPage() {
       messages={messages}
       onSendMessage={sendMessage}
       currentUserId={currentUser?.id}
-      className="h-full min-h-0 overflow-hidden"
+      // 부모가 가로 flex 라 폭을 안 주면 내용물 폭으로 줄어든다 — 입력창이 끝까지 안 닿는 원인
+      className="h-full min-h-0 w-full min-w-0 overflow-hidden"
     />
   );
 
