@@ -165,6 +165,9 @@ export function LobbyParticipantsList({
               );
               const selected = currentUserParticipant?.teamId === team.id;
               const full = members.length >= teamSize;
+              // 준비한 채로 팀을 옮기거나 나가면 서버가 준비를 푼다.
+              // 도움말·부제목 안내는 잘 안 읽혀서, 누르기 직전(버튼)과 직후(토스트)에 알린다.
+              const willUnready = Boolean(currentUserParticipant?.isReady);
               return (
                 <div
                   key={team.id}
@@ -210,16 +213,27 @@ export function LobbyParticipantsList({
                         ? selectTeam(
                             null,
                             (err) => addToast(err, "error"),
-                            () => addToast("대기석으로 이동했습니다.", "info"),
+                            () =>
+                              willUnready
+                                ? addToast(
+                                    "대기석으로 이동해 준비가 해제됐습니다.",
+                                    "warning",
+                                  )
+                                : addToast("대기석으로 이동했습니다.", "info"),
                           )
                         : selectTeam(
                             team.id,
                             (err) => addToast(err, "error"),
                             () =>
-                              addToast(
-                                `${team.name}을 선택했습니다. 준비 상태를 확인해주세요.`,
-                                "success",
-                              ),
+                              willUnready
+                                ? addToast(
+                                    `${team.name}으로 이동해 준비가 해제됐습니다. 다시 준비해주세요.`,
+                                    "warning",
+                                  )
+                                : addToast(
+                                    `${team.name}을 선택했습니다. 준비 상태를 확인해주세요.`,
+                                    "success",
+                                  ),
                           )
                     }
                     className={`w-full rounded-md px-2 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -229,10 +243,14 @@ export function LobbyParticipantsList({
                     }`}
                   >
                     {selected
-                      ? "팀 나가기"
+                      ? willUnready
+                        ? "팀 나가기 · 준비 해제"
+                        : "팀 나가기"
                       : full
                         ? "가득 참"
-                        : "이 팀으로 이동"}
+                        : willUnready
+                          ? "이동 · 준비 해제"
+                          : "이 팀으로 이동"}
                   </button>
                 </div>
               );
