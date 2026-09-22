@@ -1746,7 +1746,13 @@ export class AdminService {
         const room = await tx.room.findUnique({
           where: { id: roomId },
           include: {
-            participants: { select: { userId: true } },
+            participants: {
+              select: {
+                userId: true,
+                role: true,
+                user: { select: { username: true } },
+              },
+            },
           },
         });
 
@@ -1757,19 +1763,27 @@ export class AdminService {
           );
         }
 
-        const currentCount = room.participants.length;
-        const available = (room.maxParticipants || 10) - currentCount;
+        // 정원은 선수 자리다. 관전자(운영자 방장 포함)까지 세면 운영자 방장
+        // 방이 늘 한 자리 모자라게 채워졌다(10명 방에 봇 9명). joinRoom 도
+        // 선수만 센다 — 두 곳의 기준이 같아야 한다.
+        const playerCount = room.participants.filter(
+          (p) => p.role === "PLAYER",
+        ).length;
+        const available = (room.maxParticipants || 10) - playerCount;
         if (available <= 0)
           throw new BadRequestException("방이 가득 찼습니다.");
 
         const toAdd = Math.min(requestedCount, available);
         const existingBotIds = new Set(room.participants.map((p) => p.userId));
 
-        // 필요한 봇보다 여유 있게 확보 (방 최대 인원 40명 → 호스트 제외 최대 39봇)
-        const bots = await this.ensureBotUsers(
-          Math.min(39, currentCount + toAdd),
-          tx,
-        );
+        // 봇은 testbot_01 부터 순서대로 쓴다. 이미 방에 있는 봇 수 + 새로 넣을 수
+        // 만큼 확보하면 그 안에 빈 봇이 반드시 toAdd 개 이상 있다.
+        // 예전에는 39개로 묶여 있었다("방 최대 40명" 시절 기준). 운영자 방장
+        // 40명 방은 40번째 자리를, 배그 100명 방은 40번째부터 못 채웠다.
+        const botsInRoom = room.participants.filter((p) =>
+          p.user?.username?.startsWith("testbot_"),
+        ).length;
+        const bots = await this.ensureBotUsers(botsInRoom + toAdd, tx);
 
         const newBots = bots
           .filter((b) => !existingBotIds.has(b.id))
