@@ -3351,7 +3351,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
               winnerId: true,
               teamA: { select: { name: true } },
               teamB: { select: { name: true } },
-              matches: { select: { winnerId: true } },
+              matches: {
+                select: {
+                  winnerId: true,
+                  gameNumber: true,
+                  tournamentCode: true,
+                },
+              },
             },
           }),
       isPubg && this.scrimProgressProvider
@@ -3396,6 +3402,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         bestOf: row.bestOf,
         status: row.status,
         winnerId: row.winnerId,
+        // 아직 승자가 없는 세트 중 가장 앞 세트 = 지금 치를 세트
+        tournamentCode:
+          [...row.matches]
+            .filter((match) => !match.winnerId)
+            .sort((x, y) => x.gameNumber - y.gameNumber)[0]?.tournamentCode ??
+          null,
       })),
       scrim,
     };
@@ -4038,69 +4050,6 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       .addFields({
         name: "⚔️ 참가 팀",
         value: teams.join("\n"),
-      })
-      .setTimestamp();
-  }
-
-  // blueName/redName: 가위바위보로 정해진 진영 기준(blueSideTeamId). 호출부에서 정렬해 전달.
-  buildMatchStartEmbed(
-    blueName: string,
-    redName: string,
-    tournamentCode?: string,
-  ) {
-    const embed = new EmbedBuilder()
-      .setColor(Colors.Red)
-      .setTitle("⚔️ 매치 시작!")
-      .setDescription(`🔵 **${blueName}**  vs  🔴 **${redName}**`)
-      .addFields(
-        { name: "🔵 블루 진영", value: blueName, inline: true },
-        { name: "🔴 레드 진영", value: redName, inline: true },
-      )
-      .setTimestamp();
-
-    if (tournamentCode) {
-      embed.addFields({
-        name: "🎮 토너먼트 코드",
-        value: `\`${tournamentCode}\`\n*커스텀 게임에서 블루/레드 진영에 맞게 입장하세요*`,
-      });
-    }
-
-    return embed;
-  }
-
-  /**
-   * @param seriesLabel 다전제 진행 중인 세트면 "2세트" 같은 라벨.
-   *                    주면 시리즈가 아직 안 끝났다는 뜻이므로 문구를 낮춘다.
-   */
-  buildMatchResultEmbed(
-    winnerName: string,
-    loserName: string,
-    score?: string,
-    seriesLabel?: string,
-  ) {
-    return new EmbedBuilder()
-      .setColor(Colors.Green)
-      .setTitle(seriesLabel ? `⚔️ ${seriesLabel} 종료` : "🏆 매치 종료!")
-      .setDescription(
-        seriesLabel
-          ? `**${winnerName}** 팀이 ${seriesLabel}를 가져갔습니다.`
-          : `**${winnerName}** 팀이 승리했습니다!`,
-      )
-      .addFields({
-        name: "결과",
-        value: `${winnerName} ${score ? score : ">"} ${loserName}`,
-      })
-      .setTimestamp();
-  }
-
-  buildTournamentCompletedEmbed(roomName: string, winnerName: string) {
-    return new EmbedBuilder()
-      .setColor(Colors.Gold)
-      .setTitle("👑 토너먼트 완료!")
-      .setDescription(`**${roomName}** 토너먼트가 종료되었습니다!`)
-      .addFields({
-        name: "🏆 우승 팀",
-        value: `**${winnerName}**`,
       })
       .setTimestamp();
   }

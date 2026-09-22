@@ -68,21 +68,21 @@ export class MatchService {
       this.configService.get<string>("TOURNAMENT_API_ENABLED") === "true";
   }
 
-  private async sendRoomEmbedNotification(
-    roomId: string,
-    embed: any,
-  ): Promise<void> {
-    if (!this.discordBotService) return;
-
-    const notificationTarget =
-      await this.discordVoiceService?.getRoomNotificationTarget?.(roomId);
-    if (!notificationTarget) return;
-
-    await this.discordBotService.sendEmbedNotification(
-      notificationTarget.guildId,
-      notificationTarget.channelId,
-      embed,
-    );
+  /**
+   * 디스코드 모집 공지 패널을 지금 상태로 다시 그린다.
+   *
+   * 롤 경기 시작·결과·대회 종료를 새 메시지로 따로 보내던 것을 없애고 패널 하나로
+   * 합쳤다. 패널은 30초 동기화로도 따라가지만, 결과가 난 순간 바로 보이게 한다.
+   * 공지 실패로 경기 진행이 막히면 안 되므로 기다리지 않는다.
+   */
+  private refreshDiscordPanel(roomId: string): void {
+    void this.discordBotService
+      ?.updateRoomNotification?.(roomId)
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Discord room panel refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
   }
 
   // ========================================
@@ -181,51 +181,9 @@ export class MatchService {
       data: { tournamentCode },
     });
 
-    // Send Discord notification
-    try {
-      if (this.discordBotService) {
-        // 진영 정렬: blueSideTeamId 기준(미설정이면 teamA=블루 기본)
-        const blueIsA = match.blueSideTeamId
-          ? match.blueSideTeamId === match.teamA!.id
-          : true;
-        const blueName = blueIsA ? match.teamA!.name : match.teamB!.name;
-        const redName = blueIsA ? match.teamB!.name : match.teamA!.name;
-        const embed = this.discordBotService.buildMatchStartEmbed(
-          blueName,
-          redName,
-          tournamentCode,
-        );
-
-        await this.sendRoomEmbedNotification(match.room.id, embed);
-      }
-    } catch (error) {
-      this.logger.warn(
-        "Failed to send Discord match start notification:",
-        error,
-      );
-    }
-
-    // Send app notifications to all participants
-    try {
-      const allParticipants = [
-        ...match.teamA.members.map((m: { user: { id: string } }) => m.user.id),
-        ...match.teamB.members.map((m: { user: { id: string } }) => m.user.id),
-      ];
-      // 클로저 안에서 좁힘 유실 방지 — 위에서 match.room 검증 완료
-      const roomName = match.room.name;
-
-      await Promise.all(
-        allParticipants.map((userId) =>
-          this.notificationService.notifyMatchStarting(
-            userId,
-            matchId,
-            roomName,
-          ),
-        ),
-      );
-    } catch (error) {
-      this.logger.warn("Failed to send match start notifications:", error);
-    }
+    // 디스코드는 새 메시지 대신 모집 공지 패널에 코드를 싣는다(운영자 결정,
+    // 2026-09-22: "패널 하나로 끝내자"). 발급 직후 바로 다시 그린다.
+    this.refreshDiscordPanel(match.room.id);
 
     return tournamentCode;
   }
@@ -501,53 +459,8 @@ export class MatchService {
       await this.autoGenerateCodesForRoom(roomId);
     }
 
-    // Send Discord match result notification
-    try {
-      if (this.discordBotService) {
-        const winner =
-          winnerId === updatedMatch.teamAId
-            ? updatedMatch.teamA
-            : updatedMatch.teamB;
-        const loser =
-          winnerId === updatedMatch.teamAId
-            ? updatedMatch.teamB
-            : updatedMatch.teamA;
-
-        // 다전제면 시리즈 스코어를 승자 기준으로 정렬해 붙인다.
-        const isMultiGameSeries = (seriesProgress?.bestOf ?? 1) > 1;
-        let score: string | undefined;
-        let seriesLabel: string | undefined;
-        if (seriesProgress && isMultiGameSeries) {
-          const winnerWins =
-            winnerId === updatedMatch.teamAId
-              ? seriesProgress.teamAWins
-              : seriesProgress.teamBWins;
-          const loserWins =
-            winnerId === updatedMatch.teamAId
-              ? seriesProgress.teamBWins
-              : seriesProgress.teamAWins;
-          score = `${winnerWins} - ${loserWins}`;
-          // 시리즈가 아직 안 끝났으면 "N세트 종료"로 낮춰 표기한다.
-          if (!seriesProgress.clinched) {
-            seriesLabel = `${updatedMatch.gameNumber}세트`;
-          }
-        }
-
-        const embed = this.discordBotService.buildMatchResultEmbed(
-          winner?.name ?? "TBD",
-          loser?.name ?? "TBD",
-          score,
-          seriesLabel,
-        );
-
-        await this.sendRoomEmbedNotification(roomId, embed);
-      }
-    } catch (error) {
-      this.logger.warn(
-        "Failed to send Discord match result notification:",
-        error,
-      );
-    }
+    // 결과는 새 메시지 대신 모집 공지 패널의 대진 스코어로 보여준다.
+    this.refreshDiscordPanel(roomId);
 
     // Send app notifications to all participants about match result
     try {
@@ -638,55 +551,10 @@ export class MatchService {
           },
         });
 
-        // Then fetch winner info separately for Discord notification
-        const winnerMatch = await this.prisma.match.findFirst({
-          where: {
-            roomId: roomId,
-            winnerId: { not: null },
-          },
-          orderBy: { round: "desc" },
-          select: {
-            winner: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        });
-
-        const roomData = {
-          name:
-            (
-              await this.prisma.room.findUnique({
-                where: { id: roomId },
-                select: { name: true },
-              })
-            )?.name || "",
-          matches: winnerMatch ? [winnerMatch] : [],
-        };
-
         this.logger.log(`Tournament completed for room ${roomId}`);
 
-        // Send Discord tournament completion notification
-        try {
-          if (this.discordBotService) {
-            if (roomData.matches[0]?.winner) {
-              const embed =
-                this.discordBotService.buildTournamentCompletedEmbed(
-                  roomData.name,
-                  roomData.matches[0].winner.name,
-                );
-
-              await this.sendRoomEmbedNotification(roomId, embed);
-            }
-          }
-        } catch (error) {
-          this.logger.warn(
-            "Failed to send Discord tournament completion notification:",
-            error,
-          );
-        }
+        // 우승은 새 메시지 대신 모집 공지 패널의 종료 카드로 보여준다.
+        this.refreshDiscordPanel(roomId);
 
         // Move all participants back to lobby voice channel
         try {

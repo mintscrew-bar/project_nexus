@@ -229,6 +229,36 @@ describe("buildRoomProgressPanel", () => {
     expect(buttonsOf(payload)[0].label).toBe("대진표 보기");
   });
 
+  it("치를 대진에는 토너먼트 코드를 붙이고, 끝났거나 미정인 대진에는 안 붙인다", () => {
+    const text = textOf(
+      buildRoomProgressPanel(
+        snapshot({
+          status: "IN_PROGRESS",
+          series: [
+            series({ round: 1, tournamentCode: "KR-LIVE-1" }),
+            series({
+              round: 1,
+              matchNumber: 2,
+              winnerId: "ta",
+              winsA: 1,
+              tournamentCode: "KR-DONE",
+            }),
+            series({
+              round: 2,
+              teamAName: null,
+              teamBName: null,
+              tournamentCode: "KR-TBD",
+            }),
+          ],
+        }),
+        links,
+      ),
+    );
+    expect(text).toContain("토너먼트 코드 `KR-LIVE-1`");
+    expect(text).not.toContain("KR-DONE");
+    expect(text).not.toContain("KR-TBD");
+  });
+
   it("종료 카드는 우승 팀을 올리고 명단·음성채널 버튼은 뺀다", () => {
     const finishedAt = new Date("2026-09-22T12:00:00Z");
     const payload = buildRoomProgressPanel(

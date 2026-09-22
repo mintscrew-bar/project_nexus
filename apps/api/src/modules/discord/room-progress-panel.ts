@@ -54,6 +54,11 @@ export interface RoomProgressSeries {
   bestOf: number;
   status: string;
   winnerId: string | null;
+  /**
+   * 지금 치를 세트의 토너먼트 코드. 코드는 세트마다 새로 발급된다.
+   * 예전에는 "매치 시작" 메시지로 따로 보냈다 — 패널 하나로 합쳤다.
+   */
+  tournamentCode?: string | null;
 }
 
 /** 배그 스크림 진행 상황. 순위는 이미 정렬돼서 온다(ScrimService 기준). */
@@ -280,12 +285,17 @@ function seriesBlock(snapshot: RoomProgressSnapshot): string | null {
         aWon ? b : `**${b}**`
       }${bo}`;
     }
+    // 두 팀이 다 정해진 대진에만 코드를 붙인다. 미정 대진의 코드는 아직 쓸 데가 없다.
+    const code =
+      item.tournamentCode && item.teamAName && item.teamBName
+        ? `\n-# 　토너먼트 코드 \`${item.tournamentCode}\``
+        : "";
     const started =
       item.status === "IN_PROGRESS" || item.winsA + item.winsB > 0;
     if (started) {
-      return `${stage} ${a} ${item.winsA} : ${item.winsB} ${b} · 🔴 진행 중${bo}`;
+      return `${stage} ${a} ${item.winsA} : ${item.winsB} ${b} · 🔴 진행 중${bo}${code}`;
     }
-    return `${stage} ${a} vs ${b}${bo}`;
+    return `${stage} ${a} vs ${b}${bo}${code}`;
   });
 
   const rest = ordered.length - SERIES_LINE_LIMIT;
