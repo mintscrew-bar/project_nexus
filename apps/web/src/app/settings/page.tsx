@@ -1000,48 +1000,11 @@ export default function SettingsPage() {
                           소셜 알림
                         </h3>
                         <div className="space-y-3">
-                          <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
-                            <div>
-                              <p className="font-medium text-text-primary">
-                                친구 요청
-                              </p>
-                              <p className="text-sm text-text-secondary">
-                                새로운 친구 요청을 받았을 때 알림
-                              </p>
-                            </div>
-                            <input
-                              type="checkbox"
-                              checked={settings.notifyFriendRequest}
-                              onChange={(e) =>
-                                handleSettingChange(
-                                  "notifyFriendRequest",
-                                  e.target.checked,
-                                )
-                              }
-                              className="w-5 h-5 accent-accent-primary cursor-pointer"
-                            />
-                          </div>
-                          <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
-                            <div>
-                              <p className="font-medium text-text-primary">
-                                친구 요청 수락
-                              </p>
-                              <p className="text-sm text-text-secondary">
-                                친구 요청이 수락되었을 때 알림
-                              </p>
-                            </div>
-                            <input
-                              type="checkbox"
-                              checked={settings.notifyFriendAccepted}
-                              onChange={(e) =>
-                                handleSettingChange(
-                                  "notifyFriendAccepted",
-                                  e.target.checked,
-                                )
-                              }
-                              className="w-5 h-5 accent-accent-primary cursor-pointer"
-                            />
-                          </div>
+                          {/*
+                            친구 요청·수락 알림 스위치는 뺐다. 친구·클랜 관련은 알림(종)이
+                            아니라 친구창 "대기" 탭에서 보여서 끌 대상이 없다(2026-09-22).
+                            DB 필드(notifyFriendRequest/Accepted)는 남겨 둔다.
+                          */}
                           <div className="flex items-center justify-between py-3 border-b border-bg-tertiary">
                             <div>
                               <p className="font-medium text-text-primary">
