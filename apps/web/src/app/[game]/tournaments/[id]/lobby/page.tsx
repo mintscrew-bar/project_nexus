@@ -883,6 +883,111 @@ export default function TournamentLobbyPage() {
     />
   );
 
+  /*
+   * ─── 준비·시작 버튼 묶음 ───
+   * 예전엔 화면 폭 하단 바의 양 끝(준비는 왼쪽 아래, 시작은 오른쪽 아래)에 떨어져 있어
+   * "안 보인다"는 말을 많이 들었다. 이제 데스크톱은 준비 현황 줄 오른쪽 끝에 붙여
+   * 남은 조건과 버튼이 한눈에 들어오게 하고, 모바일만 하단 고정 바에 같은 묶음을 쓴다.
+   * 조건 안내 문구는 준비 현황 줄의 칩·한 줄 설명이 대신하므로 여기엔 두지 않는다.
+   */
+  const lobbyActions = (
+    <>
+      {room.status !== "DRAFT_COMPLETED" && !currentUserIsSpectator && (
+        <button
+          className={`inline-flex min-h-11 items-center justify-center rounded-lg px-5 py-2.5 text-sm font-bold transition-all ${
+            currentUserIsReady
+              ? "border border-bg-elevated bg-bg-tertiary text-text-primary hover:bg-bg-elevated"
+              : "bg-accent-primary hover:bg-accent-hover text-accent-on"
+          } disabled:cursor-not-allowed disabled:opacity-50`}
+          disabled={needsManualTeamSelection}
+          title={
+            needsManualTeamSelection ? "먼저 팀을 선택해주세요." : undefined
+          }
+          onClick={handleReadyToggle}
+        >
+          {needsManualTeamSelection
+            ? "팀 선택 필요"
+            : currentUserIsReady
+              ? "준비 취소"
+              : "준비 완료하기"}
+        </button>
+      )}
+      {room.status !== "DRAFT_COMPLETED" && currentUserIsSpectator && (
+        <span className="inline-flex min-h-11 items-center justify-center rounded-lg bg-bg-tertiary px-5 py-2.5 text-sm font-medium text-text-muted">
+          관전 중
+        </span>
+      )}
+      {/*
+        자동 밸런스는 방장이 확정해야 대진표가 만들어진다. 확정 전에는
+        링크를 눌러도 없는 대진표를 요청하게 되므로 감춘다.
+      */}
+      {room.status === "DRAFT_COMPLETED" &&
+        room.teamMode !== "AUTO_BALANCE" && (
+          <Link
+            href={`${gamePrefix}/tournaments/${room.id}/bracket`}
+            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent-success px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-success/90"
+          >
+            대진표 보기
+          </Link>
+        )}
+      {/* 어드민 전용: 봇 추가 버튼 */}
+      {currentUser?.role === "ADMIN" &&
+        room.status === "WAITING" &&
+        totalPlayers < room.maxParticipants && (
+          <button
+            onClick={handleAddBot}
+            disabled={isAddingBot}
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-bg-tertiary px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-50"
+            title="남은 자리를 봇으로 모두 채움 (어드민 전용)"
+          >
+            {isAddingBot
+              ? "추가 중..."
+              : `봇 채우기 (${room.maxParticipants - totalPlayers})`}
+          </button>
+        )}
+      {isCurrentUserHost && room.status === "WAITING" && (
+        <button
+          className={`inline-flex min-h-11 items-center justify-center rounded-lg px-6 py-2.5 text-sm font-bold transition-all ${
+            canStart
+              ? "bg-accent-success text-white hover:bg-accent-success/90 animate-glow-success"
+              : "border border-accent-success/60 bg-accent-success/15 text-accent-success hover:bg-accent-success/25"
+          }`}
+          // 비활성으로 두지 않는다. 비활성 버튼은 눌러도 반응이 없어
+          // 방장이 "왜 안 되지"를 알 방법이 없다. 조건이 안 맞으면
+          // 누른 순간 모달로 남은 항목과 호출 버튼을 보여준다.
+          aria-disabled={!canStart}
+          onClick={() => {
+            if (!canStart) {
+              setServerStartBlock(null);
+              setStartBlockOpen(true);
+              return;
+            }
+            startGame((err) => {
+              // 서버가 사유 코드를 주면 로비에서 풀어야 하는 조건이다
+              // (화면은 통과로 봤지만 서버가 실제로 확인해 막은 경우).
+              // 코드가 없으면 진짜 오류라 토스트로 알린다.
+              if (err.reason) {
+                setServerStartBlock({
+                  reason: err.reason,
+                  message: err.message,
+                  missingUsers: err.missingUsers ?? err.missingVoiceUsers ?? [],
+                });
+                setStartBlockOpen(true);
+              } else {
+                addToast(err.message, "error", 8000, {
+                  actionable: true,
+                });
+              }
+            });
+          }}
+          title={startBlockedMessage}
+        >
+          내전 시작
+        </button>
+      )}
+    </>
+  );
+
   /* ─── Chat Panel ─── */
   const chatPanel = (
     <ChatBox
@@ -1127,15 +1232,20 @@ export default function TournamentLobbyPage() {
                     </span>
                   ))}
                 </div>
-                {/* 막힌 이유 한 줄 — 첫 미완료 조건 기준. 좁으면 말줄임 */}
-                {firstBlockingRequirement && (
-                  <span
-                    className="min-w-0 flex-1 truncate text-xs text-text-secondary"
-                    title={firstBlockingRequirement.detail}
-                  >
-                    {firstBlockingRequirement.detail}
-                  </span>
-                )}
+                {/* 막힌 이유 한 줄 — 첫 미완료 조건 기준. 좁으면 말줄임. 비어도 자리를 차지해 버튼을 오른쪽 끝으로 민다 */}
+                <span
+                  className="min-w-0 flex-1 truncate text-xs text-text-secondary"
+                  title={firstBlockingRequirement?.detail}
+                >
+                  {firstBlockingRequirement?.detail}
+                </span>
+                {/* 준비·시작 버튼 — 데스크톱 전용(모바일은 하단 고정 바) */}
+                <div
+                  data-tour="lobby-ready-action"
+                  className="hidden flex-none items-center gap-2 lg:flex"
+                >
+                  {lobbyActions}
+                </div>
               </div>
               {hasDiscordVoice &&
                 !currentUserIsSpectator &&
@@ -1293,133 +1403,14 @@ export default function TournamentLobbyPage() {
           </div>
         </div>
 
-        {/* ═══ Sticky Bottom Action Bar — 편성 확인 단계에선 내용이 전부 비어 숨긴다 ═══ */}
+        {/* ═══ 모바일 하단 고정 액션 바 — 데스크톱은 준비 현황 줄 오른쪽에 있다 ═══ */}
         {!isAutoBalanceReviewStage && (
           <footer
             data-tour="lobby-ready-action"
-            className="sticky bottom-0 z-20 flex-shrink-0 border-t border-bg-tertiary bg-bg-secondary px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_20px_rgb(0_0_0/0.12)] lg:px-6"
+            className="sticky bottom-0 z-20 flex-shrink-0 border-t border-bg-tertiary bg-bg-secondary px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_20px_rgb(0_0_0/0.12)] lg:hidden"
           >
-            <div className="container mx-auto flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                {room.status !== "DRAFT_COMPLETED" &&
-                  !currentUserIsSpectator && (
-                    <button
-                      className={`inline-flex min-h-11 items-center justify-center rounded-lg px-5 py-2.5 text-sm font-bold transition-all ${
-                        currentUserIsReady
-                          ? "border border-bg-elevated bg-bg-tertiary text-text-primary hover:bg-bg-elevated"
-                          : "bg-accent-primary hover:bg-accent-hover text-accent-on"
-                      } disabled:cursor-not-allowed disabled:opacity-50`}
-                      disabled={needsManualTeamSelection}
-                      title={
-                        needsManualTeamSelection
-                          ? "먼저 팀을 선택해주세요."
-                          : undefined
-                      }
-                      onClick={handleReadyToggle}
-                    >
-                      {needsManualTeamSelection
-                        ? "팀 선택 필요"
-                        : currentUserIsReady
-                          ? "준비 취소"
-                          : "준비 완료하기"}
-                    </button>
-                  )}
-                {room.status !== "DRAFT_COMPLETED" &&
-                  currentUserIsSpectator && (
-                    <span className="inline-flex min-h-11 items-center justify-center rounded-lg bg-bg-tertiary px-5 py-2.5 text-sm font-medium text-text-muted">
-                      관전 중
-                    </span>
-                  )}
-                {/*
-                자동 밸런스는 방장이 확정해야 대진표가 만들어진다. 확정 전에는
-                링크를 눌러도 없는 대진표를 요청하게 되므로 감춘다.
-              */}
-                {room.status === "DRAFT_COMPLETED" &&
-                  room.teamMode !== "AUTO_BALANCE" && (
-                    <Link
-                      href={`${gamePrefix}/tournaments/${room.id}/bracket`}
-                      className="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent-success px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-success/90"
-                    >
-                      대진표 보기
-                    </Link>
-                  )}
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                {/* 어드민 전용: 봇 추가 버튼 */}
-                {currentUser?.role === "ADMIN" &&
-                  room.status === "WAITING" &&
-                  totalPlayers < room.maxParticipants && (
-                    <button
-                      onClick={handleAddBot}
-                      disabled={isAddingBot}
-                      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-bg-tertiary px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-50"
-                      title="남은 자리를 봇으로 모두 채움 (어드민 전용)"
-                    >
-                      {isAddingBot
-                        ? "추가 중..."
-                        : `봇 채우기 (${room.maxParticipants - totalPlayers}자리 남음)`}
-                    </button>
-                  )}
-                {isCurrentUserHost && room.status === "WAITING" && (
-                  <div className="flex flex-col gap-1.5 sm:items-end">
-                    {!canStart && startBlockedMessage && (
-                      <p className="max-w-[280px] text-xs font-medium text-accent-warning sm:text-right">
-                        {startBlockedMessage}
-                      </p>
-                    )}
-                    <button
-                      className={`inline-flex min-h-11 items-center justify-center rounded-lg px-6 py-2.5 text-sm font-bold text-white transition-all ${
-                        canStart
-                          ? "bg-accent-success hover:bg-accent-success/90 animate-glow-success"
-                          : "bg-accent-success/50 opacity-70 hover:opacity-90"
-                      }`}
-                      // 비활성으로 두지 않는다. 비활성 버튼은 눌러도 반응이 없어
-                      // 방장이 "왜 안 되지"를 알 방법이 없다. 조건이 안 맞으면
-                      // 누른 순간 모달로 남은 항목과 호출 버튼을 보여준다.
-                      aria-disabled={!canStart}
-                      onClick={() => {
-                        if (!canStart) {
-                          setServerStartBlock(null);
-                          setStartBlockOpen(true);
-                          return;
-                        }
-                        startGame((err) => {
-                          // 서버가 사유 코드를 주면 로비에서 풀어야 하는 조건이다
-                          // (화면은 통과로 봤지만 서버가 실제로 확인해 막은 경우).
-                          // 코드가 없으면 진짜 오류라 토스트로 알린다.
-                          if (err.reason) {
-                            setServerStartBlock({
-                              reason: err.reason,
-                              message: err.message,
-                              missingUsers:
-                                err.missingUsers ?? err.missingVoiceUsers ?? [],
-                            });
-                            setStartBlockOpen(true);
-                          } else {
-                            addToast(err.message, "error", 8000, {
-                              actionable: true,
-                            });
-                          }
-                        });
-                      }}
-                      title={startBlockedMessage}
-                    >
-                      내전 시작
-                    </button>
-                    <p className="text-right text-xs text-text-tertiary">
-                      {canStart
-                        ? "모든 시작 조건을 충족했습니다."
-                        : "누르면 남은 시작 조건과 호출 버튼을 볼 수 있습니다."}
-                    </p>
-                  </div>
-                )}
-                {!isCurrentUserHost && room.status === "WAITING" && (
-                  <p className="text-text-tertiary text-xs">
-                    준비 완료 후 방장이 내전을 시작합니다.
-                  </p>
-                )}
-              </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
+              {lobbyActions}
             </div>
           </footer>
         )}
