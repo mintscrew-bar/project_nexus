@@ -7,6 +7,7 @@ import {
   GAMES,
   getRoomStagePath,
   getTeamModeStagePath,
+  minDraftParticipants,
   type GameTitle,
 } from "@nexus/types";
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -37,7 +38,9 @@ import {
   Swords,
   Share2,
   CheckCircle2,
+  AlertCircle,
   Clock3,
+  Headphones,
   Radio,
   MoreHorizontal,
 } from "lucide-react";
@@ -142,6 +145,13 @@ export default function TournamentLobbyPage() {
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const previousMessageCountRef = useRef(messages.length);
   const [connectTimedOut, setConnectTimedOut] = useState(false);
+  // 시작 조건 불충족은 사라지는 토스트가 아니라 준비 현황 안에 남겨 보여준다.
+  // 서버와 화면 상태가 잠깐 어긋나 시작 요청이 거절된 경우에도 방장이
+  // 무엇을 고쳐야 하는지 같은 자리에서 확인할 수 있다.
+  const [startValidationError, setStartValidationError] = useState<
+    string | null
+  >(null);
+  const startRequirementsRef = useRef<HTMLDivElement>(null);
   // "다시 시도"를 누를 때마다 증가시켜 connect 이펙트를 재실행한다.
   const [retryNonce, setRetryNonce] = useState(0);
   const hasRedirected = useRef(false);
@@ -182,6 +192,12 @@ export default function TournamentLobbyPage() {
     previousMessageCountRef.current = 0;
     setUnreadChatCount(0);
   }, [roomId]); // 새 방에서는 이전 방의 읽지 않은 개수를 이어가지 않는다.
+
+  useEffect(() => {
+    // 참가·준비·음성 상태가 바뀌면 이전 실패 문구는 더 이상 사실이 아닐 수
+    // 있다. 체크리스트의 최신 계산 결과만 남긴다.
+    setStartValidationError(null);
+  }, [room?.participants, room?.status, room?.teamMode]);
 
   useEffect(() => {
     if (!error?.startsWith("ACTIVE_ROOM_EXISTS::")) return;
@@ -535,6 +551,14 @@ export default function TournamentLobbyPage() {
       ? ` 외 ${pendingReadyPlayers.length - 3}명`
       : "";
   const emptySlots = Math.max(0, room.maxParticipants - totalPlayers);
+  const participantName = (participant: any) =>
+    participant.riotAccount?.gameName ?? participant.username;
+  const summarizeParticipants = (participants: any[]) => {
+    const preview = participants.slice(0, 3).map(participantName).join(", ");
+    return participants.length > 3
+      ? `${preview} 외 ${participants.length - 3}명`
+      : preview;
+  };
 
   const teamModeLabel =
     room.teamMode === "AUCTION"
@@ -557,6 +581,14 @@ export default function TournamentLobbyPage() {
   const hasDiscordVoice = room.participants.some(
     (p: any) => p.inVoice !== undefined,
   );
+  const voiceTrackedPlayers = players.filter(
+    (p: any) => p.inVoice !== undefined && !/^testbot_\d+$/.test(p.username),
+  );
+  const playersOutsideVoice = voiceTrackedPlayers.filter(
+    (p: any) => p.inVoice !== true,
+  );
+  const playersInVoiceCount =
+    voiceTrackedPlayers.length - playersOutsideVoice.length;
   // Discord 채널이 있는 경우, 준비된 참가자 중 botbot이 아닌 유저가 모두 음성채널에 있어야 시작 가능
   const allInVoice =
     !hasDiscordVoice ||
@@ -585,7 +617,12 @@ export default function TournamentLobbyPage() {
           players.filter((player: any) => player.teamId === team.id).length ===
           roomGame.teamSize,
       ));
-  const minStartPlayers = room.teamMode === "AUCTION" ? 4 : 2;
+  const minStartPlayers =
+    room.teamMode === "AUCTION"
+      ? 4
+      : room.teamMode === "SNAKE_DRAFT"
+        ? minDraftParticipants(roomGame.title)
+        : 2;
   const hasMinimumPlayers = totalPlayers >= minStartPlayers;
   const canStart =
     allPlayersReady &&
@@ -631,6 +668,62 @@ export default function TournamentLobbyPage() {
             : hasDiscordVoice && !allInVoice
               ? "음성채널에 참가하지 않은 유저가 있습니다."
               : undefined;
+  const startRequirements = [
+    {
+      id: "roster",
+      label: requiresFullTeams ? "참가 인원" : "최소 인원",
+      value: requiresFullTeams
+        ? `${totalPlayers}/${room.maxParticipants}명`
+        : `${totalPlayers}명 · 최소 ${minStartPlayers}명`,
+      complete: hasFullRoster && hasMinimumPlayers,
+      detail: !hasFullRoster
+        ? `${emptySlots}명이 더 참가해야 합니다.`
+        : !hasMinimumPlayers
+          ? `${minStartPlayers - totalPlayers}명이 더 필요합니다.`
+          : "시작할 인원이 모였습니다.",
+    },
+    ...(room.teamMode === "MANUAL_TEAM"
+      ? [
+          {
+            id: "teams",
+            label: "팀 선택",
+            value: allPlayersAssigned
+              ? `팀당 ${roomGame.teamSize}명 확인`
+              : "미선택 참가자 있음",
+            complete: allPlayersAssigned && manualTeamsFilled,
+            detail: !allPlayersAssigned
+              ? "모든 참가자가 원하는 팀을 먼저 선택해야 합니다."
+              : !manualTeamsFilled
+                ? `각 팀을 ${roomGame.teamSize}명씩 채워주세요.`
+                : "모든 팀의 인원이 맞습니다.",
+          },
+        ]
+      : []),
+    ...(hasDiscordVoice
+      ? [
+          {
+            id: "voice",
+            label: "Discord 대기실",
+            value: `${playersInVoiceCount}/${voiceTrackedPlayers.length}명`,
+            complete: playersOutsideVoice.length === 0,
+            detail:
+              playersOutsideVoice.length > 0
+                ? `미입장: ${summarizeParticipants(playersOutsideVoice)}`
+                : "전원이 『방 제목』 카테고리의 대기실에 들어왔습니다.",
+          },
+        ]
+      : []),
+    {
+      id: "ready",
+      label: "준비 완료",
+      value: `${readyCount}/${totalPlayers}명`,
+      complete: allPlayersReady,
+      detail:
+        pendingReadyPlayers.length > 0
+          ? `대기: ${summarizeParticipants(pendingReadyPlayers)}`
+          : "모든 참가자가 준비를 완료했습니다.",
+    },
+  ];
   const readyBarStatus = canStart
     ? "시작 가능"
     : !hasFullRoster
@@ -645,6 +738,16 @@ export default function TournamentLobbyPage() {
     : pendingReadyPlayers.length > 0
       ? `대기: ${pendingReadyPreview}${pendingReadyExtra}`
       : (startBlockedMessage ?? "플레이어 입장을 기다리는 중입니다.");
+
+  const revealStartRequirement = (message: string) => {
+    setStartValidationError(message);
+    requestAnimationFrame(() => {
+      startRequirementsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  };
 
   const handleReadyToggle = () => {
     if (needsManualTeamSelection) {
@@ -1036,6 +1139,81 @@ export default function TournamentLobbyPage() {
                   </span>
                 </div>
               </div>
+              {hasDiscordVoice &&
+                !currentUserIsSpectator &&
+                currentUserParticipant?.inVoice === false && (
+                  <div className="flex items-start gap-3 rounded-xl border border-accent-warning/30 bg-accent-warning/10 px-4 py-3">
+                    <Headphones className="mt-0.5 h-5 w-5 flex-none text-accent-warning" />
+                    <div>
+                      <p className="text-sm font-bold text-text-primary">
+                        Discord 음성 대기실에 먼저 들어가세요
+                      </p>
+                      <p className="mt-0.5 text-xs leading-5 text-text-secondary">
+                        방 생성 때 선택한 Discord 서버에서 「『{room.name}』 →
+                        ── 대기실 ──」로 입장하세요. 전원이 준비하고 대기실에
+                        있어야 시작되며, 팀 확정 후 봇이 팀 채널로 자동
+                        이동시킵니다.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              <div
+                ref={startRequirementsRef}
+                aria-label="내전 시작 조건"
+                aria-live="polite"
+                className={`grid gap-2 sm:grid-cols-2 ${
+                  startRequirements.length >= 4
+                    ? "xl:grid-cols-4"
+                    : "xl:grid-cols-3"
+                } ${
+                  startValidationError
+                    ? "rounded-xl ring-2 ring-accent-warning/60 ring-offset-2 ring-offset-bg-secondary"
+                    : ""
+                }`}
+              >
+                {startRequirements.map((requirement) => (
+                  <div
+                    key={requirement.id}
+                    className={`rounded-xl border px-3 py-2.5 ${
+                      requirement.complete
+                        ? "border-accent-success/25 bg-accent-success/[0.07]"
+                        : "border-accent-warning/30 bg-accent-warning/[0.07]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-text-primary">
+                        {requirement.complete ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 flex-none text-accent-success" />
+                        ) : (
+                          <Clock3 className="h-3.5 w-3.5 flex-none text-accent-warning" />
+                        )}
+                        {requirement.label}
+                      </span>
+                      <span
+                        className={`flex-none text-xs font-bold ${
+                          requirement.complete
+                            ? "text-accent-success"
+                            : "text-accent-warning"
+                        }`}
+                      >
+                        {requirement.value}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-text-secondary">
+                      {requirement.detail}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {startValidationError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-lg bg-accent-warning/10 px-3 py-2 text-xs font-medium leading-5 text-accent-warning"
+                >
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-none" />
+                  <span>{startValidationError}</span>
+                </div>
+              )}
               <div
                 className="grid h-4 gap-1"
                 style={{
@@ -1324,19 +1502,20 @@ export default function TournamentLobbyPage() {
                       disabled={!canStart}
                       onClick={() =>
                         startGame((err) => {
-                          // 시작이 막히는 이유는 방장이 직접 해결할 수 있는 것들이다
-                          // (준비 안 한 사람, 음성채널 미참가 등). actionable 을 붙여
-                          // "요청을 처리하지 못했습니다"로 덮이지 않게 한다.
+                          // 준비·음성·팀 조건은 일시적인 오류가 아니라 로비에서
+                          // 계속 해결해야 하는 상태다. 사라지는 토스트 대신 상단
+                          // 체크리스트로 이동해 미완료 항목을 남겨 보여준다.
                           if (
                             err.missingVoiceUsers &&
                             err.missingVoiceUsers.length > 0
                           ) {
-                            addToast(
-                              `디스코드 음성채널에 없는 참가자: ${err.missingVoiceUsers.join(", ")}`,
-                              "error",
-                              8000,
-                              { actionable: true },
+                            revealStartRequirement(
+                              `Discord 대기실 미입장: ${err.missingVoiceUsers.join(", ")}`,
                             );
+                          } else if (
+                            /준비|음성|팀|인원|자리|플레이어/.test(err.message)
+                          ) {
+                            revealStartRequirement(err.message);
                           } else {
                             addToast(err.message, "error", 8000, {
                               actionable: true,
@@ -1349,7 +1528,9 @@ export default function TournamentLobbyPage() {
                       내전 시작
                     </button>
                     <p className="text-right text-xs text-text-tertiary">
-                      모든 플레이어가 준비되면 시작할 수 있습니다.
+                      {canStart
+                        ? "모든 시작 조건을 충족했습니다."
+                        : "위 시작 조건을 모두 완료하면 버튼이 활성화됩니다."}
                     </p>
                   </div>
                 )}

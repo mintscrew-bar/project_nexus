@@ -353,6 +353,7 @@ export function RoomCreationForm({
                 required
               />
               <p className="text-text-tertiary text-xs mt-1">
+                내전 목록과 Discord 카테고리에 같은 제목으로 표시됩니다. ·{" "}
                 {name.length}/50자
               </p>
             </div>
@@ -457,9 +458,15 @@ export function RoomCreationForm({
                 {guildLoadError}
               </p>
             ) : (
-              <p className="text-text-tertiary text-xs mt-1">
-                선택한 서버에 내전 음성 채널이 생성됩니다.
-              </p>
+              <div className="mt-2 rounded-lg border border-accent-primary/20 bg-accent-primary/[0.06] px-3 py-2 text-xs leading-5 text-text-secondary">
+                선택한 서버에 『방 제목』 카테고리와 대기실·팀 음성 채널이
+                생성됩니다. 참가자는{" "}
+                <strong className="text-text-primary">
+                  실제 대기실에 입장해야 시작
+                </strong>
+                할 수 있고, 팀 확정 후 봇이 팀 채널로 자동 이동시킵니다. 서버는
+                방 생성 후 변경할 수 없습니다.
+              </div>
             )}
           </div>
 
@@ -544,6 +551,11 @@ export function RoomCreationForm({
                 </button>
               ))}
             </div>
+            <p className="mt-2 text-xs leading-5 text-text-tertiary">
+              선수로 참가하는 인원만 계산합니다. 운영자 방장과 관전자는 이
+              정원에서 제외되며, 자동 밸런스·자유 팀 선택은 정원이 모두 차야
+              시작할 수 있습니다.
+            </p>
           </div>
 
           {/* 더블 일리미네이션 옵션 (4/8팀 전용) */}
@@ -732,6 +744,9 @@ export function RoomCreationForm({
                     <option value={1500}>1,500 포인트</option>
                     <option value={2000}>2,000 포인트</option>
                   </select>
+                  <p className="mt-1 text-[11px] leading-4 text-text-tertiary">
+                    각 팀장이 선수 영입에 사용할 전체 예산입니다.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-text-secondary text-xs mb-1">
@@ -747,6 +762,9 @@ export function RoomCreationForm({
                     <option value={50}>50 포인트</option>
                     <option value={100}>100 포인트</option>
                   </select>
+                  <p className="mt-1 text-[11px] leading-4 text-text-tertiary">
+                    현재 최고가보다 한 번에 올려야 하는 최소 금액입니다.
+                  </p>
                 </div>
               </div>
 
@@ -764,6 +782,10 @@ export function RoomCreationForm({
                   <option value={45}>45초</option>
                   <option value={60}>60초</option>
                 </select>
+                <p className="mt-1 text-[11px] leading-4 text-text-tertiary">
+                  새 선수의 최초 마감 시간입니다. 입찰이 들어오면 10초씩
+                  연장되며 현재 시점 기준 최대 30초까지 늘어납니다.
+                </p>
               </div>
 
               <div>
@@ -858,6 +880,10 @@ export function RoomCreationForm({
                   <option value={60}>60초</option>
                   <option value={90}>90초</option>
                 </select>
+                <p className="mt-1 text-[11px] leading-4 text-text-tertiary">
+                  팀장이 한 명을 지명할 수 있는 시간입니다. 제한 시간이 끝나면
+                  현재 순서가 서버 기준으로 처리됩니다.
+                </p>
               </div>
             </div>
           )}

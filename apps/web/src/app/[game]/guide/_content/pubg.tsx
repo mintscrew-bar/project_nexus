@@ -99,6 +99,27 @@ export function PubgStartGuide() {
         </div>
       </GuideSection>
 
+      <GuideSection
+        title="3. 로비에서 시작 준비"
+        description="로비 상단의 시작 조건 카드가 참가 인원, Discord 대기실, 준비 완료와 팀 상태를 실시간으로 보여줍니다."
+      >
+        <ol className="grid gap-3 lg:grid-cols-3">
+          <GuideStep number={1} title="Discord 대기실 입장">
+            방 생성 때 선택한 서버에서 「『방 제목』 → ── 대기실 ──」로
+            들어갑니다. 계정만 연동하고 음성 채널에 들어오지 않으면 시작할 수
+            없습니다.
+          </GuideStep>
+          <GuideStep number={2} title="정원과 준비 확인">
+            배그는 모든 편성 방식에서 설정 정원이 다 차야 합니다. 전원이 준비를
+            누르면 미완료 카드가 초록색으로 바뀝니다.
+          </GuideStep>
+          <GuideStep number={3} title="편성 후 자동 이동">
+            방장이 시작해 스쿼드를 확정하면 봇이 참가자를 각 스쿼드 음성 채널로
+            옮깁니다. 배그에는 별도 라인 선택 단계가 없습니다.
+          </GuideStep>
+        </ol>
+      </GuideSection>
+
       <GuideSection title="시작 전 체크리스트">
         <BulletList>
           <Bullet>
@@ -110,7 +131,7 @@ export function PubgStartGuide() {
             같습니다.
           </Bullet>
           <Bullet>
-            Discord 연동을 쓴다면 봇이 음성 채널을 만들 권한을 갖고 있습니다.
+            참가자 전원이 생성된 Discord 음성 대기실에 들어왔습니다.
           </Bullet>
           <Bullet>
             정원이 다 찼습니다 — 자동 밸런스와 자유 팀 선택은 자리가 모두
@@ -290,6 +311,26 @@ export function PubgDiscordGuide() {
         </div>
       </GuideSection>
 
+      <GuideSection
+        title="참가자가 해야 할 일"
+        description="Discord 계정 연결과 음성 채널 입장은 별개입니다. 실제 음성 대기실에 접속해야 로비의 시작 조건이 완료됩니다."
+      >
+        <ol className="grid gap-3 lg:grid-cols-3">
+          <GuideStep number={1} title="대기실 접속">
+            선택한 서버의 『방 제목』 카테고리에서 「── 대기실 ──」 음성 채널로
+            들어갑니다.
+          </GuideStep>
+          <GuideStep number={2} title="로비 상태 확인">
+            로비 상단 Discord 대기실 카드와 참가자 스피커 표시가 입장을
+            감지합니다. 미입장자는 이름으로 표시됩니다.
+          </GuideStep>
+          <GuideStep number={3} title="스쿼드 이동">
+            팀이 확정되면 봇이 각 4인 스쿼드 채널로 자동 이동시킵니다. 이동이 안
+            되면 대기실 접속과 봇의 멤버 이동 권한을 확인합니다.
+          </GuideStep>
+        </ol>
+      </GuideSection>
+
       <GuideSection title="봇으로 방 열기">
         <BulletList>
           <Bullet>
@@ -338,9 +379,13 @@ export function PubgDiscordGuide() {
       <GuideSection title="권한 확인">
         <BulletList>
           <Bullet>
-            봇에게 채널 관리 권한이 없으면 방을 만들 때 실패합니다.
+            봇은 채널 보기·채널 관리·메시지 보내기·연결·멤버 이동 권한을
+            기본으로 요청하며 관리자 권한은 요청하지 않습니다.
           </Bullet>
-          <Bullet>음성 채널 이동을 쓰려면 멤버 이동 권한도 필요합니다.</Bullet>
+          <Bullet>
+            채널 보기 또는 관리 권한이 없으면 방 카테고리 생성·삭제가 실패하고,
+            멤버 이동 권한이 없으면 스쿼드 자동 이동이 실패합니다.
+          </Bullet>
           <Bullet>
             참가자는 로비 대기실에 들어와 있어야 시작 시 팀 채널로 옮겨집니다.
           </Bullet>
@@ -425,6 +470,14 @@ export function PubgFaqGuide() {
     {
       q: "대진표는 어디 있나요?",
       a: "배그는 대진표를 쓰지 않습니다. 킬내기와 배틀로얄 모두 라운드를 반복하며 점수를 누적하고, 그 합계로 순위를 가립니다.",
+    },
+    {
+      q: "시작 버튼이 왜 활성화되지 않나요?",
+      a: "로비 상단의 시작 조건을 확인하세요. 배그는 설정한 정원이 모두 차야 하며, 참가자 전원이 Discord 음성 대기실에 들어와 준비를 완료해야 합니다. 자유 팀 선택은 각 스쿼드도 4명씩 맞아야 합니다.",
+    },
+    {
+      q: "Discord를 연결했는데 음성 미입장으로 나옵니다.",
+      a: "계정 연결만으로는 입장 처리되지 않습니다. 방을 만들 때 선택한 서버에서 『방 제목』 카테고리의 '── 대기실 ──' 음성 채널에 실제로 들어가야 합니다.",
     },
   ];
 

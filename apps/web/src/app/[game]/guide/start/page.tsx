@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
-import { CheckCircle2, DoorOpen, Play, Users } from "lucide-react";
+import {
+  CheckCircle2,
+  DoorOpen,
+  Eye,
+  Headphones,
+  LockKeyhole,
+  Play,
+  Settings2,
+  Users,
+} from "lucide-react";
 import { guideGame, guideUrl } from "@/lib/guide-links";
 import {
   Bullet,
@@ -54,10 +63,77 @@ function LolStartGuidePage() {
             자동으로 관전자가 됩니다.
           </GuideStep>
           <GuideStep number={3} title="내전 시작">
-            시작 조건이 충족되면 방장이 다음 단계로 진행합니다. Discord를
-            사용한다면 음성 채널 입장도 함께 확인하세요.
+            참가자 전원이 준비하고 Discord 음성 대기실에 들어오면 방장이 다음
+            단계로 진행합니다. 로비의 시작 조건 카드에서 미완료 인원과 이유를
+            확인할 수 있습니다.
           </GuideStep>
         </ol>
+      </GuideSection>
+
+      <GuideSection
+        title="방 생성 항목 자세히 보기"
+        description="방을 만든 뒤에도 대부분 바꿀 수 있지만, 참가자가 들어온 뒤 바꾸면 준비 상태와 팀 배정을 다시 확인해야 합니다. Discord 서버는 생성 뒤 변경할 수 없습니다."
+      >
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <InfoCard
+            icon={Settings2}
+            title="방 제목과 Discord 서버"
+            description="방 제목은 내전 목록과 Discord 카테고리 이름에 함께 사용됩니다. 서버를 선택하면 그곳에 『방 제목』 카테고리, 대기실과 팀 음성 채널이 생성됩니다."
+          />
+          <InfoCard
+            icon={Users}
+            title="방장 참여와 참가 인원"
+            description="선수 방장은 정원과 팀 편성에 포함됩니다. 운영자 방장은 선수 자리를 차지하지 않고 시작·편성·결과 입력만 담당합니다. 관전자는 참가 정원에서 제외됩니다."
+          />
+          <InfoCard
+            icon={Play}
+            title="경기 방식"
+            description="단판·다전제와 참가 인원을 함께 정합니다. 15·30명은 리그전, 20·40명은 토너먼트이며 더블 일리미네이션은 경기 수가 크게 늘어납니다."
+          />
+          <InfoCard
+            icon={DoorOpen}
+            title="팀 구성 방식"
+            description="경매·스네이크는 팀장이 선수를 고르고, 자동 밸런스는 시스템이 팀과 역할을 편성합니다. 자유 팀 선택은 참가자가 로비에서 직접 팀을 골라야 준비할 수 있습니다."
+          />
+          <InfoCard
+            icon={LockKeyhole}
+            title="비공개 방"
+            description="비밀번호를 켜면 비밀번호를 아는 사람만 입장할 수 있습니다. 비밀번호는 4자 이상이며 방 링크를 공유할 때 따로 전달해야 합니다."
+          />
+          <InfoCard
+            icon={Eye}
+            title="관전 허용"
+            description="관전자는 선수 정원·팀 구성·준비 인원에서 제외됩니다. 관전 허용 방은 선수 자리가 가득 찬 뒤 들어오는 사용자를 관전자로 받습니다."
+          />
+        </div>
+      </GuideSection>
+
+      <GuideSection
+        title="로비에서 시작 조건 확인하기"
+        description="시작 버튼을 눌러 오류를 확인하는 방식이 아니라, 로비 상단의 시작 조건 카드가 현재 막힌 단계를 계속 보여줍니다."
+      >
+        <ol className="grid gap-3 lg:grid-cols-3">
+          <GuideStep number={1} title="Discord 대기실 입장">
+            방 생성 때 선택한 서버에서 「『방 제목』 → ── 대기실 ──」 음성
+            채널에 들어갑니다. 카드의 스피커 표시와 시작 조건에서 미입장자를
+            확인할 수 있습니다.
+          </GuideStep>
+          <GuideStep number={2} title="준비 완료">
+            게임·포지션·진행 준비가 끝난 참가자는 준비 완료를 누릅니다. 준비하지
+            않은 사람은 시작 조건 카드에 이름이 남고, 다시 누르면 준비를 취소할
+            수 있습니다.
+          </GuideStep>
+          <GuideStep number={3} title="방장이 시작">
+            참가 인원, 팀 선택, Discord 대기실, 준비 완료 카드가 모두 초록색이
+            되면 시작 버튼이 활성화됩니다. 팀 확정 후 봇이 각 팀 음성 채널로
+            자동 이동시킵니다.
+          </GuideStep>
+        </ol>
+        <div className="mt-4 flex items-start gap-3 rounded-2xl bg-accent-primary/[0.07] p-4 text-sm leading-6 text-text-secondary">
+          <Headphones className="mt-0.5 h-5 w-5 flex-none text-accent-primary" />
+          Discord 계정만 연동하는 것으로는 부족합니다. 실제로 생성된 음성
+          대기실에 접속해 있어야 시작 조건을 통과합니다.
+        </div>
       </GuideSection>
 
       <GuideSection title="시작 전에 확인할 것">
@@ -87,7 +163,7 @@ function LolStartGuidePage() {
             모든 참가자가 준비 상태이며 팀 구성 방식을 알고 있습니다.
           </Bullet>
           <Bullet>
-            Discord 연동을 사용한다면 봇과 음성 채널 권한을 확인했습니다.
+            모든 참가자가 생성된 Discord 음성 대기실에 들어왔습니다.
           </Bullet>
           <Bullet>
             지연 시 대기자 교체 시각과 다음 행동을 한 문장으로 안내합니다.

@@ -1,9 +1,9 @@
 export const ONBOARDING_MODAL_STORAGE_KEY = "nexus:onboarding-seen-v1";
 export const HOME_TOUR_STORAGE_KEY = "nexus:home-tour-seen-v1";
 export const TOURNAMENTS_TOUR_STORAGE_KEY = "nexus:tournaments-tour-seen-v1";
-// v2: 음성 채널·시작 조건·입장 규칙 단계를 추가했다. 이미 v1 을 본 사람도
-// 새 내용을 한 번은 보도록 키를 올린다.
-export const LOBBY_TOUR_STORAGE_KEY = "nexus:lobby-tour-seen-v2";
+// v3: 시작 조건을 단계형 체크리스트로 바꾸고 미완료 인원을 화면에 계속
+// 보여준다. 이전 투어를 본 사람도 새 진행 방식을 한 번은 확인하게 한다.
+export const LOBBY_TOUR_STORAGE_KEY = "nexus:lobby-tour-seen-v3";
 export const ROOM_CREATION_TOUR_STORAGE_KEY =
   "nexus:room-creation-tour-seen-v1";
 export const MATCHES_TOUR_STORAGE_KEY = "nexus:matches-tour-seen-v1";
