@@ -148,12 +148,6 @@ export class FriendService {
       throw new BadRequestException("Friend request is not pending");
     }
 
-    // Get current user info
-    const accepter = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { username: true },
-    });
-
     // Update status to accepted
     const updatedFriendship = await this.prisma.friendship.update({
       where: { id: friendshipId },
