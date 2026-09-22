@@ -12,6 +12,7 @@ import { FloatingClanChatPanel } from "@/components/domain/FloatingClanChatPanel
 import { CreatorPromoStrip } from "./CreatorPromoStrip";
 import { ActiveRoomBanner } from "./ActiveRoomBanner";
 import { RoomStartAlertModal } from "@/components/rooms/RoomStartAlertModal";
+import { RoomInvitePopup } from "@/components/rooms/RoomInvitePopup";
 import { PubgSurfaceGrain } from "./PubgSurfaceGrain";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useCurrentGame } from "@/hooks/useCurrentGame";
@@ -161,6 +162,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <>
         {children}
         {!isBroadcastRoute && <RoomStartAlertModal />}
+        {/* 친구가 보낸 내전 초대. 송출 화면에는 찍히면 안 된다. */}
+        {!isBroadcastRoute && <RoomInvitePopup />}
       </>
     );
   }
@@ -238,6 +241,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <FloatingClanChatPanel />
       {/* 방장이 시작하려는데 내가 막고 있을 때. 어느 페이지에 있든 뜬다. */}
       <RoomStartAlertModal />
+      {/* 친구가 보낸 내전 초대 — 왼쪽 아래. 어느 페이지에 있든 뜬다. */}
+      <RoomInvitePopup />
     </div>
   );
 }

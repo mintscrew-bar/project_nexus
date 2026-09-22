@@ -2,6 +2,8 @@ import { Module, OnModuleInit, forwardRef } from "@nestjs/common";
 import { RoomController } from "./room.controller";
 import { RoomNudgeController } from "./room-nudge.controller";
 import { RoomNudgeService } from "./room-nudge.service";
+import { RoomInviteController } from "./room-invite.controller";
+import { RoomInviteService } from "./room-invite.service";
 import { RoomService } from "./room.service";
 import { RoomGateway } from "./room.gateway";
 import { SnakeDraftService } from "./snake-draft.service";
@@ -15,6 +17,7 @@ import { DiscordBotService } from "../discord/discord-bot.service";
 import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { StreamerModule } from "../streamer/streamer.module";
 import { StatsModule } from "../stats/stats.module";
+import { NotificationModule } from "../notification/notification.module";
 
 @Module({
   imports: [
@@ -25,11 +28,14 @@ import { StatsModule } from "../stats/stats.module";
     DiscordModule,
     StreamerModule,
     StatsModule,
+    // 친구 내전 초대는 알림 소켓으로 전달한다(RoomInviteService).
+    NotificationModule,
   ],
-  controllers: [RoomController, RoomNudgeController],
+  controllers: [RoomController, RoomNudgeController, RoomInviteController],
   providers: [
     RoomService,
     RoomNudgeService,
+    RoomInviteService,
     RoomGateway,
     SnakeDraftService,
     SnakeDraftGateway,

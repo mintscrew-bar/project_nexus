@@ -1465,6 +1465,29 @@ export const scrimApi = {
 };
 
 // 클랜 관련 API
+/**
+ * 친구 내전 초대. 받은 초대는 친구창 "대기" 탭과 왼쪽 아래 팝업에 뜬다.
+ * 유효한 초대가 있으면 비공개 방 비밀번호 없이 들어갈 수 있다.
+ */
+export const roomInviteApi = {
+  invite: async (roomId: string, friendId: string) => {
+    const response = await apiClient.post(`/room-invites/${roomId}`, {
+      friendId,
+    });
+    return response.data;
+  },
+
+  getReceived: async () => {
+    const response = await apiClient.get("/room-invites");
+    return response.data;
+  },
+
+  decline: async (roomId: string) => {
+    const response = await apiClient.delete(`/room-invites/${roomId}`);
+    return response.data;
+  },
+};
+
 export const clanApi = {
   getClans: async (params?: {
     gameTitle?: "LOL" | "PUBG";

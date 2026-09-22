@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { toast } from "@/stores/toast-store";
 import { notificationApi } from "@/lib/api-client";
+import { useFriendStore, type RoomInviteItem } from "@/stores/friend-store";
 import {
   connectNotificationSocket,
   notificationSocketHelpers,
@@ -55,6 +56,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         notifications: [notification, ...state.notifications],
         unreadCount: state.unreadCount + 1,
       }));
+    });
+
+    // 친구가 보낸 내전 초대 — 종이 아니라 친구창(대기 탭)과 팝업이 받는다.
+    // 알림 소켓은 로그인 중이면 늘 붙어 있어 전달 통로로만 빌려 쓴다.
+    notificationSocketHelpers.onRoomInvite((invite: RoomInviteItem) => {
+      useFriendStore.getState().receiveRoomInvite(invite);
     });
 
     // Listen for unread count updates

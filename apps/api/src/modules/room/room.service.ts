@@ -42,6 +42,7 @@ import type { GameTitle as GameTitleValue } from "@nexus/types";
 import { roomDisplayName } from "../../common/utils/room-title.util";
 import { StreamerService } from "../streamer/streamer.service";
 import { RedisService } from "../redis/redis.service";
+import { parseStoredInvite, roomInviteKey } from "./room-invite.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { StatsService } from "../stats/stats.service";
 import { BALANCE_ROLES } from "../common/balance-score.util";
@@ -179,6 +180,20 @@ export class RoomService {
   ) {
     this.discordBotService = discordBot;
     this.discordVoiceService = discordVoice;
+  }
+
+  /** 이 방에 대한 친구 초대가 아직 살아 있는지(비공개 방 비밀번호 면제용) */
+  private async hasValidRoomInvite(
+    userId: string,
+    roomId: string,
+  ): Promise<boolean> {
+    try {
+      const raw = await this.redis.hget(roomInviteKey(userId), roomId);
+      return parseStoredInvite(raw) !== null;
+    } catch {
+      // Redis 가 안 되면 면제하지 않는다. 비밀번호로는 여전히 들어올 수 있다.
+      return false;
+    }
   }
 
   /**
@@ -1826,7 +1841,13 @@ export class RoomService {
       }
 
       // Verify password for private rooms
-      if (room.isPrivate && room.password) {
+      // 친구에게 받은 유효한 초대가 있으면 비밀번호를 묻지 않는다 — 초대가 곧
+      // 입장권이다(운영자 결정, 2026-09-22). 초대는 방 참가자만 보낼 수 있다.
+      if (
+        room.isPrivate &&
+        room.password &&
+        !(await this.hasValidRoomInvite(userId, room.id))
+      ) {
         if (!dto.password) {
           throw new BadRequestException("Password required");
         }
@@ -1967,6 +1988,14 @@ export class RoomService {
           `[Room] Failed to clean empty previous room ${previousRoomId} after room switch: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
+    }
+
+    // 들어왔으니 이 방 초대는 다 썼다. 대기 탭에서 사라지게 지운다.
+    // 지우지 못해도 입장은 끝났다. 목록 조회 때 "이미 들어간 방"으로 걸러진다.
+    try {
+      await this.redis.hdel(roomInviteKey(userId), switchResult.joinedRoomId);
+    } catch {
+      // 무시
     }
 
     const roomData = await this.getRoomById(switchResult.joinedRoomId);

@@ -1130,8 +1130,12 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
     clanJoinRequests,
     resolveClanInvite,
     resolveClanJoinRequest,
+    roomInvites,
+    takeRoomInvite,
+    declineRoomInvite,
   } = useFriendStore();
   const { addToast } = useToast();
+  const router = useRouter();
 
   const incoming = pendingRequests.filter((r) => r.friendId === currentUserId);
   const outgoing = pendingRequests.filter((r) => r.userId === currentUserId);
@@ -1186,6 +1190,23 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
     }
   };
 
+  // 내전 초대 참가 — 입장은 로비 화면이 한다(초대가 있으면 비밀번호 면제).
+  const handleRoomInviteJoin = (roomId: string, gameTitle: "LOL" | "PUBG") => {
+    takeRoomInvite(roomId);
+    router.push(roomPath({ id: roomId, gameTitle }));
+  };
+
+  const handleRoomInviteDecline = async (roomId: string) => {
+    setBusyId(roomId);
+    try {
+      await declineRoomInvite(roomId);
+    } catch {
+      addToast("초대를 거절하지 못했습니다.", "error");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleAccept = async (id: string) => {
     try {
       await acceptRequest(id);
@@ -1231,13 +1252,14 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
     incoming.length === 0 &&
     outgoing.length === 0 &&
     clanInvites.length === 0 &&
-    clanJoinRequests.length === 0
+    clanJoinRequests.length === 0 &&
+    roomInvites.length === 0
   ) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 text-center p-6">
         <Clock className="w-8 h-8 text-text-tertiary mb-2" />
         <p className="text-sm text-text-secondary">
-          대기 중인 친구 요청이나 클랜 초대가 없습니다.
+          대기 중인 친구 요청이나 초대가 없습니다.
         </p>
       </div>
     );
@@ -1266,7 +1288,7 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
     </div>
   );
 
-  /** 클랜 초대·가입 요청 한 줄 — 누가 / 어느 클랜 */
+  /** 초대·가입 요청 한 줄 — 누가 / 어느 클랜(또는 어느 방) */
   const ClanRow = ({
     user,
     clanText,
@@ -1295,6 +1317,29 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
 
   return (
     <div className="flex-1 overflow-y-auto p-2 space-y-4">
+      {/* 내전 초대가 가장 급하다 — 방이 시작하면 사라진다. 맨 위에 둔다. */}
+      {roomInvites.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider px-2 mb-1">
+            받은 내전 초대 ({roomInvites.length})
+          </p>
+          {roomInvites.map((invite) => (
+            <ClanRow
+              key={invite.roomId}
+              user={invite.inviter}
+              clanText={`${invite.gameTitle === "PUBG" ? "[배그]" : "[롤]"} 『${invite.roomName}』 ${invite.playerCount}/${invite.maxParticipants}명`}
+              action={acceptRejectButtons(
+                invite.roomId,
+                (accept) =>
+                  accept
+                    ? handleRoomInviteJoin(invite.roomId, invite.gameTitle)
+                    : handleRoomInviteDecline(invite.roomId),
+                "참가",
+              )}
+            />
+          ))}
+        </div>
+      )}
       {incoming.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider px-2 mb-1">
@@ -1559,12 +1604,15 @@ export function FriendsPanel() {
 
   const { byCat, uncategorized } = friendsByCategory();
 
-  const { clanInvites, clanJoinRequests } = useFriendStore();
+  const { clanInvites, clanJoinRequests, roomInvites, inviteFriendToRoom } =
+    useFriendStore();
   // "대기" 탭 배지 — 받은 친구 요청 + 받은 클랜 초대 + 처리할 클랜 가입 요청
+  // + 받은 내전 초대
   const incomingCount =
     pendingRequests.filter((r) => r.friendId === currentUserId).length +
     clanInvites.length +
-    clanJoinRequests.length;
+    clanJoinRequests.length +
+    roomInvites.length;
 
   const handleContextMenu = (e: React.MouseEvent, f: Friendship) => {
     e.preventDefault();
@@ -1590,11 +1638,19 @@ export function FriendsPanel() {
     });
   };
 
-  const handleInviteToRoom = () => {
+  // 친구 화면에 초대 팝업을 띄운다. 놓치면 친구의 대기 탭에 30분간 남는다.
+  // (예전에는 방 링크를 클립보드에 복사할 뿐이라 친구에게 아무것도 가지 않았다.)
+  const handleInviteToRoom = async (friendId: string) => {
     if (!room) return;
-    const url = `${window.location.origin}${roomPath(room)}`;
-    navigator.clipboard.writeText(url);
-    addToast("내전 초대 링크가 복사되었습니다!", "success");
+    try {
+      await inviteFriendToRoom(room.id, friendId);
+      addToast("내전 초대를 보냈습니다.", "success");
+    } catch (e: any) {
+      addToast(
+        e?.response?.data?.message ?? "초대를 보내지 못했습니다.",
+        "error",
+      );
+    }
   };
 
   const handleDropToCategory = (
@@ -1883,7 +1939,7 @@ export function FriendsPanel() {
             setModal({ type: "category", friendship: ctx.friendship })
           }
           onRemove={() => handleRemove(ctx.friendship)}
-          onInvite={canInvite ? handleInviteToRoom : null}
+          onInvite={canInvite ? () => handleInviteToRoom(ctx.friendId) : null}
           onJoin={(() => {
             const status = getFriendStatus(ctx.friendId) as any;
             if (!status?.currentRoomId) return null;

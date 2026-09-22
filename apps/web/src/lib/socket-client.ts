@@ -1017,7 +1017,11 @@ export const clanSocketHelpers = {
   ) => {
     // 백엔드: send-clan-message, content 필드 사용
     // ACK를 받아야 서버가 거절한 이유(레이트 리밋 등)를 사용자에게 알릴 수 있다.
-    clanSocket?.emit("send-clan-message", { clanId, content: message }, callback);
+    clanSocket?.emit(
+      "send-clan-message",
+      { clanId, content: message },
+      callback,
+    );
   },
 
   sendIsTyping: (clanId: string, isTyping: boolean) => {
@@ -1136,9 +1140,15 @@ export const notificationSocketHelpers = {
     notificationSocket?.on("unread-count", callback);
   },
 
+  /** 친구가 보낸 내전 초대. 알림(종) 목록과는 따로다 */
+  onRoomInvite: (callback: (invite: any) => void) => {
+    notificationSocket?.on("room-invite", callback);
+  },
+
   offAllListeners: () => {
     notificationSocket?.off("notification");
     notificationSocket?.off("unread-count");
+    notificationSocket?.off("room-invite");
   },
 };
 

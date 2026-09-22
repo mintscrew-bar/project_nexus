@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { clanApi, friendApi } from "@/lib/api-client";
+import { clanApi, friendApi, roomInviteApi } from "@/lib/api-client";
 
 export interface FriendCategory {
   id: string;
@@ -56,6 +56,19 @@ export interface ClanJoinRequestItem {
   inviter: FriendUser;
 }
 
+/** 친구에게 받은 내전 초대 (GET /room-invites, 알림 소켓 "room-invite") */
+export interface RoomInviteItem {
+  roomId: string;
+  roomName: string;
+  gameTitle: "LOL" | "PUBG";
+  playerCount: number;
+  maxParticipants: number;
+  inviter: FriendUser;
+  createdAt: string;
+  /** 이 시각이 지나면 서버가 초대를 버린다(30분) */
+  expiresAt: string;
+}
+
 /** 플로팅 DM 창에 필요한 상대 유저 정보 */
 export interface FloatingDmTarget {
   id: string;
@@ -87,6 +100,10 @@ interface FriendStore {
    */
   clanInvites: ClanInviteItem[];
   clanJoinRequests: ClanJoinRequestItem[];
+  /** 받은 내전 초대. 팝업으로 한 번 뜨고, 놓치면 대기 탭에 남는다. */
+  roomInvites: RoomInviteItem[];
+  /** 지금 화면 왼쪽 아래 팝업에 띄울 초대(방 id). 닫아도 대기 탭에는 남는다. */
+  popupInviteRoomId: string | null;
   isLoading: boolean;
 
   // Panel
@@ -111,6 +128,15 @@ interface FriendStore {
     requestId: string,
     accept: boolean,
   ) => Promise<void>;
+  fetchRoomInvites: () => Promise<void>;
+  /** 알림 소켓으로 초대가 도착했다 — 목록에 넣고 팝업을 띄운다 */
+  receiveRoomInvite: (invite: RoomInviteItem) => void;
+  /** 팝업만 닫는다(초대는 대기 탭에 남는다) */
+  dismissInvitePopup: () => void;
+  /** 참가를 눌렀다 — 로비 입장은 화면 이동이 한다. 목록에서만 뺀다 */
+  takeRoomInvite: (roomId: string) => void;
+  declineRoomInvite: (roomId: string) => Promise<void>;
+  inviteFriendToRoom: (roomId: string, friendId: string) => Promise<void>;
   acceptRequest: (id: string) => Promise<void>;
   rejectRequest: (id: string) => Promise<void>;
   removeFriend: (id: string) => Promise<void>;
@@ -144,6 +170,8 @@ export const useFriendStore = create<FriendStore>()(
       pendingRequests: [],
       clanInvites: [],
       clanJoinRequests: [],
+      roomInvites: [],
+      popupInviteRoomId: null,
       isLoading: false,
 
       openPanel: () => set({ isOpen: true }),
@@ -166,8 +194,9 @@ export const useFriendStore = create<FriendStore>()(
 
       fetchFriends: async () => {
         // 클랜 요청도 친구창 "대기" 탭에 같이 나온다. 친구 목록과 따로 실패해도 되게
-        // 기다리지 않고 나란히 부른다.
+        // 기다리지 않고 나란히 부른다. 받은 내전 초대도 같다.
         void get().fetchClanRequests();
+        void get().fetchRoomInvites();
         set({ isLoading: true });
         try {
           const [friends, pending] = await Promise.all([
@@ -224,6 +253,55 @@ export const useFriendStore = create<FriendStore>()(
             (item) => item.id !== requestId,
           ),
         }));
+      },
+
+      fetchRoomInvites: async () => {
+        try {
+          const invites: RoomInviteItem[] = await roomInviteApi.getReceived();
+          set((s) => ({
+            roomInvites: invites,
+            // 팝업에 떠 있던 초대가 이미 무효(방 시작·만료)면 팝업도 닫는다.
+            popupInviteRoomId: invites.some(
+              (i) => i.roomId === s.popupInviteRoomId,
+            )
+              ? s.popupInviteRoomId
+              : null,
+          }));
+        } catch {
+          // 대기 탭이 비어 보일 뿐이다. 조용히 넘어간다.
+        }
+      },
+
+      receiveRoomInvite: (invite) => {
+        set((s) => ({
+          // 같은 방 초대는 하나만 — 새로 온 것(초대한 사람·인원)으로 바꾼다.
+          roomInvites: [
+            invite,
+            ...s.roomInvites.filter((i) => i.roomId !== invite.roomId),
+          ],
+          popupInviteRoomId: invite.roomId,
+        }));
+      },
+
+      dismissInvitePopup: () => set({ popupInviteRoomId: null }),
+
+      takeRoomInvite: (roomId) => {
+        // 서버의 초대는 입장이 성공하면 지워진다(RoomService.joinRoom). 입장이
+        // 실패하면 서버에 남아 있어, 다음 목록 조회 때 대기 탭에 다시 나타난다.
+        set((s) => ({
+          roomInvites: s.roomInvites.filter((i) => i.roomId !== roomId),
+          popupInviteRoomId:
+            s.popupInviteRoomId === roomId ? null : s.popupInviteRoomId,
+        }));
+      },
+
+      declineRoomInvite: async (roomId) => {
+        get().takeRoomInvite(roomId);
+        await roomInviteApi.decline(roomId);
+      },
+
+      inviteFriendToRoom: async (roomId, friendId) => {
+        await roomInviteApi.invite(roomId, friendId);
       },
 
       acceptRequest: async (id) => {

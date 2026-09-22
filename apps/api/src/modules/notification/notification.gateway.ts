@@ -80,4 +80,12 @@ export class NotificationGateway
   sendUnreadCount(userId: string, count: number) {
     this.server.to(`user:${userId}`).emit("unread-count", { count });
   }
+
+  /**
+   * 친구 내전 초대 팝업. 알림(종) 목록에는 쌓지 않는다 — 친구창 대기 탭이
+   * 같은 초대를 보여준다(RoomInviteService).
+   */
+  sendRoomInvite(userId: string, invite: unknown) {
+    this.server.to(`user:${userId}`).emit("room-invite", invite);
+  }
 }

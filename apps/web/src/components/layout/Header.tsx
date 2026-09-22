@@ -58,17 +58,19 @@ export function Header() {
     pendingRequests,
     clanInvites,
     clanJoinRequests,
+    roomInvites,
     fetchFriends,
   } = useFriendStore();
   // 친구 버튼 배지 — 내가 처리할 것만 센다: 받은 친구 요청 + 받은 클랜 초대 +
-  // 내가 관리하는 클랜의 가입 요청. (예전에는 PENDING 전체를 세서 내가 보낸
-  // 요청까지 배지에 올라갔다.)
+  // 내가 관리하는 클랜의 가입 요청 + 받은 내전 초대. (예전에는 PENDING 전체를
+  // 세서 내가 보낸 요청까지 배지에 올라갔다.)
   const incomingCount =
     pendingRequests.filter(
       (r: any) => r.status === "PENDING" && r.friendId === user?.id,
     ).length +
     clanInvites.length +
-    clanJoinRequests.length;
+    clanJoinRequests.length +
+    roomInvites.length;
 
   // 친구·클랜 요청은 알림(종)이 아니라 친구창에서 처리한다. 창을 열기 전에도
   // 배지가 보여야 하므로 로그인되면 한 번 불러온다.
