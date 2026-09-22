@@ -1122,11 +1122,69 @@ function ConversationList({
 
 // ─── Pending List ─────────────────────────────────────────────────────────────
 function PendingList({ currentUserId }: { currentUserId: string }) {
-  const { pendingRequests, acceptRequest, rejectRequest } = useFriendStore();
+  const {
+    pendingRequests,
+    acceptRequest,
+    rejectRequest,
+    clanInvites,
+    clanJoinRequests,
+    resolveClanInvite,
+    resolveClanJoinRequest,
+  } = useFriendStore();
   const { addToast } = useToast();
 
   const incoming = pendingRequests.filter((r) => r.friendId === currentUserId);
   const outgoing = pendingRequests.filter((r) => r.userId === currentUserId);
+  // 처리 중인 항목 id. 연타로 같은 요청을 두 번 보내지 않게 한다.
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  // 클랜은 게임마다 따로라 어느 게임 클랜인지 앞에 붙인다.
+  const clanLabel = (clan: {
+    name: string;
+    tag: string;
+    gameTitle?: "LOL" | "PUBG";
+  }) =>
+    `${clan.gameTitle === "PUBG" ? "[배그] " : clan.gameTitle === "LOL" ? "[롤] " : ""}[${clan.tag}] ${clan.name}`;
+
+  const handleClanInvite = async (id: string, accept: boolean) => {
+    setBusyId(id);
+    try {
+      await resolveClanInvite(id, accept);
+      addToast(
+        accept ? "클랜에 가입했습니다!" : "클랜 초대를 거절했습니다.",
+        accept ? "success" : "info",
+      );
+    } catch (e: any) {
+      addToast(
+        e?.response?.data?.message ?? "클랜 초대를 처리하지 못했습니다.",
+        "error",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleJoinRequest = async (
+    clanId: string,
+    id: string,
+    accept: boolean,
+  ) => {
+    setBusyId(id);
+    try {
+      await resolveClanJoinRequest(clanId, id, accept);
+      addToast(
+        accept ? "가입을 승인했습니다." : "가입 요청을 거절했습니다.",
+        accept ? "success" : "info",
+      );
+    } catch (e: any) {
+      addToast(
+        e?.response?.data?.message ?? "가입 요청을 처리하지 못했습니다.",
+        "error",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const handleAccept = async (id: string) => {
     try {
@@ -1169,16 +1227,71 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
     </div>
   );
 
-  if (incoming.length === 0 && outgoing.length === 0) {
+  if (
+    incoming.length === 0 &&
+    outgoing.length === 0 &&
+    clanInvites.length === 0 &&
+    clanJoinRequests.length === 0
+  ) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 text-center p-6">
         <Clock className="w-8 h-8 text-text-tertiary mb-2" />
         <p className="text-sm text-text-secondary">
-          대기 중인 친구 요청이 없습니다.
+          대기 중인 친구 요청이나 클랜 초대가 없습니다.
         </p>
       </div>
     );
   }
+
+  const acceptRejectButtons = (
+    id: string,
+    onResolve: (accept: boolean) => void,
+    acceptLabel = "수락",
+  ) => (
+    <div className="flex gap-1">
+      <button
+        className="px-2 py-1 text-xs bg-accent-primary text-accent-on rounded-md hover:bg-accent-hover disabled:opacity-50"
+        disabled={busyId === id}
+        onClick={() => onResolve(true)}
+      >
+        {acceptLabel}
+      </button>
+      <button
+        className="px-2 py-1 text-xs bg-bg-tertiary hover:bg-bg-elevated text-text-secondary rounded-md disabled:opacity-50"
+        disabled={busyId === id}
+        onClick={() => onResolve(false)}
+      >
+        거절
+      </button>
+    </div>
+  );
+
+  /** 클랜 초대·가입 요청 한 줄 — 누가 / 어느 클랜 */
+  const ClanRow = ({
+    user,
+    clanText,
+    action,
+  }: {
+    user: { id: string; username: string; avatar: string | null };
+    clanText: string;
+    action: React.ReactNode;
+  }) => (
+    <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-elevated transition-colors">
+      <Avatar
+        src={user.avatar}
+        alt={user.username}
+        fallback={user.username}
+        size="sm"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-text-primary truncate">
+          {user.username}
+        </p>
+        <p className="text-[11px] text-text-tertiary truncate">{clanText}</p>
+      </div>
+      {action}
+    </div>
+  );
 
   return (
     <div className="flex-1 overflow-y-auto p-2 space-y-4">
@@ -1208,6 +1321,43 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
                   </button>
                 </div>
               }
+            />
+          ))}
+        </div>
+      )}
+      {clanInvites.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider px-2 mb-1">
+            받은 클랜 초대 ({clanInvites.length})
+          </p>
+          {clanInvites.map((invite) => (
+            <ClanRow
+              key={invite.id}
+              user={invite.inviter}
+              clanText={`${clanLabel(invite.clan)} 에 초대했습니다`}
+              action={acceptRejectButtons(invite.id, (accept) =>
+                handleClanInvite(invite.id, accept),
+              )}
+            />
+          ))}
+        </div>
+      )}
+      {clanJoinRequests.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-text-tertiary uppercase tracking-wider px-2 mb-1">
+            클랜 가입 요청 ({clanJoinRequests.length})
+          </p>
+          {clanJoinRequests.map((request) => (
+            <ClanRow
+              key={request.id}
+              user={request.inviter}
+              clanText={`${clanLabel(request.clan)} 가입을 요청했습니다`}
+              action={acceptRejectButtons(
+                request.id,
+                (accept) =>
+                  handleJoinRequest(request.clan.id, request.id, accept),
+                "승인",
+              )}
             />
           ))}
         </div>
@@ -1409,9 +1559,12 @@ export function FriendsPanel() {
 
   const { byCat, uncategorized } = friendsByCategory();
 
-  const incomingCount = pendingRequests.filter(
-    (r) => r.friendId === currentUserId,
-  ).length;
+  const { clanInvites, clanJoinRequests } = useFriendStore();
+  // "대기" 탭 배지 — 받은 친구 요청 + 받은 클랜 초대 + 처리할 클랜 가입 요청
+  const incomingCount =
+    pendingRequests.filter((r) => r.friendId === currentUserId).length +
+    clanInvites.length +
+    clanJoinRequests.length;
 
   const handleContextMenu = (e: React.MouseEvent, f: Friendship) => {
     e.preventDefault();

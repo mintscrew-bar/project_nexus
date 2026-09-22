@@ -6,14 +6,10 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { FriendshipStatus } from "@nexus/database";
-import { NotificationService } from "../notification/notification.service";
 
 @Injectable()
 export class FriendService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly notificationService: NotificationService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // ========================================
   // Friend Request Management
@@ -128,12 +124,8 @@ export class FriendService {
       },
     });
 
-    // Send notification to receiver
-    await this.notificationService.notifyFriendRequest(
-      receiverId,
-      friendship.user.username,
-      senderId,
-    );
+    // 받은 사람은 친구창의 "받은 요청"에서 본다. 알림(종)으로는 보내지 않는다 —
+    // 친구·클랜 관련은 친구창, 나머지는 알림으로 나눴다(운영자 결정, 2026-09-22).
 
     return friendship;
   }
@@ -186,14 +178,8 @@ export class FriendService {
       },
     });
 
-    // Send notification to the original sender
-    if (accepter) {
-      await this.notificationService.notifyFriendAccepted(
-        friendship.userId,
-        accepter.username,
-        userId,
-      );
-    }
+    // 수락되면 보낸 사람 친구 목록에 바로 나타난다. 따로 알리지 않는다
+    // (친구·클랜 관련 "결과" 알림은 없앴다, 운영자 결정 2026-09-22).
 
     return updatedFriendship;
   }

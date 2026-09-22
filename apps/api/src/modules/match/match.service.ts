@@ -509,6 +509,7 @@ export class MatchService {
               matchId,
               true,
               roomName,
+              roomId,
             ),
           ),
         );
@@ -521,6 +522,7 @@ export class MatchService {
               matchId,
               false,
               roomName,
+              roomId,
             ),
           ),
         );

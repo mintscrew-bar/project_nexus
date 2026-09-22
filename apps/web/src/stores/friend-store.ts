@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { friendApi } from '@/lib/api-client';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { clanApi, friendApi } from "@/lib/api-client";
 
 export interface FriendCategory {
   id: string;
@@ -24,10 +24,36 @@ export interface Friendship {
   id: string;
   userId: string;
   friendId: string;
-  status: 'PENDING' | 'ACCEPTED' | 'BLOCKED';
+  status: "PENDING" | "ACCEPTED" | "BLOCKED";
   createdAt: string;
   user: FriendUser;
   friend: FriendUser;
+}
+
+/** 클랜 정보 요약 — 친구창의 클랜 초대·가입 요청 줄에 쓴다 */
+export interface ClanBrief {
+  id: string;
+  name: string;
+  tag: string;
+  /** 클랜은 게임마다 따로라 [롤]/[배그] 를 붙여 보여준다 */
+  gameTitle?: "LOL" | "PUBG";
+}
+
+/** 내가 받은 클랜 초대 (GET /clans/invitations/my) */
+export interface ClanInviteItem {
+  id: string;
+  createdAt: string;
+  clan: ClanBrief;
+  inviter: FriendUser;
+}
+
+/** 내가 관리하는 클랜에 들어온 가입 요청 (GET /clans/join-requests/managed) */
+export interface ClanJoinRequestItem {
+  id: string;
+  createdAt: string;
+  clan: ClanBrief;
+  /** 가입을 요청한 사람 */
+  inviter: FriendUser;
 }
 
 /** 플로팅 DM 창에 필요한 상대 유저 정보 */
@@ -55,6 +81,12 @@ interface FriendStore {
   // Transient (from API)
   friends: Friendship[];
   pendingRequests: Friendship[];
+  /**
+   * 친구·클랜 관련 요청은 알림(종)이 아니라 친구창에서 처리한다
+   * (운영자 결정, 2026-09-22). 받은 클랜 초대와, 내가 관리하는 클랜의 가입 요청.
+   */
+  clanInvites: ClanInviteItem[];
+  clanJoinRequests: ClanJoinRequestItem[];
   isLoading: boolean;
 
   // Panel
@@ -72,6 +104,13 @@ interface FriendStore {
 
   // Data
   fetchFriends: () => Promise<void>;
+  fetchClanRequests: () => Promise<void>;
+  resolveClanInvite: (invitationId: string, accept: boolean) => Promise<void>;
+  resolveClanJoinRequest: (
+    clanId: string,
+    requestId: string,
+    accept: boolean,
+  ) => Promise<void>;
   acceptRequest: (id: string) => Promise<void>;
   rejectRequest: (id: string) => Promise<void>;
   removeFriend: (id: string) => Promise<void>;
@@ -103,6 +142,8 @@ export const useFriendStore = create<FriendStore>()(
       uncategorizedCollapsed: false,
       friends: [],
       pendingRequests: [],
+      clanInvites: [],
+      clanJoinRequests: [],
       isLoading: false,
 
       openPanel: () => set({ isOpen: true }),
@@ -114,7 +155,7 @@ export const useFriendStore = create<FriendStore>()(
         set((s) =>
           s.floatingDmTarget?.id === target.id
             ? { floatingDmTarget: null }
-            : { floatingDmTarget: target }
+            : { floatingDmTarget: target },
         ),
       closeFloatingDm: () => set({ floatingDmTarget: null }),
 
@@ -124,6 +165,9 @@ export const useFriendStore = create<FriendStore>()(
       toggleClanChat: () => set((s) => ({ isClanChatOpen: !s.isClanChatOpen })),
 
       fetchFriends: async () => {
+        // 클랜 요청도 친구창 "대기" 탭에 같이 나온다. 친구 목록과 따로 실패해도 되게
+        // 기다리지 않고 나란히 부른다.
+        void get().fetchClanRequests();
         set({ isLoading: true });
         try {
           const [friends, pending] = await Promise.all([
@@ -136,7 +180,7 @@ export const useFriendStore = create<FriendStore>()(
           // userId·friendId 쌍을 정렬하여 키로 사용하면 방향에 상관없이 중복 감지 가능.
           const seenPairs = new Set<string>();
           const dedupedFriends = (friends as Friendship[]).filter((f) => {
-            const pairKey = [f.userId, f.friendId].sort().join('|');
+            const pairKey = [f.userId, f.friendId].sort().join("|");
             if (seenPairs.has(pairKey)) return false;
             seenPairs.add(pairKey);
             return true;
@@ -148,6 +192,38 @@ export const useFriendStore = create<FriendStore>()(
         } finally {
           set({ isLoading: false });
         }
+      },
+
+      fetchClanRequests: async () => {
+        // 둘 중 하나가 실패해도 나머지는 보여준다(운영진이 아니면 가입 요청은 빈 배열).
+        const [invites, joinRequests] = await Promise.allSettled([
+          clanApi.getMyInvitations(),
+          clanApi.getManagedJoinRequests(),
+        ]);
+        set({
+          clanInvites:
+            invites.status === "fulfilled" ? invites.value : get().clanInvites,
+          clanJoinRequests:
+            joinRequests.status === "fulfilled"
+              ? joinRequests.value
+              : get().clanJoinRequests,
+        });
+      },
+
+      resolveClanInvite: async (invitationId, accept) => {
+        await clanApi.resolveInvitation(invitationId, accept);
+        set((s) => ({
+          clanInvites: s.clanInvites.filter((item) => item.id !== invitationId),
+        }));
+      },
+
+      resolveClanJoinRequest: async (clanId, requestId, accept) => {
+        await clanApi.resolveJoinRequest(clanId, requestId, accept);
+        set((s) => ({
+          clanJoinRequests: s.clanJoinRequests.filter(
+            (item) => item.id !== requestId,
+          ),
+        }));
       },
 
       acceptRequest: async (id) => {
@@ -180,7 +256,9 @@ export const useFriendStore = create<FriendStore>()(
 
       renameCategory: (id, name) => {
         set((s) => ({
-          categories: s.categories.map((c) => (c.id === id ? { ...c, name } : c)),
+          categories: s.categories.map((c) =>
+            c.id === id ? { ...c, name } : c,
+          ),
         }));
       },
 
@@ -188,16 +266,20 @@ export const useFriendStore = create<FriendStore>()(
         set((s) => {
           const newMeta: Record<string, FriendMeta> = {};
           for (const [fid, meta] of Object.entries(s.friendMeta)) {
-            newMeta[fid] = meta.categoryId === id ? { ...meta, categoryId: null } : meta;
+            newMeta[fid] =
+              meta.categoryId === id ? { ...meta, categoryId: null } : meta;
           }
-          return { categories: s.categories.filter((c) => c.id !== id), friendMeta: newMeta };
+          return {
+            categories: s.categories.filter((c) => c.id !== id),
+            friendMeta: newMeta,
+          };
         });
       },
 
       toggleCategoryCollapse: (id) => {
         set((s) => ({
           categories: s.categories.map((c) =>
-            c.id === id ? { ...c, isCollapsed: !c.isCollapsed } : c
+            c.id === id ? { ...c, isCollapsed: !c.isCollapsed } : c,
           ),
         }));
       },
@@ -220,7 +302,10 @@ export const useFriendStore = create<FriendStore>()(
         set((s) => ({
           friendMeta: {
             ...s.friendMeta,
-            [friendId]: { ...s.friendMeta[friendId], nickname: nickname || undefined },
+            [friendId]: {
+              ...s.friendMeta[friendId],
+              nickname: nickname || undefined,
+            },
           },
         }));
       },
@@ -241,9 +326,14 @@ export const useFriendStore = create<FriendStore>()(
       },
     }),
     {
-      name: 'nexus-friends-v1',
+      name: "nexus-friends-v1",
       storage: createJSONStorage(() => {
-        if (typeof window === 'undefined') return { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+        if (typeof window === "undefined")
+          return {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+          };
         return localStorage;
       }),
       // 보안: friendMeta(닉네임·메모)는 민감 정보이므로 persist 제외
@@ -253,6 +343,6 @@ export const useFriendStore = create<FriendStore>()(
         categories: s.categories,
         uncategorizedCollapsed: s.uncategorizedCollapsed,
       }),
-    }
-  )
+    },
+  ),
 );

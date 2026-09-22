@@ -4,8 +4,6 @@ import {
   BadRequestException,
   ForbiddenException,
   ConflictException,
-  Inject,
-  forwardRef,
 } from "@nestjs/common";
 import { randomBytes } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
@@ -16,9 +14,7 @@ import {
   ClanInvitationType,
   ClanRole,
   GameTitle,
-  NotificationType,
 } from "@nexus/database";
-import { NotificationService } from "../notification/notification.service";
 import {
   DiscordInviteStatsService,
   extractDiscordInviteCode,
@@ -70,8 +66,6 @@ interface OfficerPermissions {
 export class ClanService {
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(forwardRef(() => NotificationService))
-    private readonly notificationService: NotificationService,
     private readonly discordInviteStatsService: DiscordInviteStatsService,
   ) {}
 
@@ -1168,15 +1162,9 @@ export class ClanService {
       },
     });
 
-    // 알림 발송
-    await this.notificationService.create({
-      userId: inviteeId,
-      type: NotificationType.CLAN_INVITE,
-      title: "클랜 초대",
-      message: `[${clan.tag}] ${clan.name} 클랜에 초대되었습니다.`,
-      link: `/clans/${clanId}`,
-      data: { clanId, invitationId: invitation.id },
-    });
+    // 초대받은 사람은 친구창의 "받은 클랜 초대"에서 수락·거절한다.
+    // 알림(종)으로는 보내지 않는다 — 친구·클랜 관련은 친구창으로 모았다
+    // (운영자 결정, 2026-09-22). 예전에는 알림만 보내고 수락할 화면이 없었다.
 
     // 활동 로그 기록
     await this.logActivity(
@@ -1258,20 +1246,8 @@ export class ClanService {
       },
     });
 
-    // 클랜 오너에게 알림 발송
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { username: true },
-    });
-
-    await this.notificationService.create({
-      userId: clan.ownerId,
-      type: NotificationType.CLAN_JOIN_REQUEST,
-      title: "클랜 가입 요청",
-      message: `${user?.username || "누군가"}가 클랜 가입을 요청했습니다.`,
-      link: `/clans/${clanId}/settings`,
-      data: { clanId, requestId: request.id },
-    });
+    // 오너·운영진은 친구창의 "클랜 가입 요청"에서 바로 승인·거절한다
+    // (getManagedJoinRequests). 알림(종)으로는 보내지 않는다.
 
     // 활동 로그 기록
     await this.logActivity(clanId, userId, ClanActivityType.JOIN_REQUEST);
@@ -1516,15 +1492,8 @@ export class ClanService {
         ClanActivityType.MEMBER_JOIN,
       );
 
-      // 승인 알림 발송
-      await this.notificationService.create({
-        userId: request.inviterId,
-        type: NotificationType.CLAN_JOIN_APPROVED,
-        title: "클랜 가입 승인",
-        message: `[${clan.tag}] ${clan.name} 클랜 가입이 승인되었습니다.`,
-        link: `/clans/${clanId}`,
-        data: { clanId },
-      });
+      // 승인 결과는 따로 알리지 않는다. 내 클랜에 바로 나타난다
+      // (친구·클랜 관련 "결과" 알림은 없앴다, 운영자 결정 2026-09-22).
     } else {
       await this.prisma.clanInvitation.update({
         where: { id: invitationId },
@@ -1556,6 +1525,8 @@ export class ClanService {
             name: true,
             tag: true,
             logo: true,
+            // 친구창이 [롤]/[배그] 를 구분해 보여준다 — 클랜은 게임별로 따로다.
+            gameTitle: true,
           },
         },
         inviter: {
@@ -1564,6 +1535,46 @@ export class ClanService {
             username: true,
             avatar: true,
           },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  /**
+   * 내가 오너·운영진으로 있는 클랜들에 들어온 가입 요청(친구창용).
+   *
+   * 클랜은 게임마다 하나씩 들 수 있어 여러 곳을 한 번에 모은다. 운영진 권한은
+   * 클랜 설정(officerCanManageInvitations)을 따른다 — getPendingJoinRequests 와
+   * 같은 기준이다. 승인·거절은 기존 resolveJoinRequest 를 쓴다.
+   */
+  async getManagedJoinRequests(userId: string) {
+    const memberships = await this.prisma.clanMember.findMany({
+      where: { userId, role: { in: [ClanRole.OWNER, ClanRole.OFFICER] } },
+      select: { clanId: true, role: true },
+    });
+
+    const manageable: string[] = [];
+    for (const membership of memberships) {
+      const permissions = await this.getOfficerPermissions(membership.clanId);
+      if (this.canManageInvitations(membership.role, permissions)) {
+        manageable.push(membership.clanId);
+      }
+    }
+    if (manageable.length === 0) return [];
+
+    return this.prisma.clanInvitation.findMany({
+      where: {
+        clanId: { in: manageable },
+        type: ClanInvitationType.JOIN_REQUEST,
+        status: ClanInvitationStatus.PENDING,
+      },
+      include: {
+        clan: {
+          select: { id: true, name: true, tag: true, gameTitle: true },
+        },
+        inviter: {
+          select: { id: true, username: true, avatar: true },
         },
       },
       orderBy: { createdAt: "desc" },

@@ -1701,6 +1701,12 @@ export const clanApi = {
     return response.data;
   },
 
+  /** 내가 오너·운영진인 클랜들에 들어온 가입 요청 (친구창) */
+  getManagedJoinRequests: async () => {
+    const response = await apiClient.get("/clans/join-requests/managed");
+    return response.data;
+  },
+
   resolveJoinRequest: async (
     clanId: string,
     requestId: string,

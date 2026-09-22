@@ -11,7 +11,7 @@ describe("ClanService game separation", () => {
 
     return {
       prisma,
-      service: new ClanService(prisma, {} as any, {} as any),
+      service: new ClanService(prisma, {} as any),
     };
   };
 

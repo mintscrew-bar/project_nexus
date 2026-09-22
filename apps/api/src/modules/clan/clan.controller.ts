@@ -398,6 +398,14 @@ export class ClanController {
     return this.clanService.getPendingInvitations(userId);
   }
 
+  // 내가 관리하는 클랜들에 들어온 가입 요청 (친구창). 승인·거절은
+  // :id/join-requests/:requestId/resolve 를 쓴다.
+  // ":id/..." 경로와 겹치지 않게 두 번째 칸을 고정 문자열로 둔다.
+  @Get("join-requests/managed")
+  async getManagedJoinRequests(@CurrentUser("sub") userId: string) {
+    return this.clanService.getManagedJoinRequests(userId);
+  }
+
   @Get(":id/invitations/sent")
   async getSentInvitations(
     @CurrentUser("sub") userId: string,

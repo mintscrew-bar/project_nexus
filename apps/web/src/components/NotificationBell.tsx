@@ -54,12 +54,18 @@ export function NotificationBell() {
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-text-secondary hover:text-accent-primary transition-colors rounded-lg hover:bg-bg-tertiary"
-        aria-label="Notifications"
+        // 헤더의 다른 아이콘 버튼(친구·관리자)과 크기·색을 맞춘다.
+        className={`relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary ${
+          isOpen
+            ? "bg-accent-primary/10 text-accent-primary"
+            : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
+        }`}
+        title="알림"
+        aria-label={`알림${unreadCount > 0 ? `, 안 읽은 알림 ${unreadCount}건` : ""}`}
       >
-        <Bell size={20} />
+        <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+          <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 flex items-center justify-center bg-accent-danger text-white text-[9px] font-bold rounded-full">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}

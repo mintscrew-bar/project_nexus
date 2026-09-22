@@ -16,6 +16,7 @@ import { GAMES } from "@nexus/types";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { GameSwitcher } from "@/components/layout/GameSwitcher";
 import { BgmToggle } from "@/components/bgm/BgmToggle";
+import { NotificationBell } from "@/components/NotificationBell";
 import { gamePath, useCurrentGame } from "@/hooks/useCurrentGame";
 
 // 게임별 화면은 `/lol/*` 처럼 현재 게임 프리픽스가 붙는다.
@@ -51,10 +52,29 @@ export function Header() {
     { href: gamePath(currentGame, "/guide"), label: "가이드" },
   ];
   const { isAuthenticated, user } = useAuthStore();
-  const { togglePanel, isOpen, pendingRequests } = useFriendStore();
-  const incomingCount = pendingRequests.filter(
-    (r: any) => r.status === "PENDING",
-  ).length;
+  const {
+    togglePanel,
+    isOpen,
+    pendingRequests,
+    clanInvites,
+    clanJoinRequests,
+    fetchFriends,
+  } = useFriendStore();
+  // 친구 버튼 배지 — 내가 처리할 것만 센다: 받은 친구 요청 + 받은 클랜 초대 +
+  // 내가 관리하는 클랜의 가입 요청. (예전에는 PENDING 전체를 세서 내가 보낸
+  // 요청까지 배지에 올라갔다.)
+  const incomingCount =
+    pendingRequests.filter(
+      (r: any) => r.status === "PENDING" && r.friendId === user?.id,
+    ).length +
+    clanInvites.length +
+    clanJoinRequests.length;
+
+  // 친구·클랜 요청은 알림(종)이 아니라 친구창에서 처리한다. 창을 열기 전에도
+  // 배지가 보여야 하므로 로그인되면 한 번 불러온다.
+  useEffect(() => {
+    if (isAuthenticated && user?.id) void fetchFriends();
+  }, [isAuthenticated, user?.id, fetchFriends]);
 
   // ---------------------------------------------------------------
   // Hydration 불일치 방지:
@@ -167,6 +187,12 @@ export function Header() {
             )}
           </button>
         )}
+        {/*
+          알림(종) — 커뮤니티 댓글·방송 시작·경기 결과·관리자 메시지.
+          친구·클랜 관련은 친구창이 맡는다(운영자 결정, 2026-09-22).
+          마운트 후에만 그려 배지 hydration 불일치를 막는다.
+        */}
+        {clientIsAuthenticated && <NotificationBell />}
         {/* 테마 토글: 좁은 데스크톱까지는 햄버거 메뉴로 이동 → 넓은 데스크톱에서만 노출 */}
         <div className="hidden nav:block">
           <ThemeToggle />
