@@ -17,7 +17,17 @@ export class RoomNudgeController {
   constructor(private readonly nudgeService: RoomNudgeService) {}
 
   /**
-   * POST /api/rooms/:id/nudge — 시작을 막고 있는 참가자에게 사이트 알림 + 디스코드 DM.
+   * POST /api/rooms/:id/start-alert — 조건이 남은 채로 방장이 시작을 눌렀다.
+   * 막고 있는 참가자 화면에 확인 모달을 띄운다(사람마다 60초에 한 번).
+   */
+  @Post(":id/start-alert")
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  startAlert(@Param("id") roomId: string, @CurrentUser("sub") userId: string) {
+    return this.nudgeService.alertBlockers(userId, roomId);
+  }
+
+  /**
+   * POST /api/rooms/:id/nudge — 방장 모달의 요청 버튼. 디스코드 DM 으로 부른다.
    * 사유별 방당 60초 쿨다운은 서비스가 건다. 여기서는 방장 한 명의 연타만 막는다.
    */
   @Post(":id/nudge")

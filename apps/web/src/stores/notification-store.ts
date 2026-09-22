@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { toast, useToastStore } from "@/stores/toast-store";
+import { toast } from "@/stores/toast-store";
 import { notificationApi } from "@/lib/api-client";
 import {
   connectNotificationSocket,
@@ -55,18 +55,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         notifications: [notification, ...state.notifications],
         unreadCount: state.unreadCount + 1,
       }));
-      // 방장의 호출은 지금 행동해야 하는 알림이다. 종 아이콘 숫자만 올리면
-      // 로비를 보고 있어도 모르고 지나친다 — 화면에 바로 띄운다.
-      if (notification.data?.kind === "ROOM_NUDGE") {
-        useToastStore
-          .getState()
-          .addToast(
-            `📣 ${notification.title} — ${notification.message}`,
-            "warning",
-            12000,
-            { actionable: true },
-          );
-      }
     });
 
     // Listen for unread count updates

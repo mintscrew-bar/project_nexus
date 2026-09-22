@@ -117,6 +117,19 @@ export interface RoomSettingsDto {
 }
 
 // 게임 시작 실패 시 서버에서 내려오는 에러 응답 타입
+/**
+ * 방장이 시작하려는데 내가 막고 있을 때 서버가 보내는 확인 모달 내용
+ * (api room-nudge.service RoomStartAlertPayload). 확인을 눌러야 사라진다.
+ */
+export interface RoomStartAlert {
+  roomId: string;
+  roomName: string;
+  hostName: string;
+  lobbyPath: string;
+  voiceUrl: string | null;
+  items: ("READY" | "VOICE")[];
+}
+
 export interface StartGameError {
   message: string;
   // 음성채널 미참가 유저 목록 (Discord 채널 있는 방에서만 존재)
@@ -142,6 +155,9 @@ interface LobbyStoreState {
   disconnect: (options?: { skipLeave?: boolean }) => void;
   setReady: (isReady?: boolean, onError?: (msg: string) => void) => void;
   startGame: (onError?: (err: StartGameError) => void) => void;
+  /** 받은 시작 확인 모달. 사이트 공통 화면(RoomStartAlertModal)이 띄운다. */
+  startAlert: RoomStartAlert | null;
+  dismissStartAlert: () => void;
   sendMessage: (content: string) => void;
   updateRoomSettings: (
     roomId: string,
@@ -157,6 +173,8 @@ interface LobbyStoreState {
 }
 
 export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
+  startAlert: null,
+  dismissStartAlert: () => set({ startAlert: null }),
   socket: null,
   room: null,
   isConnected: false,
@@ -311,6 +329,12 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
         }
       },
     );
+
+    // 방장이 시작하려는데 내가 막고 있다(준비 안 함·대기실 없음).
+    // 이 소켓은 로비를 직접 나갈 때만 끊겨서, 다른 페이지에 있어도 받는다.
+    socket.on("room-start-alert", (alert: RoomStartAlert) => {
+      set({ startAlert: alert });
+    });
 
     socket.on("all-ready", () => {
       // 모든 플레이어 준비 완료 이벤트 수신

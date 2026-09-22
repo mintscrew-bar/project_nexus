@@ -900,7 +900,22 @@ export const roomApi = {
   },
 
   /**
-   * 로비 호출 — 시작을 막고 있는 참가자에게 사이트 알림 + 디스코드 DM.
+   * 조건이 남은 채로 방장이 시작을 눌렀다 — 막고 있는 참가자 화면에 확인 모달.
+   * 같은 사람에게는 60초에 한 번만 뜬다(서버가 막는다).
+   */
+  startAlert: async (
+    roomId: string,
+  ): Promise<{
+    alerted: string[];
+    offline: string[];
+    recentlyAlerted: string[];
+  }> => {
+    const response = await apiClient.post(`/rooms/${roomId}/start-alert`);
+    return response.data;
+  },
+
+  /**
+   * 방장 모달의 요청 버튼 — 막고 있는 참가자에게 디스코드 DM.
    * 같은 사유는 방당 60초에 한 번만 된다(서버가 막는다).
    */
   nudge: async (
@@ -908,7 +923,6 @@ export const roomApi = {
     reason: "READY" | "VOICE",
   ): Promise<{
     targets: number;
-    siteNotified: number;
     dmDelivered: number;
     cooldownSeconds: number;
   }> => {

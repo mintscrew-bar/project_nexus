@@ -2,7 +2,6 @@ import { Module, OnModuleInit, forwardRef } from "@nestjs/common";
 import { RoomController } from "./room.controller";
 import { RoomNudgeController } from "./room-nudge.controller";
 import { RoomNudgeService } from "./room-nudge.service";
-import { NotificationModule } from "../notification/notification.module";
 import { RoomService } from "./room.service";
 import { RoomGateway } from "./room.gateway";
 import { SnakeDraftService } from "./snake-draft.service";
@@ -26,8 +25,6 @@ import { StatsModule } from "../stats/stats.module";
     DiscordModule,
     StreamerModule,
     StatsModule,
-    // 로비 호출이 사이트 알림을 만든다.
-    NotificationModule,
   ],
   controllers: [RoomController, RoomNudgeController],
   providers: [

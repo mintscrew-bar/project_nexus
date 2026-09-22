@@ -323,6 +323,24 @@ export class RoomGateway
     }
   }
 
+  /**
+   * 방장이 시작하려는데 막고 있는 참가자에게 확인 모달을 띄운다(room-start-alert).
+   *
+   * 알림 소켓(/notification)이 아니라 이 소켓으로 보낸다. 방에 참가한 사람은
+   * 다른 페이지로 옮겨도 이 소켓이 유지되고(로비를 직접 나갈 때만 끊긴다),
+   * 알림 소켓은 지금 사이트에서 연결하는 곳이 없다.
+   *
+   * @returns 받은 소켓 수. 0 이면 지금 사이트에 없는 사람이다.
+   */
+  sendStartAlert(userId: string, payload: unknown): number {
+    const sockets = this.userSockets.get(userId);
+    if (!sockets) return 0;
+    for (const socketId of sockets) {
+      this.server.to(socketId).emit("room-start-alert", payload);
+    }
+    return sockets.size;
+  }
+
   async handleDisconnect(client: AuthenticatedSocket) {
     if (!client.userId) return;
 

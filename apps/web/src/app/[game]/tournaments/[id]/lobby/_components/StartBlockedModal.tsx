@@ -44,8 +44,8 @@ const REQUIREMENT_TIP: Record<string, string> = {
   roster:
     "초대 링크를 공유하거나, 방 설정에서 정원을 지금 인원에 맞게 줄일 수 있습니다.",
   teams: "팀을 안 고른 참가자에게 로비 채팅으로 알려주세요.",
-  voice: "대기실에 없는 사람을 부르거나 링크를 채팅에 붙여 주세요.",
-  ready: "준비를 안 누른 사람에게 요청을 보낼 수 있습니다.",
+  voice: "대기실 링크를 채팅에 붙이거나, 사이트에 없는 사람은 DM으로 부르세요.",
+  ready: "사이트에 없는 사람은 DM으로 부르세요.",
 };
 
 /**
@@ -131,6 +131,45 @@ export function StartBlockedModal({
   >({});
   const [now, setNow] = useState(() => Date.now());
   const [copied, setCopied] = useState(false);
+  // 모달이 열리면 막고 있는 참가자 화면에 확인 창을 자동으로 띄운다.
+  const [alertState, setAlertState] = useState<{
+    sending: boolean;
+    alerted: string[];
+    offline: string[];
+    recentlyAlerted: string[];
+    error?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setAlertState({
+      sending: true,
+      alerted: [],
+      offline: [],
+      recentlyAlerted: [],
+    });
+    roomApi
+      .startAlert(roomId)
+      .then((result) => {
+        if (!cancelled) setAlertState({ sending: false, ...result });
+      })
+      .catch((error: any) => {
+        if (cancelled) return;
+        setAlertState({
+          sending: false,
+          alerted: [],
+          offline: [],
+          recentlyAlerted: [],
+          error:
+            error?.response?.data?.message ??
+            "참가자에게 확인 창을 띄우지 못했습니다.",
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, roomId]);
 
   const hasCooldown = Object.values(nudge).some(
     (state) => state?.until && state.until > now,
@@ -152,7 +191,13 @@ export function StartBlockedModal({
           message:
             result.targets === 0
               ? "부를 사람이 없습니다. 방금 해결된 것 같아요."
-              : `${result.targets}명에게 보냈습니다 · 사이트 알림 ${result.siteNotified}명 · 디스코드 DM ${result.dmDelivered}명`,
+              : result.dmDelivered === 0
+                ? `${result.targets}명 모두 디스코드 DM을 받을 수 없습니다(연동 안 함·DM 차단).`
+                : `디스코드 DM ${result.dmDelivered}명에게 보냈습니다${
+                    result.dmDelivered < result.targets
+                      ? ` (${result.targets - result.dmDelivered}명은 DM을 받을 수 없음)`
+                      : ""
+                  }.`,
           until:
             result.cooldownSeconds > 0
               ? Date.now() + result.cooldownSeconds * 1000
@@ -233,6 +278,8 @@ export function StartBlockedModal({
               : `시작 조건 ${remaining}개가 남았습니다. 아래 항목을 해결하면 바로 시작할 수 있습니다.`}
         </p>
 
+        {alertState && <AlertSummary state={alertState} />}
+
         <ul className="space-y-2.5">
           {rows.map((row) => (
             <li
@@ -284,9 +331,9 @@ export function StartBlockedModal({
                         </Button>
                       )}
                       {row.id === "voice" &&
-                        nudgeButton("VOICE", "대기실 입장 요청 보내기")}
+                        nudgeButton("VOICE", "디스코드 DM으로 부르기")}
                       {row.id === "ready" &&
-                        nudgeButton("READY", "준비 요청 보내기")}
+                        nudgeButton("READY", "디스코드 DM으로 부르기")}
                     </div>
                   )}
                 </>
@@ -296,8 +343,8 @@ export function StartBlockedModal({
         </ul>
 
         <p className="text-[11px] leading-4 text-text-tertiary">
-          요청은 사이트 알림과 디스코드 DM으로 함께 갑니다. 같은 요청은 1분에 한
-          번 보낼 수 있습니다.
+          사이트에 있는 참가자에게는 확인 창이 자동으로 뜹니다. 사이트를 안 보고
+          있는 사람은 디스코드 DM으로 부르세요. 같은 요청은 1분에 한 번 됩니다.
         </p>
 
         <div className="flex justify-end">
@@ -307,5 +354,45 @@ export function StartBlockedModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** 참가자 화면에 확인 창을 띄운 결과 한 줄 요약 */
+function AlertSummary({
+  state,
+}: {
+  state: {
+    sending: boolean;
+    alerted: string[];
+    offline: string[];
+    recentlyAlerted: string[];
+    error?: string;
+  };
+}) {
+  if (state.sending) {
+    return (
+      <p className="text-xs text-text-tertiary">
+        막고 있는 참가자에게 확인 창을 띄우는 중…
+      </p>
+    );
+  }
+  if (state.error) {
+    return <p className="text-xs text-accent-danger">{state.error}</p>;
+  }
+  const lines = [
+    state.alerted.length > 0 &&
+      `✅ ${state.alerted.join(", ")}님 화면에 확인 창을 띄웠습니다.`,
+    state.recentlyAlerted.length > 0 &&
+      `${state.recentlyAlerted.join(", ")}님은 1분 안에 이미 확인 창을 받았습니다.`,
+    state.offline.length > 0 &&
+      `⚠️ ${state.offline.join(", ")}님은 지금 사이트에 없습니다. 아래 버튼으로 디스코드 DM을 보내세요.`,
+  ].filter(Boolean) as string[];
+  if (lines.length === 0) return null;
+  return (
+    <div className="space-y-1 rounded-lg bg-bg-tertiary/60 px-3 py-2 text-xs leading-5 text-text-secondary">
+      {lines.map((line) => (
+        <p key={line}>{line}</p>
+      ))}
+    </div>
   );
 }

@@ -1,22 +1,23 @@
-'use client';
+"use client";
 
-import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import { useAuthStore } from '@/stores/auth-store';
-import { cn } from '@/lib/utils';
-import { Header } from './Header';
-import { Footer } from './Footer';
-import { FriendsPanel } from '@/components/domain/FriendsPanel';
-import { FloatingDmPanel } from '@/components/domain/FloatingDmPanel';
-import { FloatingClanChatPanel } from '@/components/domain/FloatingClanChatPanel';
-import { CreatorPromoStrip } from './CreatorPromoStrip';
-import { ActiveRoomBanner } from './ActiveRoomBanner';
-import { PubgSurfaceGrain } from './PubgSurfaceGrain';
-import { useLobbyStore } from '@/stores/lobby-store';
-import { useCurrentGame } from '@/hooks/useCurrentGame';
-import { gameFromSlug } from '@nexus/types';
-import { rememberGame } from '@/lib/last-game';
-import { withoutGamePrefix } from '@/lib/game-links';
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useAuthStore } from "@/stores/auth-store";
+import { cn } from "@/lib/utils";
+import { Header } from "./Header";
+import { Footer } from "./Footer";
+import { FriendsPanel } from "@/components/domain/FriendsPanel";
+import { FloatingDmPanel } from "@/components/domain/FloatingDmPanel";
+import { FloatingClanChatPanel } from "@/components/domain/FloatingClanChatPanel";
+import { CreatorPromoStrip } from "./CreatorPromoStrip";
+import { ActiveRoomBanner } from "./ActiveRoomBanner";
+import { RoomStartAlertModal } from "@/components/rooms/RoomStartAlertModal";
+import { PubgSurfaceGrain } from "./PubgSurfaceGrain";
+import { useLobbyStore } from "@/stores/lobby-store";
+import { useCurrentGame } from "@/hooks/useCurrentGame";
+import { gameFromSlug } from "@nexus/types";
+import { rememberGame } from "@/lib/last-game";
+import { withoutGamePrefix } from "@/lib/game-links";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -55,10 +56,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // 클랜·커뮤니티처럼 게임과 무관한 화면은 기본 게임으로 떨어지므로,
   // 거기서 적으면 배그를 보던 사람의 기억이 롤로 덮인다.
   useEffect(() => {
-    if (gameFromSlug(pathname.split('/')[1])) rememberGame(currentGame);
+    if (gameFromSlug(pathname.split("/")[1])) rememberGame(currentGame);
   }, [pathname, currentGame]);
 
-  const themeClass = currentGame === 'PUBG' ? 'game-pubg' : null;
+  const themeClass = currentGame === "PUBG" ? "game-pubg" : null;
   useEffect(() => {
     if (!themeClass) return;
     document.body.classList.add(themeClass);
@@ -66,27 +67,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [themeClass]);
 
   // /auth/* 라우트 → 풀스크린 (셸 없음)
-  const isAuthRoute = pathname.startsWith('/auth');
+  const isAuthRoute = pathname.startsWith("/auth");
 
   // /broadcast/* → OBS 방송 오버레이. 네비/사이드바/헤더 없이 children만 (자체 고정 캔버스).
-  const isBroadcastRoute = pathname.startsWith('/broadcast');
+  const isBroadcastRoute = pathname.startsWith("/broadcast");
 
   // / 라우트의 비로그인 랜딩은 자체 정적 헤더/푸터를 가진다.
   // SSR과 첫 hydration 렌더에서도 앱 헤더를 감싸지 않아 공개 랜딩 HTML이 중복 탐색을 만들지 않게 한다.
   // 인증 상태가 확정된 뒤에는 Header + 대시보드 구조로 전환한다.
-  const isLandingFullscreen = pathname === '/';
+  const isLandingFullscreen = pathname === "/";
 
   // 푸터 숨김 라우트 (대시보드성 페이지들: 자체적인 액션바나 스크롤 관리가 필요한 경우)
   // 게임 접두사를 제외한 경로로 판별해야 로비의 고정 높이와 내부 스크롤이 유지된다.
   const gamePathname = withoutGamePrefix(pathname);
-  const isTournamentLobbyRoute = /^\/tournaments\/[^/]+\/lobby(?:\/|$)/.test(gamePathname);
+  const isTournamentLobbyRoute = /^\/tournaments\/[^/]+\/lobby(?:\/|$)/.test(
+    gamePathname,
+  );
   const isDashboardRoute =
     isTournamentLobbyRoute ||
-    gamePathname.startsWith('/auction/') ||
-    gamePathname.startsWith('/draft/') ||
-    gamePathname.startsWith('/role-selection/') ||
-    gamePathname.endsWith('/bracket');
-  const showCreatorPromo = pathname !== '/' && !isDashboardRoute;
+    gamePathname.startsWith("/auction/") ||
+    gamePathname.startsWith("/draft/") ||
+    gamePathname.startsWith("/role-selection/") ||
+    gamePathname.endsWith("/bracket");
+  const showCreatorPromo = pathname !== "/" && !isDashboardRoute;
 
   const usesShell = !(isAuthRoute || isLandingFullscreen || isBroadcastRoute);
 
@@ -122,8 +125,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!usesShell || !isDashboardRoute) return;
     // 대시보드 화면에서만 body 를 뷰포트에 고정한다.
-    document.body.classList.add('h-dvh', 'overflow-hidden');
-    return () => document.body.classList.remove('h-dvh', 'overflow-hidden');
+    document.body.classList.add("h-dvh", "overflow-hidden");
+    return () => document.body.classList.remove("h-dvh", "overflow-hidden");
   }, [usesShell, isDashboardRoute]);
 
   const shellRef = useRef<HTMLDivElement>(null);
@@ -131,25 +134,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const contentFrameRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!usesShell) return;
-    const targets = [shellRef.current, mainRef.current, contentFrameRef.current]
-      .filter((el): el is HTMLElement => el !== null);
+    const targets = [
+      shellRef.current,
+      mainRef.current,
+      contentFrameRef.current,
+    ].filter((el): el is HTMLElement => el !== null);
 
     const stripHeight = () => {
       for (const el of targets) {
-        if (el.style.height) el.style.removeProperty('height');
+        if (el.style.height) el.style.removeProperty("height");
       }
     };
     stripHeight();
 
     const observer = new MutationObserver(stripHeight);
     for (const el of targets) {
-      observer.observe(el, { attributes: true, attributeFilter: ['style'] });
+      observer.observe(el, { attributes: true, attributeFilter: ["style"] });
     }
     return () => observer.disconnect();
   }, [usesShell]);
 
   if (!usesShell) {
-    return <>{children}</>;
+    // 셸이 없는 화면(첫 화면·로그인)에서도 방장의 시작 확인 모달은 떠야 한다.
+    // 방송 오버레이만 뺀다 — 송출 화면에 모달이 찍히면 안 된다.
+    return (
+      <>
+        {children}
+        {!isBroadcastRoute && <RoomStartAlertModal />}
+      </>
+    );
   }
 
   // 인증된 앱 셸 (또는 마운트 전 기본 셸)
@@ -174,23 +187,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Header />
       <main
         ref={mainRef}
-        className={cn(
-          "flex min-w-0 flex-grow",
-          isDashboardRoute && "min-h-0",
-        )}
+        className={cn("flex min-w-0 flex-grow", isDashboardRoute && "min-h-0")}
       >
         {/*
           배그 테마에서는 바탕을 비운다. 여기에 불투명한 배경을 깔면
           body 의 그레인과 광원이 통째로 가려진다 — 질감은 콘텐츠 뒤에
           있어야 하고, 카드들이 그 위를 덮는 게 맞다.
         */}
-        <div ref={contentFrameRef} className={cn(
-          "flex min-w-0 flex-grow flex-col",
-          // 넘치는 부분을 잘라내는 건 뷰포트에 고정된 대시보드에서만 맞다.
-          // 일반 페이지에서 자르면 문서가 길어져도 아래를 볼 수 없다.
-          isDashboardRoute && "min-h-0 overflow-hidden",
-          themeClass ? "bg-transparent" : "bg-bg-primary",
-        )}>
+        <div
+          ref={contentFrameRef}
+          className={cn(
+            "flex min-w-0 flex-grow flex-col",
+            // 넘치는 부분을 잘라내는 건 뷰포트에 고정된 대시보드에서만 맞다.
+            // 일반 페이지에서 자르면 문서가 길어져도 아래를 볼 수 없다.
+            isDashboardRoute && "min-h-0 overflow-hidden",
+            themeClass ? "bg-transparent" : "bg-bg-primary",
+          )}
+        >
           {showCreatorPromo && <CreatorPromoStrip />}
           <ActiveRoomBanner />
           {/*
@@ -207,7 +220,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               isDashboardRoute && "h-full min-h-0 overflow-hidden",
             )}
           >
-            {isDashboardRoute ? children : (
+            {isDashboardRoute ? (
+              children
+            ) : (
               <>
                 {/* 내용이 짧아도 푸터가 화면 아래에 붙도록 본문이 남은 높이를 먹는다. */}
                 <div className="min-w-0 flex-1">{children}</div>
@@ -221,6 +236,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* 플로팅 DM/클랜 채팅 창 — FriendsPanel 왼쪽에 렌더링 */}
       <FloatingDmPanel />
       <FloatingClanChatPanel />
+      {/* 방장이 시작하려는데 내가 막고 있을 때. 어느 페이지에 있든 뜬다. */}
+      <RoomStartAlertModal />
     </div>
   );
 }
