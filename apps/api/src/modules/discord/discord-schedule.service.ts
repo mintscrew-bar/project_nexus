@@ -120,6 +120,25 @@ export class DiscordScheduleService {
    * 공지만 닫히고 방은 남아 있는 쪽이 되돌리기 쉽다. 다만 아무도 안 오는 방의
    * 빈 음성채널까지 남겨두면 서버 채널 목록이 계속 더러워지므로 그건 정리한다.
    */
+  /**
+   * 진행 중인 내전의 공지 패널을 현재 상태로 맞춘다.
+   *
+   * 바뀐 방만 실제로 수정하므로(DiscordBotService.editRoomPanel) 30초로 돌려도
+   * 디스코드 수정 횟수는 편성·경기 결과가 나는 횟수 정도다.
+   */
+  @Cron("*/30 * * * * *")
+  async syncRoomPanels(): Promise<void> {
+    try {
+      await this.botService.syncActiveRoomPanels();
+    } catch (error) {
+      this.logger.warn(
+        `[Schedule] 진행 패널 동기화 실패: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
   @Cron("*/10 * * * *")
   async closeStaleRecruitments(): Promise<void> {
     const now = new Date();

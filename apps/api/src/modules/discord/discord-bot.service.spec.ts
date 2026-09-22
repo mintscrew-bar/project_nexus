@@ -247,6 +247,7 @@ describe("DiscordBotService room notification", () => {
     );
     prisma.room.findUnique.mockResolvedValueOnce({
       name: "금요일 내전",
+      status: "WAITING",
       maxParticipants: 10,
       teamMode: "SNAKE_DRAFT",
       isPrivate: false,
@@ -720,5 +721,173 @@ describe("DiscordBotService 배그 예약 개설", () => {
     expect(dto.pubgGameMode).toBeUndefined();
     expect(dto.pubgPlatform).toBeUndefined();
     expect(dto.maxParticipants).toBe(10);
+  });
+});
+
+describe("DiscordBotService 진행 패널", () => {
+  const config = {
+    get: jest.fn((key: string) =>
+      key === "APP_URL" ? "https://labs-nexus.com" : "",
+    ),
+  };
+  const prisma = {
+    room: {
+      findUnique: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    team: { findMany: jest.fn().mockResolvedValue([]) },
+    matchSeries: { findMany: jest.fn().mockResolvedValue([]) },
+  };
+  const redis = {
+    get: jest.fn(),
+    set: jest.fn().mockResolvedValue(undefined),
+    del: jest.fn().mockResolvedValue(undefined),
+  };
+  const emojiService = {
+    ensureRecruitEmojis: jest.fn().mockResolvedValue({}),
+  };
+
+  const notif = {
+    guildId: "guild-1",
+    channelId: "text-1",
+    messageId: "message-1",
+    roomName: "금요일 내전",
+    hostName: "host",
+    maxPlayers: 10,
+    teamMode: "AUCTION",
+    isPrivate: false,
+    voiceChannelId: "voice-1",
+  };
+
+  const liveRoom = {
+    name: "금요일 내전",
+    gameTitle: "LOL",
+    pubgPlatform: null,
+    status: "IN_PROGRESS",
+    maxParticipants: 10,
+    teamMode: "AUCTION",
+    isPrivate: false,
+    scheduledAt: null,
+    completedAt: null,
+    updatedAt: new Date("2026-09-22T12:00:00Z"),
+    host: { username: "host" },
+    participants: [],
+    discordChannels: [{ channelId: "voice-1" }],
+  };
+
+  let service: DiscordBotService;
+  let edit: jest.Mock;
+
+  const textOf = (payload: any): string => {
+    const out: string[] = [];
+    const walk = (component: any) => {
+      if (component.type === 10) out.push(component.content);
+      for (const child of component.components ?? []) walk(child);
+      if (component.accessory) walk(component.accessory);
+    };
+    walk(payload.components[0].toJSON());
+    return out.join("\n");
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new DiscordBotService(
+      config as any,
+      prisma as any,
+      { emit: jest.fn() } as any,
+      redis as any,
+      emojiService as any,
+    );
+    service.storeRoomNotifications("room-1", [notif]);
+    edit = jest.fn().mockResolvedValue(undefined);
+    (service as any).client = {
+      isReady: () => true,
+      guilds: {
+        fetch: jest.fn().mockResolvedValue({
+          channels: {
+            fetch: jest.fn().mockResolvedValue({
+              isTextBased: () => true,
+              messages: { fetch: jest.fn().mockResolvedValue({ edit }) },
+            }),
+          },
+        }),
+      },
+    };
+  });
+
+  it("시작된 방은 모집 카드 대신 진행 카드로 다시 그린다", async () => {
+    prisma.room.findUnique.mockResolvedValue(liveRoom);
+    prisma.team.findMany.mockResolvedValue([
+      {
+        id: "ta",
+        name: "블루팀",
+        captainId: "u1",
+        captain: { username: "팀장" },
+        members: [
+          { userId: "u1", user: { username: "팀장" } },
+          { userId: "u2", user: { username: "선수" } },
+        ],
+      },
+    ]);
+
+    await service.updateRoomNotification("room-1");
+
+    expect(edit).toHaveBeenCalledTimes(1);
+    const text = textOf(edit.mock.calls[0][0]);
+    expect(text).toContain("경기 진행 중");
+    // 팀장이 팀원 목록에 한 번 더 나오지 않는다
+    expect(text).toContain("**블루팀**  👑 팀장 · 선수");
+    expect(text).not.toContain("모집 현황");
+  });
+
+  it("그린 내용이 같으면 다시 수정하지 않는다", async () => {
+    prisma.room.findUnique.mockResolvedValue(liveRoom);
+
+    await service.updateRoomNotification("room-1");
+    await service.updateRoomNotification("room-1");
+    expect(edit).toHaveBeenCalledTimes(1);
+
+    // 상태가 바뀌면 다시 그린다
+    prisma.room.findUnique.mockResolvedValue({
+      ...liveRoom,
+      status: "COMPLETED",
+    });
+    await service.updateRoomNotification("room-1");
+    expect(edit).toHaveBeenCalledTimes(2);
+    expect(textOf(edit.mock.calls[1][0])).toContain("내전 종료");
+  });
+
+  it("방이 이미 없으면 캐시로 모집 카드를 되살리지 않는다", async () => {
+    prisma.room.findUnique.mockResolvedValue(null);
+    await service.updateRoomNotification("room-1");
+    expect(edit).not.toHaveBeenCalled();
+  });
+
+  it("해산하면 공지를 닫고 캐시를 비워 이후 갱신이 되살리지 못하게 한다", async () => {
+    const closed = await service.dissolveRoomNotification("room-1");
+
+    expect(closed).toBe(1);
+    expect(textOf(edit.mock.calls[0][0])).toContain("방이 해산되었습니다");
+    expect(redis.del).toHaveBeenCalledWith("discord:room-notification:room-1");
+
+    redis.get.mockResolvedValue(null);
+    prisma.room.findUnique.mockResolvedValue(liveRoom);
+    await service.updateRoomNotification("room-1");
+    expect(edit).toHaveBeenCalledTimes(1);
+  });
+
+  it("주기 동기화는 진행 중인 방과 막 끝난 방만 훑는다", async () => {
+    prisma.room.findMany.mockResolvedValue([{ id: "room-1" }]);
+    prisma.room.findUnique.mockResolvedValue(liveRoom);
+
+    await expect(service.syncActiveRoomPanels()).resolves.toBe(1);
+
+    const where = prisma.room.findMany.mock.calls[0][0].where;
+    expect(where.OR[0].status.in).toEqual(
+      expect.arrayContaining(["DRAFT", "IN_PROGRESS"]),
+    );
+    expect(where.OR[0].status.in).not.toContain("WAITING");
+    expect(where.OR[1].status).toBe("COMPLETED");
+    expect(edit).toHaveBeenCalledTimes(1);
   });
 });

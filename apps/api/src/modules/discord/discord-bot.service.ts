@@ -40,7 +40,19 @@ import type { DiscordVoiceService } from "./discord-voice.service";
 import { DiscordEmojiService, parseEmojiRef } from "./discord-emoji.service";
 import { formatKst, parseKstSchedule } from "./discord-schedule-time";
 import type { EmojiMap, RecruitEmojiName } from "./discord-emoji.service";
-import { roomBracketUrl, roomLobbyUrl } from "../../common/utils/app-url.util";
+import {
+  gameUrl,
+  roomBracketUrl,
+  roomLobbyUrl,
+} from "../../common/utils/app-url.util";
+import {
+  buildRoomDissolvedPanel,
+  buildRoomProgressPanel,
+  type PanelPayload,
+  type RoomProgressScrim,
+  type RoomProgressSnapshot,
+  type RoomProgressStatus,
+} from "./room-progress-panel";
 import { roomDisplayName } from "../../common/utils/room-title.util";
 import {
   DEFAULT_PUBG_GAME_MODE,
@@ -114,6 +126,11 @@ const JOIN_ROOM_BUTTON_PREFIX = "nexus_join_room:";
 const VERIFY_RIOT_ID_INPUT_ID = "nexus_verify_riot_id";
 const ROOM_NOTIFICATION_CACHE_PREFIX = "discord:room-notification:";
 const ROOM_NOTIFICATION_TTL_SECONDS = 24 * 60 * 60;
+/**
+ * 끝난 방의 패널을 이 시간 동안 더 맞춘다. 종료 직후 결과를 정정하는 일이 있어서다.
+ * 그 뒤로는 손대지 않는다 — 진행 동기화가 끝난 방까지 영원히 훑지 않게 한다.
+ */
+const COMPLETED_PANEL_SYNC_WINDOW_MS = 2 * 60 * 60 * 1000;
 const DISCORD_EMBED_DESCRIPTION_LIMIT = 4000;
 const RULES_EMBED_DESCRIPTION_LIMIT = 3800;
 const DISCORD_LINE_ROLE_KEYS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
@@ -157,7 +174,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   // 방 생성 알림 메시지 참조 (roomId → 메시지 정보), 재시작 시 초기화됨
   private readonly roomNotifMap = new Map<string, RoomNotifEntry[]>();
   // 같은 방의 참가/퇴장 편집이 역순으로 완료되지 않도록 직렬화한다.
-  private readonly roomNotifUpdateQueue = new Map<string, Promise<void>>();
+  private readonly roomNotifUpdateQueue = new Map<string, Promise<unknown>>();
+  /**
+   * 방별로 마지막에 그린 카드. 키는 `길드:메시지`, 값은 컴포넌트 JSON.
+   * 같은 내용이면 수정을 건너뛴다(editRoomPanel). 프로세스 메모리에만 둔다 —
+   * 재시작 뒤 첫 동기화에서 한 번씩 다시 그리는 정도는 괜찮다.
+   */
+  private readonly roomPanelSignatures = new Map<string, Map<string, string>>();
 
   constructor(
     private readonly configService: ConfigService,
@@ -3090,24 +3113,16 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     roomId: string,
     participants?: string[],
   ): Promise<void> {
-    const previous = this.roomNotifUpdateQueue.get(roomId) ?? Promise.resolve();
-    const current = previous
-      .catch(() => {})
-      .then(() => this.performRoomNotificationUpdate(roomId, participants));
-    this.roomNotifUpdateQueue.set(roomId, current);
-
-    try {
-      await current;
-    } finally {
-      if (this.roomNotifUpdateQueue.get(roomId) === current) {
-        this.roomNotifUpdateQueue.delete(roomId);
-      }
-    }
+    await this.enqueueRoomPanelTask(roomId, () =>
+      this.performRoomNotificationUpdate(roomId, participants),
+    );
   }
 
   private async performRoomNotificationUpdate(
     roomId: string,
-    fallbackParticipants?: string[],
+    // 예전에는 방이 사라졌을 때 이 명단으로 모집 카드를 그렸다. 지금은 방이 없으면
+    // 해산 카드(dissolveRoomNotification)가 맡아서 쓰지 않는다. 호출부 호환용.
+    _fallbackParticipants?: string[],
   ): Promise<void> {
     const notifs = await this.getRoomNotifications(roomId);
     if (notifs.length === 0) return;
@@ -3116,10 +3131,15 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         where: { id: roomId },
         select: {
           name: true,
+          gameTitle: true,
+          pubgPlatform: true,
+          status: true,
           maxParticipants: true,
           teamMode: true,
           isPrivate: true,
           scheduledAt: true,
+          completedAt: true,
+          updatedAt: true,
           host: { select: { username: true } },
           participants: {
             where: { role: "PLAYER" },
@@ -3133,27 +3153,31 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           },
         },
       });
-      const latestParticipants = room
-        ? room.participants.map((participant) => participant.user.username)
-        : (fallbackParticipants ?? []);
+      // 방이 이미 지워졌다. 해산 카드는 dissolveRoomNotification 이 그린다.
+      // 여기서 캐시 값으로 모집 카드를 다시 그리면 해산 카드를 덮어쓴다.
+      if (!room) return;
 
-      const latestNotifs: RoomNotifEntry[] = notifs.map((notif) =>
-        room
-          ? {
-              ...notif,
-              roomName: room.name,
-              hostName: room.host.username,
-              maxPlayers: room.maxParticipants,
-              teamMode: room.teamMode,
-              isPrivate: room.isPrivate,
-              scheduledAt: room.scheduledAt
-                ? room.scheduledAt.toISOString()
-                : null,
-              voiceChannelId:
-                room.discordChannels[0]?.channelId ?? notif.voiceChannelId,
-            }
-          : notif,
+      // 모집이 끝난 방은 모집 공지 대신 진행 패널로 다시 그린다.
+      if (room.status !== "WAITING") {
+        await this.renderProgressPanels(roomId, notifs, room);
+        return;
+      }
+
+      const latestParticipants = room.participants.map(
+        (participant) => participant.user.username,
       );
+
+      const latestNotifs: RoomNotifEntry[] = notifs.map((notif) => ({
+        ...notif,
+        roomName: room.name,
+        hostName: room.host.username,
+        maxPlayers: room.maxParticipants,
+        teamMode: room.teamMode,
+        isPrivate: room.isPrivate,
+        scheduledAt: room.scheduledAt ? room.scheduledAt.toISOString() : null,
+        voiceChannelId:
+          room.discordChannels[0]?.channelId ?? notif.voiceChannelId,
+      }));
       this.storeRoomNotifications(roomId, latestNotifs);
 
       // 한 서버 갱신이 실패해도 나머지는 갱신되어야 한다.
@@ -3161,9 +3185,6 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       await Promise.allSettled(
         latestNotifs.map(async (notif) => {
           const guild = await this.client.guilds.fetch(notif.guildId);
-          const channel = await guild.channels.fetch(notif.channelId);
-          if (!channel?.isTextBased()) return;
-          const message = await channel.messages.fetch(notif.messageId);
           const emojis = await this.emojiService.ensureRecruitEmojis(guild);
           // 갱신에서는 역할을 멘션하지 않는다. 인원이 바뀔 때마다 핑이 가면
           // 알림 역할이 곧 소음이 되어 사람들이 역할을 떼어버린다.
@@ -3187,13 +3208,312 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
           );
           // V2 로 전환하기 전에 보낸 메시지는 플래그를 나중에 붙일 수 없어 edit 이
           // 실패한다. 그 방들은 다음 모집부터 새 형식이 된다.
-          await message.edit(payload);
+          await this.editRoomPanel(roomId, notif, payload);
         }),
       );
     } catch (err: any) {
       console.warn(
         `[DiscordBot] 방 알림 업데이트 실패 (${roomId}): ${err?.message}`,
       );
+    }
+  }
+
+  /**
+   * 공지 메시지 하나를 새 카드로 고친다. 직전에 그린 것과 같으면 건너뛴다.
+   *
+   * 진행 패널은 30초마다 다시 계산되는데(syncActiveRoomPanels) 대부분은 바뀐 게
+   * 없다. 그때마다 수정하면 채널 수정 레이트 리밋만 깎아 먹는다.
+   *
+   * @returns 실제로 수정했으면 true
+   */
+  private async editRoomPanel(
+    roomId: string,
+    notif: RoomNotifEntry,
+    payload: PanelPayload,
+  ): Promise<boolean> {
+    const key = `${notif.guildId}:${notif.messageId}`;
+    const signature = JSON.stringify(
+      payload.components.map((component) => component.toJSON()),
+    );
+    const drawn = this.roomPanelSignatures.get(roomId);
+    if (drawn?.get(key) === signature) return false;
+
+    const guild = await this.client.guilds.fetch(notif.guildId);
+    const channel = await guild.channels.fetch(notif.channelId);
+    if (!channel?.isTextBased()) return false;
+    const message = await channel.messages.fetch(notif.messageId);
+    await message.edit(payload);
+
+    const next = drawn ?? new Map<string, string>();
+    next.set(key, signature);
+    this.roomPanelSignatures.set(roomId, next);
+    return true;
+  }
+
+  /** 모집이 끝난 방의 공지를 진행 상황 카드로 다시 그린다. */
+  private async renderProgressPanels(
+    roomId: string,
+    notifs: RoomNotifEntry[],
+    room: {
+      name: string;
+      gameTitle: string;
+      pubgPlatform: string | null;
+      status: string;
+      teamMode: string;
+      isPrivate: boolean;
+      completedAt: Date | null;
+      updatedAt: Date;
+      host: { username: string };
+      discordChannels: { channelId: string }[];
+    },
+  ): Promise<void> {
+    const snapshot = await this.loadRoomProgressSnapshot(roomId, room);
+    const appUrl =
+      this.configService.get("APP_URL") || "https://labs-nexus.com";
+    const gameTitle = snapshot.gameTitle;
+    const lobbyUrl = roomLobbyUrl(appUrl, roomId, gameTitle);
+    const resultUrl =
+      gameTitle === "PUBG"
+        ? gameUrl(appUrl, `tournaments/${roomId}/scrim`, gameTitle)
+        : roomBracketUrl(appUrl, roomId, gameTitle);
+    const lobbyVoiceId = room.discordChannels[0]?.channelId ?? null;
+
+    const results = await Promise.allSettled(
+      notifs.map((notif) => {
+        const isOrigin = notif.isOrigin !== false;
+        const voiceId = lobbyVoiceId ?? notif.voiceChannelId ?? null;
+        return this.editRoomPanel(
+          roomId,
+          notif,
+          buildRoomProgressPanel(snapshot, {
+            lobbyUrl,
+            resultUrl,
+            voiceUrl:
+              isOrigin && voiceId
+                ? `https://discord.com/channels/${notif.guildId}/${voiceId}`
+                : null,
+            originGuildName: isOrigin ? null : (notif.originGuildName ?? null),
+          }),
+        );
+      }),
+    );
+
+    // 실제로 고친 게 있을 때만 캐시 수명(24시간)을 늘린다. 30초 동기화가
+    // 바뀐 것도 없는데 매번 Redis 에 쓰지 않게 한다.
+    if (
+      results.some((result) => result.status === "fulfilled" && result.value)
+    ) {
+      this.storeRoomNotifications(roomId, notifs);
+    }
+  }
+
+  /**
+   * 진행 패널에 그릴 스냅샷.
+   *
+   * 롤은 대진(시리즈)과 세트 스코어, 배그는 스크림 순위를 붙인다. 배그 순위
+   * 계산은 규칙이 복잡해(SUPER 동점 처리 등) 여기서 다시 짜지 않고
+   * ScrimService 가 넘겨준 제공자를 쓴다(setScrimProgressProvider).
+   */
+  private async loadRoomProgressSnapshot(
+    roomId: string,
+    room: Parameters<DiscordBotService["renderProgressPanels"]>[2],
+  ): Promise<RoomProgressSnapshot> {
+    const isPubg = room.gameTitle === "PUBG";
+    const [teams, seriesRows, scrim] = await Promise.all([
+      this.prisma.team.findMany({
+        where: { roomId },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          name: true,
+          captainId: true,
+          captain: { select: { username: true } },
+          members: {
+            orderBy: { joinedAt: "asc" },
+            select: { userId: true, user: { select: { username: true } } },
+          },
+        },
+      }),
+      isPubg
+        ? Promise.resolve([])
+        : this.prisma.matchSeries.findMany({
+            where: { roomId },
+            orderBy: [{ round: "asc" }, { matchNumber: "asc" }],
+            select: {
+              round: true,
+              matchNumber: true,
+              bracketRound: true,
+              bracketType: true,
+              teamAId: true,
+              teamBId: true,
+              bestOf: true,
+              status: true,
+              winnerId: true,
+              teamA: { select: { name: true } },
+              teamB: { select: { name: true } },
+              matches: { select: { winnerId: true } },
+            },
+          }),
+      isPubg && this.scrimProgressProvider
+        ? this.scrimProgressProvider(roomId).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
+    const status = room.status as RoomProgressStatus;
+    return {
+      roomName: roomDisplayName(room as any),
+      hostName: room.host.username,
+      gameTitle: isPubg ? "PUBG" : "LOL",
+      teamMode: room.teamMode,
+      isPrivate: room.isPrivate,
+      status,
+      finishedAt:
+        room.completedAt ?? (status === "COMPLETED" ? room.updatedAt : null),
+      teams: teams.map((team) => ({
+        id: team.id,
+        name: team.name,
+        captainName: team.captain?.username ?? null,
+        // 팀장도 TeamMember 로 들어가 있다. 명단에서 두 번 나오지 않게 뺀다.
+        members: team.members
+          .filter((member) => member.userId !== team.captainId)
+          .map((member) => member.user.username),
+      })),
+      series: seriesRows.map((row) => ({
+        round: row.round,
+        matchNumber: row.matchNumber,
+        bracketRound: row.bracketRound,
+        bracketType: row.bracketType,
+        teamAId: row.teamAId,
+        teamAName: row.teamA?.name ?? null,
+        teamBId: row.teamBId,
+        teamBName: row.teamB?.name ?? null,
+        winsA: row.matches.filter(
+          (match) => match.winnerId && match.winnerId === row.teamAId,
+        ).length,
+        winsB: row.matches.filter(
+          (match) => match.winnerId && match.winnerId === row.teamBId,
+        ).length,
+        bestOf: row.bestOf,
+        status: row.status,
+        winnerId: row.winnerId,
+      })),
+      scrim,
+    };
+  }
+
+  /**
+   * 배그 스크림 진행 상황 제공자.
+   *
+   * ScrimModule 이 DiscordModule 을 임포트하므로 반대 방향 임포트는 순환이 된다.
+   * setRoomJoiner 와 같은 세터 주입으로 받는다.
+   */
+  private scrimProgressProvider?: (
+    roomId: string,
+  ) => Promise<RoomProgressScrim | null>;
+
+  setScrimProgressProvider(
+    provider: NonNullable<DiscordBotService["scrimProgressProvider"]>,
+  ) {
+    this.scrimProgressProvider = provider;
+  }
+
+  /** 같은 방의 패널 작업을 한 줄로 세운다. 순서가 뒤집히면 옛 상태가 이긴다. */
+  private enqueueRoomPanelTask<T>(
+    roomId: string,
+    task: () => Promise<T>,
+  ): Promise<T> {
+    const previous = this.roomNotifUpdateQueue.get(roomId) ?? Promise.resolve();
+    const current = previous.catch(() => {}).then(task);
+    this.roomNotifUpdateQueue.set(roomId, current);
+    void current
+      .catch(() => {})
+      .finally(() => {
+        if (this.roomNotifUpdateQueue.get(roomId) === current) {
+          this.roomNotifUpdateQueue.delete(roomId);
+        }
+      });
+    return current;
+  }
+
+  /**
+   * 방이 지워졌을 때 공지를 "해산" 카드로 닫는다.
+   *
+   * 예전에는 캐시만 비워서, 전원이 나가 사라진 방의 공지가 "모집 중"과
+   * 참가 버튼을 단 채로 영원히 남았다. 방 데이터를 지운 뒤에 불러도 된다 —
+   * 그릴 내용은 캐시에 남아 있는 방 이름뿐이다.
+   *
+   * @returns 실제로 닫은 서버 수
+   */
+  async dissolveRoomNotification(roomId: string): Promise<number> {
+    return this.enqueueRoomPanelTask(roomId, async () => {
+      const notifs = await this.getRoomNotifications(roomId);
+      // 먼저 비워서, 뒤에 줄 선 갱신이 해산 카드를 모집 카드로 되돌리지 못하게 한다.
+      this.clearRoomNotification(roomId);
+      if (notifs.length === 0) return 0;
+
+      const results = await Promise.allSettled(
+        notifs.map((notif) =>
+          this.editRoomPanel(
+            roomId,
+            notif,
+            buildRoomDissolvedPanel(notif.roomName),
+          ),
+        ),
+      );
+      this.roomPanelSignatures.delete(roomId);
+      return results.filter(
+        (result) => result.status === "fulfilled" && result.value,
+      ).length;
+    });
+  }
+
+  /** 동기화가 30초를 넘기면 다음 회차와 겹친다. 겹치면 이번 회차를 건너뛴다. */
+  private syncingRoomPanels = false;
+
+  /**
+   * 진행 중인 방의 공지를 현재 상태로 맞춘다. DiscordScheduleService 가 30초마다 부른다.
+   *
+   * 팀 확정·경기 결과·배그 라운드 결과는 5개 서비스 20곳 가까이에서 일어난다.
+   * 그 지점마다 갱신 호출을 박으면 하나만 빠져도 패널이 멈춘다. 대신 주기적으로
+   * 다시 계산하고, 그린 결과가 바뀐 방만 수정한다(editRoomPanel).
+   * 종료된 방은 결과 정정이 반영되도록 끝나고 한동안 더 본다.
+   *
+   * @returns 확인한 방 수
+   */
+  async syncActiveRoomPanels(): Promise<number> {
+    if (this.syncingRoomPanels || !this.client?.isReady?.()) return 0;
+    this.syncingRoomPanels = true;
+    try {
+      const rooms = await this.prisma.room.findMany({
+        where: {
+          OR: [
+            {
+              status: {
+                in: [
+                  "TEAM_SELECTION",
+                  "DRAFT",
+                  "DRAFT_COMPLETED",
+                  "ROLE_SELECTION",
+                  "IN_PROGRESS",
+                ],
+              },
+            },
+            {
+              status: "COMPLETED",
+              updatedAt: {
+                gte: new Date(Date.now() - COMPLETED_PANEL_SYNC_WINDOW_MS),
+              },
+            },
+          ],
+        },
+        select: { id: true },
+      });
+      for (const room of rooms) {
+        await this.updateRoomNotification(room.id);
+      }
+      return rooms.length;
+    } finally {
+      this.syncingRoomPanels = false;
     }
   }
 
@@ -3205,49 +3525,6 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
    *
    * @returns 실제로 전송된 서버 수
    */
-  /**
-   * 내전 결과 공지.
-   *
-   * 모집 공지가 나갔던 서버·채널에 그대로 보낸다. 결과만 다른 곳에 뜨면
-   * 모집을 본 사람들이 어떻게 끝났는지 알 수 없다.
-   *
-   * @returns 실제로 전송된 서버 수
-   */
-  async sendRoomResultNotification(
-    roomId: string,
-    result: { title: string; lines: string[] },
-  ): Promise<number> {
-    const notifs = await this.getRoomNotifications(roomId);
-    if (notifs.length === 0) return 0;
-
-    const room = await this.prisma.room.findUnique({
-      where: { id: roomId },
-      select: { name: true, gameTitle: true, pubgPlatform: true },
-    });
-    if (!room) return 0;
-
-    const embed = new EmbedBuilder()
-      .setTitle(`🏆 ${roomDisplayName(room)} — ${result.title}`)
-      // 줄이 너무 많으면 임베드가 잘린다. 상위권만 남기고 끊는다.
-      .setDescription(result.lines.slice(0, 25).join("\n") || "결과 없음")
-      .setColor(0x5865f2)
-      .setTimestamp(new Date());
-
-    let sent = 0;
-    for (const notif of notifs) {
-      try {
-        await this.sendEmbedNotification(notif.guildId, notif.channelId, embed);
-        sent += 1;
-      } catch (error: unknown) {
-        // 한 서버가 실패해도 나머지에는 보낸다. 채널이 지워졌을 뿐일 수 있다.
-        console.warn(
-          `[DiscordBot] 결과 공지 실패 (${notif.guildId}): ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    }
-    return sent;
-  }
-
   async sendRoomScheduleReminder(
     roomId: string,
     phase: "1h" | "10m",
@@ -3432,6 +3709,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
 
   clearRoomNotification(roomId: string) {
     this.roomNotifMap.delete(roomId);
+    this.roomPanelSignatures.delete(roomId);
     void this.redis
       .del(`${ROOM_NOTIFICATION_CACHE_PREFIX}${roomId}`)
       .catch(() => {});

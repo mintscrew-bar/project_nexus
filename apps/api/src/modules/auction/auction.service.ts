@@ -82,6 +82,7 @@ export class AuctionService implements OnModuleInit {
     ReturnType<typeof setTimeout>
   >();
   private discordVoiceService: any; // DiscordVoiceService (optional dependency)
+  private discordBotService: any; // DiscordBotService (optional dependency) — 공지 해산용
 
   // Redis 키 상수
   private static readonly AUCTION_STATE_KEY = (roomId: string) =>
@@ -95,8 +96,10 @@ export class AuctionService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
+    @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
   ) {
     this.discordVoiceService = discordVoice;
+    this.discordBotService = discordBot;
   }
 
   /**
@@ -1841,6 +1844,15 @@ export class AuctionService implements OnModuleInit {
 
     await this.prisma.room.delete({ where: { id: roomId } });
     this.clearAuctionState(roomId);
+    // 공지를 "해산"으로 닫는다. 캐시만 남겨 두면 사라진 방의 공지가
+    // 참가 버튼을 단 채 모집 중으로 남는다. 공지 실패로 삭제가 막히면 안 된다.
+    void this.discordBotService
+      ?.dissolveRoomNotification?.(roomId)
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Discord room notification dissolve failed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
     return true;
   }
 

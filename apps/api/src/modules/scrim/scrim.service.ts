@@ -22,6 +22,7 @@ import {
 } from "@nexus/types";
 import { Inject, Optional } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import type { RoomProgressScrim } from "../discord/room-progress-panel";
 import { CreateScrimDto, SubmitRoundResultDto } from "./dto";
 import {
   COLLECT_GRACE_AFTER_CUTOFF_MS,
@@ -39,10 +40,10 @@ export class ScrimService {
 
   /** 디스코드 봇 (선택 의존). 봇이 꺼져 있어도 스크림은 굴러가야 한다. */
   private readonly discordBot?: {
-    sendRoomResultNotification: (
-      roomId: string,
-      result: { title: string; lines: string[] },
-    ) => Promise<number>;
+    updateRoomNotification: (roomId: string) => Promise<void>;
+    setScrimProgressProvider?: (
+      provider: (roomId: string) => Promise<RoomProgressScrim | null>,
+    ) => void;
   };
 
   constructor(
@@ -52,6 +53,11 @@ export class ScrimService {
     @Optional() private readonly config?: ConfigService,
   ) {
     this.discordBot = discordBot;
+    // 디스코드 공지 패널이 순위를 그릴 수 있게 넘겨준다. 순위 규칙(SUPER 동점
+    // 처리 등)을 봇 쪽에서 다시 짜면 웹 리더보드와 어긋난다.
+    this.discordBot?.setScrimProgressProvider?.((roomId) =>
+      this.getDiscordProgress(roomId),
+    );
   }
 
   /**
@@ -566,11 +572,14 @@ export class ScrimService {
 
     const finished = await this.getScrimByRoom(roomId);
 
-    // 모집 공지가 나갔던 채널에 결과를 그대로 보낸다.
+    // 결과는 새 메시지로 보내지 않고 모집 공지 패널을 "종료" 카드로 바꿔 보여준다
+    // (운영자 결정, 2026-09-22). 30초 동기화를 기다리지 않고 바로 그린다.
     // 공지 실패로 확정이 막히면 안 되므로 붙잡지 않는다.
-    void this.announceResult(roomId, finished).catch((error: Error) =>
-      this.logger.warn(`스크림 결과 공지 실패: ${error.message}`),
-    );
+    void this.discordBot
+      ?.updateRoomNotification(roomId)
+      .catch((error: Error) =>
+        this.logger.warn(`스크림 결과 패널 갱신 실패: ${error.message}`),
+      );
 
     return finished;
   }
@@ -614,23 +623,32 @@ export class ScrimService {
     return this.getScrimByRoom(roomId);
   }
 
-  /** 디스코드 결과 공지 — 누적 리더보드 상위권을 그대로 옮긴다. */
-  private async announceResult(
-    roomId: string,
-    scrim: Awaited<ReturnType<ScrimService["getScrimByRoom"]>>,
-  ) {
-    if (!this.discordBot || !scrim) return;
-    const lines = scrim.leaderboard.map(
-      (row, index) =>
-        `**${index + 1}위** ${row.teamName} — ${row.totalPoints}점 (킬 ${row.totalKills})`,
-    );
-    const rounds = scrim.rounds.filter(
-      (round) => round.status === ScrimRoundStatus.COMPLETED,
-    ).length;
-    await this.discordBot.sendRoomResultNotification(roomId, {
-      title: `배틀로얄 ${rounds}라운드 결과`,
-      lines,
+  /**
+   * 디스코드 공지 패널용 진행 상황.
+   *
+   * 웹 리더보드와 같은 getScrimByRoom 결과를 그대로 옮긴다. 순위도 이미 정렬돼 있다.
+   */
+  async getDiscordProgress(roomId: string): Promise<RoomProgressScrim | null> {
+    const scrim = await this.getScrimByRoom(roomId);
+    if (!scrim) return null;
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      select: { pubgGameMode: true },
     });
+    return {
+      status: scrim.status,
+      totalRounds: scrim.totalRounds,
+      completedRounds: scrim.rounds.filter(
+        (round) => round.status === ScrimRoundStatus.COMPLETED,
+      ).length,
+      timed: room?.pubgGameMode === "KILL_MATCH",
+      cutoffAt: scrim.cutoffAt ?? null,
+      standings: scrim.leaderboard.map((row) => ({
+        teamName: row.teamName,
+        totalPoints: row.totalPoints,
+        totalKills: row.totalKills,
+      })),
+    };
   }
 
   private async findOwnedScrim(hostId: string, roomId: string) {

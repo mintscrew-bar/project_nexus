@@ -582,6 +582,17 @@ export class RoomService {
       await tx.team.deleteMany({ where: { roomId } });
       await tx.room.delete({ where: { id: roomId } });
     });
+
+    // 방이 지워지는 길은 전부 여기로 모인다(전원 퇴장·방 전환·관리자 삭제).
+    // 공지를 "해산"으로 닫는다. 예전에는 캐시만 비워서 사라진 방의 공지가
+    // 참가 버튼을 단 채 모집 중으로 남았다. 공지 실패로 삭제가 막히면 안 된다.
+    void this.discordBotService
+      ?.dissolveRoomNotification?.(roomId)
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Discord room notification dissolve failed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
   }
 
   private shuffle<T>(items: T[]): T[] {
@@ -1931,7 +1942,6 @@ export class RoomService {
           await this.discordVoiceService.deleteRoomChannels(previousRoomId);
         }
         await this.deleteRoomData(previousRoomId);
-        this.discordBotService?.clearRoomNotification(previousRoomId);
       } catch (error) {
         this.logger.warn(
           `[Room] Failed to clean empty previous room ${previousRoomId} after room switch: ${error instanceof Error ? error.message : String(error)}`,
@@ -2212,7 +2222,6 @@ export class RoomService {
         await this.discordVoiceService.deleteRoomChannels(roomId);
       }
       await this.deleteRoomData(roomId);
-      this.discordBotService?.clearRoomNotification(roomId);
       return {
         message: "Room deleted (no participants)",
         username,
@@ -2226,7 +2235,6 @@ export class RoomService {
         await this.discordVoiceService.deleteRoomChannels(roomId);
       }
       await this.deleteRoomData(roomId);
-      this.discordBotService?.clearRoomNotification(roomId);
       return {
         message: "Room deleted (only bots remaining)",
         username,
@@ -3641,6 +3649,10 @@ export class RoomService {
       throw new BadRequestException("이미 게임 시작 처리 중입니다.");
     }
 
+    // 공지를 바로 "팀 구성 중"으로 바꾼다. 30초 동기화를 기다리면 그 사이
+    // 참가 버튼을 눌러 "이미 시작된 방" 오류를 보는 사람이 생긴다.
+    this.refreshDiscordRoomNotification(roomId);
+
     return {
       success: true,
       roomId,
@@ -3693,6 +3705,9 @@ export class RoomService {
         },
       });
     });
+
+    // 시작이 실패해 대기로 돌아왔다. 공지도 다시 모집 카드로 되돌린다.
+    this.refreshDiscordRoomNotification(roomId);
   }
 
   async sendChatMessage(userId: string, roomId: string, content: string) {
