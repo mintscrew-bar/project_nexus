@@ -546,14 +546,6 @@ export default function TournamentLobbyPage() {
   const allPlayersReady = totalPlayers > 0 && readyCount === totalPlayers;
   const pendingReadyPlayers = players.filter((p: any) => !p.isReady);
   const pendingReadyCount = pendingReadyPlayers.length;
-  const pendingReadyPreview = pendingReadyPlayers
-    .slice(0, 3)
-    .map((p: any) => p.riotAccount?.gameName ?? p.username)
-    .join(", ");
-  const pendingReadyExtra =
-    pendingReadyPlayers.length > 3
-      ? ` 외 ${pendingReadyPlayers.length - 3}명`
-      : "";
   const emptySlots = Math.max(0, room.maxParticipants - totalPlayers);
   const participantName = (participant: any) =>
     participant.riotAccount?.gameName ?? participant.username;
@@ -649,25 +641,6 @@ export default function TournamentLobbyPage() {
     !currentUserIsSpectator &&
     !currentUserParticipant?.teamId &&
     !currentUserIsReady;
-  const directModeRequirements = [
-    {
-      label: `정원 ${totalPlayers}/${room.maxParticipants}`,
-      complete: hasFullRoster,
-    },
-    ...(room.teamMode === "MANUAL_TEAM"
-      ? [
-          { label: "전원 팀 선택", complete: allPlayersAssigned },
-          {
-            label: `팀당 ${roomGame.teamSize}명`,
-            complete: manualTeamsFilled,
-          },
-        ]
-      : []),
-    {
-      label: `준비 ${readyCount}/${totalPlayers}`,
-      complete: allPlayersReady,
-    },
-  ];
   const startBlockedMessage = !hasFullRoster
     ? "설정한 정원이 모두 참가해야 시작할 수 있습니다."
     : !hasMinimumPlayers
@@ -739,6 +712,10 @@ export default function TournamentLobbyPage() {
           : "모든 참가자가 준비를 완료했습니다.",
     },
   ];
+  // 스트립 오른쪽에 막힌 이유 한 줄로 보여줄 조건 — 대기자 이름 등
+  const firstBlockingRequirement = startRequirements.find(
+    (requirement) => !requirement.complete,
+  );
   const readyBarStatus = canStart
     ? "시작 가능"
     : !hasFullRoster
@@ -748,11 +725,6 @@ export default function TournamentLobbyPage() {
         : allPlayersReady
           ? "시작 조건 확인"
           : `${pendingReadyCount}명 대기`;
-  const readyBarHint = canStart
-    ? "준비와 음성채널 확인이 완료되었습니다."
-    : pendingReadyPlayers.length > 0
-      ? `대기: ${pendingReadyPreview}${pendingReadyExtra}`
-      : (startBlockedMessage ?? "플레이어 입장을 기다리는 중입니다.");
 
   const handleReadyToggle = () => {
     if (needsManualTeamSelection) {
@@ -1097,63 +1069,73 @@ export default function TournamentLobbyPage() {
           </div>
         </header>
 
-        {/* ═══ Ready Progress Bar — 편성 확인 단계에선 이미 전원 준비 완료라 숨긴다 ═══ */}
+        {/*
+          ═══ 준비 현황 스트립 — 편성 확인 단계에선 이미 전원 준비 완료라 숨긴다 ═══
+          예전엔 상태 배지·전체/준비/대기 숫자·조건 카드·칸 바·모드별 "진행 조건"
+          배너가 같은 정보(인원·준비)를 대여섯 번 반복했다. 조건 칩 한 줄로 합친다.
+          - 모드 설명은 헤더의 모드 배지 (?) 가 이미 한다 → 여기선 안 한다
+          - 누가 준비했는지는 참가자 카드가 보여준다 → 칸 바는 없앤다
+          - 막힌 이유(대기자 이름 등)는 첫 미완료 조건의 detail 한 줄로만 보인다
+        */}
         {!isAutoBalanceReviewStage && (
           <div
             data-tour="lobby-ready-status"
-            className={`border-b px-4 py-3 lg:px-6 ${
+            className={`border-b px-4 py-2 lg:px-6 ${
               canStart
                 ? "border-accent-success/30 bg-accent-success/10"
                 : "border-bg-tertiary bg-bg-secondary/90"
             }`}
           >
-            <div className="container mx-auto flex flex-col gap-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div
-                    className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${
-                      canStart
-                        ? "bg-accent-success text-white"
-                        : "bg-bg-tertiary text-accent-primary"
-                    }`}
+            <div className="container mx-auto flex flex-col gap-2">
+              <div
+                aria-label="내전 시작 조건"
+                aria-live="polite"
+                className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5"
+              >
+                {/* 전체 상태 — 시작 가능/정원 대기/N명 대기 */}
+                <span
+                  className={`inline-flex flex-none items-center gap-1.5 text-sm font-bold ${
+                    canStart ? "text-accent-success" : "text-text-primary"
+                  }`}
+                >
+                  {canStart ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    <Clock3 className="h-4 w-4 text-accent-primary" />
+                  )}
+                  {readyBarStatus}
+                </span>
+                {/* 조건 칩 — 상세(대기자 이름 등)는 호버 툴팁으로 */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {startRequirements.map((requirement) => (
+                    <span
+                      key={requirement.id}
+                      title={requirement.detail}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                        requirement.complete
+                          ? "border-accent-success/30 bg-accent-success/10 text-accent-success"
+                          : "border-accent-warning/30 bg-accent-warning/10 text-accent-warning"
+                      }`}
+                    >
+                      {requirement.complete ? (
+                        <CheckCircle2 className="h-3 w-3 flex-none" />
+                      ) : (
+                        <Clock3 className="h-3 w-3 flex-none" />
+                      )}
+                      {requirement.label}
+                      <span className="font-bold">{requirement.value}</span>
+                    </span>
+                  ))}
+                </div>
+                {/* 막힌 이유 한 줄 — 첫 미완료 조건 기준. 좁으면 말줄임 */}
+                {firstBlockingRequirement && (
+                  <span
+                    className="min-w-0 flex-1 truncate text-xs text-text-secondary"
+                    title={firstBlockingRequirement.detail}
                   >
-                    {canStart ? (
-                      <CheckCircle2 className="h-5 w-5" />
-                    ) : (
-                      <Clock3 className="h-5 w-5" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-sm font-bold text-text-primary">
-                        준비 현황
-                      </span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                          canStart
-                            ? "bg-accent-success text-white"
-                            : "bg-bg-tertiary text-text-secondary"
-                        }`}
-                      >
-                        {readyBarStatus}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-text-secondary">
-                      {readyBarHint}
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-shrink-0">
-                  <span className="rounded-lg bg-bg-tertiary px-3 py-1.5 text-center text-xs font-semibold text-text-secondary">
-                    전체 {totalPlayers}
+                    {firstBlockingRequirement.detail}
                   </span>
-                  <span className="rounded-lg bg-accent-success/10 px-3 py-1.5 text-center text-xs font-semibold text-accent-success">
-                    준비 {readyCount}
-                  </span>
-                  <span className="rounded-lg bg-bg-tertiary px-3 py-1.5 text-center text-xs font-semibold text-text-secondary">
-                    대기 {pendingReadyCount}
-                  </span>
-                </div>
+                )}
               </div>
               {hasDiscordVoice &&
                 !currentUserIsSpectator &&
@@ -1177,119 +1159,6 @@ export default function TournamentLobbyPage() {
                     </div>
                   </div>
                 )}
-              <div
-                aria-label="내전 시작 조건"
-                aria-live="polite"
-                className={`grid gap-2 sm:grid-cols-2 ${
-                  startRequirements.length >= 4
-                    ? "xl:grid-cols-4"
-                    : "xl:grid-cols-3"
-                }`}
-              >
-                {startRequirements.map((requirement) => (
-                  <div
-                    key={requirement.id}
-                    className={`rounded-xl border px-3 py-2.5 ${
-                      requirement.complete
-                        ? "border-accent-success/25 bg-accent-success/[0.07]"
-                        : "border-accent-warning/30 bg-accent-warning/[0.07]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-text-primary">
-                        {requirement.complete ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 flex-none text-accent-success" />
-                        ) : (
-                          <Clock3 className="h-3.5 w-3.5 flex-none text-accent-warning" />
-                        )}
-                        {requirement.label}
-                      </span>
-                      <span
-                        className={`flex-none text-xs font-bold ${
-                          requirement.complete
-                            ? "text-accent-success"
-                            : "text-accent-warning"
-                        }`}
-                      >
-                        {requirement.value}
-                      </span>
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-text-secondary">
-                      {requirement.detail}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <div
-                className="grid h-4 gap-1"
-                style={{
-                  gridTemplateColumns: `repeat(${Math.max(totalPlayers, 1)}, minmax(0, 1fr))`,
-                }}
-                aria-label={`준비 ${readyCount}명, 대기 ${pendingReadyCount}명`}
-              >
-                {totalPlayers > 0 ? (
-                  players.map((player: any) => {
-                    const playerName =
-                      player.riotAccount?.gameName ?? player.username;
-                    return (
-                      <div
-                        key={player.id}
-                        title={`${playerName}: ${player.isReady ? "준비 완료" : "대기 중"}`}
-                        className={`rounded-sm transition-colors ${
-                          player.isReady
-                            ? canStart
-                              ? "bg-accent-success"
-                              : "bg-accent-primary"
-                            : "bg-bg-elevated ring-1 ring-inset ring-bg-tertiary"
-                        }`}
-                      />
-                    );
-                  })
-                ) : (
-                  <div className="rounded-sm bg-bg-elevated ring-1 ring-inset ring-bg-tertiary" />
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {requiresFullTeams && room.status === "WAITING" && (
-          <div className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 lg:px-6">
-            <div className="container mx-auto rounded-xl border border-accent-primary/20 bg-accent-primary/5 px-4 py-3">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-text-primary">
-                    {room.teamMode === "AUTO_BALANCE"
-                      ? "자동 밸런스 진행 조건"
-                      : "자유 팀 선택 진행 조건"}
-                  </p>
-                  <p className="mt-0.5 text-xs text-text-secondary">
-                    {room.teamMode === "AUTO_BALANCE"
-                      ? "정원과 준비가 완료되면 라인별 티어와 랭크·내전 기록을 반영해 팀과 역할을 함께 편성합니다."
-                      : "팀 카드를 선택해 이동하세요. 팀을 바꾸면 준비 상태가 해제되며, 모든 팀을 5명씩 채운 뒤 시작합니다."}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {directModeRequirements.map((requirement) => (
-                    <span
-                      key={requirement.label}
-                      className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                        requirement.complete
-                          ? "border-accent-success/30 bg-accent-success/10 text-accent-success"
-                          : "border-bg-elevated bg-bg-tertiary text-text-secondary"
-                      }`}
-                    >
-                      {requirement.complete ? "완료" : "대기"}{" "}
-                      {requirement.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              {needsManualTeamSelection && (
-                <p className="mt-2 text-xs font-medium text-accent-warning">
-                  준비하려면 먼저 원하는 팀을 선택하세요.
-                </p>
-              )}
             </div>
           </div>
         )}
