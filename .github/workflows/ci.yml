@@ -106,11 +106,22 @@ jobs:
   # 어떤 이미지를 새로 빌드해야 하는지 판별한다.
   # 안 바뀐 앱은 빌드 대신 직전 이미지를 이번 SHA 로 재태그한다(수 초).
   # CD 가 api/web 양쪽을 IMAGE_TAG=<sha> 로 pull 하므로 태그는 항상 존재해야 한다.
+  #
+  # 비교 기준은 "직전 push(github.event.before)"가 아니라 **각 앱의 latest 이미지가
+  # 실제로 담고 있는 커밋**(이미지 라벨 org.opencontainers.image.revision)이다.
+  # 직전 push 기준이면 CI 가 한 번 깨진 push 의 변경이 영영 빌드되지 않는다:
+  #   push A(web 변경) → lint 실패로 이미지 빌드 안 됨
+  #   push B(api 만 변경) → "web 안 바뀜" → 낡은 web:latest 를 B 로 재태그 → 운영엔 옛 화면
+  # 2026-09-22 로비 개편이 이렇게 빠졌다. 재태그는 라벨도 그대로 복사하므로
+  # 라벨은 항상 "그 이미지 코드의 출처 커밋"을 가리킨다.
   changes:
     name: 변경 범위 판별
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     outputs:
       api: ${{ steps.filter.outputs.api }}
       web: ${{ steps.filter.outputs.web }}
@@ -121,47 +132,63 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: GHCR 로그인
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: 변경 경로 분류
         id: filter
         env:
-          BASE_REF: ${{ github.event.before }}
+          IMAGE_PREFIX: ghcr.io/mintscrew-bar/project_nexus
         run: |
           set -euo pipefail
-
-          build_both() {
-            echo "$1"
-            echo "api=true" >> "$GITHUB_OUTPUT"
-            echo "web=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          }
-
-          # 기준 커밋을 모르면(첫 push, force-push 등) 판별을 포기하고 둘 다 빌드한다.
-          # 덜 빌드해서 낡은 이미지가 나가는 것보다 더 빌드해서 느린 편이 안전하다.
-          if [ -z "${BASE_REF:-}" ] \
-            || [ "$BASE_REF" = "0000000000000000000000000000000000000000" ] \
-            || ! git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null; then
-            build_both "기준 커밋 불명 → api/web 둘 다 빌드"
-          fi
-
-          CHANGED=$(git diff --name-only "$BASE_REF" "$GITHUB_SHA")
-          echo "변경 파일:"; echo "$CHANGED" | sed 's/^/  /'
 
           # 이미지에 안 들어가는 경로. 여기만 바뀌었으면 어느 이미지도 새로 만들 필요가 없다.
           # nginx.conf 는 bind mount, systemd/scripts 는 호스트 파일이다.
           IGNORE_RE='^(docs|scripts|systemd|nginx|load-test|tools|\.github)/|\.md$'
 
-          # apps/api, apps/web 어느 쪽도 아니면서 무시 대상도 아닌 것 = 공용
-          # (packages/, pnpm-lock.yaml, package.json, turbo.json 등) → 둘 다 영향
-          SHARED=$(echo "$CHANGED" | grep -Ev '^apps/(api|web)/' | grep -Ev "$IGNORE_RE" || true)
-          if [ -n "$SHARED" ]; then
-            echo "공용 파일 변경:"; echo "$SHARED" | sed 's/^/  /'
-            build_both "→ api/web 둘 다 빌드"
-          fi
+          # latest 이미지 라벨에서 출처 커밋을 읽는다. 없으면(라벨 도입 전 이미지, 이미지 없음) 빈 값.
+          # 인덱스(attestation 포함)여도 imagetools 는 실제 플랫폼 하나만 .Image 로 보여준다.
+          image_revision() {
+            docker buildx imagetools inspect "${IMAGE_PREFIX}/$1:latest" --format '{{json .Image}}' 2>/dev/null \
+              | jq -r 'if has("config") then . else .["linux/amd64"] end
+                       | .config.Labels // {} | .["org.opencontainers.image.revision"] // empty' \
+              || true
+          }
 
-          API=false; WEB=false
-          echo "$CHANGED" | grep -qE '^apps/api/' && API=true
-          echo "$CHANGED" | grep -qE '^apps/web/' && WEB=true
+          # 앱 하나를 판별한다. 확실하지 않으면 빌드한다 —
+          # 덜 빌드해서 낡은 이미지가 나가는 것보다 더 빌드해서 느린 편이 안전하다.
+          decide() {
+            local app="$1" base
+            base=$(image_revision "$app")
+            if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              echo "[$app] latest 출처 커밋 불명(${base:-라벨 없음}) → 빌드" >&2
+              echo true; return
+            fi
+            local changed
+            changed=$(git diff --name-only "$base" "$GITHUB_SHA")
+            # 같은 커밋 재실행 등 변경이 없으면 빈 줄이 공용 변경으로 잡히지 않게 먼저 끝낸다
+            if [ -z "$changed" ]; then
+              echo "[$app] 기준 ${base:0:7} 이후 변경 없음" >&2
+              echo false; return
+            fi
+            echo "[$app] 기준 ${base:0:7} 이후 변경:" >&2
+            echo "$changed" | sed 's/^/  /' >&2
+            # 이 앱 경로, 또는 어느 앱도 아니면서 무시 대상도 아닌 공용 파일
+            # (packages/, pnpm-lock.yaml, package.json, turbo.json 등)
+            if echo "$changed" | grep -qE "^apps/${app}/" \
+              || echo "$changed" | grep -Ev '^apps/(api|web)/' | grep -Evq "$IGNORE_RE"; then
+              echo true
+            else
+              echo false
+            fi
+          }
 
+          API=$(decide api)
+          WEB=$(decide web)
           echo "api=$API" >> "$GITHUB_OUTPUT"
           echo "web=$WEB" >> "$GITHUB_OUTPUT"
           echo "판별 결과 — api 빌드: $API / web 빌드: $WEB"
@@ -233,6 +260,8 @@ jobs:
           file: apps/api/Dockerfile
           push: true
           platforms: linux/amd64
+          # 변경 판별(changes 잡)이 이 라벨을 기준 커밋으로 쓴다
+          labels: org.opencontainers.image.revision=${{ github.sha }}
           tags: |
             ${{ env.IMAGE_PREFIX }}/api:latest
             ${{ env.IMAGE_PREFIX }}/api:${{ github.sha }}
@@ -250,6 +279,8 @@ jobs:
           file: apps/web/Dockerfile
           push: true
           platforms: linux/amd64
+          # 변경 판별(changes 잡)이 이 라벨을 기준 커밋으로 쓴다
+          labels: org.opencontainers.image.revision=${{ github.sha }}
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_UPLOADS_BASE_URL=${{ vars.NEXT_PUBLIC_UPLOADS_BASE_URL }}
