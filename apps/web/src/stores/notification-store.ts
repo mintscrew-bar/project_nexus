@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { toast } from "@/stores/toast-store";
+import { toast, useToastStore } from "@/stores/toast-store";
 import { notificationApi } from "@/lib/api-client";
 import {
   connectNotificationSocket,
@@ -55,6 +55,18 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         notifications: [notification, ...state.notifications],
         unreadCount: state.unreadCount + 1,
       }));
+      // 방장의 호출은 지금 행동해야 하는 알림이다. 종 아이콘 숫자만 올리면
+      // 로비를 보고 있어도 모르고 지나친다 — 화면에 바로 띄운다.
+      if (notification.data?.kind === "ROOM_NUDGE") {
+        useToastStore
+          .getState()
+          .addToast(
+            `📣 ${notification.title} — ${notification.message}`,
+            "warning",
+            12000,
+            { actionable: true },
+          );
+      }
     });
 
     // Listen for unread count updates
@@ -63,10 +75,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     });
 
     // Track connection state on reconnect/disconnect (기존 핸들러 제거 후 등록)
-    socket?.off('connect');
-    socket?.off('disconnect');
-    socket?.on('connect', () => set({ isConnected: true }));
-    socket?.on('disconnect', () => set({ isConnected: false }));
+    socket?.off("connect");
+    socket?.off("disconnect");
+    socket?.on("connect", () => set({ isConnected: true }));
+    socket?.on("disconnect", () => set({ isConnected: false }));
 
     // Fetch initial data
     get().fetchNotifications();
@@ -81,7 +93,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   fetchNotifications: async (limit = 20, offset = 0) => {
     set({ isLoading: true });
     try {
-      const notifications = await notificationApi.getNotifications(limit, offset);
+      const notifications = await notificationApi.getNotifications(
+        limit,
+        offset,
+      );
       set({ notifications, isLoading: false });
     } catch (error) {
       toast.error("알림을 불러오지 못했습니다.");
@@ -104,12 +119,16 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     try {
       await notificationApi.markAsRead(notificationId);
       set((state) => {
-        const wasUnread = state.notifications.find((n) => n.id === notificationId && !n.isRead);
+        const wasUnread = state.notifications.find(
+          (n) => n.id === notificationId && !n.isRead,
+        );
         return {
           notifications: state.notifications.map((n) =>
-            n.id === notificationId ? { ...n, isRead: true } : n
+            n.id === notificationId ? { ...n, isRead: true } : n,
           ),
-          unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount,
+          unreadCount: wasUnread
+            ? Math.max(0, state.unreadCount - 1)
+            : state.unreadCount,
         };
       });
     } catch (error) {
@@ -135,7 +154,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     try {
       await notificationApi.deleteNotification(notificationId);
       set((state) => ({
-        notifications: state.notifications.filter((n) => n.id !== notificationId),
+        notifications: state.notifications.filter(
+          (n) => n.id !== notificationId,
+        ),
       }));
     } catch (error) {
       toast.error("알림 삭제에 실패했습니다.");

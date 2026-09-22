@@ -9,6 +9,7 @@
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { startBlocked } from "../room/start-blocked";
 import { RedisService } from "../redis/redis.service";
 import { Prisma } from "@prisma/client";
 import { RoomStatus, TeamCaptainSelection, TeamMode } from "@nexus/database";
@@ -449,8 +450,12 @@ export class AuctionService implements OnModuleInit {
     // 팀 수는 게임별 팀 인원으로 나눈다(롤 5인, 배그 4인).
     // 최소 인원은 게임과 무관한 하한값 — 정원이 덜 차도 돌려볼 수 있게 둔다.
     if (room.participants.length < MIN_AUCTION_PLAYERS) {
+      // 화면 토스트가 영어 문구를 기술 오류로 보고 덮어써서 한국어로 바꿨다.
       throw new BadRequestException(
-        `Auction mode requires at least ${MIN_AUCTION_PLAYERS} players`,
+        startBlocked(
+          "ROSTER",
+          `경매는 최소 ${MIN_AUCTION_PLAYERS}명이 있어야 시작할 수 있습니다. (현재 ${room.participants.length}명)`,
+        ),
       );
     }
     // 배그는 정원이 차야 편성을 시작한다. 자동 밸런스·자유 팀 선택과 같은 규칙이다.
@@ -461,7 +466,10 @@ export class AuctionService implements OnModuleInit {
       room.participants.length !== room.maxParticipants
     ) {
       throw new BadRequestException(
-        `모든 팀 자리가 채워져야 경매를 시작할 수 있습니다. (현재 ${room.participants.length}/${room.maxParticipants}명)`,
+        startBlocked(
+          "ROSTER",
+          `모든 팀 자리가 채워져야 경매를 시작할 수 있습니다. (현재 ${room.participants.length}/${room.maxParticipants}명)`,
+        ),
       );
     }
     const numTeams = teamCountForRoster(

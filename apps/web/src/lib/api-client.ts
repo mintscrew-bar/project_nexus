@@ -899,6 +899,25 @@ export const roomApi = {
     return response.data;
   },
 
+  /**
+   * 로비 호출 — 시작을 막고 있는 참가자에게 사이트 알림 + 디스코드 DM.
+   * 같은 사유는 방당 60초에 한 번만 된다(서버가 막는다).
+   */
+  nudge: async (
+    roomId: string,
+    reason: "READY" | "VOICE",
+  ): Promise<{
+    targets: number;
+    siteNotified: number;
+    dmDelivered: number;
+    cooldownSeconds: number;
+  }> => {
+    const response = await apiClient.post(`/rooms/${roomId}/nudge`, {
+      reason,
+    });
+    return response.data;
+  },
+
   kick: async (roomId: string, participantId: string) => {
     const response = await apiClient.delete(
       `/rooms/${roomId}/participants/${participantId}`,

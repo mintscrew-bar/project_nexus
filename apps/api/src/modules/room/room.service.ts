@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
+import { startBlocked } from "./start-blocked";
 import { ShutdownService } from "../common/shutdown.service";
 import {
   RoomStatus,
@@ -1445,6 +1446,12 @@ export class RoomService {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },
       include: {
+        // 로비 시작 조건 모달의 "대기실 링크 복사"에 쓴다.
+        discordChannels: {
+          where: { teamName: "Lobby" },
+          select: { channelId: true },
+          take: 1,
+        },
         host: {
           select: {
             id: true,
@@ -1589,7 +1596,20 @@ export class RoomService {
       throw new NotFoundException("Room not found");
     }
 
-    return this.transformRoomData(room);
+    // 방 대기실 음성 채널 링크. 방 서버가 없으면 넥서스 홈 서버다
+    // (discord-voice.service resolveRoomGuildId 와 같은 규칙).
+    const lobbyChannelId = room.discordChannels?.[0]?.channelId;
+    const guildId =
+      room.discordGuildId ||
+      this.configService.get<string>("DISCORD_GUILD_ID") ||
+      null;
+    return {
+      ...this.transformRoomData(room),
+      discordLobbyUrl:
+        lobbyChannelId && guildId
+          ? `https://discord.com/channels/${guildId}/${lobbyChannelId}`
+          : null,
+    };
   }
 
   private readonly validRoomStatuses = new Set<RoomStatus>([
@@ -3570,6 +3590,8 @@ export class RoomService {
       include: {
         participants: {
           where: { role: "PLAYER" },
+          // 거절 사유에 "누가" 막고 있는지 이름을 싣는다(로비 모달이 그대로 보여준다).
+          include: { user: { select: { username: true } } },
         },
       },
     });
@@ -3596,9 +3618,13 @@ export class RoomService {
       // 알 수 없었다 (2026-09-20 제보).
       const notReady = room.participants.filter(
         (p: (typeof room.participants)[number]) => !p.isReady,
-      ).length;
+      );
       throw new BadRequestException(
-        `아직 준비하지 않은 참가자가 ${notReady}명 있습니다.`,
+        startBlocked(
+          "READY",
+          `아직 준비하지 않은 참가자가 ${notReady.length}명 있습니다.`,
+          notReady.map((p) => p.user?.username ?? ""),
+        ),
       );
     }
 
@@ -3608,21 +3634,33 @@ export class RoomService {
       room.participants.length !== room.maxParticipants
     ) {
       throw new BadRequestException(
-        "이 모드는 모든 팀 자리가 채워져야 시작할 수 있습니다.",
+        startBlocked(
+          "ROSTER",
+          "이 모드는 모든 팀 자리가 채워져야 시작할 수 있습니다.",
+        ),
       );
     }
 
     if (room.teamMode === TeamMode.MANUAL_TEAM) {
-      if (room.participants.some((participant) => !participant.teamId)) {
+      const unassigned = room.participants.filter(
+        (participant) => !participant.teamId,
+      );
+      if (unassigned.length > 0) {
         throw new BadRequestException(
-          "모든 플레이어가 팀을 선택한 뒤 시작해주세요.",
+          startBlocked(
+            "TEAMS",
+            "모든 플레이어가 팀을 선택한 뒤 시작해주세요.",
+            unassigned.map((p) => p.user?.username ?? ""),
+          ),
         );
       }
       if (
         new Set(room.participants.map((participant) => participant.teamId))
           .size < 2
       ) {
-        throw new BadRequestException("최소 두 팀에 플레이어가 있어야 합니다.");
+        throw new BadRequestException(
+          startBlocked("TEAMS", "최소 두 팀에 플레이어가 있어야 합니다."),
+        );
       }
     }
 
@@ -3632,7 +3670,12 @@ export class RoomService {
       if (!voiceValidation.valid) {
         const missing = voiceValidation.missingUsernames.join(", ");
         throw new BadRequestException({
-          message: `음성채널 미참가 유저가 있습니다: ${missing}`,
+          ...startBlocked(
+            "VOICE",
+            `음성채널 미참가 유저가 있습니다: ${missing}`,
+            voiceValidation.missingUsernames,
+          ),
+          // 옛 클라이언트 호환. 새 화면은 reason/missingUsers 를 본다.
           missingVoiceUsers: voiceValidation.missingUsernames,
         });
       }

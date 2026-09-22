@@ -78,6 +78,8 @@ export interface Room {
   battleRoyaleRounds?: number;
   /** 방이 속한 게임. 로비 링크·팀 인원·표시 항목이 여기서 갈린다. */
   gameTitle?: "LOL" | "PUBG";
+  /** 방 Discord 대기실 음성 채널 링크. 채널이 아직 없으면 null */
+  discordLobbyUrl?: string | null;
   /** 배그 방에서만 채워진다 — 스팀(스배) / 카카오(카배) */
   pubgPlatform?: "STEAM" | "KAKAO" | null;
   /** 배그 방에서만 — 편성 뒤에 대진표로 갈지 스크림으로 갈지가 여기서 갈린다 */
@@ -119,6 +121,13 @@ export interface StartGameError {
   message: string;
   // 음성채널 미참가 유저 목록 (Discord 채널 있는 방에서만 존재)
   missingVoiceUsers?: string[];
+  /**
+   * 시작 조건 미충족 사유(서버 start-blocked.ts). 있으면 "오류"가 아니라
+   * 로비에서 풀어야 하는 조건이다 — 화면은 토스트 대신 시작 조건 모달을 띄운다.
+   */
+  reason?: "READY" | "ROSTER" | "TEAMS" | "VOICE";
+  /** 막고 있는 사람 이름 */
+  missingUsers?: string[];
 }
 
 interface LobbyStoreState {
@@ -421,6 +430,8 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
           onError({
             message: response.error || "게임 시작에 실패했습니다.",
             missingVoiceUsers: response.missingVoiceUsers,
+            reason: response.reason,
+            missingUsers: response.missingUsers,
           });
         }
       });

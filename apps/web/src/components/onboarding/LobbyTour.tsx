@@ -68,7 +68,8 @@ function buildSteps(game: GameTitle): GuidedTourStep[] {
       selector: '[data-tour="lobby-ready-status"]',
       eyebrow: EYEBROW,
       title: "시작 조건",
-      description: START_RULES[game],
+      // 방장이 조건이 안 맞은 채로 시작을 누르면 모달이 뜬다(StartBlockedModal).
+      description: `${START_RULES[game]} 조건이 남은 채로 시작을 누르면 남은 항목과 '호출' 버튼이 뜹니다.`,
     },
     {
       eyebrow: EYEBROW,

@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { randomInt } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
+import { startBlocked } from "./start-blocked";
 import { RoomStatus, TeamMode, TeamCaptainSelection } from "@nexus/database";
 import { Prisma } from "@prisma/client";
 import {
@@ -110,7 +111,10 @@ export class SnakeDraftService {
     const minPlayers = minDraftParticipants(room.gameTitle);
     if (room.participants.length < minPlayers) {
       throw new BadRequestException(
-        `Need at least ${minPlayers} players for draft`,
+        startBlocked(
+          "ROSTER",
+          `스네이크 드래프트는 최소 ${minPlayers}명이 있어야 시작할 수 있습니다. (현재 ${room.participants.length}명)`,
+        ),
       );
     }
     // 배그는 정원이 차야 편성을 시작한다. 자동 밸런스·자유 팀 선택과 같은 규칙이다.
@@ -121,7 +125,10 @@ export class SnakeDraftService {
       room.participants.length !== room.maxParticipants
     ) {
       throw new BadRequestException(
-        `모든 팀 자리가 채워져야 드래프트를 시작할 수 있습니다. (현재 ${room.participants.length}/${room.maxParticipants}명)`,
+        startBlocked(
+          "ROSTER",
+          `모든 팀 자리가 채워져야 드래프트를 시작할 수 있습니다. (현재 ${room.participants.length}/${room.maxParticipants}명)`,
+        ),
       );
     }
     const numTeams = teamCountForRoster(

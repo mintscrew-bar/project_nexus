@@ -865,6 +865,19 @@ export class RoomGateway
         "missingVoiceUsers" in errorResponse
           ? errorResponse.missingVoiceUsers
           : undefined;
+      // 시작 조건 미충족(start-blocked.ts). 로비는 이 코드로 "무엇이 막혔는지"를
+      // 판단해 모달에 그대로 보여준다. 코드가 없으면 진짜 오류다.
+      const startBlocked =
+        typeof errorResponse === "object" &&
+        errorResponse !== null &&
+        "reason" in errorResponse
+          ? {
+              reason: (errorResponse as any).reason as string,
+              missingUsers: Array.isArray((errorResponse as any).missingUsers)
+                ? ((errorResponse as any).missingUsers as string[])
+                : [],
+            }
+          : undefined;
 
       // 실패를 반드시 남긴다. 전에는 아무 기록도 없어서, 방장이 "시작이 안 된다"고
       // 해도 서버에서는 원인을 확인할 방법이 없었다 (2026-09-20).
@@ -876,6 +889,7 @@ export class RoomGateway
       return {
         error: errorMessage,
         ...(missingVoiceUsers ? { missingVoiceUsers } : {}),
+        ...(startBlocked ?? {}),
       };
     } finally {
       this.startingRooms.delete(data.roomId);

@@ -1165,6 +1165,11 @@ export class DiscordVoiceService {
    */
   async validateVoicePresence(
     roomId: string,
+    /**
+     * true 면 준비 여부와 상관없이 선수 전원을 본다. 시작 검증은 준비한 사람만
+     * 보지만, 로비 "대기실 호출"은 아직 준비 안 한 사람도 미리 불러야 한다.
+     */
+    options: { includeNotReady?: boolean } = {},
   ): Promise<{ valid: boolean; missingUsernames: string[] }> {
     const guildId = await this.resolveRoomGuildId(roomId);
     if (!guildId) {
@@ -1206,7 +1211,9 @@ export class DiscordVoiceService {
 
     // 방 참가자 중 Discord 연동 유저 목록 조회
     const participants = await this.prisma.roomParticipant.findMany({
-      where: { roomId, isReady: true },
+      where: options.includeNotReady
+        ? { roomId, role: "PLAYER" }
+        : { roomId, isReady: true },
       include: {
         user: {
           select: {

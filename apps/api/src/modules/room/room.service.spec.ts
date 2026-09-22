@@ -1335,6 +1335,67 @@ describe("RoomService", () => {
       }
     });
   });
+  describe("startGame — 거절 사유 코드", () => {
+    // 로비 모달은 문구가 아니라 reason 으로 무엇이 막혔는지 판단한다.
+    const player = (id: string, username: string, isReady: boolean) => ({
+      id,
+      userId: id,
+      isReady,
+      teamId: null,
+      user: { username },
+    });
+    const room = (participants: ReturnType<typeof player>[]) => ({
+      id: "room-1",
+      hostId: "host",
+      status: RoomStatus.WAITING,
+      teamMode: TeamMode.AUCTION,
+      maxParticipants: 10,
+      participants,
+    });
+
+    const rejection = async () => {
+      try {
+        await service.startGame("host", "room-1");
+      } catch (error: any) {
+        return error.getResponse();
+      }
+      throw new Error("시작이 거절되지 않았다");
+    };
+
+    it("준비 안 한 선수가 있으면 READY 와 그 이름을 싣는다", async () => {
+      prisma.room.findUnique.mockResolvedValue(
+        room([
+          player("host", "방장", true),
+          player("u1", "철수", false),
+          player("u2", "영희", false),
+        ]),
+      );
+
+      await expect(rejection()).resolves.toMatchObject({
+        reason: "READY",
+        message: "아직 준비하지 않은 참가자가 2명 있습니다.",
+        missingUsers: ["철수", "영희"],
+      });
+    });
+
+    it("음성 대기실에 없는 선수가 있으면 VOICE 와 옛 필드를 같이 싣는다", async () => {
+      prisma.room.findUnique.mockResolvedValue(
+        room([player("host", "방장", true), player("u1", "철수", true)]),
+      );
+      (service as any).discordVoiceService = {
+        validateVoicePresence: jest
+          .fn()
+          .mockResolvedValue({ valid: false, missingUsernames: ["철수"] }),
+      };
+
+      await expect(rejection()).resolves.toMatchObject({
+        reason: "VOICE",
+        missingUsers: ["철수"],
+        missingVoiceUsers: ["철수"],
+      });
+    });
+  });
+
   describe("updateRoomSettings — 정원 검증", () => {
     const pubgRoom = (mode: string, maxParticipants: number) => ({
       id: "room-1",

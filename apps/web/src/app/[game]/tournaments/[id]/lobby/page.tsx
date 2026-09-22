@@ -8,6 +8,7 @@ import {
   getRoomStagePath,
   getTeamModeStagePath,
   minDraftParticipants,
+  pubgRoomTitle,
   type GameTitle,
 } from "@nexus/types";
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -38,7 +39,6 @@ import {
   Swords,
   Share2,
   CheckCircle2,
-  AlertCircle,
   Clock3,
   Headphones,
   Radio,
@@ -55,6 +55,10 @@ import {
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { LobbyTour } from "@/components/onboarding/LobbyTour";
+import {
+  StartBlockedModal,
+  type ServerStartBlock,
+} from "./_components/StartBlockedModal";
 import { LobbyParticipantsList } from "./_components/LobbyParticipantsList";
 import { AutoBalanceReview } from "./_components/AutoBalanceReview";
 import { LobbyErrorState } from "./_components/LobbyErrorState";
@@ -145,13 +149,13 @@ export default function TournamentLobbyPage() {
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const previousMessageCountRef = useRef(messages.length);
   const [connectTimedOut, setConnectTimedOut] = useState(false);
-  // 시작 조건 불충족은 사라지는 토스트가 아니라 준비 현황 안에 남겨 보여준다.
-  // 서버와 화면 상태가 잠깐 어긋나 시작 요청이 거절된 경우에도 방장이
-  // 무엇을 고쳐야 하는지 같은 자리에서 확인할 수 있다.
-  const [startValidationError, setStartValidationError] = useState<
-    string | null
-  >(null);
-  const startRequirementsRef = useRef<HTMLDivElement>(null);
+  // 시작 조건이 안 맞은 채로 "내전 시작"을 누르면 모달로 막힌 항목·사람·호출
+  // 버튼을 보여준다(StartBlockedModal). 사라지는 토스트로는 무엇을 고쳐야
+  // 하는지 인식하지 못했다(2026-09-22 운영자 제보).
+  const [startBlockOpen, setStartBlockOpen] = useState(false);
+  // 서버가 거절한 사유. 화면 판정만으로 연 모달이면 null 이다.
+  const [serverStartBlock, setServerStartBlock] =
+    useState<ServerStartBlock | null>(null);
   // "다시 시도"를 누를 때마다 증가시켜 connect 이펙트를 재실행한다.
   const [retryNonce, setRetryNonce] = useState(0);
   const hasRedirected = useRef(false);
@@ -194,9 +198,9 @@ export default function TournamentLobbyPage() {
   }, [roomId]); // 새 방에서는 이전 방의 읽지 않은 개수를 이어가지 않는다.
 
   useEffect(() => {
-    // 참가·준비·음성 상태가 바뀌면 이전 실패 문구는 더 이상 사실이 아닐 수
-    // 있다. 체크리스트의 최신 계산 결과만 남긴다.
-    setStartValidationError(null);
+    // 참가·준비·음성 상태가 바뀌면 서버가 준 거절 사유는 더 이상 사실이 아닐
+    // 수 있다. 모달은 체크리스트의 최신 계산으로 돌아간다.
+    setServerStartBlock(null);
   }, [room?.participants, room?.status, room?.teamMode]);
 
   useEffect(() => {
@@ -589,6 +593,15 @@ export default function TournamentLobbyPage() {
   );
   const playersInVoiceCount =
     voiceTrackedPlayers.length - playersOutsideVoice.length;
+  // 음성 상태를 아직 모르는 참가자. 막 들어와 봇이 확인하기 전이거나 조회가
+  // 실패한 경우다. 화면은 이들을 막지 않지만 서버는 실제로 확인한다 — 시작이
+  // 거절되면 모달이 서버 판정을 보여준다. 체크리스트에는 "확인 중"으로 남긴다.
+  const playersVoiceUnknown = hasDiscordVoice
+    ? players.filter(
+        (p: any) =>
+          p.inVoice === undefined && !/^testbot_\d+$/.test(p.username),
+      )
+    : [];
   // Discord 채널이 있는 경우, 준비된 참가자 중 botbot이 아닌 유저가 모두 음성채널에 있어야 시작 가능
   const allInVoice =
     !hasDiscordVoice ||
@@ -709,7 +722,9 @@ export default function TournamentLobbyPage() {
             detail:
               playersOutsideVoice.length > 0
                 ? `미입장: ${summarizeParticipants(playersOutsideVoice)}`
-                : "전원이 『방 제목』 카테고리의 대기실에 들어왔습니다.",
+                : playersVoiceUnknown.length > 0
+                  ? `확인 중: ${summarizeParticipants(playersVoiceUnknown)}`
+                  : "전원이 『방 제목』 카테고리의 대기실에 들어왔습니다.",
           },
         ]
       : []),
@@ -738,16 +753,6 @@ export default function TournamentLobbyPage() {
     : pendingReadyPlayers.length > 0
       ? `대기: ${pendingReadyPreview}${pendingReadyExtra}`
       : (startBlockedMessage ?? "플레이어 입장을 기다리는 중입니다.");
-
-  const revealStartRequirement = (message: string) => {
-    setStartValidationError(message);
-    requestAnimationFrame(() => {
-      startRequirementsRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    });
-  };
 
   const handleReadyToggle = () => {
     if (needsManualTeamSelection) {
@@ -919,6 +924,16 @@ export default function TournamentLobbyPage() {
   return (
     <>
       <LobbyTour gameTitle={room.gameTitle as GameTitle} />
+      {isCurrentUserHost && (
+        <StartBlockedModal
+          isOpen={startBlockOpen}
+          onClose={() => setStartBlockOpen(false)}
+          roomId={room.id}
+          requirements={startRequirements}
+          serverBlock={serverStartBlock}
+          lobbyVoiceUrl={room.discordLobbyUrl ?? null}
+        />
+      )}
       {/* 참가자 호버 툴팁 — overflow-hidden 탈출을 위해 페이지 최상위에서 렌더링 */}
       {hoveredPlayer && (
         <PlayerHoverCard
@@ -1149,26 +1164,25 @@ export default function TournamentLobbyPage() {
                         Discord 음성 대기실에 먼저 들어가세요
                       </p>
                       <p className="mt-0.5 text-xs leading-5 text-text-secondary">
-                        방 생성 때 선택한 Discord 서버에서 「『{room.name}』 →
-                        ── 대기실 ──」로 입장하세요. 전원이 준비하고 대기실에
-                        있어야 시작되며, 팀 확정 후 봇이 팀 채널로 자동
+                        방 생성 때 선택한 Discord 서버에서 「『
+                        {pubgRoomTitle(
+                          room.name,
+                          room.gameTitle === "PUBG" ? room.pubgPlatform : null,
+                        )}
+                        』 → ── 대기실 ──」로 입장하세요. 전원이 준비하고
+                        대기실에 있어야 시작되며, 팀 확정 후 봇이 팀 채널로 자동
                         이동시킵니다.
                       </p>
                     </div>
                   </div>
                 )}
               <div
-                ref={startRequirementsRef}
                 aria-label="내전 시작 조건"
                 aria-live="polite"
                 className={`grid gap-2 sm:grid-cols-2 ${
                   startRequirements.length >= 4
                     ? "xl:grid-cols-4"
                     : "xl:grid-cols-3"
-                } ${
-                  startValidationError
-                    ? "rounded-xl ring-2 ring-accent-warning/60 ring-offset-2 ring-offset-bg-secondary"
-                    : ""
                 }`}
               >
                 {startRequirements.map((requirement) => (
@@ -1205,15 +1219,6 @@ export default function TournamentLobbyPage() {
                   </div>
                 ))}
               </div>
-              {startValidationError && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2 rounded-lg bg-accent-warning/10 px-3 py-2 text-xs font-medium leading-5 text-accent-warning"
-                >
-                  <AlertCircle className="mt-0.5 h-4 w-4 flex-none" />
-                  <span>{startValidationError}</span>
-                </div>
-              )}
               <div
                 className="grid h-4 gap-1"
                 style={{
@@ -1497,32 +1502,37 @@ export default function TournamentLobbyPage() {
                       className={`inline-flex min-h-11 items-center justify-center rounded-lg px-6 py-2.5 text-sm font-bold text-white transition-all ${
                         canStart
                           ? "bg-accent-success hover:bg-accent-success/90 animate-glow-success"
-                          : "bg-accent-success/50 cursor-not-allowed opacity-60"
+                          : "bg-accent-success/50 opacity-70 hover:opacity-90"
                       }`}
-                      disabled={!canStart}
-                      onClick={() =>
+                      // 비활성으로 두지 않는다. 비활성 버튼은 눌러도 반응이 없어
+                      // 방장이 "왜 안 되지"를 알 방법이 없다. 조건이 안 맞으면
+                      // 누른 순간 모달로 남은 항목과 호출 버튼을 보여준다.
+                      aria-disabled={!canStart}
+                      onClick={() => {
+                        if (!canStart) {
+                          setServerStartBlock(null);
+                          setStartBlockOpen(true);
+                          return;
+                        }
                         startGame((err) => {
-                          // 준비·음성·팀 조건은 일시적인 오류가 아니라 로비에서
-                          // 계속 해결해야 하는 상태다. 사라지는 토스트 대신 상단
-                          // 체크리스트로 이동해 미완료 항목을 남겨 보여준다.
-                          if (
-                            err.missingVoiceUsers &&
-                            err.missingVoiceUsers.length > 0
-                          ) {
-                            revealStartRequirement(
-                              `Discord 대기실 미입장: ${err.missingVoiceUsers.join(", ")}`,
-                            );
-                          } else if (
-                            /준비|음성|팀|인원|자리|플레이어/.test(err.message)
-                          ) {
-                            revealStartRequirement(err.message);
+                          // 서버가 사유 코드를 주면 로비에서 풀어야 하는 조건이다
+                          // (화면은 통과로 봤지만 서버가 실제로 확인해 막은 경우).
+                          // 코드가 없으면 진짜 오류라 토스트로 알린다.
+                          if (err.reason) {
+                            setServerStartBlock({
+                              reason: err.reason,
+                              message: err.message,
+                              missingUsers:
+                                err.missingUsers ?? err.missingVoiceUsers ?? [],
+                            });
+                            setStartBlockOpen(true);
                           } else {
                             addToast(err.message, "error", 8000, {
                               actionable: true,
                             });
                           }
-                        })
-                      }
+                        });
+                      }}
                       title={startBlockedMessage}
                     >
                       내전 시작
@@ -1530,7 +1540,7 @@ export default function TournamentLobbyPage() {
                     <p className="text-right text-xs text-text-tertiary">
                       {canStart
                         ? "모든 시작 조건을 충족했습니다."
-                        : "위 시작 조건을 모두 완료하면 버튼이 활성화됩니다."}
+                        : "누르면 남은 시작 조건과 호출 버튼을 볼 수 있습니다."}
                     </p>
                   </div>
                 )}
