@@ -10,6 +10,7 @@
     "room:capacity": "node scripts/room-capacity.js",
     "room:realistic": "node scripts/room-realistic.js",
     "room:concurrent": "node scripts/room-concurrent.js",
+    "room:auction": "node scripts/room-auction.js",
     "socket:chat": "node scripts/socket-load.js"
   },
   "devDependencies": {

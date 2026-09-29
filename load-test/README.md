@@ -22,31 +22,38 @@ curl http://localhost:4000/api/health
 ## 테스트 실행
 
 ### 1. HTTP API 부하 테스트 (권장 첫 번째)
+
 ```bash
 npm run http
 ```
+
 - 로그인 → 프로필 조회
 - 방 목록 조회
 - 클랜 정보 조회
 - 3단계 부하: 워밍업(2/s) → 일반(10/s) → 최대(30/s)
 
 ### 2. 소켓 채팅 부하 테스트
+
 ```bash
 npm run socket:chat
 ```
+
 - /clan 네임스페이스 연결 + 메시지 전송
 - JWT 인증 흐름 포함
 
 ### 3. 방 정원 안정성 테스트
+
 ```bash
 ADMIN_EMAIL=admin@nexus.dev ADMIN_PASSWORD=... npm run room:capacity
 ```
+
 - 10/15/20/30/40명 방을 순서대로 생성
 - 관리자 봇으로 정원까지 채움
 - 호스트 준비 → /room 소켓 start-game → 팀 구성 검증
 - 테스트 후 생성한 방 자동 삭제
 
 옵션:
+
 ```bash
 # 특정 정원만 반복 테스트
 ADMIN_TOKEN=... npm run room:capacity -- --counts=20,40 --repeat=3
@@ -61,9 +68,11 @@ ADMIN_TOKEN=... npm run room:capacity -- --base=https://api.example.com
 주의: 방 생성 정책상 유효한 정원은 `10, 15, 20, 30, 40`입니다.
 
 ### 4. 실제 유저 흐름 안정성 테스트
+
 ```bash
 npm run room:realistic -- --count=40
 ```
+
 - `testbot_01` ~ `testbot_40` 유저를 DB에 준비
 - 각 봇이 실제 JWT로 `/room` 소켓 연결
 - 순차 입장, 타이핑, 채팅, 준비, 게임 시작
@@ -71,12 +80,14 @@ npm run room:realistic -- --count=40
 - 브래킷 생성 후 `/match` 소켓에서 가위바위보 시작까지 진행
 
 필수 환경:
+
 ```bash
 DATABASE_URL=...
 JWT_ACCESS_SECRET=...
 ```
 
 옵션:
+
 ```bash
 # 실제 사람 입장처럼 조금 더 천천히 입장
 npm run room:realistic -- --count=40 --join-delay=500
@@ -91,12 +102,61 @@ npm run room:realistic -- --count=20 --skip-rps
 npm run room:realistic -- --count=40 --rps-matches=4
 ```
 
-### 5. 동시 다중 방 부하 테스트
+### 5. 경매 모드 안정성 테스트
+
+```bash
+npm run room:auction -- --count=20
+```
+
+2026-08-11 20인 경매방이 무너진 경로를 그대로 재현한다. 그날 터진 것들은
+경매가 **실제로 돌아가는 동안에만** 나타나서, 게임 시작까지만 보던 기존
+테스트로는 한 번도 잡히지 않았다.
+
+검증 항목:
+
+- 입찰 / 입찰 포기(fold)가 20인 규모에서 정상 동작하는가
+- **유찰된 매물이 곧바로 다시 올라오지 않는가** — 남은 매물이 전부 한 번씩
+  나온 뒤에야 재등장해야 한다 (`984c99ba`, `e8ff4ae6`).
+  이게 깨지면 같은 사람이 30초씩 연속 유찰되는 "공개처형"이 다시 생긴다.
+- **경매 도중 호스트 소켓이 끊겨도 경매가 계속 진행되는가** ← 그날 방을 죽인 경로
+- 호스트가 재접속하면 진행 중인 상태를 그대로 돌려받는가
+
+필수 환경:
+
+```bash
+DATABASE_URL=...
+JWT_ACCESS_SECRET=...
+```
+
+옵션:
+
+```bash
+# 매물당 입찰 시간(초). 5~120. 짧게 잡아야 테스트가 빨리 끝난다
+npm run room:auction -- --count=20 --bid-time=6
+
+# 팀장이 매물을 포기할 확률. 높일수록 유찰 경로가 자주 만들어진다
+npm run room:auction -- --count=20 --fold-rate=0.6
+
+# N번째 매물에서 호스트 소켓을 끊는다 (0이면 끊김 재현 생략)
+npm run room:auction -- --count=20 --disconnect-at=6
+npm run room:auction -- --count=20 --disconnect-at=0
+
+# 끊은 호스트를 다시 붙이지 않는다
+npm run room:auction -- --count=20 --no-reconnect
+```
+
+출력의 `items/bids/folds/sold/unsold`는 진행량이고, `hostDrop@N`과
+`itemsAfterDrop`이 호스트 끊김 뒤 경매가 몇 건 더 진행됐는지를 보여준다.
+`itemsAfterDrop=0`이면 끊김이 곧 경매 정지라는 뜻이라 실패로 잡힌다.
+
+### 6. 동시 다중 방 부하 테스트
+
 ```bash
 npm run room:concurrent -- --rooms=2
 npm run room:concurrent -- --rooms=3
 npm run room:concurrent -- --rooms=4
 ```
+
 - 2~4개 방을 동시에(Promise.allSettled) 생성해 서버 동시성 확인
 - 방마다 인원수 랜덤(10/15/20/30/40), 팀 모드 랜덤(AUTO_BALANCE/AUCTION/SNAKE_DRAFT/MANUAL_TEAM)
 - 봇 슬롯 격리: 방 간 봇 충돌 없음 (concbot_001~, concbot_041~, ...)
@@ -104,12 +164,14 @@ npm run room:concurrent -- --rooms=4
 - 나머지 모드: 게임 시작까지 확인 (모드별 봇 로직 미구현)
 
 필수 환경:
+
 ```bash
 DATABASE_URL=...
 JWT_ACCESS_SECRET=...
 ```
 
 옵션:
+
 ```bash
 # 반복 실행
 npm run room:concurrent -- --rooms=3 --repeat=5
@@ -121,12 +183,14 @@ npm run room:concurrent -- --rooms=4 --keep-rooms
 npm run room:concurrent -- --rooms=2 --skip-rps
 ```
 
-### 6. 브라우저 실제 흐름 테스트
+### 7. 브라우저 실제 흐름 테스트
+
 ```bash
 npm install
 npx playwright install chromium
 npm run browser:room -- --count=10
 ```
+
 - 각 테스트봇이 별도 브라우저 컨텍스트로 로그인 콜백 진입
 - 로비 페이지 렌더링, 소켓 연결, 준비 버튼 클릭
 - 방장 브라우저에서 내전 시작 클릭
@@ -134,6 +198,7 @@ npm run browser:room -- --count=10
 - 브래킷 페이지 도착 및 RPS 소켓 검증
 
 옵션:
+
 ```bash
 # 브라우저 창을 직접 보면서 실행
 npm run browser:room -- --count=10 --headful
@@ -145,14 +210,17 @@ npm run browser:room -- --count=40 --join-delay=250
 npm run browser:room -- --count=20 --skip-rps
 ```
 
-### 6. 경매 소켓 부하 테스트
+### 8. 경매 소켓 부하 테스트(레거시)
+
 ```bash
 npm run socket:auction
 ```
+
 - **주의**: `scenarios/socket-auction.yml`의 `roomId` 값을 실제 방 ID로 바꿔야 합니다.
 - /auction 네임스페이스 연결 + 입찰 이벤트
 
 ### HTML 리포트 생성
+
 ```bash
 npm run http:report
 # → report-http.html 파일 생성, 브라우저에서 열기
@@ -178,10 +246,10 @@ Codes:
 
 ## 병목 발견 시
 
-| 증상 | 원인 의심 | 조치 |
-|------|----------|------|
-| p99만 높고 p95는 정상 | 일부 DB 쿼리 느림 | Prisma 쿼리 최적화 |
-| 소켓 연결 실패 급증 | 동시 연결 한도 초과 | NestJS cors/adapter 설정 확인 |
-| 429 응답 증가 | 같은 IP/NAT의 여러 유저가 전역 제한을 공유하거나 조회 API가 과도하게 호출됨 | 응답 로그의 URL 확인, 인증 유저별 제한/엔드포인트별 제한 조정 |
-| 500 에러 증가 | DB 커넥션 풀 고갈 | PrismaClient 풀 크기 조정 |
-| 메모리 급증 | 소켓 리소스 누수 | Gateway disconnect 핸들러 점검 |
+| 증상                  | 원인 의심                                                                   | 조치                                                          |
+| --------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| p99만 높고 p95는 정상 | 일부 DB 쿼리 느림                                                           | Prisma 쿼리 최적화                                            |
+| 소켓 연결 실패 급증   | 동시 연결 한도 초과                                                         | NestJS cors/adapter 설정 확인                                 |
+| 429 응답 증가         | 같은 IP/NAT의 여러 유저가 전역 제한을 공유하거나 조회 API가 과도하게 호출됨 | 응답 로그의 URL 확인, 인증 유저별 제한/엔드포인트별 제한 조정 |
+| 500 에러 증가         | DB 커넥션 풀 고갈                                                           | PrismaClient 풀 크기 조정                                     |
+| 메모리 급증           | 소켓 리소스 누수                                                            | Gateway disconnect 핸들러 점검                                |
