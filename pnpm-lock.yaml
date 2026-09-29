@@ -178,6 +178,9 @@ importers:
       socket.io:
         specifier: ^4.7.4
         version: 4.8.3
+      socket.io-client:
+        specifier: ^4.7.4
+        version: 4.8.3
     devDependencies:
       '@nestjs/cli':
         specifier: ^11.0.19
@@ -5468,7 +5471,7 @@ packages:
       '@socket.io/component-emitter': 3.1.2
       debug: 4.4.3
       engine.io-parser: 5.2.3
-      ws: 8.21.0
+      ws: 8.21.1
       xmlhttprequest-ssl: 2.1.2
     transitivePeerDependencies:
       - bufferutil

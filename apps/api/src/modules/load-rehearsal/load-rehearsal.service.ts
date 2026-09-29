@@ -6,11 +6,13 @@ import {
   Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomService } from "../room/room.service";
 import { AdminService } from "../admin/admin.service";
 import { AuctionService } from "../auction/auction.service";
-import { TEST_BOT_USER_WHERE } from "../common/test-bot.util";
+import { TEST_BOT_USER_WHERE, isTestBotUser } from "../common/test-bot.util";
+import { RehearsalSocketCrew } from "./rehearsal-socket-crew";
 
 /**
  * 경매 리허설 — 관리자가 운영 서버에서 20인 경매를 통째로 재현한다.
@@ -45,6 +47,7 @@ export class LoadRehearsalService {
     private readonly roomService: RoomService,
     private readonly adminService: AdminService,
     private readonly auctionService: AuctionService,
+    private readonly jwtService: JwtService,
   ) {}
 
   /** 켜져 있지 않으면 엔드포인트 자체가 없는 것처럼 군다. */
@@ -148,6 +151,8 @@ export class LoadRehearsalService {
       run.setPhase("SETUP");
       await this._createHiddenRoom(run);
       await this._fillWithBots(run);
+      // 소켓은 경매 시작 전에 붙인다 — 실제 화면도 로비에서 이미 붙어 있다.
+      if (run.options.mode === "full") await this._connectBotCrew(run);
       run.setPhase("STARTING");
       await this._startAuction(run);
       run.setPhase("RUNNING");
@@ -156,8 +161,93 @@ export class LoadRehearsalService {
     } finally {
       // 성공이든 실패든 방은 반드시 치운다. 찌꺼기 방이 목록에 남으면
       // 실유저가 들어가고, 그 방은 봇으로 차 있어서 아무것도 못 한다.
+      run.crew?.disconnectAll();
       await this._cleanup(run);
     }
+  }
+
+  /**
+   * 봇 참가자 수만큼 진짜 소켓을 연다.
+   *
+   * 연결이 생겨야 브로드캐스트 팬아웃이 실제 부하로 걸리고, 무엇보다
+   * 끊을 소켓이 생긴다 — 8/11 에 방을 죽인 게 그 경로다.
+   *
+   * **봇 계정에만 붙인다.** 관리자(호스트) 몫의 소켓은 열지 않는다.
+   * 서버가 사람 계정의 토큰을 찍어낼 수 있게 되는 순간 이 코드는
+   * 리허설 도구가 아니라 사칭 수단이 된다. 낙오 재현에 필요한 건
+   * "팀장 소켓이 경매 도중 사라지는 것"이지 그게 호스트일 필요는 없다.
+   */
+  private async _connectBotCrew(run: RehearsalRun): Promise<void> {
+    const port = this.config.get<string>("PORT") || "4000";
+    const crew = new RehearsalSocketCrew(
+      `http://127.0.0.1:${port}`,
+      run.roomId!,
+    );
+    run.crew = crew;
+
+    const participants = await this.prisma.roomParticipant.findMany({
+      where: { roomId: run.roomId! },
+      select: {
+        userId: true,
+        user: {
+          select: {
+            username: true,
+            email: true,
+            role: true,
+            riotAccounts: { select: { puuid: true, tagLine: true } },
+          },
+        },
+      },
+    });
+
+    const bots = participants.filter(
+      (participant) => participant.user && isTestBotUser(participant.user),
+    );
+
+    let connected = 0;
+    for (const bot of bots) {
+      const token = await this._signForBot(bot.userId, bot.user!);
+      if (await crew.connect(bot.userId, token)) connected += 1;
+    }
+    run.log(`봇 소켓 ${connected}/${bots.length}개 연결`);
+
+    if (connected < bots.length) {
+      run.addViolation(`소켓 ${bots.length - connected}개가 붙지 못했습니다.`);
+    }
+  }
+
+  /**
+   * 봇 한 명의 접속 토큰을 만든다.
+   *
+   * 반드시 봇인지 다시 확인한다. 호출부에서 이미 걸렀더라도 여기서 한 번 더
+   * 막아야, 나중에 누가 이 함수를 다른 곳에서 부를 때 사람 계정 토큰이
+   * 찍혀 나가지 않는다. 유효기간도 리허설 한 판보다 길 이유가 없다.
+   */
+  private async _signForBot(
+    userId: string,
+    user: {
+      username?: string | null;
+      email?: string | null;
+      role?: string | null;
+      riotAccounts?: Array<{ puuid?: string | null; tagLine?: string | null }>;
+    },
+  ): Promise<string> {
+    if (!isTestBotUser(user)) {
+      throw new ForbiddenException(
+        "리허설은 봇 계정에만 접속할 수 있습니다. 사람 계정 토큰은 만들지 않습니다.",
+      );
+    }
+    return this.jwtService.signAsync(
+      {
+        sub: userId,
+        username: user.username ?? "",
+        role: "USER",
+      },
+      {
+        secret: this.config.get("JWT_ACCESS_SECRET"),
+        expiresIn: "20m",
+      },
+    );
   }
 
   /**
@@ -218,14 +308,91 @@ export class LoadRehearsalService {
       if (!state) {
         // 경매가 끝나면 상태가 사라진다.
         run.log("경매 상태 종료 — 완료로 간주");
+        if (run.dropAt > 0 && !run.dropped) {
+          run.addViolation(
+            `팀장 낙오를 재현하지 못했습니다 (매물이 ${run.itemCount}개뿐).`,
+          );
+        }
+        if (run.dropped && run.itemsAfterDrop === 0) {
+          run.addViolation(
+            "팀장이 낙오한 뒤 경매가 한 건도 진행되지 않았습니다.",
+          );
+        }
         return;
       }
 
       run.observe(state);
+      if (run.options.mode === "full") await this._maybeDropCaptain(run, state);
       await delay(500);
     }
 
     run.addViolation("경매가 제한 시간 안에 끝나지 않았습니다.");
+  }
+
+  /**
+   * 정해진 매물 순번에서 팀장 봇 하나의 소켓을 끊고, 잠시 뒤 다시 붙인다.
+   *
+   * 보려는 것 두 가지:
+   *   1. 팀장이 사라져도 경매가 계속 굴러가는가 (8/11 에는 여기서 멈췄다)
+   *   2. 돌아왔을 때 진행 중이던 상태를 그대로 돌려받는가
+   */
+  private async _maybeDropCaptain(
+    run: RehearsalRun,
+    state: any,
+  ): Promise<void> {
+    if (run.dropAt <= 0 || run.dropped) return;
+    if (run.itemCount < run.dropAt) return;
+
+    const crew = run.crew;
+    if (!crew) return;
+
+    // 팀장이면서 봇인 사람을 고른다. 지금 매물로 올라와 있는 사람은 피한다.
+    const captainId = (state?.teams ?? [])
+      .map((team: any) => team.captainId)
+      .find(
+        (id: string | null) =>
+          !!id && id !== state?.currentPlayer?.id && crew.has(id),
+      );
+    if (!captainId) return;
+
+    run.dropped = true;
+    run.droppedAtItem = run.itemCount;
+    crew.drop(captainId);
+    run.log(`팀장 소켓 강제 종료 (매물 #${run.itemCount})`);
+
+    // 재접속은 다음 매물로 넘어갈 시간을 준 뒤에 시도한다.
+    void (async () => {
+      await delay(Math.max(6000, run.options.bidTime * 1000));
+      try {
+        const bot = await this.prisma.user.findUnique({
+          where: { id: captainId },
+          select: {
+            username: true,
+            email: true,
+            role: true,
+            riotAccounts: { select: { puuid: true, tagLine: true } },
+          },
+        });
+        if (!bot) return;
+        const token = await this._signForBot(captainId, bot);
+        const restored = await crew.reconnect(captainId, token);
+        run.reconnectRestored = !!(
+          restored?.state?.currentPlayer || restored?.state
+        );
+        run.log(
+          run.reconnectRestored
+            ? "팀장 재접속 — 상태 복원 확인"
+            : "팀장 재접속 — 상태를 돌려받지 못함",
+        );
+        if (!run.reconnectRestored) {
+          run.addViolation("재접속이 진행 중 상태를 돌려받지 못했습니다.");
+        }
+      } catch (error) {
+        run.addViolation(
+          `재접속 실패: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    })();
   }
 
   private async _cleanup(run: RehearsalRun): Promise<void> {
@@ -274,6 +441,13 @@ export interface RehearsalView {
   violations: string[];
   logs: string[];
   error: string | null;
+  /** full 모드에서 붙어 있는 봇 소켓 수. light 모드는 0. */
+  socketCount: number;
+  /** 팀장을 낙오시킨 매물 순번. 재현 안 했으면 null. */
+  droppedAtItem: number | null;
+  /** 낙오 이후 진행된 매물 수. 0이면 낙오가 곧 경매 정지였다는 뜻. */
+  itemsAfterDrop: number;
+  reconnectRestored: boolean;
 }
 
 export interface RehearsalStatus {
@@ -297,6 +471,16 @@ class RehearsalRun {
   error: string | null = null;
   abortRequested = false;
 
+  /** full 모드에서만 채워진다. light 모드는 소켓이 없다. */
+  crew: RehearsalSocketCrew | null = null;
+  /** 몇 번째 매물에서 팀장을 낙오시킬지. 0이면 재현하지 않는다. */
+  dropAt = 0;
+  dropped = false;
+  droppedAtItem: number | null = null;
+  /** 낙오 이후 경매가 몇 건 더 진행됐는지. 0이면 낙오가 곧 정지라는 뜻이다. */
+  itemsAfterDrop = 0;
+  reconnectRestored = false;
+
   private readonly logs: string[] = [];
   private readonly violations: string[] = [];
   private readonly appearances: string[] = [];
@@ -312,7 +496,16 @@ class RehearsalRun {
   constructor(
     readonly adminId: string,
     readonly options: { count: number; mode: RehearsalMode; bidTime: number },
-  ) {}
+  ) {
+    // full 모드는 경매가 좀 굴러간 뒤에 낙오시킨다. 너무 이르면 팀장 선정이
+    // 끝나기도 전이라 끊을 대상이 없고, 너무 늦으면 남은 매물이 없어
+    // "계속 진행되는가"를 볼 수가 없다.
+    this.dropAt = options.mode === "full" ? 4 : 0;
+  }
+
+  get itemCount(): number {
+    return this.appearances.length;
+  }
 
   log(message: string): void {
     this.logs.push(`${new Date().toISOString().slice(11, 19)} ${message}`);
@@ -371,6 +564,7 @@ class RehearsalRun {
 
     this.lastPlayerId = playerId;
     this.appearances.push(playerId);
+    if (this.dropped) this.itemsAfterDrop += 1;
     this._checkCycle(playerId);
   }
 
@@ -430,6 +624,10 @@ class RehearsalRun {
       violations: [...this.violations],
       logs: this.logs.slice(-50),
       error: this.error,
+      socketCount: this.crew?.size ?? 0,
+      droppedAtItem: this.droppedAtItem,
+      itemsAfterDrop: this.itemsAfterDrop,
+      reconnectRestored: this.reconnectRestored,
     };
   }
 }
