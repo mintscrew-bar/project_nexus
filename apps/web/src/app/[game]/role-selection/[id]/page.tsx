@@ -58,12 +58,18 @@ export default function RoleSelectionPage() {
   useEffect(() => {
     if (GAMES[game].hasPositions) return;
     router.replace(
-      afterTeamsPath({ id: roomId, gameTitle: game, teamMode: "MANUAL_TEAM" }, gamePrefix),
+      afterTeamsPath(
+        { id: roomId, gameTitle: game, teamMode: "MANUAL_TEAM" },
+        gamePrefix,
+      ),
     );
   }, [game, roomId, gamePrefix, router]);
   const { addToast } = useToast();
   const { user } = useAuthStore();
   const hasRedirected = useRef(false);
+  const redirectRecoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const [isAborting, setIsAborting] = useState(false);
   const [isMarkingReady, setIsMarkingReady] = useState(false);
   const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
@@ -123,33 +129,84 @@ export default function RoleSelectionPage() {
     return () => disconnect();
   }, [roomId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (hasRedirected.current) return;
-    if (isCompleted) {
+  /**
+   * 역할 선택 완료는 소켓 이벤트 한 번에만 의존하면 안 된다.
+   *
+   * 브라우저가 백그라운드에 있거나 라우터 전환이 다른 렌더와 겹치면 서버에서
+   * 대진표를 정상 생성했는데도 역할 선택 화면에 남을 수 있다. 우선 App Router로
+   * 부드럽게 이동하고, 실제 URL이 바뀌지 않으면 전체 문서 이동으로 복구한다.
+   */
+  const redirectToNextStage = useCallback(
+    (target: string) => {
+      if (hasRedirected.current) return;
       hasRedirected.current = true;
       addToast("역할 선택 완료! 대진표로 이동합니다.", "success");
-      router.push(navigationTarget ?? `${gamePrefix}/tournaments/${roomId}/bracket`);
-    }
-  }, [isCompleted, navigationTarget, roomId, router, addToast, gamePrefix]);
+      router.replace(target);
+
+      if (redirectRecoveryTimerRef.current) {
+        clearTimeout(redirectRecoveryTimerRef.current);
+      }
+      redirectRecoveryTimerRef.current = setTimeout(() => {
+        if (window.location.pathname !== target) {
+          window.location.replace(target);
+        }
+      }, 1500);
+    },
+    [addToast, router],
+  );
+
+  useEffect(
+    () => () => {
+      if (redirectRecoveryTimerRef.current) {
+        clearTimeout(redirectRecoveryTimerRef.current);
+        redirectRecoveryTimerRef.current = null;
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
-    if (hasRedirected.current || isCompleted || !roomId) return;
+    if (isCompleted) {
+      redirectToNextStage(
+        navigationTarget ?? `${gamePrefix}/tournaments/${roomId}/bracket`,
+      );
+    }
+  }, [isCompleted, navigationTarget, roomId, gamePrefix, redirectToNextStage]);
+
+  useEffect(() => {
+    if (!roomId) return;
     let cancelled = false;
     const checkRoomStage = async () => {
       try {
         const currentRoom = await roomApi.getRoom(roomId);
         if (cancelled || hasRedirected.current) return;
         if (currentRoom?.status === "IN_PROGRESS") {
-          hasRedirected.current = true;
-          addToast("역할 선택 완료! 대진표로 이동합니다.", "success");
-          router.replace(gamePrefix + "/tournaments/" + roomId + "/bracket");
+          redirectToNextStage(
+            gamePrefix + "/tournaments/" + roomId + "/bracket",
+          );
         }
       } catch {}
     };
     void checkRoomStage();
     const timer = window.setInterval(checkRoomStage, 2000);
-    return () => { cancelled = true; window.clearInterval(timer); };
-  }, [isCompleted, roomId, router, addToast, gamePrefix]);
 
+    // 백그라운드 탭에서는 interval이 수십 초 이상 지연될 수 있다. 사용자가
+    // 돌아오는 순간 서버 상태를 다시 읽어 이미 생성된 대진표로 즉시 복구한다.
+    const checkOnReturn = () => {
+      if (document.visibilityState === "visible") void checkRoomStage();
+    };
+    window.addEventListener("focus", checkOnReturn);
+    window.addEventListener("pageshow", checkOnReturn);
+    document.addEventListener("visibilitychange", checkOnReturn);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", checkOnReturn);
+      window.removeEventListener("pageshow", checkOnReturn);
+      document.removeEventListener("visibilitychange", checkOnReturn);
+    };
+  }, [roomId, gamePrefix, redirectToNextStage]);
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
