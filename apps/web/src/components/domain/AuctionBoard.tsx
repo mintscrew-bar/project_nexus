@@ -20,6 +20,9 @@ import {
   SkipForward,
 } from "lucide-react";
 import { getRoleIcon } from "@/lib/role-icon";
+import { RoleTierBadges } from "./RoleTierBadges";
+import { ChampionIcon } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
+import type { RoleTier } from "@/lib/role-tier";
 import { DEFAULT_GAME, GAMES } from "@nexus/types";
 
 interface Player {
@@ -32,7 +35,10 @@ interface Player {
   mainRole?: string;
   subRole?: string;
   avatar?: string;
+  /** 주 역할 선호 픽. 본인이 매긴 순서대로 내려온다. */
   champions?: string[];
+  /** 라인별 티어. 선택 입력이라 대부분 비어 있고, 비면 아무것도 그리지 않는다. */
+  roleTiers?: RoleTier[];
 }
 
 interface Team {
@@ -527,6 +533,40 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                       </span>
                     )}
                   </div>
+
+                  {/*
+                    라인별 티어 — 본인이 입력한 사람만 나온다.
+                    RoleTierBadges 가 빈 배열이면 스스로 null 을 반환하므로
+                    미입력자는 위의 대표 티어 한 줄만 보이는 기존 모습 그대로다.
+                  */}
+                  <RoleTierBadges
+                    roleTiers={auctionState.currentPlayer.roleTiers}
+                    className="mt-2"
+                    compact
+                  />
+
+                  {/*
+                    주 역할 선호 픽 — 30초 안에 판단해야 하는 자리라
+                    전 라인을 펼치지 않고 주 역할 것만 순서대로 보여준다.
+                  */}
+                  {auctionState.currentPlayer.champions?.length ? (
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <span className="text-[10px] font-medium text-text-muted">
+                        선호 픽
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {auctionState.currentPlayer.champions.map(
+                          (championId) => (
+                            <ChampionIcon
+                              key={championId}
+                              championId={championId}
+                              size={28}
+                            />
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* 타이머 — 큰 숫자 하나로 집중 */}
@@ -829,7 +869,10 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 variant="primary"
                 onClick={handleBid}
                 disabled={
-                  disabled || !canPlaceBid || isAlreadyHighestBidder || hasFolded
+                  disabled ||
+                  !canPlaceBid ||
+                  isAlreadyHighestBidder ||
+                  hasFolded
                 }
                 isLoading={isBidding}
                 className="flex-1"
@@ -857,7 +900,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   variant="outline"
                   size="sm"
                   isLoading={isVotingItemSkip}
-                  disabled={disabled || isVotingItemSkip || isAlreadyHighestBidder}
+                  disabled={
+                    disabled || isVotingItemSkip || isAlreadyHighestBidder
+                  }
                   onClick={() => void onVoteItemSkip()}
                   title={
                     isAlreadyHighestBidder

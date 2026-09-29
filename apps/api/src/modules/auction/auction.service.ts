@@ -39,6 +39,22 @@ const MIN_AUCTION_PLAYERS = 4;
  */
 const NEUTRAL_PUBG_SCORE = 50;
 
+/**
+ * 매물 카드를 그리는 데 필요한 라이엇 계정 조회 모양.
+ *
+ * 카드에는 대표 티어 말고도 라인별 티어와 주 역할 선호 픽이 올라간다.
+ * 두 관계를 빼먹으면 카드가 조회 경로마다 다르게 그려지므로,
+ * 매물 페이로드를 만드는 모든 조회가 이 상수를 함께 쓴다.
+ */
+const AUCTION_RIOT_ACCOUNT_INCLUDE = {
+  where: { isPrimary: true },
+  include: {
+    roleTiers: true,
+    /** order 오름차순 = 본인이 매긴 선호 순서. 카드는 앞에서부터 자른다. */
+    championPreferences: { orderBy: { order: "asc" } },
+  },
+} satisfies Prisma.User$riotAccountsArgs;
+
 export interface AuctionState {
   roomId: string;
   hostId?: string;
@@ -239,6 +255,8 @@ export class AuctionService implements OnModuleInit {
       };
     }
 
+    const mainRole = acc?.mainRole ?? null;
+
     return {
       ...base,
       tier: acc?.tier ?? "UNRANKED",
@@ -251,6 +269,26 @@ export class AuctionService implements OnModuleInit {
         acc?.lp || 0,
       ),
       position: participant?.assignedRole ?? acc?.mainRole ?? "FLEX",
+      /**
+       * 라인별 티어. 계정 등록 때 본인이 직접 적는 선택 항목이라 대부분 비어 있다.
+       * 비어 있으면 카드는 기존처럼 대표 티어 하나만 그린다 — 없는 값을 추정해서
+       * 채우면 입찰자가 그걸 실측으로 오해한다.
+       */
+      roleTiers: (acc?.roleTiers ?? []).map((entry: any) => ({
+        role: entry.role,
+        tier: entry.tier,
+        rank: entry.rank,
+        lp: entry.lp,
+      })),
+      /**
+       * 주 역할 선호 픽. 경매는 30초 안에 판단해야 해서 전 라인을 다 펼치지 않고
+       * 어느 라인으로 쓸지가 이미 정해진 주 역할만 보여준다.
+       */
+      champions: mainRole
+        ? (acc?.championPreferences ?? [])
+            .filter((pref: any) => pref.role === mainRole)
+            .map((pref: any) => pref.championId)
+        : [],
     };
   }
 
@@ -413,9 +451,7 @@ export class AuctionService implements OnModuleInit {
           include: {
             user: {
               include: {
-                riotAccounts: {
-                  where: { isPrimary: true },
-                },
+                riotAccounts: AUCTION_RIOT_ACCOUNT_INCLUDE,
                 pubgAccounts: {
                   where: { isPrimary: true },
                 },
@@ -751,7 +787,7 @@ export class AuctionService implements OnModuleInit {
           include: {
             user: {
               include: {
-                riotAccounts: { where: { isPrimary: true } },
+                riotAccounts: AUCTION_RIOT_ACCOUNT_INCLUDE,
                 pubgAccounts: { where: { isPrimary: true } },
               },
             },
@@ -914,7 +950,7 @@ export class AuctionService implements OnModuleInit {
           include: {
             user: {
               include: {
-                riotAccounts: { where: { isPrimary: true } },
+                riotAccounts: AUCTION_RIOT_ACCOUNT_INCLUDE,
                 pubgAccounts: { where: { isPrimary: true } },
               },
             },
@@ -1016,7 +1052,7 @@ export class AuctionService implements OnModuleInit {
           include: {
             user: {
               include: {
-                riotAccounts: { where: { isPrimary: true } },
+                riotAccounts: AUCTION_RIOT_ACCOUNT_INCLUDE,
                 pubgAccounts: { where: { isPrimary: true } },
               },
             },
@@ -1163,7 +1199,7 @@ export class AuctionService implements OnModuleInit {
           include: {
             user: {
               include: {
-                riotAccounts: { where: { isPrimary: true } },
+                riotAccounts: AUCTION_RIOT_ACCOUNT_INCLUDE,
                 pubgAccounts: { where: { isPrimary: true } },
               },
             },
@@ -1275,7 +1311,7 @@ export class AuctionService implements OnModuleInit {
           include: {
             user: {
               include: {
-                riotAccounts: { where: { isPrimary: true } },
+                riotAccounts: AUCTION_RIOT_ACCOUNT_INCLUDE,
                 pubgAccounts: { where: { isPrimary: true } },
               },
             },
@@ -1382,7 +1418,7 @@ export class AuctionService implements OnModuleInit {
           include: {
             user: {
               include: {
-                riotAccounts: { where: { isPrimary: true } },
+                riotAccounts: AUCTION_RIOT_ACCOUNT_INCLUDE,
                 pubgAccounts: { where: { isPrimary: true } },
               },
             },
@@ -1629,7 +1665,7 @@ export class AuctionService implements OnModuleInit {
           include: {
             user: {
               include: {
-                riotAccounts: { where: { isPrimary: true } },
+                riotAccounts: AUCTION_RIOT_ACCOUNT_INCLUDE,
                 pubgAccounts: { where: { isPrimary: true } },
               },
             },
@@ -1882,7 +1918,7 @@ export class AuctionService implements OnModuleInit {
               include: {
                 user: {
                   include: {
-                    riotAccounts: { where: { isPrimary: true } },
+                    riotAccounts: AUCTION_RIOT_ACCOUNT_INCLUDE,
                     pubgAccounts: { where: { isPrimary: true } },
                   },
                 },
@@ -1895,7 +1931,7 @@ export class AuctionService implements OnModuleInit {
           include: {
             user: {
               include: {
-                riotAccounts: { where: { isPrimary: true } },
+                riotAccounts: AUCTION_RIOT_ACCOUNT_INCLUDE,
                 pubgAccounts: { where: { isPrimary: true } },
               },
             },
