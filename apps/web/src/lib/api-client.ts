@@ -2700,6 +2700,25 @@ export const adminApi = {
     const response = await apiClient.get("/admin/error-logs", { params });
     return response.data;
   },
+  // 경매 리허설 — 운영에서 20인 경매를 통째로 재현한다.
+  // 진행 상황은 status 를 짧은 주기로 다시 물어 따라간다. 리허설은 한 번에
+  // 하나만 돌고 관리자 화면에서만 보므로 전용 소켓을 새로 열 이유가 없다.
+  getRehearsalStatus: async () => {
+    const response = await apiClient.get("/admin/load-rehearsal/status");
+    return response.data;
+  },
+  startRehearsal: async (body: {
+    count?: number;
+    mode?: "light" | "full";
+    bidTimeSeconds?: number;
+  }) => {
+    const response = await apiClient.post("/admin/load-rehearsal/start", body);
+    return response.data;
+  },
+  abortRehearsal: async () => {
+    const response = await apiClient.post("/admin/load-rehearsal/abort");
+    return response.data;
+  },
   // Community
   getPosts: async (params?: {
     page?: number;

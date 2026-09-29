@@ -24,6 +24,7 @@ import {
 import type { GameTitle } from "@nexus/types";
 import { DiscordGuildLinksTab } from "@/components/admin/system/DiscordGuildLinksTab";
 import { ErrorLogsTab } from "@/components/admin/system/ErrorLogsTab";
+import { RehearsalTab } from "@/components/admin/system/RehearsalTab";
 import {
   Shield,
   Users,
@@ -38,6 +39,7 @@ import {
   Radio,
   Bot,
   Crosshair,
+  FlaskConical,
   Bug,
 } from "lucide-react";
 
@@ -55,7 +57,8 @@ type Tab =
   | "streamers"
   | "appeals"
   | "discord"
-  | "errors";
+  | "errors"
+  | "rehearsal";
 
 interface TabItem {
   id: Tab;
@@ -166,6 +169,11 @@ const TAB_GROUPS: TabGroup[] = [
         id: "discord",
         label: "디스코드 연동",
         icon: <Bot className="h-4 w-4" />,
+      },
+      {
+        id: "rehearsal",
+        label: "경매 리허설",
+        icon: <FlaskConical className="h-4 w-4" />,
       },
     ],
   },
@@ -326,6 +334,7 @@ function AdminPageInner() {
         {activeTab === "discord" && (
           <DiscordGuildLinksTab addToast={addToast} />
         )}
+        {activeTab === "rehearsal" && <RehearsalTab addToast={addToast} />}
       </main>
     </div>
   );
