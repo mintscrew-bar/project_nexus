@@ -34,6 +34,16 @@
 - [x] Task 5: 관리자 페이지 리허설 탭
 - [ ] Task 6: 운영에서 1회 실행하고 결과 기록
 
+## 켜는 법
+
+CD 가 `.env.production` 을 GitHub Secrets 에서 **통째로 다시 쓴다**
+(`deploy.yml` 의 `.env.production 생성` 단계). 서버 파일을 직접 고치면
+다음 배포에 지워지므로, 플래그는 반드시 Secret 으로 넣는다.
+
+- GitHub Secret `ENABLE_LOAD_REHEARSAL=1` (등록 완료 2026-09-29)
+- `deploy.yml` 의 heredoc 에 한 줄 추가 — 여기 없으면 Secret 이 있어도 안 나간다
+- 끄려면 Secret 값을 `0` 으로 바꾸고 재배포한다
+
 ## 검증 항목
 
 | 항목                                     | light | full |

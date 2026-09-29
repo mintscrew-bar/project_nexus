@@ -119,6 +119,7 @@ jobs:
           CHZZK_CLIENT_ID=${{ secrets.CHZZK_CLIENT_ID }}
           CHZZK_CLIENT_SECRET=${{ secrets.CHZZK_CLIENT_SECRET }}
           CHZZK_CALLBACK_URL=${{ secrets.CHZZK_CALLBACK_URL }}
+          ENABLE_LOAD_REHEARSAL=${{ secrets.ENABLE_LOAD_REHEARSAL }}
           EOF
           chmod 600 /home/haru/projects/nexus/.env.production
 
