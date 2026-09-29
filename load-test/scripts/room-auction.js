@@ -87,7 +87,7 @@ Options:
   --count=20                      방 정원: 10, 15, 20, 30, 40
   --repeat=1                      반복 횟수
   --join-delay=120                입장 간격(ms)
-  --bid-time=8                    매물당 입찰 시간(초). 짧게 잡아야 테스트가 빨리 끝난다
+  --bid-time=20                   매물당 입찰 시간(초). 15초 미만이면 봇 입찰기가 굶어 전부 유찰된다
   --fold-rate=0.35                팀장이 매물을 포기할 확률 (유찰 경로를 만들기 위함)
   --disconnect-at=4               N번째 매물에서 호스트 소켓을 강제로 끊는다 (0이면 생략)
   --no-reconnect                  끊은 호스트를 다시 붙이지 않는다
@@ -120,7 +120,7 @@ const config = {
     "join-delay",
   ),
   bidTimeSeconds: parseBidTime(
-    getArg("bid-time") || process.env.BID_TIME || "8",
+    getArg("bid-time") || process.env.BID_TIME || "20",
   ),
   foldRate: parseRate(getArg("fold-rate") || process.env.FOLD_RATE || "0.35"),
   disconnectAt: parseNonNegativeInt(
@@ -155,11 +155,18 @@ function parseNonNegativeInt(raw, label) {
   return value;
 }
 
-/** 서버 DTO 가 5~120초만 받는다. 벗어나면 방 생성이 400으로 떨어진다. */
+/**
+ * 서버 DTO 는 5~120초를 받지만 여기서는 15초를 하한으로 둔다.
+ *
+ * 서버 봇 입찰기(_scheduleBotBids)는 봇마다 2~8초 뒤 시도를 걸고, 한 봇이
+ * 시도할 때마다 나머지를 취소해 다시 2~8초 뒤로 민다. 매물 시간이 짧으면
+ * 시도가 매물당 0~1회에 그쳐 낙찰이 거의 나오지 않는다. 경매가 고장난 것처럼
+ * 보이지만 실제로는 설정이 현실(기본 30초)과 다른 것뿐이다.
+ */
 function parseBidTime(raw) {
   const value = Number(raw);
-  if (!Number.isInteger(value) || value < 5 || value > 120) {
-    throw new Error("bid-time 값은 5 이상 120 이하의 정수여야 합니다.");
+  if (!Number.isInteger(value) || value < 15 || value > 120) {
+    throw new Error("bid-time 값은 15 이상 120 이하의 정수여야 합니다.");
   }
   return value;
 }

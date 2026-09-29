@@ -131,8 +131,8 @@ JWT_ACCESS_SECRET=...
 옵션:
 
 ```bash
-# 매물당 입찰 시간(초). 5~120. 짧게 잡아야 테스트가 빨리 끝난다
-npm run room:auction -- --count=20 --bid-time=6
+# 매물당 입찰 시간(초). 15~120. 15초 미만은 봇 입찰기가 굶어 전부 유찰된다
+npm run room:auction -- --count=20 --bid-time=30
 
 # 팀장이 매물을 포기할 확률. 높일수록 유찰 경로가 자주 만들어진다
 npm run room:auction -- --count=20 --fold-rate=0.6

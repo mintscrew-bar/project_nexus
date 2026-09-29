@@ -56,7 +56,7 @@ export function RehearsalTab({
   const [status, setStatus] = useState<RehearsalStatus | null>(null);
   const [count, setCount] = useState(20);
   const [mode, setMode] = useState<"light" | "full">("full");
-  const [bidTime, setBidTime] = useState(8);
+  const [bidTime, setBidTime] = useState(20);
   const [busy, setBusy] = useState(false);
   const logRef = useRef<HTMLDivElement | null>(null);
 
@@ -193,17 +193,21 @@ export function RehearsalTab({
 
             <label className="text-sm">
               <span className="mb-1 block font-medium text-text-secondary">
-                매물당 입찰 시간
+                매물당 입찰 시간 (초)
               </span>
               <input
                 type="number"
-                min={5}
+                min={15}
                 max={120}
                 value={bidTime}
                 onChange={(event) => setBidTime(Number(event.target.value))}
                 disabled={running}
                 className="w-full rounded-lg border border-bg-tertiary bg-bg-secondary px-3 py-2 text-text-primary"
               />
+              <span className="mt-1 block text-[11px] text-text-muted">
+                15초 미만은 막아둡니다 — 서버 봇 입찰기가 매물 시간 안에
+                움직이지 못해 전부 유찰로 끝납니다.
+              </span>
             </label>
           </div>
 

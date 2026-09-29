@@ -119,9 +119,24 @@ export class LoadRehearsalService {
       );
     }
     const mode: RehearsalMode = options.mode === "full" ? "full" : "light";
-    const bidTime = Number(options.bidTimeSeconds ?? 8);
-    if (!Number.isInteger(bidTime) || bidTime < 5 || bidTime > 120) {
-      throw new BadRequestException("입찰 시간은 5~120초여야 합니다.");
+    const bidTime = Number(options.bidTimeSeconds ?? 20);
+    /*
+     * 하한이 15초인 이유 — 서버 봇 입찰기가 굶는다.
+     *
+     * _scheduleBotBids 는 봇마다 2~8초 뒤 시도를 걸어 두는데, 한 봇이 시도할
+     * 때마다 _cancelBotTimers 로 나머지 전원을 취소하고 다시 2~8초 뒤로 민다.
+     * 그리고 _autoBotBid 는 매물 마감 시각이 지나면 즉시 리턴한다.
+     * 그래서 매물 시간이 10초보다 짧으면 매물당 시도가 0~1회에 그치고,
+     * 그 시도마저 40% 는 스스로 패스해서 낙찰이 거의 나오지 않는다.
+     *
+     * 이건 기본값 30초에 맞춰 둔 기존 동작이다. 여기서 짧게 잡으면 경매가
+     * 고장난 것처럼 보이지만 실제로는 리허설 설정이 현실과 다른 것뿐이다.
+     */
+    if (!Number.isInteger(bidTime) || bidTime < 15 || bidTime > 120) {
+      throw new BadRequestException(
+        "입찰 시간은 15~120초여야 합니다. " +
+          "15초보다 짧으면 서버 봇 입찰기가 매물 시간 안에 움직이지 못해 전부 유찰됩니다.",
+      );
     }
 
     await this.assertNoLiveUsers(Number(options.liveUserWindowMinutes ?? 15));
