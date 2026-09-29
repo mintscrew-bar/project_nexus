@@ -186,7 +186,8 @@ export class LoadRehearsalService {
     run.crew = crew;
 
     const participants = await this.prisma.roomParticipant.findMany({
-      where: { roomId: run.roomId! },
+      // 관전석(관리자)은 경매에 참여하지 않으므로 소켓도 열지 않는다.
+      where: { roomId: run.roomId!, role: "PLAYER" },
       select: {
         userId: true,
         user: {
@@ -260,7 +261,8 @@ export class LoadRehearsalService {
       maxParticipants: run.options.count,
       teamMode: "AUCTION",
       captainSelection: "TIER",
-      allowSpectators: false,
+      // 관리자는 관전석으로 뺀다(아래). 그러려면 관전이 열려 있어야 한다.
+      allowSpectators: true,
       bidTimeLimit: run.options.bidTime,
       // 목록에서 숨기기 위한 값이지 보안용이 아니다.
       password: `rehearsal-${Date.now()}`,
@@ -270,14 +272,34 @@ export class LoadRehearsalService {
   }
 
   private async _fillWithBots(run: RehearsalRun): Promise<void> {
-    // 호스트(관리자)가 한 자리를 차지하므로 나머지를 봇으로 채운다.
-    const needed = run.options.count - 1;
+    /*
+     * 관리자를 관전석으로 뺀다.
+     *
+     * 방을 만들면 호스트가 PLAYER 로 들어가는데, 그대로 두면 경매 매물·팀장
+     * 후보에 관리자가 섞인다. 팀장은 TIER 순으로 뽑히고 봇은 전부 0LP 라서
+     * 실계정을 쓰는 관리자가 거의 항상 팀장 1순위로 올라간다.
+     *
+     * 그런데 관리자 몫으로는 소켓을 열지 않고(사람 계정 토큰을 만들지 않으려고)
+     * 자동입찰도 봇에게만 걸린다. 결국 한 팀의 팀장이 끝까지 아무것도 하지 않는
+     * 상태가 되어, 그 팀은 유찰 자동배정으로만 채워지고 리허설 결과가 일그러진다.
+     *
+     * 경매는 role='PLAYER' 만 보고 startAuction 은 Room.hostId 만 확인하므로,
+     * 관전석으로 옮겨도 호스트로서 경매를 시작하는 데는 지장이 없다.
+     */
+    await this.prisma.roomParticipant.updateMany({
+      where: { roomId: run.roomId!, userId: run.adminId },
+      data: { role: "SPECTATOR" },
+    });
+    run.log("관리자를 관전석으로 이동 (매물·팀장 후보에서 제외)");
+
+    // 관전자는 정원에 안 세므로 자리 전부를 봇으로 채운다.
+    const needed = run.options.count;
     await this.adminService.addBotToRoom(run.roomId!, run.adminId, needed);
     run.log(`봇 ${needed}명 투입`);
 
-    // 경매 시작 조건은 전원 준비다. 봇은 스스로 준비를 누르지 않는다.
+    // 경매 시작 조건은 PLAYER 전원 준비다. 봇은 스스로 준비를 누르지 않는다.
     await this.prisma.roomParticipant.updateMany({
-      where: { roomId: run.roomId! },
+      where: { roomId: run.roomId!, role: "PLAYER" },
       data: { isReady: true },
     });
     run.log("전원 준비 완료 처리");
