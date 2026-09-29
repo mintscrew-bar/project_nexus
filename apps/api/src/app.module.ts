@@ -32,6 +32,7 @@ import { RoleSelectionModule } from "./modules/role-selection/role-selection.mod
 import { StatsModule } from "./modules/stats/stats.module";
 import { NotificationModule } from "./modules/notification/notification.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { LoadRehearsalModule } from "./modules/load-rehearsal/load-rehearsal.module";
 import { DmModule } from "./modules/dm/dm.module";
 import { TasksModule } from "./modules/tasks/tasks.module";
 import { RankingModule } from "./modules/ranking/ranking.module";
@@ -113,6 +114,7 @@ const projectRoot = resolve(apiRoot, "../..");
     PresenceModule,
     NotificationModule,
     AdminModule,
+    LoadRehearsalModule,
     DmModule,
     TasksModule,
     RankingModule,
