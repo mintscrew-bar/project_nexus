@@ -76,20 +76,23 @@ export class RehearsalSocketCrew {
     return response;
   }
 
-  /** 팀장 한 명이 이번 매물에 입찰하거나 포기한다. */
+  /**
+   * 팀장 한 명이 이번 매물을 포기한다.
+   *
+   * 입찰(`place-bid`)은 일부러 다루지 않는다. 서버 자동입찰이 이미
+   * 같은 락·같은 서비스 호출을 타므로 소켓으로 또 넣으면 중복일 뿐이다.
+   * 포기는 자동입찰이 하지 않아 이 경로로만 만들어진다.
+   */
   act(
     userId: string,
-    action: "bid" | "fold",
-    amount?: number,
+    action: "fold",
   ): Promise<{ ok: boolean; error?: string }> {
     const socket = this.sockets.get(userId);
     if (!socket?.connected) return Promise.resolve({ ok: false });
 
-    const event = action === "fold" ? "vote-item-skip" : "place-bid";
-    const payload =
-      action === "fold"
-        ? { roomId: this.roomId }
-        : { roomId: this.roomId, amount };
+    const event = "vote-item-skip";
+    const payload = { roomId: this.roomId };
+    void action;
 
     return new Promise((resolve) => {
       const timer = setTimeout(

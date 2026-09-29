@@ -360,7 +360,7 @@ export class LoadRehearsalService {
 
       const newItem = run.observe(state);
       if (run.options.mode === "full") {
-        if (newItem) this._actOverSockets(run, state);
+        if (newItem) this._foldOverSockets(run, state);
         await this._maybeDropCaptain(run, state);
       }
       await delay(500);
@@ -370,46 +370,40 @@ export class LoadRehearsalService {
   }
 
   /**
-   * 소켓이 붙어 있는 팀장 봇들이 이번 매물에 실제로 행동한다.
+   * 소켓이 붙어 있는 팀장 봇 일부가 이번 매물을 포기(fold)한다.
    *
-   * 서버 자동입찰(`_scheduleBotBids`)만으로도 경매는 굴러가지만, 그건
-   * place-bid / vote-item-skip 핸들러를 한 번도 타지 않는다. 8/11 에 터진 건
-   * 그 핸들러들이 20인 동시에 두드려질 때였으므로, full 모드에서는 소켓으로도
-   * 같은 이벤트를 보낸다.
+   * **입찰은 일부러 보내지 않는다.** 서버 자동입찰(`_autoBotBid`)이 이미
+   * `_withRoomBidLock` + `auctionService.placeBid` 로, 소켓 핸들러와 같은 락·같은
+   * 서비스 호출을 탄다. 소켓으로 한 번 더 넣어 봐야 같은 경로를 중복해서
+   * 두드릴 뿐이고, 어느 입찰이 어디서 왔는지만 흐려진다.
    *
-   * 포기(fold)를 섞는 이유: 자동입찰은 포기를 하지 않아서 유찰이 잘 안 생긴다.
-   * 검증하려는 불변식이 "유찰된 매물의 재등장 순서"라 유찰 자체가 만들어져야 한다.
+   * 포기만 소켓으로 보내는 이유: 자동입찰은 포기를 하지 않는다. 그래서
+   * `vote-item-skip` 핸들러는 봇만 있는 방에서 한 번도 실행되지 않고,
+   * 유찰도 "아무도 입찰할 여력이 없을 때"만 우연히 생긴다. 검증하려는
+   * 불변식이 "유찰된 매물의 재등장 순서"라 유찰 자체가 만들어져야 한다.
    */
-  private _actOverSockets(run: RehearsalRun, state: any): void {
+  private _foldOverSockets(run: RehearsalRun, state: any): void {
     const crew = run.crew;
     if (!crew) return;
 
-    const increment = state?.bidIncrement ?? 50;
     const currentPlayerId = state?.currentPlayer?.id ?? null;
+    const teams = state?.teams ?? [];
 
-    for (const team of state?.teams ?? []) {
+    for (const team of teams) {
       const captainId = team?.captainId;
       if (!captainId || !crew.has(captainId)) continue;
-      // 자기 자신이 매물이면 입찰 대상이 아니다.
+      // 자기 자신이 매물이면 판단 주체가 아니다.
       if (captainId === currentPlayerId) continue;
+      if (Math.random() >= 0.25) continue;
 
-      const fold = Math.random() < 0.25;
       const thinkMs = 400 + Math.floor(Math.random() * 1500);
-
       setTimeout(() => {
         if (run.finished) return;
         // 이미 다음 매물로 넘어갔으면 늦은 행동을 보내지 않는다.
         if (run.currentItemId !== currentPlayerId) return;
-
-        void crew
-          .act(
-            captainId,
-            fold ? "fold" : "bid",
-            fold ? undefined : (state?.currentHighestBid ?? 0) + increment,
-          )
-          .then((result) => {
-            if (result.ok) run.countSocketAction(fold ? "fold" : "bid");
-          });
+        void crew.act(captainId, "fold").then((result) => {
+          if (result.ok) run.countSocketAction("fold");
+        });
       }, thinkMs);
     }
   }
@@ -528,8 +522,7 @@ export interface RehearsalView {
   error: string | null;
   /** full 모드에서 붙어 있는 봇 소켓 수. light 모드는 0. */
   socketCount: number;
-  /** 소켓으로 실제 전송된 입찰/포기. 0이면 핸들러를 한 번도 안 탔다. */
-  socketBids: number;
+  /** 소켓으로 전송된 포기 수. full 모드인데 0이면 핸들러를 안 탔다는 뜻. */
   socketFolds: number;
   /** 팀장을 낙오시킨 매물 순번. 재현 안 했으면 null. */
   droppedAtItem: number | null;
@@ -568,8 +561,7 @@ class RehearsalRun {
   /** 낙오 이후 경매가 몇 건 더 진행됐는지. 0이면 낙오가 곧 정지라는 뜻이다. */
   itemsAfterDrop = 0;
   reconnectRestored = false;
-  /** 소켓으로 실제 전송된 입찰/포기 수. 0이면 핸들러를 한 번도 안 탔다는 뜻. */
-  socketBids = 0;
+  /** 소켓으로 전송된 포기 수. 입찰은 서버 자동입찰이 맡으므로 세지 않는다. */
   socketFolds = 0;
 
   private readonly logs: string[] = [];
@@ -610,9 +602,8 @@ class RehearsalRun {
     return this.lastPlayerId;
   }
 
-  countSocketAction(kind: "bid" | "fold"): void {
-    if (kind === "bid") this.socketBids += 1;
-    else this.socketFolds += 1;
+  countSocketAction(kind: "fold"): void {
+    if (kind === "fold") this.socketFolds += 1;
   }
 
   log(message: string): void {
@@ -735,7 +726,6 @@ class RehearsalRun {
       logs: this.logs.slice(-50),
       error: this.error,
       socketCount: this.crew?.size ?? 0,
-      socketBids: this.socketBids,
       socketFolds: this.socketFolds,
       droppedAtItem: this.droppedAtItem,
       itemsAfterDrop: this.itemsAfterDrop,

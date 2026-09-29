@@ -28,7 +28,6 @@ interface RehearsalView {
   logs: string[];
   error: string | null;
   socketCount: number;
-  socketBids: number;
   socketFolds: number;
   droppedAtItem: number | null;
   itemsAfterDrop: number;
@@ -249,10 +248,10 @@ export function RehearsalTab({
               <Stat label="유찰" value={run.unsold} />
               <Stat label="소켓" value={run.socketCount} />
               <Stat
-                label="소켓 입찰/포기"
-                value={`${run.socketBids}/${run.socketFolds}`}
+                label="소켓 포기"
+                value={run.socketFolds}
                 warn={
-                  run.mode === "full" && run.items > 2 && run.socketBids === 0
+                  run.mode === "full" && run.items > 4 && run.socketFolds === 0
                 }
               />
               <Stat
