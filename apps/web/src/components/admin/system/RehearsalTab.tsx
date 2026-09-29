@@ -28,6 +28,8 @@ interface RehearsalView {
   logs: string[];
   error: string | null;
   socketCount: number;
+  socketBids: number;
+  socketFolds: number;
   droppedAtItem: number | null;
   itemsAfterDrop: number;
   reconnectRestored: boolean;
@@ -241,11 +243,18 @@ export function RehearsalTab({
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
               <Stat label="매물" value={run.items} />
               <Stat label="낙찰" value={run.sold} />
               <Stat label="유찰" value={run.unsold} />
               <Stat label="소켓" value={run.socketCount} />
+              <Stat
+                label="소켓 입찰/포기"
+                value={`${run.socketBids}/${run.socketFolds}`}
+                warn={
+                  run.mode === "full" && run.items > 2 && run.socketBids === 0
+                }
+              />
               <Stat
                 label="낙오 후 진행"
                 value={run.droppedAtItem == null ? "-" : run.itemsAfterDrop}

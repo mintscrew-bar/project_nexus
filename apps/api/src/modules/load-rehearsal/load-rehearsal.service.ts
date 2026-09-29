@@ -11,6 +11,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RoomService } from "../room/room.service";
 import { AdminService } from "../admin/admin.service";
 import { AuctionService } from "../auction/auction.service";
+import { AuctionGateway } from "../auction/auction.gateway";
 import { TEST_BOT_USER_WHERE, isTestBotUser } from "../common/test-bot.util";
 import { RehearsalSocketCrew } from "./rehearsal-socket-crew";
 
@@ -47,6 +48,7 @@ export class LoadRehearsalService {
     private readonly roomService: RoomService,
     private readonly adminService: AdminService,
     private readonly auctionService: AuctionService,
+    private readonly auctionGateway: AuctionGateway,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -305,8 +307,21 @@ export class LoadRehearsalService {
     run.log("전원 준비 완료 처리");
   }
 
+  /**
+   * 경매를 시작한다.
+   *
+   * startAuction 만 부르면 상태는 생기는데 **아무 일도 일어나지 않는다.**
+   * 입찰 마감 타이머와 봇 자동입찰은 둘 다 게이트웨이의 emitAuctionStarted
+   * 안에 걸려 있다(auction.gateway.ts). 실제 start-game 경로도 서비스 →
+   * 게이트웨이 순서로 두 번 부른다(room.gateway.ts). 한쪽만 부르면
+   * 타이머가 안 돌아 전 매물이 유찰로 흘러간다.
+   */
   private async _startAuction(run: RehearsalRun): Promise<void> {
-    await this.auctionService.startAuction(run.adminId, run.roomId!);
+    const result = await this.auctionService.startAuction(
+      run.adminId,
+      run.roomId!,
+    );
+    this.auctionGateway.emitAuctionStarted(run.roomId!, result);
     run.log("경매 시작");
   }
 
@@ -343,12 +358,60 @@ export class LoadRehearsalService {
         return;
       }
 
-      run.observe(state);
-      if (run.options.mode === "full") await this._maybeDropCaptain(run, state);
+      const newItem = run.observe(state);
+      if (run.options.mode === "full") {
+        if (newItem) this._actOverSockets(run, state);
+        await this._maybeDropCaptain(run, state);
+      }
       await delay(500);
     }
 
     run.addViolation("경매가 제한 시간 안에 끝나지 않았습니다.");
+  }
+
+  /**
+   * 소켓이 붙어 있는 팀장 봇들이 이번 매물에 실제로 행동한다.
+   *
+   * 서버 자동입찰(`_scheduleBotBids`)만으로도 경매는 굴러가지만, 그건
+   * place-bid / vote-item-skip 핸들러를 한 번도 타지 않는다. 8/11 에 터진 건
+   * 그 핸들러들이 20인 동시에 두드려질 때였으므로, full 모드에서는 소켓으로도
+   * 같은 이벤트를 보낸다.
+   *
+   * 포기(fold)를 섞는 이유: 자동입찰은 포기를 하지 않아서 유찰이 잘 안 생긴다.
+   * 검증하려는 불변식이 "유찰된 매물의 재등장 순서"라 유찰 자체가 만들어져야 한다.
+   */
+  private _actOverSockets(run: RehearsalRun, state: any): void {
+    const crew = run.crew;
+    if (!crew) return;
+
+    const increment = state?.bidIncrement ?? 50;
+    const currentPlayerId = state?.currentPlayer?.id ?? null;
+
+    for (const team of state?.teams ?? []) {
+      const captainId = team?.captainId;
+      if (!captainId || !crew.has(captainId)) continue;
+      // 자기 자신이 매물이면 입찰 대상이 아니다.
+      if (captainId === currentPlayerId) continue;
+
+      const fold = Math.random() < 0.25;
+      const thinkMs = 400 + Math.floor(Math.random() * 1500);
+
+      setTimeout(() => {
+        if (run.finished) return;
+        // 이미 다음 매물로 넘어갔으면 늦은 행동을 보내지 않는다.
+        if (run.currentItemId !== currentPlayerId) return;
+
+        void crew
+          .act(
+            captainId,
+            fold ? "fold" : "bid",
+            fold ? undefined : (state?.currentHighestBid ?? 0) + increment,
+          )
+          .then((result) => {
+            if (result.ok) run.countSocketAction(fold ? "fold" : "bid");
+          });
+      }, thinkMs);
+    }
   }
 
   /**
@@ -465,6 +528,9 @@ export interface RehearsalView {
   error: string | null;
   /** full 모드에서 붙어 있는 봇 소켓 수. light 모드는 0. */
   socketCount: number;
+  /** 소켓으로 실제 전송된 입찰/포기. 0이면 핸들러를 한 번도 안 탔다. */
+  socketBids: number;
+  socketFolds: number;
   /** 팀장을 낙오시킨 매물 순번. 재현 안 했으면 null. */
   droppedAtItem: number | null;
   /** 낙오 이후 진행된 매물 수. 0이면 낙오가 곧 경매 정지였다는 뜻. */
@@ -502,6 +568,9 @@ class RehearsalRun {
   /** 낙오 이후 경매가 몇 건 더 진행됐는지. 0이면 낙오가 곧 정지라는 뜻이다. */
   itemsAfterDrop = 0;
   reconnectRestored = false;
+  /** 소켓으로 실제 전송된 입찰/포기 수. 0이면 핸들러를 한 번도 안 탔다는 뜻. */
+  socketBids = 0;
+  socketFolds = 0;
 
   private readonly logs: string[] = [];
   private readonly violations: string[] = [];
@@ -527,6 +596,23 @@ class RehearsalRun {
 
   get itemCount(): number {
     return this.appearances.length;
+  }
+
+  /** 끝났거나 중단 요청을 받았는가. 늦게 도착한 타이머가 행동하지 않게 막는다. */
+  get finished(): boolean {
+    return (
+      this.phase === "DONE" || this.phase === "FAILED" || this.abortRequested
+    );
+  }
+
+  /** 지금 올라와 있는 매물. 늦게 도착한 소켓 행동을 버리는 데 쓴다. */
+  get currentItemId(): string | null {
+    return this.lastPlayerId;
+  }
+
+  countSocketAction(kind: "bid" | "fold"): void {
+    if (kind === "bid") this.socketBids += 1;
+    else this.socketFolds += 1;
   }
 
   log(message: string): void {
@@ -558,7 +644,8 @@ class RehearsalRun {
   }
 
   /** 폴링으로 본 상태에서 매물 전환과 유찰을 읽어낸다. */
-  observe(state: any): void {
+  /** 새 매물이 시작됐으면 true. 소켓 봇의 행동을 그 시점에만 걸기 위함. */
+  observe(state: any): boolean {
     const playerId = state?.currentPlayer?.id ?? null;
     const counts: Record<string, number> = state?.yuchalCountsByPlayer ?? {};
 
@@ -576,7 +663,7 @@ class RehearsalRun {
       }
     }
 
-    if (!playerId || playerId === this.lastPlayerId) return;
+    if (!playerId || playerId === this.lastPlayerId) return false;
 
     // 매물이 바뀌었는데 직전 매물의 유찰 수가 그대로면 팔린 것이다.
     const previous = this.lastPlayerId;
@@ -588,6 +675,7 @@ class RehearsalRun {
     this.appearances.push(playerId);
     if (this.dropped) this.itemsAfterDrop += 1;
     this._checkCycle(playerId);
+    return true;
   }
 
   private _onSold(playerId: string): void {
@@ -647,6 +735,8 @@ class RehearsalRun {
       logs: this.logs.slice(-50),
       error: this.error,
       socketCount: this.crew?.size ?? 0,
+      socketBids: this.socketBids,
+      socketFolds: this.socketFolds,
       droppedAtItem: this.droppedAtItem,
       itemsAfterDrop: this.itemsAfterDrop,
       reconnectRestored: this.reconnectRestored,
