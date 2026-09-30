@@ -412,6 +412,16 @@ export function AuctionLotDetails({
           {games > 0
             ? `내전 ${stats!.wins}승 ${stats!.losses}패 · 승률 ${Math.round(stats!.winRate)}%`
             : "내전 기록 없음"}
+          {/*
+            아래 지표는 스탯이 수집된 판만의 평균이다(토너먼트 코드 없는 판은
+            기록이 없다). 전체 판수와 다르면 몇 판 기준인지 밝힌다.
+          */}
+          {kda && kda.games !== games && (
+            <span className="text-text-muted">
+              {" "}
+              · 지표는 {kda.games}판 기준
+            </span>
+          )}
         </p>
         <div className="grid grid-cols-5 gap-2 [@media(max-height:820px)]:grid-cols-7">
           <StatCell
