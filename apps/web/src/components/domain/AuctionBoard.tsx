@@ -474,7 +474,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
             <CardContent className="p-0">
               {/* 상단: 선수 정보 + 타이머 */}
               <div
-                className="flex items-center gap-5 p-6 cursor-pointer"
+                className="flex items-center gap-4 px-5 py-4 cursor-pointer"
                 onMouseEnter={(e) =>
                   handlePlayerHover(
                     auctionState.currentPlayer!.id,
@@ -488,18 +488,18 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   src={auctionState.currentPlayer.avatar}
                   alt={auctionState.currentPlayer.username}
                   fallback={auctionState.currentPlayer.username[0]}
-                  size="xl"
+                  size="lg"
                   className="ring-2 ring-accent-primary/60 flex-shrink-0"
                 />
 
                 <div className="flex-1 min-w-0">
-                  <div className="mb-2 flex items-center gap-2">
+                  <div className="mb-1 flex items-center gap-2">
                     <Badge variant="primary">현재 매물</Badge>
                     <span className="text-xs font-medium text-text-secondary">
                       모든 팀장 동시 입찰
                     </span>
                   </div>
-                  <h2 className="mb-2 truncate text-3xl font-bold text-text-primary">
+                  <h2 className="mb-1.5 truncate text-2xl font-bold text-text-primary">
                     {auctionState.currentPlayer.username}
                   </h2>
                   <div className="flex items-center gap-3 flex-wrap">
@@ -541,18 +541,30 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   */}
                   <RoleTierBadges
                     roleTiers={auctionState.currentPlayer.roleTiers}
-                    className="mt-2"
+                    className="mt-1.5"
                     compact
                   />
 
                   {/*
                     주 역할 선호 픽 — 30초 안에 판단해야 하는 자리라
                     전 라인을 펼치지 않고 주 역할 것만 순서대로 보여준다.
+                    "선호 픽"만 적어 두면 어느 라인 픽인지 몰라서
+                    주 역할 아이콘과 이름을 라벨에 붙인다.
                   */}
                   {auctionState.currentPlayer.champions?.length ? (
-                    <div className="mt-2 flex items-center gap-1.5">
-                      <span className="text-[10px] font-medium text-text-muted">
-                        선호 픽
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-text-tertiary">
+                        <RoleIcon
+                          role={auctionState.currentPlayer.mainRole}
+                          size={14}
+                        />
+                        {auctionState.currentPlayer.mainRole
+                          ? `${
+                              POSITION_LABELS[
+                                auctionState.currentPlayer.mainRole.toUpperCase()
+                              ] ?? auctionState.currentPlayer.mainRole
+                            } 선호 픽`
+                          : "선호 픽"}
                       </span>
                       <div className="flex items-center gap-1">
                         {auctionState.currentPlayer.champions.map(
@@ -560,7 +572,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                             <ChampionIcon
                               key={championId}
                               championId={championId}
-                              size={28}
+                              size={24}
                             />
                           ),
                         )}
@@ -573,7 +585,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 <div className="flex flex-col items-center flex-shrink-0">
                   <div
                     className={cn(
-                      "text-5xl font-bold tabular-nums leading-none transition-[text-shadow] duration-200",
+                      "text-4xl font-bold tabular-nums leading-none transition-[text-shadow] duration-200",
                       timeLeft <= 5
                         ? "text-accent-danger animate-pulse [text-shadow:0_0_22px_rgba(239,68,68,0.8),0_0_8px_rgba(239,68,68,0.6)]"
                         : "text-text-primary",
@@ -593,30 +605,74 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                 </div>
               </div>
 
-              {/* 하단: 최고 입찰 바 — 별도 박스 대신 카드 하단 띠로 분리 */}
+              {/*
+                하단: 최고 입찰가 + 그 금액을 건 사람을 한 줄로.
+                예전엔 "현재 선두"를 카드 밖 별도 블록으로 뒀는데, FHD 에서
+                하단에 고정된 입찰 패널 뒤로 가려져 금액과 입찰자를 한 눈에
+                볼 수 없었다(2026-10-01 운영자 제보). 금액 바로 옆에 붙인다.
+              */}
               <div
                 className={cn(
-                  "flex items-center justify-center px-6 py-4 bg-bg-secondary/60 border-t border-bg-tertiary transition-colors",
+                  "flex items-center justify-center gap-4 px-5 py-3 bg-bg-secondary/60 border-t border-bg-tertiary transition-colors",
                   bidFlash && "animate-bid-flash",
                 )}
               >
-                <div className="flex items-center gap-2.5">
-                  <Coins className="w-6 h-6 text-accent-gold" />
-                  <span className="text-3xl font-bold text-accent-gold tabular-nums">
+                <div className="flex items-center gap-2">
+                  <Coins className="w-5 h-5 text-accent-gold" />
+                  <span className="text-2xl font-bold text-accent-gold tabular-nums">
                     {auctionState.currentHighestBid.toLocaleString()}
                   </span>
-                  <span className="text-sm text-text-tertiary self-end mb-1">
+                  <span className="text-xs text-text-tertiary self-end mb-0.5">
                     G
                   </span>
                 </div>
+                <span className="h-5 w-px bg-bg-tertiary" aria-hidden />
+                {auctionState.currentHighestBidder ? (
+                  (() => {
+                    const bidderTeam = sortedTeams.find(
+                      (team) =>
+                        team.id === auctionState.currentHighestBidder ||
+                        team.captainId === auctionState.currentHighestBidder,
+                    );
+                    return (
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="text-[11px] font-bold text-accent-gold">
+                          선두
+                        </span>
+                        {bidderTeam?.color && (
+                          <span
+                            className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                            style={{ backgroundColor: bidderTeam.color }}
+                          />
+                        )}
+                        <strong className="truncate text-lg font-bold text-text-primary">
+                          {highestBidderName}
+                        </strong>
+                        {bidderTeam && (
+                          <span className="truncate text-xs text-text-tertiary">
+                            {bidderTeam.name}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <span className="text-sm font-medium text-text-muted">
+                    첫 입찰을 기다리는 중
+                  </span>
+                )}
               </div>
             </CardContent>
           </Card>
         </>
       )}
 
-      {/* 팀별 예산 요약 바 — 스크롤 없이 한눈에 확인 */}
-      {auctionState.currentPlayer && sortedTeams.length > 0 && (
+      {/*
+        팀별 예산 요약 바 — 스크롤 없이 한눈에 확인.
+        데스크톱 3열(hideTeams)에선 왼쪽 "팀 요약"이 같은 예산·인원을 보여주고,
+        이 바가 세로 공간을 먹어 입찰 패널이 매물 카드를 덮었다. 그때는 숨긴다.
+      */}
+      {auctionState.currentPlayer && sortedTeams.length > 0 && !hideTeams && (
         <div className="flex items-center gap-2 flex-wrap rounded-lg border border-bg-tertiary bg-bg-secondary/60 px-3 py-2.5">
           <span className="hidden xl:inline text-xs font-medium text-text-tertiary mr-1">
             팀 현황
@@ -691,58 +747,6 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
         </div>
       )}
 
-      {auctionState.currentPlayer && (
-        <div
-          className={cn(
-            "hidden min-h-[140px] flex-1 flex-col items-center justify-center py-5 text-center lg:flex",
-            bidFlash && "animate-bid-flash",
-          )}
-        >
-          {auctionState.currentHighestBidder ? (
-            (() => {
-              const bidderTeam = sortedTeams.find(
-                (team) =>
-                  team.id === auctionState.currentHighestBidder ||
-                  team.captainId === auctionState.currentHighestBidder,
-              );
-
-              return (
-                <>
-                  <span className="mb-2 text-xs font-bold uppercase text-accent-gold">
-                    현재 선두
-                  </span>
-                  <div className="flex max-w-full items-center justify-center gap-3">
-                    {bidderTeam?.color && (
-                      <span
-                        className="h-4 w-4 flex-shrink-0 rounded-full"
-                        style={{ backgroundColor: bidderTeam.color }}
-                      />
-                    )}
-                    <strong className="truncate text-3xl font-black text-text-primary xl:text-4xl">
-                      {highestBidderName}
-                    </strong>
-                  </div>
-                  {bidderTeam && (
-                    <span className="mt-2 max-w-full truncate text-sm font-medium text-text-secondary">
-                      {bidderTeam.name}
-                    </span>
-                  )}
-                </>
-              );
-            })()
-          ) : (
-            <>
-              <span className="text-xs font-bold uppercase text-text-tertiary">
-                현재 선두
-              </span>
-              <span className="mt-2 text-lg font-semibold text-text-muted">
-                첫 입찰을 기다리는 중
-              </span>
-            </>
-          )}
-        </div>
-      )}
-
       {/* 비캡틴/관전자 관전 안내 */}
       {!canCurrentUserBid && auctionState.currentPlayer && !hideBidPanel && (
         <div
@@ -771,8 +775,8 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               "sticky bottom-0 z-20 mt-auto border-accent-primary/20 bg-bg-secondary/95 shadow-[0_-18px_44px_rgba(0,0,0,0.32)] backdrop-blur",
           )}
         >
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
               <Badge variant="success">지금 입찰 가능</Badge>
               <p className="text-sm text-text-tertiary">
                 사용 가능:{" "}
@@ -794,11 +798,11 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               </p>
             </div>
 
-            <div className="border-y border-bg-tertiary py-4 mb-4 text-center">
+            <div className="border-y border-bg-tertiary py-2.5 mb-3 text-center">
               <p className="text-xs text-text-tertiary mb-1">입찰가</p>
               <p
                 className={cn(
-                  "text-2xl md:text-3xl font-bold",
+                  "text-2xl font-bold",
                   accumulatedBid > 0
                     ? "text-accent-gold"
                     : "text-text-tertiary",
@@ -834,7 +838,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="grid grid-cols-3 gap-2 mb-3">
               {bidSteps.map((inc) => (
                 <Button
                   key={inc}
