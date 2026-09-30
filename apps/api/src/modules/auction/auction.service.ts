@@ -1855,10 +1855,13 @@ export class AuctionService implements OnModuleInit {
       return false;
     }
 
-    // Don't delete rooms that have progressed beyond WAITING
-    // (e.g., DRAFT_COMPLETED, ROLE_SELECTION, IN_PROGRESS)
+    // 경매가 진행 중일 때만 정리한다.
+    // - 대진 이후 단계(DRAFT_COMPLETED, ROLE_SELECTION, IN_PROGRESS)는 지울 대상이 아니다.
+    // - WAITING 도 뺀다. 경매 소켓은 내전 종료로 방이 로비로 돌아간 뒤 화면이
+    //   로비로 넘어갈 때도 끊기는데, 그때 지우면 방장이 로비에 도착하기도 전에
+    //   방이 사라진다(2026-09-30 운영 실측: 종료 3초 뒤 "Room not found").
+    //   로비 상태의 방은 방 게이트웨이의 유예 정리(90초)가 맡는다.
     const deletableStatuses: RoomStatus[] = [
-      RoomStatus.WAITING,
       RoomStatus.DRAFT,
       RoomStatus.TEAM_SELECTION,
     ];

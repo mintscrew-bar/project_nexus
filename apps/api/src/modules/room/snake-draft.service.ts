@@ -647,6 +647,15 @@ export class SnakeDraftService {
       return false;
     }
 
+    // 드래프트가 진행 중일 때만 정리한다. 드래프트 소켓이 끊기는 건
+    // 방장이 방을 버린 경우만이 아니다 — 내전 종료로 방이 로비(WAITING)로
+    // 돌아간 뒤 화면이 로비로 넘어갈 때도 끊긴다. 그때 지우면 방장이
+    // 로비에 도착하기도 전에 방이 사라진다. 로비 상태의 방은 방 게이트웨이의
+    // 유예 정리(90초)가 맡고, 대진 이후 단계는 애초에 지울 대상이 아니다.
+    if (room.status !== RoomStatus.DRAFT) {
+      return false;
+    }
+
     const remainingParticipants = room.participants.filter(
       (p: (typeof room.participants)[number]) => p.userId !== userId,
     );
