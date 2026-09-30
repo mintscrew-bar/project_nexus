@@ -16,7 +16,13 @@ import { MatchGateway } from "../match/match.gateway";
 import { MatchService } from "../match/match.service";
 import { resolveBroadcastRoomId } from "../broadcast/broadcast-resolve.util";
 import { Role } from "@nexus/database";
-import { DEFAULT_GAME, GAMES, afterTeamsPath, getGame } from "@nexus/types";
+import {
+  DEFAULT_GAME,
+  GAMES,
+  afterTeamsPath,
+  getGame,
+  getRoomStagePath,
+} from "@nexus/types";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -365,15 +371,23 @@ export class RoleSelectionGateway
         select: { gameTitle: true, pubgGameMode: true, teamMode: true },
       });
       const gameSlug = GAMES[navRoom?.gameTitle ?? DEFAULT_GAME].slug;
-      const target = afterTeamsPath(
-        {
-          id: roomId,
-          gameTitle: navRoom?.gameTitle ?? DEFAULT_GAME,
-          pubgGameMode: navRoom?.pubgGameMode,
-          teamMode: navRoom?.teamMode ?? "MANUAL_TEAM",
-        },
-        `/${gameSlug}`,
-      );
+      //
+      // afterTeamsPath 가 아니다. 그건 "팀 편성 다음 화면"이라 롤에서는 역할 선택
+      // 자신을 가리킨다. 그 값을 보내면 클라이언트가 같은 주소로 이동하면서
+      // "이미 이동함" 표시를 켜 버려, 이후 대진표 복구 확인까지 전부 무시하고
+      // 역할 선택 화면에 갇혔다 (2026-09-06 b3543ac9 부터, 09-30 운영에서 확인).
+      // 역할 선택이 끝난 방은 대진이 만들어진 IN_PROGRESS 상태다.
+      const stageRoom = {
+        id: roomId,
+        gameTitle: navRoom?.gameTitle ?? DEFAULT_GAME,
+        pubgGameMode: navRoom?.pubgGameMode,
+        teamMode: navRoom?.teamMode ?? "MANUAL_TEAM",
+      };
+      const target =
+        getRoomStagePath(
+          { ...stageRoom, status: "IN_PROGRESS" },
+          `/${gameSlug}`,
+        ) ?? afterTeamsPath(stageRoom, `/${gameSlug}`);
       this.server.to(`room:${roomId}`).emit("role-selection-navigation", {
         target,
       });

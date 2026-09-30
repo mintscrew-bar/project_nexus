@@ -139,6 +139,11 @@ export default function RoleSelectionPage() {
   const redirectToNextStage = useCallback(
     (target: string) => {
       if (hasRedirected.current) return;
+      // 지금 이 화면으로의 "이동"은 이동이 아니다. 여기서 표시를 켜면 이후 상태
+      // 확인이 대진표를 찾아도 전부 무시돼 화면에 갇힌다(서버가 역할 선택
+      // 경로를 목표로 보냈던 2026-09 버그). 표시를 켜지 않고 넘겨서, 상태 확인
+      // 루프가 대진표로 데려가게 둔다.
+      if (target === window.location.pathname) return;
       hasRedirected.current = true;
       addToast("역할 선택 완료! 대진표로 이동합니다.", "success");
       router.replace(target);
