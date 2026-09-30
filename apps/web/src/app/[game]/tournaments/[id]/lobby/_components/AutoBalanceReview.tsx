@@ -10,6 +10,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { PositionIcon, POSITION_LABELS } from "./icons";
+import { GAME_SFX, playSfx } from "@/lib/sfx";
 
 interface ReviewMember {
   userId: string;
@@ -165,6 +166,8 @@ export function AutoBalanceReview({
 
   const beginDrag = (origin: { x: number; y: number; userId: string }) => {
     draggingRef.current = true;
+    // 카드를 집는 순간(마우스는 누르자마자, 터치는 홀드가 끝난 뒤). 이동 중에는 무음.
+    playSfx(GAME_SFX.hold);
     setSwapFrom(origin.userId);
     setDragPosition({ x: origin.x, y: origin.y });
   };

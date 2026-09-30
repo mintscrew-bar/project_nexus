@@ -13,6 +13,7 @@ import React, {
   useMemo,
 } from "react";
 import { useAuction } from "@/hooks/useAuction";
+import { useAuctionSfx } from "@/hooks/useAuctionSfx";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
 import {
@@ -632,6 +633,8 @@ export default function AuctionRoomPage() {
   const { user } = useAuthStore();
   const { addToast } = useToast();
   const hasRedirected = useRef(false);
+  // 입찰·카운트다운·낙찰 효과음 (방송 화면에는 없다)
+  useAuctionSfx();
   const redirectRecoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );

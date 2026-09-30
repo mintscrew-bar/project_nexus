@@ -18,7 +18,9 @@ export const SFX_GAIN_BY_FILE: Record<string, number> = {
   "auction_close_822568.mp3": 0.88,
   "mixkit_2577.mp3": 0.72,
   "card_drop_817539.mp3": 0.95,
-  "switch_snap_842480.mp3": 0.62,
+  // 원본이 매우 작다(최대 -32dB). 0.62 로는 게임 중 줄인 배경음악에도 묻혀서
+  // 보정 없이 최대로 둔다. 더 키우려면 파일 자체를 정규화해야 한다.
+  "switch_snap_842480.mp3": 1,
   "rebalance_clean_108334.mp3": 0.68,
 };
 

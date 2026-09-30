@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { GAME_SFX, playSfx } from "@/lib/sfx";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
 import {
   DEFAULT_GAME,
@@ -811,7 +812,10 @@ export default function TournamentLobbyPage() {
         );
         if (!result.success) {
           addToast(result.error ?? "재편성에 실패했습니다.", "error");
+          return;
         }
+        // 성공했을 때만. 편성 조작은 방장만 하므로 방장 화면에서만 난다.
+        playSfx(GAME_SFX.rebalance);
       }}
       onConfirm={async () => {
         const result = await roomSocketHelpers.confirmAutoBalance(room.id);
@@ -845,7 +849,10 @@ export default function TournamentLobbyPage() {
         );
         if (!result.success) {
           addToast(result.error ?? "자리 교체에 실패했습니다.", "error");
+          return;
         }
+        // 카드를 놓아 교체가 실제로 반영된 순간
+        playSfx(GAME_SFX.drop);
       }}
       onMemberHover={(userId, anchorRect) => {
         cancelHoverClose();
