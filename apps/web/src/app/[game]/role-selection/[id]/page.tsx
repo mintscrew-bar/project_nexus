@@ -146,11 +146,12 @@ export default function RoleSelectionPage() {
       if (redirectRecoveryTimerRef.current) {
         clearTimeout(redirectRecoveryTimerRef.current);
       }
+      // 주소 비교로는 부족하다 — 주소만 바뀌고 화면은 남는 경우가 있다
+      // (2026-09-30 경매 화면에서 실측). 이동이 끝나면 이 화면이 내려가며
+      // 아래 정리에서 타이머가 취소되므로, 타이머가 돌았다면 이동 실패다.
       redirectRecoveryTimerRef.current = setTimeout(() => {
-        if (window.location.pathname !== target) {
-          window.location.replace(target);
-        }
-      }, 1500);
+        window.location.replace(target);
+      }, 3000);
     },
     [addToast, router],
   );

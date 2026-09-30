@@ -632,6 +632,48 @@ export default function AuctionRoomPage() {
   const { user } = useAuthStore();
   const { addToast } = useToast();
   const hasRedirected = useRef(false);
+  const redirectRecoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  /**
+   * 경매 다음 단계(역할 선택·대진표)로 넘어간다. 라우터 이동이 안 끝나면 전체 이동으로 복구한다.
+   *
+   * 2026-09-30 운영에서 주소는 역할 선택으로 바뀌었는데 화면은 경매에 남아 있었다.
+   * 경매 화면의 상태 확인 루프는 "이미 이동함" 표시를 보고 결과를 버리므로
+   * 새로고침 전까지 빠져나갈 길이 없었다.
+   *
+   * 역할 선택 화면의 복구는 "주소가 안 바뀌었으면"을 기준으로 삼는데, 이번엔
+   * 주소가 이미 바뀐 채 멈췄으므로 그 기준으로는 못 잡는다. 대신 "이 화면이
+   * 아직 떠 있는가"를 본다. 이동이 끝나면 경매 화면이 내려가며 아래 정리에서
+   * 타이머가 취소되므로, 타이머가 실행됐다는 것 자체가 이동 실패의 증거다.
+   */
+  const goToNextStage = useCallback(
+    (target: string, mode: "push" | "replace" = "push") => {
+      hasRedirected.current = true;
+      if (mode === "replace") router.replace(target);
+      else router.push(target);
+
+      if (redirectRecoveryTimerRef.current) {
+        clearTimeout(redirectRecoveryTimerRef.current);
+      }
+      // 느린 네트워크에서 정상 이동까지 전체 이동으로 바꾸지 않도록 여유를 둔다.
+      redirectRecoveryTimerRef.current = setTimeout(() => {
+        window.location.replace(target);
+      }, 3000);
+    },
+    [router],
+  );
+
+  useEffect(
+    () => () => {
+      if (redirectRecoveryTimerRef.current) {
+        clearTimeout(redirectRecoveryTimerRef.current);
+        redirectRecoveryTimerRef.current = null;
+      }
+    },
+    [],
+  );
   const logEndRef = useRef<HTMLDivElement>(null);
   const [selectedCaptains, setSelectedCaptains] = useState<string[]>([]);
   const [volunteerTimer, setVolunteerTimer] = useState(0);
@@ -697,8 +739,7 @@ export default function AuctionRoomPage() {
         if (prev === null || prev <= 1) {
           clearInterval(interval);
           if (!hasRedirected.current) {
-            hasRedirected.current = true;
-            router.push(
+            goToNextStage(
               afterTeamsPath(
                 { id: auctionId, gameTitle: game, teamMode: "AUCTION" },
                 gamePrefix,
@@ -711,25 +752,44 @@ export default function AuctionRoomPage() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [auctionState?.status, auctionId, router, gamePrefix, game]);
+  }, [auctionState?.status, auctionId, goToNextStage, gamePrefix, game]);
   useEffect(() => {
-    if (hasRedirected.current || auctionState?.status === "COMPLETED" || !auctionId) return;
+    if (
+      hasRedirected.current ||
+      auctionState?.status === "COMPLETED" ||
+      !auctionId
+    )
+      return;
     let cancelled = false;
     const checkAuctionStage = async () => {
       try {
         const currentRoom = await roomApi.getRoom(auctionId);
         if (cancelled || hasRedirected.current) return;
-        if (currentRoom?.status === "DRAFT_COMPLETED" || currentRoom?.status === "IN_PROGRESS") {
-          hasRedirected.current = true;
-          router.replace(afterTeamsPath({ id: auctionId, gameTitle: currentRoom.gameTitle ?? game, teamMode: "AUCTION" }, gamePrefix));
+        if (
+          currentRoom?.status === "DRAFT_COMPLETED" ||
+          currentRoom?.status === "IN_PROGRESS"
+        ) {
+          goToNextStage(
+            afterTeamsPath(
+              {
+                id: auctionId,
+                gameTitle: currentRoom.gameTitle ?? game,
+                teamMode: "AUCTION",
+              },
+              gamePrefix,
+            ),
+            "replace",
+          );
         }
       } catch {}
     };
     void checkAuctionStage();
     const timer = window.setInterval(checkAuctionStage, 2000);
-    return () => { cancelled = true; window.clearInterval(timer); };
-  }, [auctionState?.status, auctionId, router, gamePrefix, game]);
-
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [auctionState?.status, auctionId, goToNextStage, gamePrefix, game]);
 
   useEffect(() => {
     if (!sessionAbortedAt) return;
@@ -860,7 +920,9 @@ export default function AuctionRoomPage() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => router.push(`${gamePrefix}/tournaments/${auctionId}/lobby`)}
+              onClick={() =>
+                router.push(`${gamePrefix}/tournaments/${auctionId}/lobby`)
+              }
             >
               로비로 돌아가기
             </Button>
@@ -1392,9 +1454,8 @@ export default function AuctionRoomPage() {
             <Button
               variant="primary"
               onClick={() => {
-                hasRedirected.current = true;
                 setCompleteCountdown(0);
-                router.push(
+                goToNextStage(
                   afterTeamsPath(
                     { id: auctionId, gameTitle: game, teamMode: "AUCTION" },
                     gamePrefix,
