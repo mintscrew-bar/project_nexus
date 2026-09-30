@@ -64,10 +64,7 @@ export default function BracketPage() {
         // 배그 킬내기는 승패만이 아니라 킬 수까지 받아야 한다.
         gameTitle: (room.gameTitle ?? "LOL") as "LOL" | "PUBG",
         pubgGameMode: (room.pubgGameMode ?? null) as
-          | "KILL_MATCH"
-          | "BATTLE_ROYALE"
-          | "FREE_MATCH"
-          | null,
+          "KILL_MATCH" | "BATTLE_ROYALE" | "FREE_MATCH" | null,
       };
     },
     staleTime: Infinity,
@@ -255,6 +252,8 @@ export default function BracketPage() {
         status: slotStatus,
         scheduledTime: activeGame.scheduledTime,
         tournamentCode: activeGame.tournamentCode,
+        // 진영은 세트마다 다르다(2세트부터는 교대). 지금 가리키는 세트 것을 싣는다.
+        blueSideTeamId: activeGame.blueSideTeamId ?? null,
         bracketSection: first.bracketRound || undefined,
         bestOf,
         currentGameNumber: activeGame.gameNumber ?? 1,

@@ -49,6 +49,8 @@ export interface Match {
   status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
   scheduledTime?: string;
   tournamentCode?: string;
+  /** 지금 세트의 블루 진영 팀(가위바위보 결과). 아직 안 정했으면 null */
+  blueSideTeamId?: string | null;
   bracketSection?: string; // "WB_R1", "WB_F", "LB_R1", "LB_F", "GF", etc.
   mvpUserId?: string;
   aceUserId?: string;
@@ -122,13 +124,57 @@ function getMatchStatus(match: Match) {
   }
 }
 
+/**
+ * 이 팀의 진영. 진영이 안 정해졌거나 팀이 없으면 null.
+ * 블루 팀 id 하나만 저장하므로 상대는 자동으로 레드다.
+ */
+export function getTeamSide(
+  blueSideTeamId: string | null | undefined,
+  team?: Team,
+): "blue" | "red" | null {
+  if (!blueSideTeamId || !team?.id) return null;
+  return team.id === blueSideTeamId ? "blue" : "red";
+}
+
+/**
+ * 진영 표시 태그. 팀 고유 색과 헷갈리지 않게 점이 아니라 글자 태그로 쓴다.
+ * 컴팩트 카드에서는 폭이 좁아 한 글자(B/R)만 쓴다.
+ */
+export function SideTag({
+  side,
+  compact = false,
+}: {
+  side: "blue" | "red" | null;
+  compact?: boolean;
+}) {
+  if (!side) return null;
+  const isBlue = side === "blue";
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded border font-bold leading-none",
+        compact ? "px-1 py-0.5 text-[9px]" : "px-1.5 py-0.5 text-[10px]",
+        isBlue
+          ? "border-blue-500/40 bg-blue-500/15 text-blue-400"
+          : "border-red-500/40 bg-red-500/15 text-red-400",
+      )}
+      title={isBlue ? "블루 진영" : "레드 진영"}
+    >
+      {compact ? (isBlue ? "B" : "R") : isBlue ? "블루" : "레드"}
+    </span>
+  );
+}
+
 function TeamSlot({
   team,
   isWinner,
+  side = null,
   density = "detailed",
 }: {
   team?: Team;
   isWinner: boolean;
+  /** 지금 세트의 진영. 시리즈가 끝났거나 아직 안 정했으면 null */
+  side?: "blue" | "red" | null;
   density?: Density;
 }) {
   const compact = density === "compact";
@@ -167,6 +213,7 @@ function TeamSlot({
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          <SideTag side={side} compact={compact} />
           {team?.score !== undefined && (
             <span
               className={cn(
@@ -206,6 +253,8 @@ function MatchCard({
 }) {
   const status = getMatchStatus(match);
   const compact = density === "compact";
+  // 끝난 대진엔 진영을 안 보인다 — 마지막 세트 진영만 남아 있어 오해를 부른다.
+  const sideBlueId = match.status === "COMPLETED" ? null : match.blueSideTeamId;
 
   // 컴팩트는 한 줄 머리글 + 팀 두 줄만 남긴다. 나머지 정보(섹션명·세트 진행·
   // 예정 시각)는 카드를 열면 볼 수 있으므로 여기서는 접는다.
@@ -237,11 +286,13 @@ function MatchCard({
           <TeamSlot
             team={match.team1}
             isWinner={match.winner?.id === match.team1?.id}
+            side={getTeamSide(sideBlueId, match.team1)}
             density="compact"
           />
           <TeamSlot
             team={match.team2}
             isWinner={match.winner?.id === match.team2?.id}
+            side={getTeamSide(sideBlueId, match.team2)}
             density="compact"
           />
         </div>
@@ -298,6 +349,7 @@ function MatchCard({
         <TeamSlot
           team={match.team1}
           isWinner={match.winner?.id === match.team1?.id}
+          side={getTeamSide(sideBlueId, match.team1)}
         />
         <div className="flex items-center gap-2 px-1">
           <div className="h-px flex-1 bg-bg-tertiary" />
@@ -307,6 +359,7 @@ function MatchCard({
         <TeamSlot
           team={match.team2}
           isWinner={match.winner?.id === match.team2?.id}
+          side={getTeamSide(sideBlueId, match.team2)}
         />
       </div>
 

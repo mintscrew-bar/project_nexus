@@ -795,6 +795,8 @@ export class MatchService {
         teamBId: true,
         winnerId: true,
         tournamentCode: true,
+        // 가위바위보로 정한 진영. 대진표 카드·매치 모달이 블루/레드 표시에 쓴다.
+        blueSideTeamId: true,
         scheduledAt: true,
         startedAt: true,
         completedAt: true,

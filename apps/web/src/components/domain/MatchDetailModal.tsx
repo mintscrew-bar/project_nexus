@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Loader2, Swords, Trophy, Copy, ShieldCheck, AlertCircle, Star, Sword } from 'lucide-react';
-import { Match, getTeamDisplayName } from './BracketView';
+import { Match, SideTag, getTeamDisplayName, getTeamSide } from './BracketView';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { matchApi, reputationApi } from '@/lib/api-client';
@@ -190,10 +190,13 @@ export function MatchDetailModal({
   // 시리즈가 없는 레거시/외부 매치는 currentGameStatus가 없어 기존대로 status를 쓴다.
   const currentGameStatus = match ? (match.currentGameStatus ?? match.status) : null;
 
-  // 세트가 시작(IN_PROGRESS)되면 가위바위보 상태 정리
+  // 세트가 시작(IN_PROGRESS)되면 가위바위보 상태 정리.
+  // 단, 진영이 확정된(done) 결과는 남긴다. 서버는 진영이 정해지자마자 매치를
+  // 시작하므로, 여기서 지우면 결과 화면이 뜨자마자 사라져 누가 어느 진영인지
+  // 아무도 못 봤다(2026-10-01 운영자 제보).
   useEffect(() => {
     if (currentGameStatus && currentGameStatus !== 'PENDING') {
-      setRps(null);
+      setRps((prev) => (prev?.phase === 'done' ? prev : null));
       setRpsReveal(null);
     }
   }, [currentGameStatus]);
@@ -310,8 +313,14 @@ export function MatchDetailModal({
     !!(user?.id && match.team2?.captain?.id && user.id === match.team2.captain.id);
   const canManageMatch = isHost || isCaptainOfMatch;
 
-  // 가위바위보 진행 중 여부 + 팀(A/B) 매핑
-  const rpsActive = !!rps && currentGameStatus === 'PENDING';
+  // 가위바위보 진행 중 여부 + 팀(A/B) 매핑.
+  // 진영 확정(done) 결과는 세트가 시작된 뒤에도 계속 보여준다.
+  const rpsActive = !!rps && (currentGameStatus === 'PENDING' || rps.phase === 'done');
+  // 지금 세트의 블루 진영 팀. 방금 끝난 가위바위보 결과가 대진표 재조회보다 빠르다.
+  const blueSideTeamId =
+    (rps?.phase === 'done' ? rps.blueSideTeamId : null) ?? match.blueSideTeamId ?? null;
+  // 끝난 대진엔 진영을 안 보인다 — 마지막 세트 진영만 남아 있어 오해를 부른다.
+  const showSides = match.status !== 'COMPLETED';
   const teamNameById = (id: string) =>
     match.team1?.id === id ? getTeamDisplayName(match.team1)
       : match.team2?.id === id ? getTeamDisplayName(match.team2) : '팀';
@@ -333,9 +342,12 @@ export function MatchDetailModal({
     >
       {/* 대진 요약 — 상태 배지를 별도 행으로 빼지 않고 제목 줄에 붙인다 */}
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <p className="text-lg font-bold text-text-primary">
+        <p className="flex flex-wrap items-center gap-x-1.5 text-lg font-bold text-text-primary">
+          {/* 진영이 정해졌으면 팀 이름 옆에 블루/레드 태그 */}
+          {showSides && <SideTag side={getTeamSide(blueSideTeamId, match.team1)} />}
           {getTeamDisplayName(match.team1)}
-          <span className="mx-2 text-sm font-medium text-text-tertiary">vs</span>
+          <span className="mx-1 text-sm font-medium text-text-tertiary">vs</span>
+          {showSides && <SideTag side={getTeamSide(blueSideTeamId, match.team2)} />}
           {getTeamDisplayName(match.team2)}
         </p>
         {getStatusBadge(match.status)}

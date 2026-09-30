@@ -42,6 +42,8 @@ export interface Match {
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
   tournamentCode?: string;
   scheduledTime?: string;
+  /** 가위바위보로 정한 블루 진영 팀. 아직 안 정했으면 null */
+  blueSideTeamId?: string | null;
   // 다전제: 이 매치가 속한 시리즈(대진 슬롯)와 세트 번호.
   // 시리즈 도입 이전 방과 외부 매치는 없다.
   seriesId?: string | null;
