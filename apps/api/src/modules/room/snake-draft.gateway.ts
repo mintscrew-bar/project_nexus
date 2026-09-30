@@ -116,14 +116,23 @@ export class SnakeDraftGateway
     this.connectedUsers.delete(client.id);
 
     if (trackedUser) {
-      try {
-        await this.snakeDraftService.cleanupBotOnlyRoomOnHostDisconnect(
-          trackedUser.userId,
-          trackedUser.roomId,
-        );
-      } catch {
-        // Best-effort cleanup only
-      }
+      const { userId, roomId } = trackedUser;
+      // 경매 게이트웨이와 같은 이유로 유예를 둔다 — 새로고침한 방장이
+      // 돌아오기 전에 방이 지워지면 안 된다. 그 사이 다시 붙었으면 그대로 둔다.
+      const timer = setTimeout(async () => {
+        for (const tracked of this.connectedUsers.values()) {
+          if (tracked.userId === userId && tracked.roomId === roomId) return;
+        }
+        try {
+          await this.snakeDraftService.cleanupBotOnlyRoomOnHostDisconnect(
+            userId,
+            roomId,
+          );
+        } catch {
+          // Best-effort cleanup only
+        }
+      }, 30_000);
+      timer.unref?.();
     }
   }
 

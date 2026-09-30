@@ -67,6 +67,12 @@ export class AuctionGateway
   private readonly BID_LOCK_TTL_MS = 5000;
   private readonly BID_LOCK_RETRY_DELAY_MS = 50;
   private readonly NEXT_ITEM_DELAY_MS = 900;
+  /**
+   * 방장이 끊긴 봇 방을 지우기 전 기다리는 시간.
+   * 새로고침·잠깐의 네트워크 끊김은 이 안에 다시 붙는다. 기다리지 않으면
+   * 방장이 새로고침하는 순간 방이 지워져 돌아올 곳이 없어진다(2026-09-30 실측).
+   */
+  private readonly HOST_ABANDON_GRACE_MS = 30_000;
 
   constructor(
     private readonly authService: AuthService,
@@ -171,22 +177,38 @@ export class AuctionGateway
     this.connectedUsers.delete(client.id);
 
     if (trackedUser) {
-      try {
-        const deleted =
-          await this.auctionService.cleanupBotOnlyRoomOnHostDisconnect(
-            trackedUser.userId,
-            trackedUser.roomId,
-          );
-        if (deleted) {
-          this.cleanupRoom(trackedUser.roomId);
+      const { userId, roomId } = trackedUser;
+      // 바로 지우지 않고 유예를 둔다. 그 사이 같은 사람이 이 방에 다시
+      // 붙었으면(새로고침) 방을 버린 게 아니므로 아무것도 하지 않는다.
+      const timer = setTimeout(async () => {
+        if (this._isUserInRoom(userId, roomId)) return;
+        try {
+          const deleted =
+            await this.auctionService.cleanupBotOnlyRoomOnHostDisconnect(
+              userId,
+              roomId,
+            );
+          if (deleted) {
+            this.cleanupRoom(roomId);
+          }
+        } catch {
+          // Best-effort cleanup only
         }
-      } catch {
-        // Best-effort cleanup only
-      }
+      }, this.HOST_ABANDON_GRACE_MS);
+      // 이 타이머 때문에 프로세스 종료가 늦어지지 않게 한다.
+      timer.unref?.();
     }
 
     // Note: Auction continues even if a captain disconnects.
     // The timer will still expire and resolve normally (yuchal or auto-assign).
+  }
+
+  /** 이 사람이 지금 이 방의 경매 소켓에 하나라도 붙어 있는가. */
+  private _isUserInRoom(userId: string, roomId: string): boolean {
+    for (const tracked of this.connectedUsers.values()) {
+      if (tracked.userId === userId && tracked.roomId === roomId) return true;
+    }
+    return false;
   }
 
   @SubscribeMessage("join-room")
