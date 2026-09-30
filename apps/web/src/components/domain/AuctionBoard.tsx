@@ -753,7 +753,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
           className={cn(
             "py-3 px-4 rounded-lg bg-bg-secondary border border-bg-tertiary text-center text-sm text-text-secondary",
             shouldDockBidPanel &&
-              "sticky bottom-0 z-20 mt-auto bg-bg-secondary/95 shadow-[0_-18px_44px_rgba(0,0,0,0.28)] backdrop-blur",
+              "sticky bottom-0 z-20 bg-bg-secondary/95 shadow-[0_-18px_44px_rgba(0,0,0,0.28)] backdrop-blur",
           )}
         >
           {auctionState.status === "IN_PROGRESS"
@@ -772,7 +772,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
           className={cn(
             "overflow-hidden p-0",
             shouldDockBidPanel &&
-              "sticky bottom-0 z-20 mt-auto border-accent-primary/20 bg-bg-secondary/95 shadow-[0_-18px_44px_rgba(0,0,0,0.32)] backdrop-blur",
+              "sticky bottom-0 z-20 border-accent-primary/20 bg-bg-secondary/95 shadow-[0_-18px_44px_rgba(0,0,0,0.32)] backdrop-blur",
           )}
         >
           <CardContent className="p-4">
