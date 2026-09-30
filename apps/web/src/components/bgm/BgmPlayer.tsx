@@ -3,13 +3,18 @@
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  BGM_DUCKED_VOLUME,
+  BGM_DUCK_RATIO,
+  BGM_MAX_VOLUME,
   BGM_TRACKS,
-  BGM_VOLUME,
   pickNextTrack,
+  stepTrack,
   type BgmTrack,
 } from "@/lib/bgm/playlist";
-import { BGM_MUTED_STORAGE_KEY, useBgmStore } from "@/stores/bgm-store";
+import {
+  BGM_MUTED_STORAGE_KEY,
+  BGM_VOLUME_STORAGE_KEY,
+  useBgmStore,
+} from "@/stores/bgm-store";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useMyMatchInProgress } from "@/hooks/useMyMatchInProgress";
 
@@ -28,6 +33,8 @@ const FADE_OUT_MS = 800;
 const SWITCH_FADE_MS = 500;
 /** 게임 진행 구간에 들어가거나 나올 때 볼륨을 옮기는 시간 */
 const DUCK_FADE_MS = 700;
+/** 볼륨 슬라이더를 움직일 때. 끌면서 바로 들려야 해서 짧게 둔다. */
+const USER_VOLUME_FADE_MS = 120;
 /** 볼륨을 한 칸 바꾸는 간격 */
 const FADE_TICK_MS = 50;
 
@@ -56,7 +63,7 @@ const DUCKED_ROOM_STATUSES = new Set([
  *
  * `Providers` 에 한 번만 둔다. 페이지가 아니라 최상위에 있어야 클라이언트
  * 라우팅으로 화면을 옮겨도 곡이 끊기지 않는다. 화면은 그리지 않는다 —
- * 켜고 끄는 버튼은 `BgmToggle` 이다.
+ * 음소거·볼륨·곡 고르기는 헤더의 `BgmToggle` 패널이 한다.
  *
  * 곡이 하나도 등록되지 않았으면 아무것도 하지 않는다.
  */
@@ -71,6 +78,10 @@ function BgmEngine() {
   const hydrated = useBgmStore((s) => s.hydrated);
   const hydrate = useBgmStore((s) => s.hydrate);
   const syncMuted = useBgmStore((s) => s.syncMuted);
+  const syncVolume = useBgmStore((s) => s.syncVolume);
+  const userVolume = useBgmStore((s) => s.volume);
+  const trackRequest = useBgmStore((s) => s.trackRequest);
+  const setCurrentTrackId = useBgmStore((s) => s.setCurrentTrackId);
   const gameStarting = useLobbyStore((s) => s.gameStarting);
   const roomStatus = useLobbyStore((s) => s.room?.status);
   const inMatch = useMyMatchInProgress();
@@ -100,7 +111,9 @@ function BgmEngine() {
   const ducked =
     gameStarting ||
     (roomStatus !== undefined && DUCKED_ROOM_STATUSES.has(roomStatus));
-  const targetVolume = ducked ? BGM_DUCKED_VOLUME : BGM_VOLUME;
+  // 사용자 볼륨 × 최대치 × (게임 중이면 줄이는 비율)
+  const targetVolume =
+    userVolume * BGM_MAX_VOLUME * (ducked ? BGM_DUCK_RATIO : 1);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const trackRef = useRef<BgmTrack | null>(null);
@@ -212,11 +225,12 @@ function BgmEngine() {
     (track: BgmTrack) => {
       const audio = getAudio();
       trackRef.current = track;
+      setCurrentTrackId(track.id);
       audio.src = track.src;
       audio.volume = 0;
       playLoaded();
     },
-    [getAudio, playLoaded],
+    [getAudio, playLoaded, setCurrentTrackId],
   );
 
   const startNextTrack = useCallback(
@@ -241,11 +255,14 @@ function BgmEngine() {
     const onStorage = (event: StorageEvent) => {
       if (event.key === BGM_MUTED_STORAGE_KEY) {
         syncMuted(event.newValue === "1");
+      } else if (event.key === BGM_VOLUME_STORAGE_KEY && event.newValue) {
+        const next = Number(event.newValue);
+        if (Number.isFinite(next)) syncVolume(next);
       }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [syncMuted]);
+  }, [syncMuted, syncVolume]);
 
   // 탭 간 재생 담당 조율
   useEffect(() => {
@@ -303,15 +320,53 @@ function BgmEngine() {
       events.forEach((name) => window.removeEventListener(name, unlock));
   }, [unlocked, getAudio, playLoaded, startNextTrack]);
 
-  // 곡이 끝나면 다른 곡으로 넘어간다 (같은 곡 연속 재생 없음)
+  // 곡이 끝나면 재생목록 순서대로 다음 곡으로 넘어간다 (끝에서는 처음으로)
   useEffect(() => {
     const audio = getAudio();
     const onEnded = () => {
-      if (shouldPlayRef.current) startNextTrack();
+      if (!shouldPlayRef.current) return;
+      const next = stepTrack(BGM_TRACKS, trackRef.current?.id ?? null, 1);
+      if (next) startTrack(next);
     };
     audio.addEventListener("ended", onEnded);
     return () => audio.removeEventListener("ended", onEnded);
-  }, [getAudio, startNextTrack]);
+  }, [getAudio, startTrack]);
+
+  /**
+   * 재생목록에서 곡을 골랐을 때.
+   *
+   * 아래 "재생 조건" 이펙트보다 먼저 둔다. 곡을 고르면 음소거도 같이 풀리는데,
+   * 그 이펙트가 먼저 돌면 예전 곡을 잠깐 틀었다가 바꾸게 된다.
+   * 지금 틀 수 없는 상황(첫 클릭 전·경기 중·조용한 화면)이면 곡만 걸어 두고,
+   * 재생이 가능해지는 순간 그 곡부터 나온다.
+   */
+  const handledRequestSeqRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!trackRequest || trackRequest.seq === handledRequestSeqRef.current) {
+      return;
+    }
+    handledRequestSeqRef.current = trackRequest.seq;
+    const track = BGM_TRACKS.find((t) => t.id === trackRequest.trackId);
+    if (!track) return;
+
+    const audio = getAudio();
+    if (!shouldPlayRef.current) {
+      trackRef.current = track;
+      setCurrentTrackId(track.id);
+      audio.src = track.src;
+      return;
+    }
+    if (audio.paused) {
+      startTrack(track);
+      return;
+    }
+    // 듣던 곡을 짧게 줄인 뒤 바꾼다. 뚝 끊기면 고장으로 들린다.
+    fadeTo(0, SWITCH_FADE_MS, () => {
+      switchingRef.current = false;
+      if (shouldPlayRef.current) startTrack(track);
+    });
+    switchingRef.current = true;
+  }, [trackRequest, fadeTo, getAudio, setCurrentTrackId, startTrack]);
 
   // 재생 조건이 바뀔 때: 켜야 하면 이어서 틀고, 꺼야 하면 줄이고 멈춘다
   useEffect(() => {
@@ -367,11 +422,15 @@ function BgmEngine() {
    * 재생 중일 때만 한다. 멈춰 있거나 끄는 중(페이드아웃)이면 건드리지 않는다 —
    * 다음에 재생을 시작할 때 `targetVolumeRef` 로 알아서 맞춰진다.
    */
+  const prevDuckedRef = useRef(ducked);
   useEffect(() => {
+    // 게임 구간 진입·이탈은 천천히, 슬라이더 조작은 바로 들리게.
+    const duckChanged = prevDuckedRef.current !== ducked;
+    prevDuckedRef.current = ducked;
     const audio = getAudio();
     if (!shouldPlayRef.current || audio.paused || switchingRef.current) return;
-    fadeTo(targetVolume, DUCK_FADE_MS);
-  }, [targetVolume, fadeTo, getAudio]);
+    fadeTo(targetVolume, duckChanged ? DUCK_FADE_MS : USER_VOLUME_FADE_MS);
+  }, [targetVolume, ducked, fadeTo, getAudio]);
 
   // 정리. Providers 는 사실상 내려가지 않지만 개발 중 핫 리로드 대비.
   useEffect(() => {

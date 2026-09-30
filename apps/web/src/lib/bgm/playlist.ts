@@ -10,7 +10,7 @@
 export interface BgmTrack {
   /** 같은 곡 연속 재생을 막을 때 비교하는 값. 파일명과 같게 둔다. */
   id: string;
-  /** 사람이 알아보기 위한 이름. 화면에는 아직 쓰지 않는다. */
+  /** 재생목록 패널에 보이는 이름 */
   title: string;
   /** public 기준 경로 */
   src: string;
@@ -39,22 +39,42 @@ export const BGM_TRACKS: BgmTrack[] = [
 ];
 
 /**
- * 재생 볼륨(0~1).
+ * 사용자 볼륨 100% 일 때의 실제 재생 볼륨(0~1).
  *
- * 수노 곡은 마스터링이 크게 나와서 낮게 잡는다. 효과음·디스코드 음성채팅
- * 아래에 깔리는 소리여야 한다.
+ * 수노 곡은 마스터링이 크게 나와서 최대치도 낮게 잡는다. 효과음·디스코드
+ * 음성채팅 아래에 깔리는 소리여야 한다. 사용자 볼륨은 이 값에 곱해진다.
  */
-export const BGM_VOLUME = 0.2;
+export const BGM_MAX_VOLUME = 0.5;
 
 /**
- * 방 게임이 진행되는 동안의 볼륨(0~1).
+ * 사용자 볼륨 기본값(0~1).
+ *
+ * 0.4 × 최대 0.5 = 0.2 로, 볼륨 조절이 생기기 전의 고정 볼륨과 같다.
+ * 처음 온 사람에게는 예전과 똑같이 들린다.
+ */
+export const BGM_DEFAULT_USER_VOLUME = 0.4;
+
+/**
+ * 방 게임이 진행되는 동안 곱하는 비율.
  *
  * 경매 카운트다운·입찰·편성 효과음이 음악에 묻히지 않게 줄인다.
  * 2026-09 측정 기준, 카운트다운 틱 원본이 매우 작아(최대 -32dB) 0.2 로 틀면
- * 음악 평균보다 8dB 가까이 작게 들렸다. 0.07 이면 음악이 약 9dB 내려가
- * 틱과 비슷한 수준이 된다.
+ * 음악 평균보다 8dB 가까이 작게 들렸다. 0.2 → 0.07(약 -9dB)로 내리던 것을
+ * 비율로 옮긴 값이라, 사용자가 볼륨을 바꿔도 줄어드는 폭은 같다.
  */
-export const BGM_DUCKED_VOLUME = 0.07;
+export const BGM_DUCK_RATIO = 0.35;
+
+/** 재생목록 순서대로 앞·뒤 곡. 끝에서는 반대쪽 끝으로 돈다. */
+export function stepTrack(
+  tracks: readonly BgmTrack[],
+  currentId: string | null,
+  step: 1 | -1,
+): BgmTrack | null {
+  if (tracks.length === 0) return null;
+  const index = tracks.findIndex((t) => t.id === currentId);
+  if (index === -1) return tracks[0];
+  return tracks[(index + step + tracks.length) % tracks.length];
+}
 
 /**
  * 다음 곡 고르기.
