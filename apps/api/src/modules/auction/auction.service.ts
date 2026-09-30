@@ -637,7 +637,7 @@ export class AuctionService implements OnModuleInit {
     this._setAuctionState(roomId, auctionState);
 
     return {
-      teams,
+      teams: await this._teamsForClient(roomId),
       players: players.map((p: any) => {
         const acc = p.user.riotAccounts[0];
         return {
@@ -913,7 +913,7 @@ export class AuctionService implements OnModuleInit {
     this._setAuctionState(roomId, auctionState);
 
     return {
-      teams,
+      teams: await this._teamsForClient(roomId),
       players: nonCaptains.map((p) => {
         const acc = p.user.riotAccounts[0];
         return {
@@ -1008,7 +1008,7 @@ export class AuctionService implements OnModuleInit {
     this._setAuctionState(roomId, auctionState);
 
     return {
-      teams,
+      teams: await this._teamsForClient(roomId),
       players: nonCaptains.map((p: any) => {
         const acc = p.user.riotAccounts[0];
         return {
@@ -1901,6 +1901,19 @@ export class AuctionService implements OnModuleInit {
         ),
       );
     return true;
+  }
+
+  /**
+   * 경매 시작 응답에 실을 팀 목록 — 팀장이 멤버로 들어간 모양.
+   *
+   * 시작 경로는 팀을 막 만든 `tx.team.create` 결과를 그대로 내보냈는데,
+   * 거기엔 members 가 없다. 팀장은 DB 에서 이미 팀원인데도 첫 화면이
+   * 0/5 · 빈 슬롯 다섯으로 그려지고, 나중에 상태를 다시 받아올 때야
+   * 첫 칸에 팀장이 나타났다. 페이지 첫 로드와 같은 조회를 써서 모양을 맞춘다.
+   */
+  private async _teamsForClient(roomId: string): Promise<any[]> {
+    const { teams } = await this.getFullAuctionData(roomId);
+    return teams;
   }
 
   /** Return current teams and remaining players for initial auction page load. */
