@@ -201,8 +201,13 @@ export function AuctionLotDetails({
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_auto] gap-x-5 gap-y-3 px-5 py-4">
-      {/* ── 왼쪽: 누구인가 ── */}
-      <div className="min-w-0 space-y-2.5 [@media(min-height:900px)]:space-y-3.5">
+      {/*
+        ── 왼쪽: 누구인가 ──
+        좌우 두 단은 그리드 행 높이(둘 중 큰 쪽)에 맞춰 늘어난다. 왼쪽은 위아래로
+        벌리고(승률·평판이 바닥에 붙음), 오른쪽은 라인 줄이 나눠 채워 두 단의
+        윗선·아랫선을 맞춘다(2026-10-01 운영자 요청).
+      */}
+      <div className="flex min-w-0 flex-col justify-between gap-2.5">
         <div className="flex items-center gap-3">
           <Avatar
             src={player.avatar}
@@ -304,9 +309,9 @@ export function AuctionLotDetails({
       </div>
 
       {/* ── 오른쪽: 라인별 티어·선호 챔피언 ── */}
-      <div className="min-w-0 space-y-2.5">
+      <div className="flex min-w-0 flex-col">
         {isLol && (
-          <div className="space-y-1">
+          <div className="flex flex-1 flex-col gap-1">
             {roleRows.length === 0 && (
               <p className="py-2 text-xs text-text-muted">
                 라인·선호 픽 정보 없음
@@ -316,7 +321,7 @@ export function AuctionLotDetails({
               <div
                 key={row.role}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-2 py-1 [@media(min-height:900px)]:py-1.5",
+                  "flex flex-1 items-center gap-2 rounded-md px-2 py-1",
                   row.kind === "main"
                     ? "bg-accent-primary/10"
                     : "bg-bg-tertiary/40",
