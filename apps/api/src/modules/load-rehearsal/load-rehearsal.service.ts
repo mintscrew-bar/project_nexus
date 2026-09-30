@@ -10,7 +10,7 @@ import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../prisma/prisma.service";
 import { RoomService } from "../room/room.service";
 import { AdminService } from "../admin/admin.service";
-import { AuctionService } from "../auction/auction.service";
+import { AuctionService, type AuctionState } from "../auction/auction.service";
 import { AuctionGateway } from "../auction/auction.gateway";
 import { TEST_BOT_USER_WHERE, isTestBotUser } from "../common/test-bot.util";
 import { RehearsalSocketCrew } from "./rehearsal-socket-crew";
@@ -263,7 +263,8 @@ export class LoadRehearsalService {
       },
       {
         secret: this.config.get("JWT_ACCESS_SECRET"),
-        expiresIn: "20m",
+        // 한 판의 상한(45분)보다 조금 길게. 그 이상 살아 있을 이유가 없다.
+        expiresIn: "50m",
       },
     );
   }
@@ -348,15 +349,35 @@ export class LoadRehearsalService {
    * 상태만으로 충분하다.
    */
   private async _watchAuction(run: RehearsalRun): Promise<void> {
-    const deadline = Date.now() + run.options.count * 20_000 + 120_000;
+    /*
+     * 실패 판정은 "오래 걸림"이 아니라 "멈춤"으로 한다.
+     *
+     * 예전에는 `정원 × 20초 + 2분` 을 절대 마감으로 뒀는데, 봇 팀장들은
+     * 매물마다 최소 단위로 번갈아 올리고 입찰마다 타이머가 10초씩 연장된다
+     * (최대 30초). 예산 1000 / 단위 50 이면 초반 매물 하나에 입찰이 십수 번
+     * 오가서 20인 경매가 12분 안팎 걸린다. 그래서 멀쩡히 굴러가는 경매를
+     * 마감으로 끊고 "실패"로 적었다 (2026-09-29 20:56 실행).
+     *
+     * 보려는 건 8/11 처럼 경매가 멈추는 것이므로, 매물·최고가·타이머 중
+     * 무엇이든 움직이면 진척으로 본다. 한 매물이 입찰 없이 끝까지 가는
+     * 시간(입찰 시간) + 연장 최대치(30초) + 여유 30초 동안 아무것도 안
+     * 움직이면 멈춘 것이다.
+     */
+    const stallLimitMs = (run.options.bidTime + 30 + 30) * 1000;
+    // 진척이 있어도 끝없이 돌게 두지는 않는다. 운영 서버에서 도는 부하다.
+    const hardDeadline = Date.now() + 45 * 60_000;
+    let lastProgressKey = "";
+    let lastProgressAt = Date.now();
 
-    while (Date.now() < deadline) {
+    while (Date.now() < hardDeadline) {
       if (run.abortRequested) {
         run.log("중단 요청으로 종료");
         return;
       }
 
-      const state = this.auctionService.getAuctionState(run.roomId!);
+      const state = toObservedState(
+        this.auctionService.getAuctionState(run.roomId!),
+      );
       if (!state) {
         // 경매가 끝나면 상태가 사라진다.
         run.log("경매 상태 종료 — 완료로 간주");
@@ -374,6 +395,23 @@ export class LoadRehearsalService {
       }
 
       const newItem = run.observe(state);
+
+      // 매물·최고가·타이머 중 하나라도 바뀌면 진척이다.
+      const progressKey = [
+        state.currentPlayer?.id ?? "",
+        state.currentHighestBid ?? "",
+        state.timerEnd ?? "",
+      ].join("|");
+      if (progressKey !== lastProgressKey) {
+        lastProgressKey = progressKey;
+        lastProgressAt = Date.now();
+      } else if (Date.now() - lastProgressAt > stallLimitMs) {
+        run.addViolation(
+          `경매가 멈췄습니다 — ${Math.round(stallLimitMs / 1000)}초 동안 매물·입찰·타이머가 움직이지 않았습니다 (매물 #${run.itemCount}).`,
+        );
+        return;
+      }
+
       if (run.options.mode === "full") {
         if (newItem) this._foldOverSockets(run, state);
         await this._maybeDropCaptain(run, state);
@@ -381,7 +419,9 @@ export class LoadRehearsalService {
       await delay(500);
     }
 
-    run.addViolation("경매가 제한 시간 안에 끝나지 않았습니다.");
+    run.addViolation(
+      "경매가 45분 안에 끝나지 않았습니다. 멈추지는 않았지만 비정상적으로 길다.",
+    );
   }
 
   /**
@@ -503,6 +543,30 @@ export class LoadRehearsalService {
       );
     }
   }
+}
+
+/**
+ * 서버 내부 경매 상태를 리허설이 읽는 모양으로 바꾼다.
+ *
+ * 관찰·포기·팀장 낙오 로직은 클라이언트가 받는 페이로드처럼
+ * `currentPlayer`·`teams` 를 읽도록 짜여 있었는데, 그 둘은 게이트웨이가
+ * 내보낼 때 붙이는 필드라 서버 내부 `AuctionState` 에는 없다. 그래서
+ * 폴링한 상태에서 매물 전환이 한 번도 안 잡혔고, 매물·낙찰이 0으로 찍히고
+ * 낙오·포기도 발동하지 않았다.
+ *
+ * - 현재 매물: `_syncCurrentAuctionPlayer` 가 매물이 바뀔 때마다
+ *   `skipVotePlayerId` 를 현재 매물 id 로 맞춘다. 그걸 그대로 쓴다.
+ * - 팀장: 리허설 방은 팀장이 전부 봇이라 `botCaptainIds` 가 곧 팀장 전원이다.
+ */
+function toObservedState(state: AuctionState | undefined): any {
+  if (!state) return null;
+  return {
+    ...state,
+    currentPlayer: state.skipVotePlayerId
+      ? { id: state.skipVotePlayerId }
+      : null,
+    teams: state.botCaptainIds.map((captainId) => ({ captainId })),
+  };
 }
 
 function delay(ms: number): Promise<void> {
