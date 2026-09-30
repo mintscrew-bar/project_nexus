@@ -638,24 +638,9 @@ export class AuctionService implements OnModuleInit {
 
     return {
       teams: await this._teamsForClient(roomId),
-      players: players.map((p: any) => {
-        const acc = p.user.riotAccounts[0];
-        return {
-          id: p.userId,
-          username: p.user.username,
-          avatar: p.user.avatar,
-          tier: acc?.tier,
-          rank: acc?.rank,
-          lp: acc?.lp,
-          mmr: calculateTierScore(
-            acc?.tier || "UNRANKED",
-            acc?.rank || "",
-            acc?.lp || 0,
-          ),
-          mainRole: acc?.mainRole,
-          subRole: acc?.subRole,
-        };
-      }),
+      players: players.map((player: any) =>
+        this._mapAuctionParticipant(player, room.gameTitle),
+      ),
       auctionState,
     };
   }
@@ -914,24 +899,9 @@ export class AuctionService implements OnModuleInit {
 
     return {
       teams: await this._teamsForClient(roomId),
-      players: nonCaptains.map((p) => {
-        const acc = p.user.riotAccounts[0];
-        return {
-          id: p.userId,
-          username: p.user.username,
-          avatar: p.user.avatar,
-          tier: acc?.tier,
-          rank: acc?.rank,
-          lp: acc?.lp,
-          mmr: calculateTierScore(
-            acc?.tier || "UNRANKED",
-            acc?.rank || "",
-            acc?.lp || 0,
-          ),
-          mainRole: acc?.mainRole,
-          subRole: acc?.subRole,
-        };
-      }),
+      players: nonCaptains.map((player) =>
+        this._mapAuctionParticipant(player, room.gameTitle),
+      ),
       auctionState,
       captainUserIds,
     };
@@ -1009,24 +979,9 @@ export class AuctionService implements OnModuleInit {
 
     return {
       teams: await this._teamsForClient(roomId),
-      players: nonCaptains.map((p: any) => {
-        const acc = p.user.riotAccounts[0];
-        return {
-          id: p.userId,
-          username: p.user.username,
-          avatar: p.user.avatar,
-          tier: acc?.tier,
-          rank: acc?.rank,
-          lp: acc?.lp,
-          mmr: calculateTierScore(
-            acc?.tier || "UNRANKED",
-            acc?.rank || "",
-            acc?.lp || 0,
-          ),
-          mainRole: acc?.mainRole,
-          subRole: acc?.subRole,
-        };
-      }),
+      players: nonCaptains.map((player: any) =>
+        this._mapAuctionParticipant(player, room.gameTitle),
+      ),
       auctionState,
       captainUserIds: userIds,
     };
@@ -1969,28 +1924,9 @@ export class AuctionService implements OnModuleInit {
       this._setAuctionState(roomId, state);
     }
 
-    const players = sortedParticipants.map((p: any) => {
-      const acc = p.user.riotAccounts[0];
-      return {
-        id: p.userId,
-        username: p.user.username,
-        avatar: p.user.avatar,
-        tier: acc?.tier,
-        rank: acc?.rank,
-        mainRole: acc?.mainRole,
-        subRole: acc?.subRole,
-        gameName: acc?.gameName,
-        tagLine: acc?.tagLine,
-        peakTier: acc?.peakTier,
-        peakRank: acc?.peakRank,
-        championPreferences: acc?.championPreferences ?? [],
-        mmr: calculateTierScore(
-          acc?.tier || "UNRANKED",
-          acc?.rank || "",
-          acc?.lp || 0,
-        ),
-      };
-    });
+    const players = sortedParticipants.map((player: any) =>
+      this._mapAuctionParticipant(player, room.gameTitle),
+    );
 
     const teams = room.teams.map((t: any) => ({
       id: t.id,

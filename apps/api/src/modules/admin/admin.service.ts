@@ -14,6 +14,7 @@ import {
   Prisma,
   GameTitle,
   ScrimStatus,
+  Role,
 } from "@nexus/database";
 import {
   TEST_BOT_USER_WHERE,
@@ -32,6 +33,62 @@ import {
 } from "../../common/security/data-protection";
 
 const MAX_LIMIT = 100;
+const TEST_BOT_ROLES = [
+  Role.TOP,
+  Role.JUNGLE,
+  Role.MID,
+  Role.ADC,
+  Role.SUPPORT,
+] as const;
+const TEST_BOT_CHAMPIONS: Record<Role, readonly string[]> = {
+  [Role.TOP]: ["Aatrox", "Darius", "Fiora", "Garen", "Sett"],
+  [Role.JUNGLE]: ["LeeSin", "Viego", "Vi", "Sejuani", "Nidalee"],
+  [Role.MID]: ["Ahri", "Orianna", "Sylas", "Azir", "Syndra"],
+  [Role.ADC]: ["Jinx", "Ezreal", "Caitlyn", "KaiSa", "Jhin"],
+  [Role.SUPPORT]: ["Thresh", "Nautilus", "Rakan", "Lulu", "Nami"],
+};
+const TEST_BOT_TIERS = [
+  "BRONZE",
+  "SILVER",
+  "GOLD",
+  "PLATINUM",
+  "EMERALD",
+  "DIAMOND",
+] as const;
+
+function buildTestBotRiotProfile(botNumber: number) {
+  const mainRole = TEST_BOT_ROLES[(botNumber - 1) % TEST_BOT_ROLES.length];
+  const subRole = TEST_BOT_ROLES[botNumber % TEST_BOT_ROLES.length];
+  const baseTierIndex = botNumber % 5;
+
+  const roleTiers = TEST_BOT_ROLES.map((role, roleIndex) => {
+    const variation = ((botNumber + roleIndex) % 3) - 1;
+    const tierIndex = Math.min(
+      TEST_BOT_TIERS.length - 1,
+      Math.max(0, baseTierIndex + variation),
+    );
+
+    return {
+      role,
+      tier: TEST_BOT_TIERS[tierIndex],
+      rank: ["IV", "III", "II", "I"][(botNumber + roleIndex) % 4],
+      lp: (botNumber * 17 + roleIndex * 13) % 100,
+    };
+  });
+
+  const championPreferences = TEST_BOT_ROLES.flatMap((role, roleIndex) => {
+    const champions = TEST_BOT_CHAMPIONS[role];
+    const offset = (botNumber + roleIndex) % champions.length;
+    return Array.from({ length: champions.length }, (_, order) => ({
+      role,
+      championId: champions[(offset + order) % champions.length],
+      order: order + 1,
+    }));
+  });
+
+  return { mainRole, subRole, roleTiers, championPreferences };
+}
+
 const PRESENCE_STATUS_MAP = {
   online: UserStatus.ONLINE,
   offline: UserStatus.OFFLINE,
@@ -1604,6 +1661,37 @@ export class AdminService {
 
   // ── Test Bots ──────────────────────────────────────────────────────────────
 
+  /** 경매 카드 확인용 봇 프로필. 실제 이용자 데이터와 섞이지 않는 testbot 전용 값이다. */
+  private async ensureBotRiotProfile(
+    client: Prisma.TransactionClient | PrismaService,
+    riotAccountId: string,
+    botNumber: number,
+  ): Promise<void> {
+    const profile = buildTestBotRiotProfile(botNumber);
+    const mainRoleTier = profile.roleTiers.find(
+      (roleTier) => roleTier.role === profile.mainRole,
+    );
+
+    await client.riotAccount.update({
+      where: { id: riotAccountId },
+      data: {
+        tier: mainRoleTier?.tier,
+        rank: mainRoleTier?.rank,
+        lp: mainRoleTier?.lp,
+        mainRole: profile.mainRole,
+        subRole: profile.subRole,
+        roleTiers: {
+          deleteMany: {},
+          createMany: { data: profile.roleTiers },
+        },
+        championPreferences: {
+          deleteMany: {},
+          createMany: { data: profile.championPreferences },
+        },
+      },
+    });
+  }
+
   /** testbot_01 ~ testbot_{count} 유저를 없으면 생성, 있으면 반환 */
   async ensureBotUsers(
     count: number,
@@ -1637,17 +1725,22 @@ export class AdminService {
         ],
       },
       select: {
+        id: true,
         puuid: true,
         gameName: true,
+        mainRole: true,
+        _count: {
+          select: { roleTiers: true, championPreferences: true },
+        },
         user: { select: { id: true, username: true } },
       },
     });
 
     const botByPuuid = new Map(
-      existingAccounts.map((account) => [account.puuid, account.user]),
+      existingAccounts.map((account) => [account.puuid, account]),
     );
     const botByGameName = new Map(
-      existingAccounts.map((account) => [account.gameName, account.user]),
+      existingAccounts.map((account) => [account.gameName, account]),
     );
 
     for (let i = 1; i <= count; i++) {
@@ -1656,10 +1749,17 @@ export class AdminService {
 
       // 이미 존재하는 봇은 그대로 재사용 (쿼리 왕복도 줄어든다).
       // 두 유니크 키 중 어느 쪽으로든 걸리면 기존 봇으로 간주한다.
-      const existingBot =
+      const existingAccount =
         botByPuuid.get(`bot_puuid_${i}`) ?? botByGameName.get(username);
-      if (existingBot) {
-        bots.push(existingBot);
+      if (existingAccount) {
+        if (
+          !existingAccount.mainRole ||
+          existingAccount._count.roleTiers < TEST_BOT_ROLES.length ||
+          existingAccount._count.championPreferences < TEST_BOT_ROLES.length * 5
+        ) {
+          await this.ensureBotRiotProfile(client, existingAccount.id, i);
+        }
+        bots.push(existingAccount.user);
         continue;
       }
 
@@ -1707,12 +1807,12 @@ export class AdminService {
       // upsert가 update 분기를 타면(= email로 기존 유저를 찾은 경우) create 안의
       // nested riotAccounts.create가 실행되지 않아 RiotAccount 없는 봇이 된다.
       // 그 상태로 두면 드래프트/경매에서 조용히 깨지므로 여기서 보강한다.
-      const hasAccount = await client.riotAccount.findFirst({
+      let account = await client.riotAccount.findFirst({
         where: { userId: user.id },
         select: { id: true },
       });
-      if (!hasAccount) {
-        await client.riotAccount.create({
+      if (!account) {
+        account = await client.riotAccount.create({
           data: {
             userId: user.id,
             gameName: username,
@@ -1725,8 +1825,11 @@ export class AdminService {
             mainRole: null,
             subRole: null,
           },
+          select: { id: true },
         });
       }
+
+      await this.ensureBotRiotProfile(client, account.id, i);
 
       bots.push(user);
     }
