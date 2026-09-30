@@ -1898,7 +1898,14 @@ export class AuctionService implements OnModuleInit {
           },
         },
         participants: {
-          where: { isCaptain: false, teamId: null },
+          /*
+           * role: "PLAYER" 필수. 관전자도 teamId=null·isCaptain=false 라서
+           * 빠지면 "남은 매물"로 섞인다. 게이트웨이는 이 목록이 비어야 경매를
+           * 완료 처리하므로, 관전자가 한 명만 있어도 마지막 매물 뒤에 완료가
+           * 안 되고 "No player to resolve" 로 멈춘다(2026-09-30 리허설 실측).
+           * 매물을 실제로 고르는 resolveCurrentBid 쿼리와 같은 조건이다.
+           */
+          where: { role: "PLAYER", isCaptain: false, teamId: null },
           include: {
             user: {
               include: {
