@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Music, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
+import {
+  Music,
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BGM_TRACKS } from "@/lib/bgm/playlist";
 import { useBgmStore } from "@/stores/bgm-store";
@@ -82,32 +90,55 @@ export function BgmToggle({ className }: { className?: string }) {
           aria-label="배경음악"
           className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-bg-tertiary bg-bg-secondary p-4 shadow-xl"
         >
-          {/* 제목 + 음소거 */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <Music className="h-4 w-4 shrink-0 text-accent-primary" />
-              <p className="text-sm font-semibold text-text-primary">
-                배경음악
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={!muted}
-              onClick={toggleMuted}
-              className={cn(
-                "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-                muted ? "bg-bg-elevated" : "bg-accent-primary",
-              )}
-            >
-              <span
-                className={cn(
-                  "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform",
-                  muted ? "translate-x-0" : "translate-x-5",
+          <div className="flex items-center gap-2">
+            <Music className="h-4 w-4 shrink-0 text-accent-primary" />
+            <p className="text-sm font-semibold text-text-primary">배경음악</p>
+          </div>
+
+          {/* 지금 곡 + 시간 바 + 재생 조작 */}
+          <div className="mt-3 rounded-lg bg-bg-tertiary px-3 pb-2 pt-2.5">
+            <p className="truncate text-center text-xs font-medium text-text-primary">
+              {currentTrack?.title ?? "첫 클릭 후 재생됩니다"}
+            </p>
+            <BgmSeekBar />
+            <div className="mt-1 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={playPrev}
+                className="rounded-md p-1.5 text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
+                aria-label="이전 곡"
+                title="이전 곡"
+              >
+                <SkipBack className="h-4 w-4" />
+              </button>
+              {/*
+                재생/일시정지는 켜기·끄기와 같은 값(muted)을 쓴다. 일시정지하면 곡이
+                그 자리에서 멈추고, 다시 누르면 멈춘 곳부터 이어진다. 다음 방문에도
+                일시정지 상태가 유지된다.
+              */}
+              <button
+                type="button"
+                onClick={toggleMuted}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-primary text-white transition-opacity hover:opacity-90"
+                aria-label={muted ? "재생" : "일시정지"}
+                title={muted ? "재생" : "일시정지"}
+              >
+                {muted ? (
+                  <Play className="ml-0.5 h-4 w-4" fill="currentColor" />
+                ) : (
+                  <Pause className="h-4 w-4" fill="currentColor" />
                 )}
-              />
-              <span className="sr-only">배경음악 켜기 또는 끄기</span>
-            </button>
+              </button>
+              <button
+                type="button"
+                onClick={playNext}
+                className="rounded-md p-1.5 text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
+                aria-label="다음 곡"
+                title="다음 곡"
+              >
+                <SkipForward className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {/* 볼륨 */}
@@ -145,31 +176,6 @@ export function BgmToggle({ className }: { className?: string }) {
             </p>
           </div>
 
-          {/* 지금 곡 + 앞뒤 */}
-          <div className="mt-4 flex items-center gap-2 rounded-lg bg-bg-tertiary px-2.5 py-2">
-            <button
-              type="button"
-              onClick={playPrev}
-              className="rounded-md p-1.5 text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
-              aria-label="이전 곡"
-              title="이전 곡"
-            >
-              <SkipBack className="h-4 w-4" />
-            </button>
-            <p className="min-w-0 flex-1 truncate text-center text-xs font-medium text-text-primary">
-              {currentTrack?.title ?? "첫 클릭 후 재생됩니다"}
-            </p>
-            <button
-              type="button"
-              onClick={playNext}
-              className="rounded-md p-1.5 text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
-              aria-label="다음 곡"
-              title="다음 곡"
-            >
-              <SkipForward className="h-4 w-4" />
-            </button>
-          </div>
-
           {/* 재생목록 */}
           <ul className="mt-3 max-h-56 space-y-0.5 overflow-y-auto">
             {BGM_TRACKS.map((track, index) => {
@@ -202,6 +208,61 @@ export function BgmToggle({ className }: { className?: string }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+/** 초 → "m:ss" */
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const whole = Math.floor(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+/**
+ * 곡 시간 바.
+ *
+ * 따로 떼어 둔 이유: 재생 위치는 초당 몇 번씩 바뀐다. 패널 전체가 그 값을
+ * 구독하면 곡 목록까지 계속 다시 그려진다.
+ *
+ * 끄는 동안에는 손가락 위치를 보여주기만 하고, 놓는 순간 한 번 옮긴다.
+ * 끄는 내내 옮기면 곡이 잘게 끊겨 들린다.
+ */
+function BgmSeekBar() {
+  const position = useBgmStore((s) => s.position);
+  const duration = useBgmStore((s) => s.duration);
+  const seekTo = useBgmStore((s) => s.seekTo);
+  const [dragValue, setDragValue] = useState<number | null>(null);
+
+  const ready = duration > 0;
+  const shown = dragValue ?? position;
+
+  const commit = () => {
+    if (dragValue === null) return;
+    seekTo(dragValue);
+    setDragValue(null);
+  };
+
+  return (
+    <div className="mt-2">
+      <input
+        type="range"
+        min={0}
+        max={ready ? duration : 1}
+        step={0.1}
+        value={ready ? Math.min(shown, duration) : 0}
+        disabled={!ready}
+        aria-label="재생 위치"
+        onChange={(event) => setDragValue(Number(event.target.value))}
+        onPointerUp={commit}
+        onKeyUp={commit}
+        onBlur={commit}
+        className="h-1.5 w-full cursor-pointer accent-accent-primary disabled:cursor-default"
+      />
+      <div className="flex justify-between text-[10px] tabular-nums text-text-muted">
+        <span>{formatTime(ready ? shown : 0)}</span>
+        <span>{formatTime(duration)}</span>
+      </div>
     </div>
   );
 }

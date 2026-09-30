@@ -68,6 +68,11 @@ interface BgmState {
    * 하려는 번호다.
    */
   trackRequest: { trackId: string; seq: number } | null;
+  /** 지금 곡의 재생 위치·길이(초). 플레이어가 적는다. 길이를 모르면 0. */
+  position: number;
+  duration: number;
+  /** 시간 바에서 옮긴 위치. `seq` 로 같은 위치를 다시 골라도 알아챈다. */
+  seekRequest: { time: number; seq: number } | null;
 
   hydrate: () => void;
   toggleMuted: () => void;
@@ -80,6 +85,8 @@ interface BgmState {
   playTrack: (trackId: string) => void;
   playNext: () => void;
   playPrev: () => void;
+  setProgress: (position: number, duration: number) => void;
+  seekTo: (time: number) => void;
 }
 
 export const BGM_MUTED_STORAGE_KEY = MUTED_KEY;
@@ -91,6 +98,9 @@ export const useBgmStore = create<BgmState>((set, get) => ({
   hydrated: false,
   currentTrackId: null,
   trackRequest: null,
+  position: 0,
+  duration: 0,
+  seekRequest: null,
 
   hydrate: () => {
     if (get().hydrated) return;
@@ -134,4 +144,13 @@ export const useBgmStore = create<BgmState>((set, get) => ({
     const prev = stepTrack(BGM_TRACKS, get().currentTrackId, -1);
     if (prev) get().playTrack(prev.id);
   },
+
+  setProgress: (position, duration) => set({ position, duration }),
+
+  seekTo: (time) =>
+    set((state) => ({
+      // 바를 놓는 순간 표시도 바로 옮긴다. 플레이어의 다음 보고를 기다리면 되튄다.
+      position: time,
+      seekRequest: { time, seq: (state.seekRequest?.seq ?? 0) + 1 },
+    })),
 }));

@@ -82,6 +82,8 @@ function BgmEngine() {
   const userVolume = useBgmStore((s) => s.volume);
   const trackRequest = useBgmStore((s) => s.trackRequest);
   const setCurrentTrackId = useBgmStore((s) => s.setCurrentTrackId);
+  const setProgress = useBgmStore((s) => s.setProgress);
+  const seekRequest = useBgmStore((s) => s.seekRequest);
   const gameStarting = useLobbyStore((s) => s.gameStarting);
   const roomStatus = useLobbyStore((s) => s.room?.status);
   const inMatch = useMyMatchInProgress();
@@ -331,6 +333,43 @@ function BgmEngine() {
     audio.addEventListener("ended", onEnded);
     return () => audio.removeEventListener("ended", onEnded);
   }, [getAudio, startTrack]);
+
+  /**
+   * 재생 위치·길이를 패널에 알린다.
+   *
+   * timeupdate 는 초당 4번 정도 온다. 패널의 시간 바만 이 값을 구독하므로
+   * 다른 화면은 다시 그려지지 않는다.
+   */
+  useEffect(() => {
+    const audio = getAudio();
+    const report = () => {
+      const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+      setProgress(audio.currentTime || 0, duration);
+    };
+    const events = [
+      "timeupdate",
+      "loadedmetadata",
+      "durationchange",
+      "emptied",
+    ] as const;
+    events.forEach((name) => audio.addEventListener(name, report));
+    return () =>
+      events.forEach((name) => audio.removeEventListener(name, report));
+  }, [getAudio, setProgress]);
+
+  // 시간 바에서 위치를 옮겼을 때. 멈춰 있어도 옮겨 두면 다시 틀 때 거기서 이어진다.
+  const handledSeekSeqRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!seekRequest || seekRequest.seq === handledSeekSeqRef.current) return;
+    handledSeekSeqRef.current = seekRequest.seq;
+    const audio = getAudio();
+    if (!audio.src) return;
+    const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+    audio.currentTime =
+      duration > 0
+        ? Math.min(Math.max(0, seekRequest.time), duration - 0.25)
+        : 0;
+  }, [seekRequest, getAudio]);
 
   /**
    * 재생목록에서 곡을 골랐을 때.
