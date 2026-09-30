@@ -405,7 +405,13 @@ export function AuctionLotDetails({
       */}
       <div className="col-span-3">
         <p className="mb-1 text-[10px] font-medium text-text-tertiary">
-          {kda ? `내전 평균 · ${kda.games}판` : "내전 평균 · 기록 없음"}
+          {/*
+            판수는 KDA 집계 판수(스탯이 수집된 판)가 아니라 사이트에 저장된
+            내전 전체 승패로 보여준다(2026-10-01 운영자 요청).
+          */}
+          {games > 0
+            ? `내전 ${stats!.wins}승 ${stats!.losses}패 · 승률 ${Math.round(stats!.winRate)}%`
+            : "내전 기록 없음"}
         </p>
         <div className="grid grid-cols-5 gap-2 [@media(max-height:820px)]:grid-cols-7">
           <StatCell
