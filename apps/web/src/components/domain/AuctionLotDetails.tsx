@@ -44,16 +44,7 @@ function tierText(
   return rank ? `${tier} ${rank}` : tier;
 }
 
-/** 21450 → "2.1만". 좁은 칸에서 잘리지 않게 줄인다. */
-const compactFormatter = new Intl.NumberFormat("ko-KR", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-function formatCompact(value: number) {
-  return compactFormatter.format(value);
-}
-
-/** 오른쪽 아래 지표 한 칸 */
+/** 지표 한 칸 */
 function StatCell({
   label,
   value,
@@ -98,7 +89,8 @@ function StatCell({
  * 경매 매물 카드의 상단(선수 정보). 좌우 2단 + 타이머.
  *
  * - 왼쪽: 누구인가 — 아바타·이름·클랜·라이엇 ID·현재/최고 티어·주/부라인·내전 승률·평판
- * - 오른쪽: 어떻게 쓰나 — 라인별 [티어 · 선호 챔피언], 그 아래 내전 평균 지표
+ * - 오른쪽: 어떻게 쓰나 — 라인별 [티어 · 선호 챔피언]
+ * - 아래(전체 폭): 내전 평균 KDA·피해량·CS·시야·골드
  *
  * "현재 선두" 블록을 없애고 남은 세로 공간을 쓴다. FHD(배율 100%)에서 매물 영역
  * 전체가 약 950×785px 이고 입찰 패널을 뺀 카드 몫이 약 400px 이다
@@ -174,8 +166,41 @@ export function AuctionLotDetails({
         ? "Perfect"
         : null;
 
+  const winRateCell = (
+    <StatCell
+      large
+      label="내전 승률"
+      value={games > 0 ? `${Math.round(stats!.winRate)}%` : "—"}
+      sub={games > 0 ? `${stats!.wins}승 ${stats!.losses}패` : "기록 없음"}
+      valueClassName={
+        games > 0 && stats!.winRate >= 60 ? "text-accent-success" : undefined
+      }
+    />
+  );
+  const reputationCell = (
+    <StatCell
+      large
+      label="평판"
+      value={
+        reputation && reputation.totalRatings > 0 ? (
+          <span className="inline-flex items-center gap-1">
+            <Star className="h-3.5 w-3.5 fill-accent-gold text-accent-gold" />
+            {reputation.overallAverage.toFixed(1)}
+          </span>
+        ) : (
+          "—"
+        )
+      }
+      sub={
+        reputation && reputation.totalRatings > 0
+          ? `${reputation.totalRatings}명 평가`
+          : "평가 없음"
+      }
+    />
+  );
+
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_auto] gap-5 px-5 py-4">
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_auto] gap-x-5 gap-y-3 px-5 py-4">
       {/* ── 왼쪽: 누구인가 ── */}
       <div className="min-w-0 space-y-2.5 [@media(min-height:900px)]:space-y-3.5">
         <div className="flex items-center gap-3">
@@ -271,44 +296,14 @@ export function AuctionLotDetails({
           </>
         )}
 
-        {/* 내전 승률 + 평판 */}
-        <div className="grid grid-cols-2 gap-2">
-          <StatCell
-            large
-            label="내전 승률"
-            value={games > 0 ? `${Math.round(stats!.winRate)}%` : "—"}
-            sub={
-              games > 0 ? `${stats!.wins}승 ${stats!.losses}패` : "기록 없음"
-            }
-            valueClassName={
-              games > 0 && stats!.winRate >= 60
-                ? "text-accent-success"
-                : undefined
-            }
-          />
-          <StatCell
-            large
-            label="평판"
-            value={
-              reputation && reputation.totalRatings > 0 ? (
-                <span className="inline-flex items-center gap-1">
-                  <Star className="h-3.5 w-3.5 fill-accent-gold text-accent-gold" />
-                  {reputation.overallAverage.toFixed(1)}
-                </span>
-              ) : (
-                "—"
-              )
-            }
-            sub={
-              reputation && reputation.totalRatings > 0
-                ? `${reputation.totalRatings}명 평가`
-                : "평가 없음"
-            }
-          />
+        {/* 내전 승률 + 평판. 낮은 화면에선 아래 지표 줄로 옮긴다 */}
+        <div className="grid grid-cols-2 gap-2 [@media(max-height:820px)]:hidden">
+          {winRateCell}
+          {reputationCell}
         </div>
       </div>
 
-      {/* ── 오른쪽: 라인별 티어·선호 챔피언 + 내전 평균 ── */}
+      {/* ── 오른쪽: 라인별 티어·선호 챔피언 ── */}
       <div className="min-w-0 space-y-2.5">
         {isLol && (
           <div className="space-y-1">
@@ -375,43 +370,6 @@ export function AuctionLotDetails({
             ))}
           </div>
         )}
-
-        {/* 내전 평균 지표 */}
-        <div>
-          <p className="mb-1 text-[10px] font-medium text-text-tertiary">
-            {kda ? `내전 평균 · ${kda.games}판` : "내전 평균"}
-          </p>
-          <div className="grid grid-cols-4 gap-1.5">
-            <StatCell
-              label="KDA"
-              value={kdaRatio ?? "—"}
-              sub={
-                kda ? `${kda.kills}/${kda.deaths}/${kda.assists}` : undefined
-              }
-              valueClassName={
-                kda &&
-                kda.deaths > 0 &&
-                (kda.kills + kda.assists) / kda.deaths >= 3
-                  ? "text-accent-gold"
-                  : undefined
-              }
-            />
-            <StatCell
-              label="피해량"
-              value={kda?.damage != null ? formatCompact(kda.damage) : "—"}
-              sub={
-                kda?.damage != null
-                  ? `${kda.damage.toLocaleString()}`
-                  : undefined
-              }
-            />
-            <StatCell label="CS" value={kda?.cs != null ? kda.cs : "—"} />
-            <StatCell
-              label="시야"
-              value={kda?.vision != null ? kda.vision : "—"}
-            />
-          </div>
-        </div>
       </div>
 
       {/* ── 타이머 ── */}
@@ -433,6 +391,49 @@ export function AuctionLotDetails({
             유찰 {yuchalCount}회
           </div>
         )}
+      </div>
+
+      {/*
+        ── 아래: 내전 평균 지표 (좌우 컬럼 전체 폭) ──
+        오른쪽 라인 목록 밑에 두면 좌우 높이가 어긋나고 칸이 좁았다.
+        카드 전체 폭에 한 줄로 깔아 좌우 두 단을 받친다(2026-10-01 운영자 요청).
+      */}
+      <div className="col-span-3">
+        <p className="mb-1 text-[10px] font-medium text-text-tertiary">
+          {kda ? `내전 평균 · ${kda.games}판` : "내전 평균 · 기록 없음"}
+        </p>
+        <div className="grid grid-cols-5 gap-2 [@media(max-height:820px)]:grid-cols-7">
+          <StatCell
+            label="KDA"
+            value={kdaRatio ?? "—"}
+            sub={kda ? `${kda.kills}/${kda.deaths}/${kda.assists}` : undefined}
+            valueClassName={
+              kda &&
+              kda.deaths > 0 &&
+              (kda.kills + kda.assists) / kda.deaths >= 3
+                ? "text-accent-gold"
+                : undefined
+            }
+          />
+          <StatCell
+            label="피해량"
+            value={kda?.damage != null ? kda.damage.toLocaleString() : "—"}
+          />
+          <StatCell label="CS" value={kda?.cs != null ? kda.cs : "—"} />
+          <StatCell
+            label="시야"
+            value={kda?.vision != null ? kda.vision : "—"}
+          />
+          <StatCell
+            label="골드"
+            value={kda?.gold != null ? kda.gold.toLocaleString() : "—"}
+          />
+          {/* 낮은 화면에서만: 왼쪽에서 옮겨 온 승률·평판 */}
+          <div className="hidden [@media(max-height:820px)]:contents">
+            {winRateCell}
+            {reputationCell}
+          </div>
+        </div>
       </div>
     </div>
   );
