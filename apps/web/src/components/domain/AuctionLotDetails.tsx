@@ -59,18 +59,27 @@ function StatCell({
   value,
   sub,
   valueClassName,
+  large = false,
 }: {
   label: string;
   value: React.ReactNode;
   sub?: React.ReactNode;
   valueClassName?: string;
+  /** 화면이 충분히 높을 때(900px 이상) 값을 키운다. 왼쪽 빈 공간을 채우는 용도 */
+  large?: boolean;
 }) {
   return (
-    <div className="min-w-0 rounded-md bg-bg-tertiary/60 px-2.5 py-1.5">
+    <div
+      className={cn(
+        "min-w-0 rounded-md bg-bg-tertiary/60 px-2.5 py-1.5",
+        large && "[@media(min-height:900px)]:py-2.5",
+      )}
+    >
       <p className="text-[10px] font-medium text-text-tertiary">{label}</p>
       <p
         className={cn(
           "truncate text-sm font-bold tabular-nums text-text-primary",
+          large && "[@media(min-height:900px)]:text-xl",
           valueClassName,
         )}
       >
@@ -126,8 +135,9 @@ export function AuctionLotDetails({
   const reputation = profile?.reputation;
   const games = stats ? stats.wins + stats.losses : 0;
 
-  // 라인별 [티어 · 선호 챔피언]. 주 → 부 → 나머지 순으로 세우고,
-  // 나머지 라인은 티어나 선호 픽이 하나라도 있을 때만 보여준다.
+  // 라인별 [티어 · 선호 챔피언]. 주 → 부 → 나머지 순으로 다섯 라인을 모두 세운다.
+  // 비어 있는 라인도 남긴다 — 줄이 빠지면 "그 라인은 안 한다"는 정보가 사라진다
+  // (2026-10-01 운영자 요청: 원딜 줄이 안 보였다).
   const roleTiers = riot?.roleTiers ?? player.roleTiers ?? [];
   const prefs = riot?.championPreferences ?? [];
   const roleRows = (() => {
@@ -136,30 +146,25 @@ export function AuctionLotDetails({
       ...(subRole && subRole !== mainRole ? [subRole] : []),
       ...ROLE_ORDER.filter((r) => r !== mainRole && r !== subRole),
     ];
-    return ordered
-      .map((role) => {
-        const roleTier = roleTiers.find((t) => t.role === role) ?? null;
-        // 프로필 조회 전에는 페이로드의 주 역할 선호 픽으로 채운다.
-        const champions =
-          prefs.length > 0
-            ? prefs
-                .filter((p) => p.role === role)
-                .sort((a, b) => a.order - b.order)
-                .map((p) => p.championId)
-            : role === mainRole
-              ? (player.champions ?? [])
-              : [];
-        return {
-          role,
-          roleTier,
-          champions: champions.slice(0, CHAMPIONS_PER_ROLE),
-          kind: role === mainRole ? "main" : role === subRole ? "sub" : "other",
-        } as const;
-      })
-      .filter(
-        (row) =>
-          row.kind !== "other" || row.roleTier || row.champions.length > 0,
-      );
+    return ordered.map((role) => {
+      const roleTier = roleTiers.find((t) => t.role === role) ?? null;
+      // 프로필 조회 전에는 페이로드의 주 역할 선호 픽으로 채운다.
+      const champions =
+        prefs.length > 0
+          ? prefs
+              .filter((p) => p.role === role)
+              .sort((a, b) => a.order - b.order)
+              .map((p) => p.championId)
+          : role === mainRole
+            ? (player.champions ?? [])
+            : [];
+      return {
+        role,
+        roleTier,
+        champions: champions.slice(0, CHAMPIONS_PER_ROLE),
+        kind: role === mainRole ? "main" : role === subRole ? "sub" : "other",
+      } as const;
+    });
   })();
 
   const kdaRatio =
@@ -172,7 +177,7 @@ export function AuctionLotDetails({
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_auto] gap-5 px-5 py-4">
       {/* ── 왼쪽: 누구인가 ── */}
-      <div className="min-w-0 space-y-2.5">
+      <div className="min-w-0 space-y-2.5 [@media(min-height:900px)]:space-y-3.5">
         <div className="flex items-center gap-3">
           <Avatar
             src={player.avatar}
@@ -196,7 +201,7 @@ export function AuctionLotDetails({
                 </span>
               )}
             </div>
-            <h2 className="truncate text-2xl font-bold leading-tight text-text-primary">
+            <h2 className="truncate text-2xl font-bold leading-tight text-text-primary [@media(min-height:900px)]:text-[28px]">
               {player.username}
             </h2>
             {riot && (
@@ -269,6 +274,7 @@ export function AuctionLotDetails({
         {/* 내전 승률 + 평판 */}
         <div className="grid grid-cols-2 gap-2">
           <StatCell
+            large
             label="내전 승률"
             value={games > 0 ? `${Math.round(stats!.winRate)}%` : "—"}
             sub={
@@ -281,6 +287,7 @@ export function AuctionLotDetails({
             }
           />
           <StatCell
+            large
             label="평판"
             value={
               reputation && reputation.totalRatings > 0 ? (
@@ -314,7 +321,7 @@ export function AuctionLotDetails({
               <div
                 key={row.role}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-2 py-1",
+                  "flex items-center gap-2 rounded-md px-2 py-1 [@media(min-height:900px)]:py-1.5",
                   row.kind === "main"
                     ? "bg-accent-primary/10"
                     : "bg-bg-tertiary/40",
@@ -347,14 +354,16 @@ export function AuctionLotDetails({
                       )
                     : "—"}
                 </span>
-                <div className="flex min-w-0 items-center gap-1">
+                <div className="flex min-w-0 items-center gap-1 overflow-hidden">
                   {row.champions.length > 0 ? (
-                    row.champions.map((championId) => (
-                      <ChampionIcon
+                    row.champions.map((championId, index) => (
+                      // 좁은 화면(FHD 배율 125% 등)에선 앞 3개만 — 반쯤 잘린 아이콘을 안 남긴다.
+                      <span
                         key={championId}
-                        championId={championId}
-                        size={26}
-                      />
+                        className={cn(index >= 3 && "max-[1700px]:hidden")}
+                      >
+                        <ChampionIcon championId={championId} size={28} />
+                      </span>
                     ))
                   ) : (
                     <span className="text-[11px] text-text-muted">
