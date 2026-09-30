@@ -321,7 +321,17 @@ export class UserService {
       // 내전 참여 기록(teamId 있는 것)에서 KDA 집계
       this.prisma.matchParticipant.aggregate({
         where: { userId, teamId: { not: null } },
-        _avg: { kills: true, deaths: true, assists: true },
+        // 경매 매물 카드가 KDA 아래에 내전 평균 피해량·CS·시야·골드를 함께 보여준다.
+        _avg: {
+          kills: true,
+          deaths: true,
+          assists: true,
+          totalDamageDealtToChampions: true,
+          totalMinionsKilled: true,
+          neutralMinionsKilled: true,
+          visionScore: true,
+          goldEarned: true,
+        },
         _count: { id: true },
       }),
     ]);
@@ -347,6 +357,15 @@ export class UserService {
             deaths: Math.round((kdaAgg._avg.deaths ?? 0) * 10) / 10,
             assists: Math.round((kdaAgg._avg.assists ?? 0) * 10) / 10,
             games: kdaGames,
+            // 판당 평균. 게임 길이가 제각각이라 분당 값이 더 공정하지만,
+            // 분당은 매치 길이 조인이 필요해 우선 판당으로 둔다.
+            damage: Math.round(kdaAgg._avg.totalDamageDealtToChampions ?? 0),
+            cs: Math.round(
+              (kdaAgg._avg.totalMinionsKilled ?? 0) +
+                (kdaAgg._avg.neutralMinionsKilled ?? 0),
+            ),
+            vision: Math.round((kdaAgg._avg.visionScore ?? 0) * 10) / 10,
+            gold: Math.round(kdaAgg._avg.goldEarned ?? 0),
           }
         : null;
 

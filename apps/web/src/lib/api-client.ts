@@ -642,6 +642,14 @@ export const userApi = {
       deaths: number;
       assists: number;
       games: number;
+      /** 내전 판당 평균 챔피언 피해량 */
+      damage?: number;
+      /** 내전 판당 평균 CS (미니언 + 정글) */
+      cs?: number;
+      /** 내전 판당 평균 시야 점수 */
+      vision?: number;
+      /** 내전 판당 평균 획득 골드 */
+      gold?: number;
     } | null;
     reputation: { overallAverage: number; totalRatings: number };
   }> => {

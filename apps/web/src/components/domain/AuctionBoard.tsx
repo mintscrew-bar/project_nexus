@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { getRoleIcon } from "@/lib/role-icon";
 import { RoleTierBadges } from "./RoleTierBadges";
+import { AuctionLotDetails } from "./AuctionLotDetails";
 import { ChampionIcon } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import type { RoleTier } from "@/lib/role-tier";
 import { DEFAULT_GAME, GAMES } from "@nexus/types";
@@ -472,137 +473,16 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
             )}
           >
             <CardContent className="p-0">
-              {/* 상단: 선수 정보 + 타이머 */}
+              {/* 상단: 선수 정보 좌우 2단 + 타이머. 누르면 프로필 모달 */}
               <div
-                className="flex items-center gap-4 px-5 py-4 cursor-pointer"
-                onMouseEnter={(e) =>
-                  handlePlayerHover(
-                    auctionState.currentPlayer!.id,
-                    e.currentTarget,
-                  )
-                }
-                onMouseLeave={scheduleHoverClose}
+                className="cursor-pointer"
                 onClick={() => setProfileUserId(auctionState.currentPlayer!.id)}
               >
-                <Avatar
-                  src={auctionState.currentPlayer.avatar}
-                  alt={auctionState.currentPlayer.username}
-                  fallback={auctionState.currentPlayer.username[0]}
-                  size="lg"
-                  className="ring-2 ring-accent-primary/60 flex-shrink-0"
+                <AuctionLotDetails
+                  player={auctionState.currentPlayer}
+                  timeLeft={timeLeft}
+                  yuchalCount={auctionState.yuchalCount}
                 />
-
-                <div className="flex-1 min-w-0">
-                  <div className="mb-1 flex items-center gap-2">
-                    <Badge variant="primary">현재 매물</Badge>
-                    <span className="text-xs font-medium text-text-secondary">
-                      모든 팀장 동시 입찰
-                    </span>
-                  </div>
-                  <h2 className="mb-1.5 truncate text-2xl font-bold text-text-primary">
-                    {auctionState.currentPlayer.username}
-                  </h2>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <TierBadge
-                      tier={auctionState.currentPlayer.tier}
-                      rank={auctionState.currentPlayer.rank}
-                      size="md"
-                    />
-                    {/* 주라인 + 부라인 아이콘 */}
-                    {auctionState.currentPlayer.mainRole ||
-                    auctionState.currentPlayer.subRole ? (
-                      <div className="flex items-center gap-1">
-                        <RoleIcon
-                          role={auctionState.currentPlayer.mainRole}
-                          size={22}
-                        />
-                        <RoleIcon
-                          role={auctionState.currentPlayer.subRole}
-                          size={18}
-                          dim
-                        />
-                      </div>
-                    ) : (
-                      <Badge variant="primary" className="text-sm px-3 py-1.5">
-                        {getPlayerPosition(auctionState.currentPlayer)}
-                      </Badge>
-                    )}
-                    {auctionState.currentPlayer.mmr !== undefined && (
-                      <span className="text-sm font-mono font-semibold text-text-muted">
-                        MMR {auctionState.currentPlayer.mmr}
-                      </span>
-                    )}
-                  </div>
-
-                  {/*
-                    라인별 티어 — 본인이 입력한 사람만 나온다.
-                    RoleTierBadges 가 빈 배열이면 스스로 null 을 반환하므로
-                    미입력자는 위의 대표 티어 한 줄만 보이는 기존 모습 그대로다.
-                  */}
-                  <RoleTierBadges
-                    roleTiers={auctionState.currentPlayer.roleTiers}
-                    className="mt-1.5"
-                    compact
-                  />
-
-                  {/*
-                    주 역할 선호 픽 — 30초 안에 판단해야 하는 자리라
-                    전 라인을 펼치지 않고 주 역할 것만 순서대로 보여준다.
-                    "선호 픽"만 적어 두면 어느 라인 픽인지 몰라서
-                    주 역할 아이콘과 이름을 라벨에 붙인다.
-                  */}
-                  {auctionState.currentPlayer.champions?.length ? (
-                    <div className="mt-1.5 flex items-center gap-1.5">
-                      <span className="flex items-center gap-1 text-[11px] font-medium text-text-tertiary">
-                        <RoleIcon
-                          role={auctionState.currentPlayer.mainRole}
-                          size={14}
-                        />
-                        {auctionState.currentPlayer.mainRole
-                          ? `${
-                              POSITION_LABELS[
-                                auctionState.currentPlayer.mainRole.toUpperCase()
-                              ] ?? auctionState.currentPlayer.mainRole
-                            } 선호 픽`
-                          : "선호 픽"}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        {auctionState.currentPlayer.champions.map(
-                          (championId) => (
-                            <ChampionIcon
-                              key={championId}
-                              championId={championId}
-                              size={24}
-                            />
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                {/* 타이머 — 큰 숫자 하나로 집중 */}
-                <div className="flex flex-col items-center flex-shrink-0">
-                  <div
-                    className={cn(
-                      "text-4xl font-bold tabular-nums leading-none transition-[text-shadow] duration-200",
-                      timeLeft <= 5
-                        ? "text-accent-danger animate-pulse [text-shadow:0_0_22px_rgba(239,68,68,0.8),0_0_8px_rgba(239,68,68,0.6)]"
-                        : "text-text-primary",
-                    )}
-                  >
-                    {timeLeft}
-                  </div>
-                  <p className="text-[11px] text-text-tertiary mt-1.5">
-                    남은 시간(초)
-                  </p>
-                  {auctionState.yuchalCount > 0 && (
-                    <div className="flex items-center gap-1 mt-1.5 text-accent-warning text-xs font-medium">
-                      <AlertTriangle className="w-3 h-3" />
-                      유찰 {auctionState.yuchalCount}회
-                    </div>
-                  )}
-                </div>
               </div>
 
               {/*
@@ -613,20 +493,20 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               */}
               <div
                 className={cn(
-                  "flex items-center justify-center gap-4 px-5 py-3 bg-bg-secondary/60 border-t border-bg-tertiary transition-colors",
+                  "flex items-center justify-center gap-6 px-5 py-3.5 bg-bg-secondary/60 border-t border-bg-tertiary transition-colors",
                   bidFlash && "animate-bid-flash",
                 )}
               >
                 <div className="flex items-center gap-2">
-                  <Coins className="w-5 h-5 text-accent-gold" />
-                  <span className="text-2xl font-bold text-accent-gold tabular-nums">
+                  <Coins className="w-7 h-7 text-accent-gold" />
+                  <span className="text-4xl font-black text-accent-gold tabular-nums">
                     {auctionState.currentHighestBid.toLocaleString()}
                   </span>
-                  <span className="text-xs text-text-tertiary self-end mb-0.5">
+                  <span className="text-sm text-text-tertiary self-end mb-1">
                     G
                   </span>
                 </div>
-                <span className="h-5 w-px bg-bg-tertiary" aria-hidden />
+                <span className="h-8 w-px bg-bg-tertiary" aria-hidden />
                 {auctionState.currentHighestBidder ? (
                   (() => {
                     const bidderTeam = sortedTeams.find(
@@ -635,21 +515,21 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                         team.captainId === auctionState.currentHighestBidder,
                     );
                     return (
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="text-[11px] font-bold text-accent-gold">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="rounded bg-accent-gold/15 px-1.5 py-0.5 text-xs font-bold text-accent-gold">
                           선두
                         </span>
                         {bidderTeam?.color && (
                           <span
-                            className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                            className="h-3.5 w-3.5 flex-shrink-0 rounded-full"
                             style={{ backgroundColor: bidderTeam.color }}
                           />
                         )}
-                        <strong className="truncate text-lg font-bold text-text-primary">
+                        <strong className="truncate text-2xl font-black text-text-primary">
                           {highestBidderName}
                         </strong>
                         {bidderTeam && (
-                          <span className="truncate text-xs text-text-tertiary">
+                          <span className="truncate text-sm text-text-tertiary">
                             {bidderTeam.name}
                           </span>
                         )}
@@ -657,7 +537,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                     );
                   })()
                 ) : (
-                  <span className="text-sm font-medium text-text-muted">
+                  <span className="text-base font-medium text-text-muted">
                     첫 입찰을 기다리는 중
                   </span>
                 )}
@@ -798,7 +678,11 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               </p>
             </div>
 
-            <div className="border-y border-bg-tertiary py-2.5 mb-3 text-center">
+            {/*
+              화면이 낮으면(배율 125% FHD 등) 이 블록을 접는다. 입찰가는 아래
+              입찰 버튼에 "150G 입찰"로 그대로 나오므로 정보는 잃지 않는다.
+            */}
+            <div className="border-y border-bg-tertiary py-2.5 mb-3 text-center [@media(max-height:820px)]:hidden">
               <p className="text-xs text-text-tertiary mb-1">입찰가</p>
               <p
                 className={cn(
@@ -896,7 +780,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
             {/* 입찰 포기 — 입찰을 접는 결정도 입찰 패널에서 내린다 */}
             {onVoteItemSkip && !hasFolded && (
               <div className="mt-3 flex items-center justify-between gap-3 border-t border-bg-tertiary pt-3">
-                <p className="text-xs text-text-tertiary">
+                <p className="text-xs text-text-tertiary [@media(max-height:820px)]:invisible">
                   포기하면 이 매물에 입찰할 수 없습니다. 입찰자만 남으면 즉시
                   낙찰, 전원 포기 시 유찰됩니다.
                 </p>

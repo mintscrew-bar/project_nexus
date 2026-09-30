@@ -90,7 +90,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     gamePathname.startsWith("/draft/") ||
     gamePathname.startsWith("/role-selection/") ||
     gamePathname.endsWith("/bracket");
-  const showCreatorPromo = pathname !== "/" && !isDashboardRoute;
+  // 파트너 모집 띠는 게임 진행 화면에선 숨긴다 — 세로 공간을 먹고 몰입을 깬다.
+  // 스크림은 대시보드(고정 높이)가 아니라 따로 짚는다.
+  const isScrimRoute = /^\/tournaments\/[^/]+\/scrim(?:\/|$)/.test(
+    gamePathname,
+  );
+  const showCreatorPromo =
+    pathname !== "/" && !isDashboardRoute && !isScrimRoute;
 
   const usesShell = !(isAuthRoute || isLandingFullscreen || isBroadcastRoute);
 
