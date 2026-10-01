@@ -14,6 +14,14 @@ import axios from "axios";
  * 참고: https://ddragon.leagueoflegends.com/
  */
 
+/**
+ * DDragon 버전 조회가 실패하고 기억해 둔 버전도 없을 때 쓰는 값.
+ * 웹의 로컬 아이콘 패치(apps/web/src/lib/ddragon-champion-ids.ts)와 맞춰 둔다.
+ */
+const FALLBACK_DDRAGON_VERSION = "16.19.1";
+/** 폴백 버전을 캐시하는 시간(초). 짧게 둬서 곧 최신 조회를 다시 시도한다 */
+const FALLBACK_CACHE_TTL_SECONDS = 300;
+
 // DataDragon versions API returns an array of version strings (e.g., ["14.1.1", "14.1.0", ...])
 type DataDragonVersions = string[];
 
@@ -138,10 +146,13 @@ export class DataDragonService {
       return version;
     } catch (error) {
       this.logger.error("Failed to fetch Data Dragon version", error);
-      // 폴백: DDragon API 실패 시 폴백 버전을 Redis에 저장해 반복 호출 방지
-      const fallback = "16.7.1";
+      // 폴백: 마지막으로 받은 버전 → 없으면 고정값.
+      // 예전엔 아주 오래된 고정값(16.7.1)을 1시간 캐시해, DDragon 이 한 번만 흔들려도
+      // 한 시간 동안 신규 챔피언·아이템 이미지가 깨졌다. 폴백은 짧게(5분)만 캐시해
+      // 반복 호출만 막고 곧 다시 최신을 시도한다.
+      const fallback = this.cachedVersion ?? FALLBACK_DDRAGON_VERSION;
       await this.redis
-        .set("ddragon:version", fallback, this.cacheTTL)
+        .set("ddragon:version", fallback, FALLBACK_CACHE_TTL_SECONDS)
         .catch(() => {});
       return fallback;
     }

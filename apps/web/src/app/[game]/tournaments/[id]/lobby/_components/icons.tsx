@@ -15,6 +15,15 @@ export function getChampionIconUrl(championId: string) {
   return getChampionIcon(raw);
 }
 
+/**
+ * 로컬 아이콘이 없을 때 쓰는 CDN 주소. CommunityDragon 은 숫자 ID("805")와
+ * 챔피언 키("Locke") 모두 받고 항상 최신 패치를 따라간다.
+ */
+export function championCdnUrl(championId: string) {
+  const raw = String(championId ?? "").trim();
+  return `https://cdn.communitydragon.org/latest/champion/${encodeURIComponent(raw)}/square`;
+}
+
 export const POSITION_LABELS: Record<string, string> = {
   TOP: "탑", JUNGLE: "정글", MID: "미드", MIDDLE: "미드",
   ADC: "원딜", BOTTOM: "원딜", SUPPORT: "서포터", UTILITY: "서포터",
@@ -45,9 +54,16 @@ export function ChampionIcon({ championId, size = 24 }: { championId: string; si
           height={size}
           className="w-full h-full object-cover"
           onError={(e) => {
-            // 로드 실패 시 빈 원 대신 fallback 표시
-            e.currentTarget.style.display = "none";
-            const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+            const img = e.currentTarget;
+            // 1차 실패(로컬 아이콘 없음 — 신규 챔피언 등): CommunityDragon 으로 한 번 더.
+            // 숫자 ID·챔피언 키 둘 다 받는다. 그래도 안 되면 "?" 를 보인다.
+            if (!img.dataset.cdnTried) {
+              img.dataset.cdnTried = "1";
+              img.src = championCdnUrl(championId);
+              return;
+            }
+            img.style.display = "none";
+            const fallback = img.nextElementSibling as HTMLElement | null;
             if (fallback) fallback.style.display = "flex";
           }}
         />

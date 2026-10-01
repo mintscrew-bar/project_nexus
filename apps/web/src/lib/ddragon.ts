@@ -11,15 +11,16 @@
  * 주의: api-client.ts와의 순환 의존을 피하기 위해 fetch 를 직접 사용한다.
  */
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { DDRAGON_ASSET_VERSION } from "./ddragon-champion-ids";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 const STORAGE_KEY = "nexus:ddragon-version";
 const STORAGE_TTL_MS = 60 * 60 * 1000; // 1시간
 // 백엔드 조회 실패 시에만 쓰이는 최후의 폴백.
 // 너무 오래된 버전이면 신규 챔피언 아이콘이 CDN에 없어 404가 나므로,
-// 신규 챔피언 추가 시 함께 갱신한다.
-const FALLBACK_VERSION = "16.13.1";
+// 로컬 아이콘을 받은 패치 버전(scripts/update-ddragon-assets.mjs 가 기록)을 따라간다.
+const FALLBACK_VERSION = DDRAGON_ASSET_VERSION;
 
 let inMemory: string | null = null;
 let inflight: Promise<string> | null = null;
@@ -119,7 +120,10 @@ const COMMUNITY_DRAGON_PERK =
  * - iconPath가 있으면(룬 메타데이터에서 가져온 경우) 공식 DDragon 사용
  * - 없으면(rune ID 만 알 때) Community Dragon의 ID 기반 URL 사용
  */
-export function runeIconUrl(opts: { iconPath?: string; runeId?: number }): string {
+export function runeIconUrl(opts: {
+  iconPath?: string;
+  runeId?: number;
+}): string {
   if (opts.iconPath) {
     return `${DDRAGON_CDN}/img/${opts.iconPath}`;
   }
@@ -138,7 +142,10 @@ export function championIconUrl(championKey: string, version: string): string {
 }
 
 /** 소환사 주문 아이콘 CDN URL */
-export function summonerSpellIconUrl(spellName: string, version: string): string {
+export function summonerSpellIconUrl(
+  spellName: string,
+  version: string,
+): string {
   return `${DDRAGON_CDN}/${version}/img/spell/Summoner${spellName}.png`;
 }
 
