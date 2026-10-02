@@ -11,6 +11,9 @@
  *   - icons/spells/{주문키}.png         (summoner.json 의 image.full)
  *   - icons/perks/{룬ID}.png            (runesReforged.json 의 계열·룬 icon 경로)
  *   - src/lib/ddragon-champion-ids.ts   (숫자 ID → 챔피언 키 표)
+ *   - api data-dragon.service.ts 의 FALLBACK_DDRAGON_VERSION 상수
+ *
+ * 자동 실행: .github/workflows/ddragon-assets.yml 이 매일 돌려 바뀐 게 있으면 커밋한다.
  *
  * 왜 로컬에 두나: 화면은 1순위로 로컬 아이콘을 쓰고, 없을 때만 CDN 으로 넘어간다.
  * 패치마다 신규 챔피언·아이템이 생기는데 로컬이 낡으면 매번 CDN 폴백을 타거나
@@ -27,6 +30,11 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ICONS = path.join(ROOT, "apps/web/public/icons");
 const ID_MAP_FILE = path.join(ROOT, "apps/web/src/lib/ddragon-champion-ids.ts");
+/** API 의 DDragon 폴백 버전 상수도 같은 패치로 맞춘다 */
+const API_DDRAGON_FILE = path.join(
+  ROOT,
+  "apps/api/src/modules/riot/data-dragon.service.ts",
+);
 const BASE = "https://ddragon.leagueoflegends.com";
 /** 동시 다운로드 수. DDragon 은 정적 CDN 이라 여유 있지만 과하게 몰지 않는다 */
 const CONCURRENCY = 16;
@@ -134,6 +142,22 @@ async function main() {
   console.log(
     `  챔피언 ID 표: ${entries.length}개 → ${path.relative(ROOT, ID_MAP_FILE)}`,
   );
+
+  // API 폴백 버전 상수(조회 실패 + 기억한 버전도 없을 때 쓰는 값)를 같은 패치로.
+  const apiSource = await fs.readFile(API_DDRAGON_FILE, "utf8");
+  const apiUpdated = apiSource.replace(
+    /const FALLBACK_DDRAGON_VERSION = "[^"]+";/,
+    `const FALLBACK_DDRAGON_VERSION = "${version}";`,
+  );
+  if (apiUpdated !== apiSource) {
+    await fs.writeFile(API_DDRAGON_FILE, apiUpdated);
+    console.log(`  API 폴백 버전 → ${version}`);
+  }
+
+  // 워크플로가 커밋 메시지에 쓰도록 버전을 남긴다(GitHub Actions 출력).
+  if (process.env.GITHUB_OUTPUT) {
+    await fs.appendFile(process.env.GITHUB_OUTPUT, `version=${version}\n`);
+  }
 
   if (failures) {
     console.error(`실패 ${failures}건 — 위 목록 확인`);

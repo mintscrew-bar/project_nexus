@@ -54,6 +54,8 @@ export function ItemImage({
         className="object-cover rounded"
         unoptimized
         onError={onError}
+        // 자체 CDN 폴백이 있다 — 전역 IconCdnFallback 은 건너뛴다
+        data-own-fallback=""
       />
     </div>
   );

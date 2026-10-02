@@ -259,6 +259,7 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
                   className="rounded"
                   unoptimized
                   onError={onIconError}
+                  data-own-fallback=""
                 />
                 <div>
                   <p className="font-semibold text-text-primary">{getItemKoreanName(item.name) || item.name}</p>

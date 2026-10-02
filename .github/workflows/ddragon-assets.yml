@@ -1,0 +1,115 @@
+name: DDragon 아이콘 갱신
+
+# 롤 패치(보통 2주마다 수요일)마다 Data Dragon 이 갱신된다. 로컬 아이콘
+# (apps/web/public/icons)·챔피언 ID 표·한글 이름표가 낡으면 신규 챔피언·아이템이
+# 깨지거나 "?" 로 뜬다(2026-10-01 운영자 제보). 매일 확인해 바뀐 게 있을 때만 커밋한다.
+#
+# 커밋 방식:
+#   - ASSET_BOT_TOKEN 시크릿(contents:write 권한의 fine-grained PAT)이 있으면 main 에 바로 push.
+#     GITHUB_TOKEN 으로 push 한 커밋은 CI 를 트리거하지 않기 때문에, 배포까지 이어지려면
+#     별도 토큰이 필요하다(GitHub 의 재귀 실행 방지 규칙).
+#   - 없으면 브랜치에 올리고 PR 을 연다. 머지하면 평소처럼 CI → CD 로 배포된다.
+
+on:
+  schedule:
+    # 매일 05:00 KST (20:00 UTC). 패치 당일 오전 배포 이후에 돌도록 새벽으로 둔다.
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ddragon-assets
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: 아이콘·매핑 갱신
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # 시크릿은 if 에서 직접 못 읽어 job 환경변수로 옮긴다.
+      HAS_BOT_TOKEN: ${{ secrets.ASSET_BOT_TOKEN != '' }}
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v6
+        with:
+          # 시크릿이 있으면 그 토큰으로 체크아웃해야 push 가 CI 를 트리거한다.
+          token: ${{ secrets.ASSET_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: pnpm 설치
+        uses: pnpm/action-setup@v6
+
+      - name: Node.js 22 설정
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: 아이콘·챔피언 ID 표 갱신
+        id: assets
+        run: node scripts/update-ddragon-assets.mjs
+
+      - name: 한글 이름표 갱신
+        run: pnpm --filter @nexus/types mappings:update
+
+      - name: 포맷 맞추기
+        run: >-
+          npx prettier --write
+          apps/web/src/lib/ddragon-champion-ids.ts
+          apps/api/src/modules/riot/data-dragon.service.ts
+
+      - name: 변경 확인
+        id: diff
+        run: |
+          git add -A apps/web/public/icons apps/web/src/lib/ddragon-champion-ids.ts \
+            apps/api/src/modules/riot/data-dragon.service.ts packages/types/src/lol-mappings.ts
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "바뀐 것 없음 — 종료"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --cached --stat | tail -5
+          fi
+
+      - name: main 에 커밋 (토큰 있음)
+        if: steps.diff.outputs.changed == 'true' && env.HAS_BOT_TOKEN == 'true'
+        env:
+          VERSION: ${{ steps.assets.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(ddragon): Data Dragon ${VERSION} 아이콘·매핑 자동 갱신"
+          # 그사이 다른 커밋이 들어왔으면 그 위로 올린다.
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: PR 열기 (토큰 없음)
+        if: steps.diff.outputs.changed == 'true' && env.HAS_BOT_TOKEN != 'true'
+        env:
+          VERSION: ${{ steps.assets.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="chore/ddragon-${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git commit -m "chore(ddragon): Data Dragon ${VERSION} 아이콘·매핑 자동 갱신"
+          git push --force origin "$BRANCH"
+          # 같은 버전 PR 이 이미 있으면 브랜치만 갱신하고 끝낸다.
+          if gh pr view "$BRANCH" --json state --jq .state 2>/dev/null | grep -q OPEN; then
+            echo "PR 이미 열려 있음 — 브랜치만 갱신"
+            exit 0
+          fi
+          gh pr create --base main --head "$BRANCH" \
+            --title "chore(ddragon): Data Dragon ${VERSION} 아이콘·매핑 갱신" \
+            --body "새 롤 패치(${VERSION})의 챔피언·아이템·주문·룬 아이콘, 챔피언 ID 표, 한글 이름표를 자동으로 갱신했습니다. 머지하면 CI → CD 로 배포됩니다.
+
+          ASSET_BOT_TOKEN 시크릿을 넣으면 다음부터는 PR 없이 main 에 바로 반영됩니다." \
+            || echo "PR 생성 실패 — 저장소 설정 'Allow GitHub Actions to create and approve pull requests' 확인. 브랜치 ${BRANCH} 는 올라가 있다."

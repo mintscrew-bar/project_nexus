@@ -77,10 +77,12 @@ export function ChampionImage({
         className={cn(
           "object-cover",
           type === "square" && "rounded",
-          type === "splash" && "rounded-lg"
+          type === "splash" && "rounded-lg",
         )}
         unoptimized // Data Dragon은 외부 CDN이므로 Next.js 최적화 비활성화
         onError={onError}
+        // 자체 CDN 폴백이 있다 — 전역 IconCdnFallback 은 건너뛴다
+        data-own-fallback=""
       />
     </div>
   );

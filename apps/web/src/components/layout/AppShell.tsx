@@ -13,6 +13,7 @@ import { CreatorPromoStrip } from "./CreatorPromoStrip";
 import { ActiveRoomBanner } from "./ActiveRoomBanner";
 import { RoomStartAlertModal } from "@/components/rooms/RoomStartAlertModal";
 import { RoomInvitePopup } from "@/components/rooms/RoomInvitePopup";
+import { IconCdnFallback } from "./IconCdnFallback";
 import { PubgSurfaceGrain } from "./PubgSurfaceGrain";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useCurrentGame } from "@/hooks/useCurrentGame";
@@ -170,6 +171,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {!isBroadcastRoute && <RoomStartAlertModal />}
         {/* 친구가 보낸 내전 초대. 송출 화면에는 찍히면 안 된다. */}
         {!isBroadcastRoute && <RoomInvitePopup />}
+        {/* 로컬 게임 아이콘이 없으면 CDN 으로 — 방송 오버레이 포함 모든 화면 */}
+        <IconCdnFallback />
       </>
     );
   }
@@ -249,6 +252,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <RoomStartAlertModal />
       {/* 친구가 보낸 내전 초대 — 왼쪽 아래. 어느 페이지에 있든 뜬다. */}
       <RoomInvitePopup />
+      <IconCdnFallback />
     </div>
   );
 }

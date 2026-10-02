@@ -53,6 +53,8 @@ export function ChampionIcon({ championId, size = 24 }: { championId: string; si
           width={size}
           height={size}
           className="w-full h-full object-cover"
+          // 자체 폴백(CommunityDragon → "?")이 있다 — 전역 IconCdnFallback 은 건너뛴다
+          data-own-fallback=""
           onError={(e) => {
             const img = e.currentTarget;
             // 1차 실패(로컬 아이콘 없음 — 신규 챔피언 등): CommunityDragon 으로 한 번 더.
