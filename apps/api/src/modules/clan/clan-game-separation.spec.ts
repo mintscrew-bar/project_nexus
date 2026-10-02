@@ -4,7 +4,7 @@ import { ClanService } from "./clan.service";
 describe("ClanService game separation", () => {
   const createService = (prismaOverrides: Record<string, unknown> = {}) => {
     const prisma = {
-      clanMember: { findFirst: jest.fn() },
+      clanMember: { findFirst: jest.fn(), findMany: jest.fn() },
       clan: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
       ...prismaOverrides,
     } as any;
@@ -26,6 +26,40 @@ describe("ClanService game separation", () => {
         where: { userId: "user-1", clan: { gameTitle: GameTitle.PUBG } },
       }),
     );
+  });
+
+  it("lists every clan the user belongs to regardless of game", async () => {
+    const { prisma, service } = createService();
+    prisma.clanMember.findMany.mockResolvedValue([
+      { clanId: "lol-clan" },
+      { clanId: "pubg-clan" },
+    ]);
+
+    await expect(service.getUserClanIds("user-1")).resolves.toEqual([
+      "lol-clan",
+      "pubg-clan",
+    ]);
+    // 게임 조건 없이 유저로만 조회한다 — 한 유저가 롤·배그 클랜에 동시에 속할 수 있다.
+    expect(prisma.clanMember.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: "user-1" } }),
+    );
+  });
+
+  it("checks clan membership by clan id, not by game", async () => {
+    const { prisma, service } = createService();
+    prisma.clanMember.findFirst.mockResolvedValue({ id: "m1" });
+
+    await expect(service.isClanMember("user-1", "pubg-clan")).resolves.toBe(
+      true,
+    );
+    expect(prisma.clanMember.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "user-1", clanId: "pubg-clan" },
+      }),
+    );
+
+    prisma.clanMember.findFirst.mockResolvedValue(null);
+    await expect(service.isClanMember("user-1", "other")).resolves.toBe(false);
   });
 
   it("filters clan discovery by game", async () => {

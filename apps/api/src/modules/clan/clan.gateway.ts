@@ -83,10 +83,10 @@ export class ClanGateway
       client.userId = payload.sub;
       client.username = payload.username;
 
-      // Auto-join user's clan room if they have one
-      const userClan = await this.clanService.getUserClan(payload.sub);
-      if (userClan) {
-        client.join(`clan:${userClan.id}`);
+      // 속한 모든 클랜 방에 자동 입장한다. 롤 클랜과 배그 클랜에 동시에 속할 수 있다.
+      const clanIds = await this.clanService.getUserClanIds(payload.sub);
+      for (const clanId of clanIds) {
+        client.join(`clan:${clanId}`);
       }
     } catch (_error) {
       client.disconnect();
@@ -95,10 +95,10 @@ export class ClanGateway
 
   handleDisconnect(client: AuthenticatedSocket) {
     if (client.userId) {
-      // 비동기 타이핑 상태 정리 (void로 floating promise 억제)
-      void this.clanService.getUserClan(client.userId).then((userClan) => {
-        if (userClan) {
-          this.stopTyping(userClan.id, client.userId!);
+      // 비동기 타이핑 상태 정리 (void로 floating promise 억제). 속한 모든 클랜에서 정리한다.
+      void this.clanService.getUserClanIds(client.userId).then((clanIds) => {
+        for (const clanId of clanIds) {
+          this.stopTyping(clanId, client.userId!);
         }
       });
     }
@@ -109,9 +109,11 @@ export class ClanGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ clanId: f.id() })) data: { clanId: string },
   ) {
-    // Verify user is a member of this clan
-    const userClan = await this.clanService.getUserClan(client.userId!); // Assert client.userId is string
-    if (!userClan || userClan.id !== data.clanId) {
+    // 이 클랜의 멤버인지 클랜 ID 로 확인한다(게임 기준 조회는 배그 클랜을 놓친다)
+    if (
+      !client.userId ||
+      !(await this.clanService.isClanMember(client.userId, data.clanId))
+    ) {
       return { error: "Unauthorized to join this clan chat" };
     }
 
@@ -138,8 +140,7 @@ export class ClanGateway
     if (!client.userId) return;
 
     // 실제 클랜 멤버인지 확인 후 룸 이탈 처리
-    const userClan = await this.clanService.getUserClan(client.userId);
-    if (!userClan || userClan.id !== data.clanId) {
+    if (!(await this.clanService.isClanMember(client.userId, data.clanId))) {
       return { error: "Unauthorized to leave this clan chat" };
     }
 
@@ -205,9 +206,8 @@ export class ClanGateway
     );
     if (!typingRate.allowed) return;
 
-    // Verify user is a member of this clan
-    const userClan = await this.clanService.getUserClan(client.userId!); // Assert client.userId is string
-    if (!userClan || userClan.id !== data.clanId) {
+    // 이 클랜의 멤버인지 클랜 ID 로 확인한다
+    if (!(await this.clanService.isClanMember(client.userId, data.clanId))) {
       return { error: "Unauthorized to send typing events in this clan" };
     }
 

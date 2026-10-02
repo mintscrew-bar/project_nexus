@@ -1797,6 +1797,30 @@ export class ClanService {
   // Utility
   // ========================================
 
+  /**
+   * 유저가 속한 모든 클랜 ID. 클랜은 게임마다 하나씩 가입할 수 있어(롤 1 + 배그 1) 한 유저가
+   * 여러 클랜에 속할 수 있다. 게임을 따지지 않는 곳(소켓 방 입장 등)에서 쓴다.
+   *
+   * `getUserClan(userId)` 는 게임을 안 주면 롤로 조회해서, 소켓이 그걸 쓰던 동안
+   * 배그 클랜 멤버는 채팅 방에 들어가지 못했다(2026-10-02 점검).
+   */
+  async getUserClanIds(userId: string): Promise<string[]> {
+    const memberships = await this.prisma.clanMember.findMany({
+      where: { userId },
+      select: { clanId: true },
+    });
+    return memberships.map((membership) => membership.clanId);
+  }
+
+  /** 유저가 이 클랜의 멤버인가 — 게임과 무관하게 클랜 ID 로 확인한다 */
+  async isClanMember(userId: string, clanId: string): Promise<boolean> {
+    const membership = await this.prisma.clanMember.findFirst({
+      where: { userId, clanId },
+      select: { id: true },
+    });
+    return membership !== null;
+  }
+
   async getUserClan(userId: string, gameTitle: GameTitle = GameTitle.LOL) {
     const membership = await this.prisma.clanMember.findFirst({
       where: { userId, clan: { gameTitle } },
