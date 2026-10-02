@@ -20,6 +20,9 @@ import { ConfirmModal } from "@/components/ui/Modal";
 import { MarkdownViewer } from "@/components/community/MarkdownViewer";
 import { RichTextViewer } from "@/components/community/RichTextViewer";
 import { AdSlotCard } from "@/components/ads/AdSlot";
+import { useNavigationGame } from "@/hooks/useCurrentGame";
+import { scopedSectionPath } from "@/lib/scoped-section-routes";
+import { GAMES, type GameTitle } from "@nexus/types";
 import type { PostContentFormat, RichTextDocument } from "@/lib/rich-text";
 import {
   ArrowLeft,
@@ -80,6 +83,7 @@ interface Post {
   contentJson?: RichTextDocument | null;
   category: PostCategory | null;
   board?: {
+    gameTitle?: GameTitle | null;
     id: string;
     slug: string;
     name: string;
@@ -116,12 +120,15 @@ const categoryConfig: Record<
 };
 
 export default function PostDetailClient() {
+  const navigationGame = useNavigationGame();
   const params = useParams();
   const router = useRouter();
   const postId = params.id as string;
   const { user, isAuthenticated } = useAuthStore();
 
   const [post, setPost] = useState<Post | null>(null);
+  const game = post?.board?.gameTitle ?? navigationGame;
+  const communityPath = scopedSectionPath("community", game);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasLiked, setHasLiked] = useState(false);
@@ -363,7 +370,7 @@ export default function PostDetailClient() {
     try {
       await communityApi.deletePost(postId);
       addToast("게시글이 삭제되었습니다.", "info");
-      router.push("/community");
+      router.push(communityPath);
     } catch (err: any) {
       addToast(getApiErrorMessage(err, "게시글 삭제에 실패했습니다."), "error");
     }
@@ -484,7 +491,7 @@ export default function PostDetailClient() {
         <Button
           variant="secondary"
           className="mt-4"
-          onClick={() => router.push("/community")}
+          onClick={() => router.push(communityPath)}
         >
           목록으로
         </Button>
@@ -518,7 +525,7 @@ export default function PostDetailClient() {
           <Button
             variant="ghost"
             className="mb-4"
-            onClick={() => router.push("/community")}
+            onClick={() => router.push(communityPath)}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             목록으로
@@ -669,7 +676,11 @@ export default function PostDetailClient() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => router.push(`/community/${postId}/edit`)}
+                      onClick={() =>
+                        router.push(
+                          `/community/${postId}/edit?game=${GAMES[game].slug}`,
+                        )
+                      }
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       수정

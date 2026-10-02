@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { enabledGames, type GameTitle } from "@nexus/types";
 import {
   ExternalLink,
   Loader2,
@@ -56,6 +57,7 @@ export function StreamerSettingsSection() {
   const [links, setLinks] = useState<StreamerLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [games, setGames] = useState<GameTitle[]>(["LOL"]);
   const [platform, setPlatform] = useState<StreamerPlatform>("CHZZK");
   const [channelUrl, setChannelUrl] = useState("");
   const [channelName, setChannelName] = useState("");
@@ -100,6 +102,7 @@ export function StreamerSettingsSection() {
         platform: selectedPlatform,
         channelUrl: channelUrl.trim(),
         channelName: channelName.trim() || undefined,
+        games,
       });
       await reload();
       setChannelUrl("");
@@ -132,7 +135,7 @@ export function StreamerSettingsSection() {
   const connectChzzk = async () => {
     setSaving(true);
     try {
-      const { url } = await streamerApi.startChzzkOAuth();
+      const { url } = await streamerApi.startChzzkOAuth(games);
       window.location.assign(url);
     } catch (error: any) {
       addToast(
@@ -198,6 +201,30 @@ export function StreamerSettingsSection() {
     addToast("방송 링크를 삭제했습니다.", "success");
   };
 
+  const toggleChannelGame = async (
+    profile: StreamerProfile,
+    game: GameTitle,
+  ) => {
+    const current = profile.games ?? ["LOL"];
+    const next = current.includes(game)
+      ? current.filter((item) => item !== game)
+      : [...current, game];
+    if (next.length === 0) {
+      addToast("게임을 하나 이상 선택해주세요.", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      await userApi.updateStreamerGames(profile.platform, next);
+      await reload();
+      addToast("방송 게임을 저장했습니다.", "success");
+    } catch {
+      addToast("방송 게임을 저장하지 못했습니다.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -218,6 +245,37 @@ export function StreamerSettingsSection() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <fieldset className="flex flex-wrap gap-4 rounded-lg border border-bg-elevated p-3">
+            <legend className="px-1 text-sm font-semibold">
+              연결할 채널의 방송 게임
+            </legend>
+            {enabledGames().map((game) => (
+              <label
+                key={game.title}
+                className="flex items-center gap-2 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  checked={games.includes(game.title)}
+                  disabled={saving}
+                  onChange={() =>
+                    setGames((current) =>
+                      current.includes(game.title)
+                        ? current.length > 1
+                          ? current.filter((item) => item !== game.title)
+                          : current
+                        : [...current, game.title],
+                    )
+                  }
+                />
+                {game.label}
+              </label>
+            ))}
+            <p className="w-full text-xs text-text-muted">
+              두 게임 모두 선택할 수 있습니다. 선택한 게임의 스트리머 목록에
+              노출됩니다.
+            </p>
+          </fieldset>
           {/*
             플랫폼별 인증 경로 안내. 치지직은 OAuth 한 번으로 끝나지만
             SOOP은 OAuth를 쓸 수 없어 코드 대조를 거친다.
@@ -306,6 +364,26 @@ export function StreamerSettingsSection() {
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
+                <div className="flex w-full flex-wrap gap-4 border-t border-bg-elevated pt-2">
+                  {enabledGames().map((game) => (
+                    <label
+                      key={game.title}
+                      className="flex items-center gap-2 text-xs text-text-secondary"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={(profile.games ?? ["LOL"]).includes(
+                          game.title,
+                        )}
+                        disabled={saving}
+                        onChange={() =>
+                          void toggleChannelGame(profile, game.title)
+                        }
+                      />
+                      {game.label}
+                    </label>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

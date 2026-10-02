@@ -73,7 +73,8 @@ interface Room {
 interface Post {
   id: string;
   title: string;
-  category: "NOTICE" | "FREE" | "TIP" | "QNA";
+  category: "NOTICE" | "FREE" | "TIP" | "QNA" | null;
+  board?: { name: string; color: string | null } | null;
   views: number;
   createdAt: string;
   author: { username: string };
@@ -256,7 +257,7 @@ export function DashboardHero({
           ? `승률 ${stats.winRate.toFixed(0)}%`
           : "첫 경기를 시작해보세요",
       icon: Trophy,
-      href: `${gamePrefix}/profile`,
+      href: `/me?game=${gamePrefix.slice(1)}`,
     },
     {
       label: isPubg ? "내 배그 클랜" : "내 롤 클랜",
@@ -376,7 +377,9 @@ export function DashboardHero({
           <div className="mt-7 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => router.push(`${gamePrefix}/profile`)}
+              onClick={() =>
+                router.push(`/settings/game-accounts${gamePrefix}`)
+              }
               className="inline-flex items-center gap-2 rounded-chip border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
@@ -494,14 +497,14 @@ function QuickActions({
       label: "내 전적",
       description: "경기 기록과 플레이 성향을 확인하세요",
       icon: UserRound,
-      href: `${gamePrefix}/profile`,
+      href: `/me?game=${gamePrefix.slice(1)}`,
       tone: "text-cyan-300 bg-cyan-300/[0.08] border-cyan-300/10",
     },
     {
       label: "글쓰기",
       description: "커뮤니티에 새로운 이야기를 남겨보세요",
       icon: PenLine,
-      href: "/community/write",
+      href: `/community/write?game=${gamePrefix.slice(1)}`,
       tone: "text-emerald-300 bg-emerald-300/[0.08] border-emerald-300/10",
     },
   ];
@@ -707,7 +710,7 @@ function MyStatsCard({
         iconColor="bg-violet-500/80"
         title="내 전적"
         actionLabel="프로필"
-        onAction={() => router.push(`${gamePrefix}/profile`)}
+        onAction={() => router.push(`/me?game=${gamePrefix.slice(1)}`)}
       />
 
       <div className="relative px-5 pb-5">
@@ -725,7 +728,9 @@ function MyStatsCard({
               </p>
             </div>
             <button
-              onClick={() => router.push(`${gamePrefix}/profile`)}
+              onClick={() =>
+                router.push(`/settings/game-accounts${gamePrefix}`)
+              }
               className="px-5 py-2 rounded-control text-sm font-medium text-violet-400 border border-violet-500/30 hover:bg-violet-500/10 transition-colors"
             >
               계정 연동하기
@@ -1002,6 +1007,7 @@ function formatRelativeDate(dateString: string) {
 
 function PopularPostsCard({ posts }: { posts: Post[] }) {
   const router = useRouter();
+  const gamePrefix = useDashboardGamePrefix();
 
   return (
     <GlassCard className="h-full">
@@ -1010,7 +1016,7 @@ function PopularPostsCard({ posts }: { posts: Post[] }) {
         iconColor="bg-emerald-500/80"
         title="인기글"
         actionLabel="커뮤니티"
-        onAction={() => router.push("/community")}
+        onAction={() => router.push(`/community?game=${gamePrefix.slice(1)}`)}
       />
 
       <div>
@@ -1022,11 +1028,20 @@ function PopularPostsCard({ posts }: { posts: Post[] }) {
         ) : (
           <div>
             {posts.map((post, i) => {
-              const cfg = CATEGORY_CONFIG[post.category];
+              const cfg = post.category
+                ? CATEGORY_CONFIG[post.category]
+                : {
+                    label: post.board?.name ?? "게시글",
+                    color: post.board?.color ?? "text-text-secondary",
+                  };
               return (
                 <div
                   key={post.id}
-                  onClick={() => router.push(`/community/${post.id}`)}
+                  onClick={() =>
+                    router.push(
+                      `/community/${post.id}?game=${gamePrefix.slice(1)}`,
+                    )
+                  }
                   className="flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.02] cursor-pointer transition-colors border-t border-white/[0.04] first:border-t-0"
                 >
                   {/* 순위 뱃지 */}
@@ -1326,9 +1341,9 @@ export function DashboardContent({
 
   const { data: popularPosts = [], isLoading: isPopularPostsLoading } =
     useQuery<Post[]>({
-      queryKey: ["dashboard", "popularPosts"],
+      queryKey: ["dashboard", "popularPosts", gameTitle],
       queryFn: async () => {
-        const data = await communityApi.getPosts({ limit: 20 });
+        const data = await communityApi.getPosts({ limit: 20, gameTitle });
         const arr = Array.isArray(data) ? data : (data?.posts ?? []);
         return [...arr]
           .sort(

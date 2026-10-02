@@ -9,13 +9,17 @@ import {
   Matches,
 } from "class-validator";
 import { Transform } from "class-transformer";
-import { UserRole } from "@nexus/database";
+import { GameTitle, UserRole } from "@nexus/database";
 import { stripAllHtml } from "@/common/utils/sanitize";
 
 /**
  * 게시판 생성 DTO (관리자 전용)
  */
 export class CreateBoardDto {
+  @IsOptional()
+  @IsEnum(GameTitle)
+  gameTitle?: GameTitle | null;
+
   /** 표시 이름 (필수, 플레인 텍스트) */
   @Transform(({ value }) => stripAllHtml(value))
   @IsString()

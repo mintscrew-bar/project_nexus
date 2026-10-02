@@ -12,12 +12,12 @@ import { DiscordIcon } from "@/components/icons/DiscordIcon";
 import { Users, Shield } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useFriendStore } from "@/stores/friend-store";
-import { GAMES } from "@nexus/types";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { GameSwitcher } from "@/components/layout/GameSwitcher";
 import { BgmToggle } from "@/components/bgm/BgmToggle";
 import { NotificationBell } from "@/components/NotificationBell";
-import { gamePath, useCurrentGame } from "@/hooks/useCurrentGame";
+import { gamePath, useNavigationGame } from "@/hooks/useCurrentGame";
+import { scopedSectionPath } from "@/lib/scoped-section-routes";
 
 // 게임별 화면은 `/lol/*` 처럼 현재 게임 프리픽스가 붙는다.
 // 옛 경로를 그대로 쓰면 매 클릭마다 리다이렉트를 한 번 더 타고,
@@ -28,15 +28,9 @@ const gameNavItems = [
   { path: "/ranking", label: "랭킹" },
 ];
 
-// 게임과 무관한 화면. 프리픽스 없이 그대로 둔다.
-const commonNavItems = [
-  { href: "/streamers", label: "스트리머" },
-  { href: "/community", label: "커뮤니티" },
-];
-
 export function Header() {
   const pathname = usePathname();
-  const currentGame = useCurrentGame();
+  const currentGame = useNavigationGame();
   const navItems = [
     ...gameNavItems.map((item) => ({
       href: gamePath(currentGame, item.path),
@@ -47,8 +41,15 @@ export function Header() {
      * 쿼리로 게임을 실어 보낸다 — 전에는 `/clans` 만 보내 놓고 화면이 그걸
      * 롤로 해석해서, 배그를 보던 사람이 눌러도 롤 클랜이 떴다.
      */
-    { href: `/clans?game=${GAMES[currentGame].slug}`, label: "클랜" },
-    ...commonNavItems,
+    { href: scopedSectionPath("clans", currentGame), label: "클랜" },
+    {
+      href: scopedSectionPath("streamers", currentGame),
+      label: "스트리머",
+    },
+    {
+      href: scopedSectionPath("community", currentGame),
+      label: "커뮤니티",
+    },
     { href: gamePath(currentGame, "/guide"), label: "가이드" },
   ];
   const { isAuthenticated, user } = useAuthStore();
@@ -97,8 +98,10 @@ export function Header() {
   const clientIncomingCount = mounted ? incomingCount : 0;
   const clientUser = mounted ? user : null;
 
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) => {
+    const path = href.split("?")[0];
+    return pathname === path || pathname.startsWith(`${path}/`);
+  };
 
   return (
     <header className="bg-bg-secondary border-b border-bg-tertiary px-3 py-2 md:px-4 md:py-3 flex justify-between items-center gap-3 z-50 sticky top-0">

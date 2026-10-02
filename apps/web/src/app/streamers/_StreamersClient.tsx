@@ -14,15 +14,19 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useToast } from "@/components/ui/Toast";
 import { useRouter } from "next/navigation";
 import { StreamersTour } from "@/components/onboarding/PrimaryPageTours";
+import { useNavigationGame } from "@/hooks/useCurrentGame";
+import { GameSectionTabs } from "@/components/GameSectionTabs";
+import { scopedSectionPath } from "@/lib/scoped-section-routes";
 
 export function StreamersClient() {
+  const game = useNavigationGame();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const { addToast } = useToast();
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["streamers"],
-    queryFn: streamerApi.list,
+    queryKey: ["streamers", game, user?.id ?? null],
+    queryFn: () => streamerApi.list(game),
     // 라이브 상태는 서버가 1분마다 갱신하므로 화면도 비슷한 주기로 따라간다.
     refetchInterval: 60_000,
     staleTime: 30_000,
@@ -38,13 +42,8 @@ export function StreamersClient() {
       return streamer;
     },
     onSuccess: (streamer) => {
-      queryClient.setQueryData<StreamerListItem[]>(["streamers"], (current) =>
-        current?.map((item) =>
-          item.userId === streamer.userId
-            ? { ...item, isFollowing: !streamer.isFollowing }
-            : item,
-        ),
-      );
+      // 두 게임 모두에 등록된 스트리머의 팔로우 상태가 다른 탭에도 반영되어야 한다.
+      void queryClient.invalidateQueries({ queryKey: ["streamers"] });
       addToast(
         streamer.isFollowing
           ? "방송 시작 알림을 해제했습니다."
@@ -57,7 +56,9 @@ export function StreamersClient() {
 
   const toggleFollow = (streamer: StreamerListItem) => {
     if (!isAuthenticated) {
-      router.push("/auth/login?callbackUrl=/streamers");
+      router.push(
+        `/auth/login?redirect=${encodeURIComponent(scopedSectionPath("streamers", game))}`,
+      );
       return;
     }
     followMutation.mutate(streamer);
@@ -72,6 +73,7 @@ export function StreamersClient() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
       <StreamersTour />
+      <GameSectionTabs section="streamers" game={game} />
       <header data-tour="streamers-intro" className="mb-8">
         <h1 className="text-2xl font-bold text-text-primary md:text-3xl">
           스트리머
@@ -82,68 +84,68 @@ export function StreamersClient() {
       </header>
 
       <div data-tour="streamers-list">
-      {isLoading && (
-        <div className="flex justify-center py-20">
-          <LoadingSpinner />
-        </div>
-      )}
-
-      {isError && (
-        <p className="rounded-xl border border-bg-tertiary bg-bg-secondary p-6 text-center text-sm text-text-secondary">
-          스트리머 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
-        </p>
-      )}
-
-      {!isLoading && !isError && streamers.length === 0 && <EmptyState />}
-
-      {liveStreamers.length > 0 && (
-        <section className="mb-10">
-          <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-text-primary">
-            <span className="flex h-2 w-2 animate-pulse rounded-full bg-red-500" />
-            지금 방송 중
-            <span className="text-text-muted">({liveStreamers.length})</span>
-          </h2>
-
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {liveStreamers.map((streamer) => (
-              <LiveStreamerCard
-                key={streamer.userId}
-                streamer={streamer}
-                onToggleFollow={toggleFollow}
-                followPending={
-                  followMutation.isPending &&
-                  followMutation.variables?.userId === streamer.userId
-                }
-              />
-            ))}
+        {isLoading && (
+          <div className="flex justify-center py-20">
+            <LoadingSpinner />
           </div>
-        </section>
-      )}
+        )}
 
-      {offlineStreamers.length > 0 && (
-        <section>
-          <h2 className="mb-4 text-sm font-semibold text-text-primary">
-            전체 스트리머
-            <span className="ml-1.5 text-text-muted">
-              ({offlineStreamers.length})
-            </span>
-          </h2>
+        {isError && (
+          <p className="rounded-xl border border-bg-tertiary bg-bg-secondary p-6 text-center text-sm text-text-secondary">
+            스트리머 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
+          </p>
+        )}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {offlineStreamers.map((streamer) => (
-              <OfflineStreamerCard
-                key={streamer.userId}
-                streamer={streamer}
-                onToggleFollow={toggleFollow}
-                followPending={
-                  followMutation.isPending &&
-                  followMutation.variables?.userId === streamer.userId
-                }
-              />
-            ))}
-          </div>
-        </section>
-      )}
+        {!isLoading && !isError && streamers.length === 0 && <EmptyState />}
+
+        {liveStreamers.length > 0 && (
+          <section className="mb-10">
+            <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-text-primary">
+              <span className="flex h-2 w-2 animate-pulse rounded-full bg-red-500" />
+              지금 방송 중
+              <span className="text-text-muted">({liveStreamers.length})</span>
+            </h2>
+
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {liveStreamers.map((streamer) => (
+                <LiveStreamerCard
+                  key={streamer.userId}
+                  streamer={streamer}
+                  onToggleFollow={toggleFollow}
+                  followPending={
+                    followMutation.isPending &&
+                    followMutation.variables?.userId === streamer.userId
+                  }
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {offlineStreamers.length > 0 && (
+          <section>
+            <h2 className="mb-4 text-sm font-semibold text-text-primary">
+              전체 스트리머
+              <span className="ml-1.5 text-text-muted">
+                ({offlineStreamers.length})
+              </span>
+            </h2>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {offlineStreamers.map((streamer) => (
+                <OfflineStreamerCard
+                  key={streamer.userId}
+                  streamer={streamer}
+                  onToggleFollow={toggleFollow}
+                  followPending={
+                    followMutation.isPending &&
+                    followMutation.variables?.userId === streamer.userId
+                  }
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

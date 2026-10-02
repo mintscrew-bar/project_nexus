@@ -8,6 +8,7 @@ import {
   Body,
   UseGuards,
   Param,
+  ParseEnumPipe,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
@@ -26,6 +27,7 @@ import {
   UpdateSettingsDto,
   UpdateProfileDto,
   UpsertStreamerProfileDto,
+  UpdateStreamerGamesDto,
   UpsertStreamerLinkDto,
 } from "./dto";
 import { UploadService } from "../upload/upload.service";
@@ -89,6 +91,16 @@ export class UserController {
     @Body() data: UpsertStreamerProfileDto,
   ) {
     return this.userService.upsertStreamerProfile(userId, data);
+  }
+
+  @Patch("me/streamer-profile/:platform/games")
+  async updateMyStreamerGames(
+    @CurrentUser("sub") userId: string,
+    @Param("platform", new ParseEnumPipe(StreamerPlatform))
+    platform: StreamerPlatform,
+    @Body() data: UpdateStreamerGamesDto,
+  ) {
+    return this.userService.updateStreamerGames(userId, platform, data.games);
   }
 
   @Delete("me/streamer-profile/:platform")

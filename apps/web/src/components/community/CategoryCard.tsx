@@ -7,6 +7,8 @@ import { type Post, formatDate } from "./community-types";
 import { type Board } from "@/lib/api-client";
 import { resolveBoardIcon } from "@/lib/board-icons";
 import { useCommunityStore } from "@/stores/community-store";
+import { useNavigationGame } from "@/hooks/useCurrentGame";
+import { GAMES } from "@nexus/types";
 
 interface CategoryCardProps {
   board: Board;
@@ -23,6 +25,7 @@ export function CategoryCard({
   isLoading = false,
 }: CategoryCardProps) {
   const router = useRouter();
+  const game = useNavigationGame();
   const setSelectedCategory = useCommunityStore((s) => s.setSelectedCategory);
   const Icon = resolveBoardIcon(board.iconName);
   const title = board.fullName ?? board.name;
@@ -35,7 +38,9 @@ export function CategoryCard({
       {/* 카드 헤더 */}
       <div className="bg-bg-tertiary border-b border-bg-elevated px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Icon className={cn("h-4 w-4", board.color ?? "text-text-secondary")} />
+          <Icon
+            className={cn("h-4 w-4", board.color ?? "text-text-secondary")}
+          />
           <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
           {totalCount > 0 && (
             <span className="text-xs text-text-tertiary">{totalCount}개</span>
@@ -70,7 +75,9 @@ export function CategoryCard({
             {displayPosts.map((post) => (
               <div
                 key={post.id}
-                onClick={() => router.push(`/community/${post.id}`)}
+                onClick={() =>
+                  router.push(`/community/${post.id}?game=${GAMES[game].slug}`)
+                }
                 className="flex items-center gap-2 px-4 py-2.5 hover:bg-bg-tertiary cursor-pointer transition-colors border-b border-bg-elevated last:border-0"
               >
                 <p className="text-sm text-text-primary truncate flex-1">

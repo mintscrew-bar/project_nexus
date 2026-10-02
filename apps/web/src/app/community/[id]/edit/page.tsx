@@ -18,6 +18,9 @@ import {
 import { RichTextEditor } from "@/components/community/RichTextEditor";
 import { isRichTextDocument, type RichTextDocument } from "@/lib/rich-text";
 import { useToast } from "@/components/ui/Toast";
+import { useNavigationGame } from "@/hooks/useCurrentGame";
+import { scopedSectionPath } from "@/lib/scoped-section-routes";
+import { GAMES } from "@nexus/types";
 import {
   ArrowLeft,
   Save,
@@ -31,7 +34,11 @@ import {
 
 type PostCategory = "NOTICE" | "FREE" | "TIP" | "QNA";
 
-const categories: { value: PostCategory; label: string; icon: React.ElementType }[] = [
+const categories: {
+  value: PostCategory;
+  label: string;
+  icon: React.ElementType;
+}[] = [
   { value: "FREE", label: "자유", icon: MessageCircle },
   { value: "TIP", label: "팁", icon: Lightbulb },
   { value: "QNA", label: "Q&A", icon: HelpCircle },
@@ -39,9 +46,11 @@ const categories: { value: PostCategory; label: string; icon: React.ElementType 
 ];
 
 export default function EditPostPage() {
+  const game = useNavigationGame();
   const params = useParams();
   const router = useRouter();
   const postId = params.id as string;
+  const postPath = `/community/${postId}?game=${GAMES[game].slug}`;
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { addToast } = useToast();
 
@@ -58,7 +67,11 @@ export default function EditPostPage() {
 
   // 태그 정규화: 소문자, 한글/영문/숫자만 허용, 최대 20자
   const normalizeTag = (val: string) =>
-    val.trim().toLowerCase().replace(/[^a-z0-9가-힣]/g, "").slice(0, 20);
+    val
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9가-힣]/g, "")
+      .slice(0, 20);
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
@@ -89,22 +102,28 @@ export default function EditPostPage() {
         // 본인 게시글인지 확인
         if (user && post.author.id !== user.id) {
           addToast("수정 권한이 없습니다.", "error");
-          router.push(`/community/${postId}`);
+          router.push(postPath);
           return;
         }
 
         setTitle(post.title);
         setContent(post.content);
-        setContentJson(isRichTextDocument(post.contentJson) ? post.contentJson : null);
+        setContentJson(
+          isRichTextDocument(post.contentJson) ? post.contentJson : null,
+        );
         // 레거시 category가 있을 때만 설정 (커스텀 게시판 글은 null)
         if (post.category) setCategory(post.category);
         // 기존 태그 불러오기
         if (post.tags && Array.isArray(post.tags)) {
-          setTags(post.tags.map((t: any) => t.tag?.name ?? t.name ?? "").filter(Boolean));
+          setTags(
+            post.tags
+              .map((t: any) => t.tag?.name ?? t.name ?? "")
+              .filter(Boolean),
+          );
         }
       } catch {
         addToast("게시글을 불러오는데 실패했습니다.", "error");
-        router.push("/community");
+        router.push(scopedSectionPath("community", game));
       } finally {
         setIsLoadingPost(false);
       }
@@ -113,7 +132,16 @@ export default function EditPostPage() {
     if (!authLoading && isAuthenticated) {
       fetchPost();
     }
-  }, [postId, user, isAuthenticated, authLoading, router, addToast]);
+  }, [
+    postId,
+    user,
+    isAuthenticated,
+    authLoading,
+    router,
+    addToast,
+    game,
+    postPath,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,7 +167,7 @@ export default function EditPostPage() {
         tags,
       });
       addToast("게시글이 수정되었습니다.", "success");
-      router.push(`/community/${postId}`);
+      router.push(postPath);
     } catch (err: any) {
       setError(err.message || "게시글 수정에 실패했습니다.");
     } finally {
@@ -179,7 +207,7 @@ export default function EditPostPage() {
         <Button
           variant="ghost"
           className="mb-4"
-          onClick={() => router.push(`/community/${postId}`)}
+          onClick={() => router.push(postPath)}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           돌아가기
@@ -212,7 +240,9 @@ export default function EditPostPage() {
                     );
                   })}
                 </div>
-                <p className="text-xs text-text-tertiary mt-1">카테고리는 수정할 수 없습니다.</p>
+                <p className="text-xs text-text-tertiary mt-1">
+                  카테고리는 수정할 수 없습니다.
+                </p>
               </div>
 
               {/* Title */}
@@ -247,7 +277,12 @@ export default function EditPostPage() {
 
               {/* Tags */}
               <div>
-                <Label>태그 <span className="text-text-tertiary text-xs font-normal">(최대 5개, Enter 또는 쉼표로 추가)</span></Label>
+                <Label>
+                  태그{" "}
+                  <span className="text-text-tertiary text-xs font-normal">
+                    (최대 5개, Enter 또는 쉼표로 추가)
+                  </span>
+                </Label>
                 <div className="mt-1 flex flex-wrap gap-2 p-2 rounded-lg border border-bg-tertiary bg-bg-secondary min-h-[42px] focus-within:border-accent-primary/50 transition-colors">
                   {tags.map((tag) => (
                     <span
@@ -290,7 +325,7 @@ export default function EditPostPage() {
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => router.push(`/community/${postId}`)}
+                  onClick={() => router.push(postPath)}
                 >
                   취소
                 </Button>

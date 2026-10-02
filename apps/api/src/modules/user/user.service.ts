@@ -406,6 +406,7 @@ export class UserService {
       platform: StreamerPlatform;
       channelUrl: string;
       channelName?: string;
+      games?: GameTitle[];
     },
   ) {
     const user = await this.prisma.user.findUnique({
@@ -482,14 +483,27 @@ export class UserService {
         platform: data.platform,
         channelUrl,
         channelName,
+        games: data.games ?? [GameTitle.LOL],
         isActive: true,
       },
       update: {
         channelUrl,
         channelName,
+        ...(data.games ? { games: data.games } : {}),
         isActive: true,
         ...resetVerification,
       },
+    });
+  }
+
+  async updateStreamerGames(
+    userId: string,
+    platform: StreamerPlatform,
+    games: GameTitle[],
+  ) {
+    return this.prisma.streamerProfile.update({
+      where: { userId_platform: { userId, platform } },
+      data: { games: Array.from(new Set(games)) },
     });
   }
 

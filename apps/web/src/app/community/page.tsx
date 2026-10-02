@@ -39,6 +39,9 @@ import { CategoryCard } from "@/components/community/CategoryCard";
 import { PostListFilters } from "@/components/community/PostListFilters";
 import { CommunityTour } from "@/components/onboarding/PrimaryPageTours";
 import { AdSlotCard } from "@/components/ads/AdSlot";
+import { useNavigationGame } from "@/hooks/useCurrentGame";
+import { GameSectionTabs } from "@/components/GameSectionTabs";
+import { GAMES } from "@nexus/types";
 
 /**
  * 전 해상도 공용 게시판 칩 내비.
@@ -120,6 +123,8 @@ function BoardChips({
 
 /** useSearchParams를 사용하므로 Suspense 내부에서 렌더 */
 function CommunityPageContent() {
+  const gameTitle = useNavigationGame();
+  const writePath = `/community/write?game=${GAMES[gameTitle].slug}`;
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthStore();
@@ -136,8 +141,8 @@ function CommunityPageContent() {
 
   // ── React Query: 게시판 목록 (5분 캐시) ──
   const { data: boards = [] } = useQuery({
-    queryKey: ["boards"],
-    queryFn: () => boardApi.list(),
+    queryKey: ["boards", gameTitle],
+    queryFn: () => boardApi.list(gameTitle),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -156,6 +161,19 @@ function CommunityPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 이전 게임의 게시판·검색·페이지가 다음 게임에 남지 않게 한다.
+  useEffect(() => {
+    const state = useCommunityStore.getState();
+    state.setSearchQuery("");
+    state.setSelectedCategory(
+      (
+        searchParams.get("board") ?? searchParams.get("category")
+      )?.toLowerCase() ?? "ALL",
+    );
+    state.setCurrentPage(1);
+    state.setSelectedTag(searchParams.get("tag") ?? "");
+  }, [gameTitle, searchParams]);
+
   // 검색어 debounce (queryKey에 사용)
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -164,8 +182,8 @@ function CommunityPageContent() {
 
   // ── React Query: 인기 태그 (5분 캐시) ──
   const { data: popularTags = [] } = useQuery({
-    queryKey: ["popularTags"],
-    queryFn: () => communityApi.getPopularTags(15),
+    queryKey: ["popularTags", gameTitle],
+    queryFn: () => communityApi.getPopularTags(15, gameTitle),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -177,6 +195,7 @@ function CommunityPageContent() {
       queryKey: [
         "communityPosts",
         "CARD",
+        gameTitle,
         board.slug,
         apiSortBy,
         debouncedSearch,
@@ -185,6 +204,7 @@ function CommunityPageContent() {
       ],
       queryFn: async () => {
         const data = await communityApi.getPosts({
+          gameTitle,
           boardSlug: board.slug,
           limit: 10,
           sortBy: apiSortBy,
@@ -204,6 +224,7 @@ function CommunityPageContent() {
     queryKey: [
       "communityPosts",
       "ALL_FEED",
+      gameTitle,
       apiSortBy,
       debouncedSearch,
       selectedTag,
@@ -211,6 +232,7 @@ function CommunityPageContent() {
     ],
     queryFn: async () => {
       const data = await communityApi.getPosts({
+        gameTitle,
         limit: POSTS_PER_PAGE,
         offset: (currentPage - 1) * POSTS_PER_PAGE,
         sortBy: apiSortBy,
@@ -234,6 +256,7 @@ function CommunityPageContent() {
     queryKey: [
       "communityPosts",
       selectedCategory,
+      gameTitle,
       apiSortBy,
       debouncedSearch,
       selectedTag,
@@ -241,6 +264,7 @@ function CommunityPageContent() {
     ],
     queryFn: async () => {
       const data = await communityApi.getPosts({
+        gameTitle,
         boardSlug: selectedCategory,
         limit: POSTS_PER_PAGE,
         offset: (currentPage - 1) * POSTS_PER_PAGE,
@@ -315,6 +339,7 @@ function CommunityPageContent() {
     <div className="flex-grow p-4 md:p-6 animate-fade-in">
       <CommunityTour />
       <div className="container mx-auto max-w-5xl">
+        <GameSectionTabs section="community" game={gameTitle} />
         {/* 사이드바 없이 모든 해상도에서 게시판 전환을 제공한다. */}
         <BoardChips
           boards={boards}
@@ -356,8 +381,8 @@ function CommunityPageContent() {
                 onClick={() =>
                   router.push(
                     isAuthenticated
-                      ? "/community/write"
-                      : "/auth/login?redirect=/community/write",
+                      ? writePath
+                      : `/auth/login?redirect=${encodeURIComponent(writePath)}`,
                   )
                 }
               >
@@ -455,7 +480,7 @@ function CommunityPageContent() {
                           : isAuthenticated
                             ? {
                                 label: "글쓰기",
-                                onClick: () => router.push("/community/write"),
+                                onClick: () => router.push(writePath),
                               }
                             : {
                                 label: "로그인하기",
@@ -518,7 +543,7 @@ function CommunityPageContent() {
                         : isAuthenticated
                           ? {
                               label: "글쓰기",
-                              onClick: () => router.push("/community/write"),
+                              onClick: () => router.push(writePath),
                             }
                           : {
                               label: "로그인하기",

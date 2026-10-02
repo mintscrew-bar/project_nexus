@@ -9,6 +9,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcuts";
 import { BgmPlayer } from "@/components/bgm/BgmPlayer";
 import { useSfxStore } from "@/stores/sfx-store";
+import { GameNavigationProvider } from "@/components/GameNavigationProvider";
 
 function SfxSettingsInitializer() {
   const hydrate = useSfxStore((state) => state.hydrate);
@@ -51,7 +52,9 @@ export function Providers({ children }: { children: ReactNode }) {
           <SfxSettingsInitializer />
           <KeyboardShortcutsProvider>
             <AuthInitializer>
-              <RiotAccountChecker>{children}</RiotAccountChecker>
+              <GameNavigationProvider>
+                <RiotAccountChecker>{children}</RiotAccountChecker>
+              </GameNavigationProvider>
               {/* 배경음악. 최상위에 한 번만 둬야 화면을 옮겨도 곡이 이어진다. */}
               <BgmPlayer />
             </AuthInitializer>

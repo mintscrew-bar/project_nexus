@@ -3,11 +3,10 @@
 import { useRouter } from "next/navigation";
 import { Eye, Heart, Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  type Post,
-  formatDate,
-} from "./community-types";
+import { type Post, formatDate } from "./community-types";
 import { resolveBoardIcon } from "@/lib/board-icons";
+import { useNavigationGame } from "@/hooks/useCurrentGame";
+import { GAMES } from "@nexus/types";
 
 interface PostRowProps {
   post: Post;
@@ -18,16 +17,20 @@ interface PostRowProps {
 /** 단일 게시판 모드 테이블 행 컴포넌트 */
 export function PostRow({ post, showCategoryIcon = false }: PostRowProps) {
   const router = useRouter();
+  const game = useNavigationGame();
   const CatIcon = resolveBoardIcon(post.board?.iconName);
   const catColor = post.board?.color ?? "text-text-secondary";
   const commentCount = post._count?.comments || 0;
 
   return (
     <div
-      onClick={() => router.push(`/community/${post.id}`)}
+      onClick={() =>
+        router.push(`/community/${post.id}?game=${GAMES[game].slug}`)
+      }
       className={cn(
         "grid grid-cols-12 gap-2 px-4 py-3 hover:bg-bg-tertiary cursor-pointer transition-colors border-b border-bg-elevated last:border-0",
-        post.isPinned && "border-l-2 border-l-accent-primary bg-accent-primary/5"
+        post.isPinned &&
+          "border-l-2 border-l-accent-primary bg-accent-primary/5",
       )}
     >
       {/* 제목 열 */}
@@ -43,7 +46,7 @@ export function PostRow({ post, showCategoryIcon = false }: PostRowProps) {
             "truncate",
             post.isPinned
               ? "font-semibold text-text-primary"
-              : "font-medium text-text-primary"
+              : "font-medium text-text-primary",
           )}
         >
           {post.title}

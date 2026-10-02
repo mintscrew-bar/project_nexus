@@ -1036,18 +1036,18 @@ export function RoomCreationForm({
                   )}
                   {isRiotError && (
                     <Link
-                      href={`${gamePrefix}/profile`}
+                      href="/settings/game-accounts/lol"
                       className="inline-block text-sm text-accent-primary hover:underline"
                     >
-                      프로필 페이지에서 Riot 계정 연동하기 →
+                      Riot 계정 연동하기 →
                     </Link>
                   )}
                   {isPubgError && (
                     <Link
-                      href="/pubg/profile"
+                      href="/settings/game-accounts/pubg"
                       className="inline-block text-sm text-accent-primary hover:underline"
                     >
-                      PUBG 프로필에서 계정 등록하기 →
+                      PUBG 계정 등록하기 →
                     </Link>
                   )}
                 </div>

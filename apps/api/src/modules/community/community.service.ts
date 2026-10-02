@@ -12,7 +12,12 @@ import { PostCategory } from "./community.types";
 import { NotificationService } from "../notification/notification.service";
 import { RedisService } from "../redis/redis.service";
 import { BoardService } from "../board/board.service";
-import { PostContentFormat, Prisma, UserRole } from "@nexus/database";
+import {
+  GameTitle,
+  PostContentFormat,
+  Prisma,
+  UserRole,
+} from "@nexus/database";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 
 /**
@@ -407,6 +412,7 @@ export class CommunityService {
   }
 
   async listPosts(filters?: {
+    gameTitle?: GameTitle;
     category?: PostCategory;
     boardId?: string; // 게시판 id 필터 (신규)
     boardSlug?: string; // 게시판 slug 필터 (신규)
@@ -419,6 +425,17 @@ export class CommunityService {
     isAdmin?: boolean; // 관리자 여부 (블라인드 마스킹 스킵)
   }) {
     const where: any = { isDeleted: false };
+
+    // 게임 범위는 검색 OR와 별도로 AND에 둬야 검색할 때 다른 게임 글이 섞이지 않는다.
+    if (filters?.gameTitle) {
+      where.AND = [
+        {
+          board: {
+            is: { OR: [{ gameTitle: filters.gameTitle }, { gameTitle: null }] },
+          },
+        },
+      ];
+    }
 
     // 게시판 필터: boardId 우선 → boardSlug → 레거시 category 순
     if (filters?.boardId) {
@@ -562,7 +579,29 @@ export class CommunityService {
   /**
    * 인기 태그 조회 (게시글 수 기준 상위 N개)
    */
-  async getPopularTags(limit = 20) {
+  async getPopularTags(limit = 20, gameTitle?: GameTitle) {
+    if (gameTitle) {
+      const counts = await this.prisma.postTag.groupBy({
+        by: ["tagId"],
+        where: {
+          post: {
+            isDeleted: false,
+            board: { is: { OR: [{ gameTitle }, { gameTitle: null }] } },
+          },
+        },
+        _count: { tagId: true },
+        orderBy: { _count: { tagId: "desc" } },
+        take: limit,
+      });
+      const tags = await this.prisma.tag.findMany({
+        where: { id: { in: counts.map((item) => item.tagId) } },
+      });
+      const names = new Map(tags.map((tag) => [tag.id, tag.name]));
+      return counts.map((item) => ({
+        name: names.get(item.tagId)!,
+        count: item._count.tagId,
+      }));
+    }
     const tags = await this.prisma.tag.findMany({
       include: {
         _count: { select: { posts: true } },

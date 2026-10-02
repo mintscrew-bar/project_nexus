@@ -8,7 +8,7 @@ import {
   Matches,
 } from "class-validator";
 import { Transform } from "class-transformer";
-import { UserRole } from "@nexus/database";
+import { GameTitle, UserRole } from "@nexus/database";
 import { stripAllHtml } from "@/common/utils/sanitize";
 
 /**
@@ -16,6 +16,10 @@ import { stripAllHtml } from "@/common/utils/sanitize";
  * (프로젝트에 @nestjs/mapped-types가 없어 수동 정의)
  */
 export class UpdateBoardDto {
+  @IsOptional()
+  @IsEnum(GameTitle)
+  gameTitle?: GameTitle | null;
+
   @IsOptional()
   @Transform(({ value }) => (value == null ? value : stripAllHtml(value)))
   @IsString()

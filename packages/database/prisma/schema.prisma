@@ -189,6 +189,8 @@ model StreamerProfile {
   channelName String?
   isActive    Boolean          @default(true)
   settings    Json?
+  /// 이 채널이 다루는 게임. 스트리머는 두 게임을 동시에 선택할 수 있다.
+  games       GameTitle[]     @default([LOL])
 
   // 플랫폼이 부여한 채널 식별자. 라이브 조회 키라서 검증 시점에 채워진다.
   channelId       String?
@@ -1165,6 +1167,8 @@ model Board {
   id          String    @id @default(cuid())
   /// URL/식별용 슬러그 (소문자). 기본 게시판은 enum 값과 1:1 대응
   slug        String    @unique
+  /// null은 공통 게시판. 게임 게시판은 해당 게임 커뮤니티에만 노출한다.
+  gameTitle   GameTitle?
   /// 표시 이름 (예: "자유")
   name        String
   /// 전체 이름 (예: "자유게시판"). 없으면 name 사용
@@ -1190,6 +1194,7 @@ model Board {
   posts       Post[]
 
   @@index([isDeleted, isHidden, isActive, order])
+  @@index([gameTitle])
   @@map("boards")
 }
 

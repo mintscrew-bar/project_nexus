@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { getDdragonVersion } from "./ddragon";
+import type { GameTitle } from "@nexus/types";
 
 // 보이지 않는 유니코드 문자 제거 (복사-붙여넣기 시 포함되는 bidirectional formatting 등)
 const stripInvisibleChars = (str: string): string =>
@@ -450,6 +451,7 @@ export interface StreamerProfile {
   id?: string;
   userId?: string;
   platform: StreamerPlatform;
+  games?: GameTitle[];
   channelUrl: string;
   channelName: string | null;
   isActive?: boolean;
@@ -518,6 +520,7 @@ export const userApi = {
     platform: StreamerPlatform;
     channelUrl: string;
     channelName?: string;
+    games?: GameTitle[];
   }) => {
     const response = await apiClient.put("/users/me/streamer-profile", data);
     return response.data as StreamerProfile;
@@ -528,6 +531,17 @@ export const userApi = {
       `/users/me/streamer-profile/${platform}`,
     );
     return response.data as { success: boolean };
+  },
+
+  updateStreamerGames: async (
+    platform: StreamerPlatform,
+    games: GameTitle[],
+  ) => {
+    const response = await apiClient.patch(
+      `/users/me/streamer-profile/${platform}/games`,
+      { games },
+    );
+    return response.data as StreamerProfile;
   },
 
   getStreamerLinks: async () => {
@@ -1768,6 +1782,7 @@ export const clanApi = {
 // 커뮤니티 관련 API
 export const communityApi = {
   getPosts: async (params?: {
+    gameTitle?: GameTitle;
     category?: string;
     boardId?: string;
     boardSlug?: string;
@@ -1815,9 +1830,10 @@ export const communityApi = {
 
   getPopularTags: async (
     limit = 20,
+    gameTitle?: GameTitle,
   ): Promise<{ name: string; count: number }[]> => {
     const response = await apiClient.get("/community/tags/popular", {
-      params: { limit },
+      params: { limit, gameTitle },
     });
     return response.data;
   },
@@ -1965,6 +1981,7 @@ export const communityApi = {
 export interface Board {
   id: string;
   slug: string;
+  gameTitle?: GameTitle | null;
   name: string;
   fullName: string | null;
   description: string | null;
@@ -1980,6 +1997,7 @@ export interface Board {
 }
 
 export interface BoardInput {
+  gameTitle?: GameTitle | null;
   name: string;
   slug?: string;
   fullName?: string | null;
@@ -1995,8 +2013,8 @@ export interface BoardInput {
 // 게시판 API
 export const boardApi = {
   // 공개: 활성 게시판 목록
-  list: async (): Promise<Board[]> => {
-    const response = await apiClient.get("/boards");
+  list: async (gameTitle?: GameTitle): Promise<Board[]> => {
+    const response = await apiClient.get("/boards", { params: { gameTitle } });
     return response.data;
   },
   // 관리자: 전체 목록 (숨김/비활성 포함, 글 수 포함)
@@ -2942,8 +2960,10 @@ export interface AdminStreamerItem {
 
 export const streamerApi = {
   /** 스트리머 탭 목록 — 방송 중인 스트리머가 위로 정렬되어 온다 */
-  list: async (): Promise<StreamerListItem[]> => {
-    const response = await apiClient.get("/streamers");
+  list: async (gameTitle?: GameTitle): Promise<StreamerListItem[]> => {
+    const response = await apiClient.get("/streamers", {
+      params: { gameTitle },
+    });
     return response.data;
   },
 
@@ -2955,8 +2975,10 @@ export const streamerApi = {
     await apiClient.delete(`/streamers/${streamerId}/follow`);
   },
 
-  startChzzkOAuth: async (): Promise<{ url: string }> => {
-    const response = await apiClient.post("/streamers/verify/chzzk/oauth");
+  startChzzkOAuth: async (games?: GameTitle[]): Promise<{ url: string }> => {
+    const response = await apiClient.post("/streamers/verify/chzzk/oauth", {
+      games,
+    });
     return response.data;
   },
 

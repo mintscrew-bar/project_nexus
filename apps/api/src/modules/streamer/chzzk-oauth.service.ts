@@ -6,7 +6,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { StreamerPlatform } from "@nexus/database";
+import { GameTitle, StreamerPlatform } from "@nexus/database";
 import axios from "axios";
 import { randomBytes } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
@@ -44,12 +44,15 @@ export class ChzzkOAuthService {
     private readonly redis: RedisService,
   ) {}
 
-  async createAuthorizationUrl(userId: string): Promise<{ url: string }> {
+  async createAuthorizationUrl(
+    userId: string,
+    games?: GameTitle[],
+  ): Promise<{ url: string }> {
     const { clientId, callbackUrl } = this.getConfig();
     const state = randomBytes(32).toString("base64url");
     await this.redis.set(
       `streamer:chzzk-oauth:${state}`,
-      userId,
+      games ? JSON.stringify({ userId, games: [...new Set(games)] }) : userId,
       OAUTH_STATE_TTL_SECONDS,
     );
 
@@ -66,12 +69,19 @@ export class ChzzkOAuthService {
       throw new BadRequestException("치지직 인증 응답이 올바르지 않습니다.");
     }
 
-    const userId = await this.redis.getdel(`streamer:chzzk-oauth:${state}`);
-    if (!userId) {
+    const storedState = await this.redis.getdel(
+      `streamer:chzzk-oauth:${state}`,
+    );
+    if (!storedState) {
       throw new BadRequestException(
         "인증 요청이 만료되었거나 이미 사용되었습니다. 다시 연결해주세요.",
       );
     }
+
+    // 기존 발급된 OAuth 상태(사용자 ID 문자열)도 10분 만료 전까지 받을 수 있다.
+    const { userId, games } = storedState.startsWith("{")
+      ? (JSON.parse(storedState) as { userId: string; games?: GameTitle[] })
+      : { userId: storedState, games: undefined };
 
     const { clientId, clientSecret } = this.getConfig();
     try {
@@ -119,12 +129,14 @@ export class ChzzkOAuthService {
         create: {
           userId,
           platform: StreamerPlatform.CHZZK,
+          ...(games ? { games } : {}),
           channelUrl: `https://chzzk.naver.com/${channel.channelId}`,
           channelId: channel.channelId,
           channelName: channel.channelName,
           verifiedAt: new Date(),
         },
         update: {
+          ...(games ? { games } : {}),
           channelUrl: `https://chzzk.naver.com/${channel.channelId}`,
           channelId: channel.channelId,
           channelName: channel.channelName,

@@ -34,7 +34,7 @@ export function LiveStreamersSection({
 }) {
   const { data } = useQuery({
     queryKey: ["streamers", "live"],
-    queryFn: streamerApi.list,
+    queryFn: () => streamerApi.list(),
     refetchInterval: 60_000,
     staleTime: 30_000,
     // 실패해도 홈 다른 영역에 영향을 주지 않게 조용히 넘어간다.

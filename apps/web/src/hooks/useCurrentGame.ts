@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { lastGameOrDefault } from "@/lib/last-game";
+import { useNavigationGameContext } from "@/components/GameNavigationProvider";
 import {
   DEFAULT_GAME,
   GAMES,
@@ -34,6 +35,17 @@ export function useCurrentGame(): GameTitle {
 export function useGameFromPath(): GameTitle | null {
   const pathname = usePathname();
   return gameFromSlug(pathname.split("/")[1]) ?? null;
+}
+
+/**
+ * 헤더·공용 섹션 링크에 사용할 게임 문맥.
+ * 경로 → `?game=` → 마지막으로 본 게임 순서로 판단해 중립 주소가 조용히
+ * 롤로 떨어지는 일을 막는다. 첫 렌더는 기본 게임이라 hydration도 유지한다.
+ */
+export function useNavigationGame(): GameTitle {
+  const gameFromPath = useGameFromPath();
+  const contextGame = useNavigationGameContext();
+  return gameFromPath ?? contextGame;
 }
 
 /**

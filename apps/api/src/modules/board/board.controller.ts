@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -17,6 +18,7 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "@nexus/database";
 import { BoardService } from "./board.service";
 import { CreateBoardDto, UpdateBoardDto } from "./dto";
+import { GameScopeQueryDto } from "@/common/dto/game-scope.dto";
 
 @Controller("boards")
 export class BoardController {
@@ -26,8 +28,8 @@ export class BoardController {
   /** 활성·노출 중인 게시판 목록 (커뮤니티 UI용) */
   @Get()
   @Throttle({ default: { limit: 120, ttl: 60000 } })
-  list() {
-    return this.boardService.listPublic();
+  list(@Query() query: GameScopeQueryDto) {
+    return this.boardService.listPublic(query.gameTitle);
   }
 
   // ── 관리자: 게시판 관리 ──────────────────────────────────────────────

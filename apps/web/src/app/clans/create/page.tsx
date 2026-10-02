@@ -189,6 +189,31 @@ function CreateClanPageContent() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              <fieldset className="flex flex-wrap gap-4 rounded-lg border border-bg-elevated p-4">
+                <legend className="px-1 text-sm font-semibold">
+                  클랜 게임
+                </legend>
+                {(["LOL", "PUBG"] as const).map((game) => (
+                  <label key={game} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="clan-game"
+                      checked={gameTitle === game}
+                      disabled={isSubmitting}
+                      onChange={() =>
+                        router.replace(
+                          `/clans/create?game=${game.toLowerCase()}`,
+                          { scroll: false },
+                        )
+                      }
+                    />
+                    {game === "LOL" ? "리그 오브 레전드" : "배틀그라운드"}
+                  </label>
+                ))}
+                <p className="w-full text-xs text-text-muted">
+                  클랜은 선택한 게임의 가입·전적·랭킹을 별도로 관리합니다.
+                </p>
+              </fieldset>
               {/* 정체성 미리보기 + 편집 (배너 / 엠블럼 / 대표색) */}
               <div className="overflow-hidden rounded-lg border border-bg-elevated">
                 {/* 배너 */}

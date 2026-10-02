@@ -1,9 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { GAMES, GAME_TITLES, type GameTitle } from "@nexus/types";
 import { cn } from "@/lib/utils";
-import { useCurrentGame } from "@/hooks/useCurrentGame";
+import { useNavigationGame } from "@/hooks/useCurrentGame";
+import {
+  scopedSectionPath,
+  type GameScopedSection,
+} from "@/lib/scoped-section-routes";
+import { myProfilePath } from "@/lib/profile-routes";
 
 /**
  * 롤 ↔ 배그 전환.
@@ -14,10 +19,20 @@ import { useCurrentGame } from "@/hooks/useCurrentGame";
  */
 export function GameSwitcher({ className }: { className?: string }) {
   const router = useRouter();
-  const current = useCurrentGame();
+  const current = useNavigationGame();
+  const pathname = usePathname();
 
   const go = (title: GameTitle) => {
     if (title === current) return;
+    if (pathname === "/me") {
+      router.push(myProfilePath(title));
+      return;
+    }
+    const section = pathname.slice(1);
+    if (["clans", "streamers", "community"].includes(section)) {
+      router.push(scopedSectionPath(section as GameScopedSection, title));
+      return;
+    }
     router.push(`/${GAMES[title].slug}`);
   };
 

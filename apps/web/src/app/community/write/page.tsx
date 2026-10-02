@@ -16,6 +16,9 @@ import {
 } from "@/components/ui";
 import { RichTextEditor } from "@/components/community/RichTextEditor";
 import type { RichTextDocument } from "@/lib/rich-text";
+import { useNavigationGame } from "@/hooks/useCurrentGame";
+import { scopedSectionPath } from "@/lib/scoped-section-routes";
+import { GAMES } from "@nexus/types";
 import {
   ArrowLeft,
   Send,
@@ -46,6 +49,7 @@ const ROLE_RANK: Record<string, number> = {
 };
 
 export default function WritePostPage() {
+  const gameTitle = useNavigationGame();
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
 
@@ -94,21 +98,29 @@ export default function WritePostPage() {
 
   // 게시판 목록 로드 + 기본 선택(첫 작성 가능 게시판)
   useEffect(() => {
+    let active = true;
     boardApi
-      .list()
+      .list(gameTitle)
       .then((data) => {
+        if (!active) return;
         setBoards(data);
         const writable = data.filter(
           (b) => !b.writeRole || userRank >= (ROLE_RANK[b.writeRole] ?? 0),
         );
         // 자유게시판(free) 우선, 없으면 첫 작성 가능 게시판
-        const def =
-          writable.find((b) => b.slug === "free") ?? writable[0];
-        if (def) setBoardId((prev) => prev || def.id);
+        const def = writable.find((b) => b.slug === "free") ?? writable[0];
+        setBoardId((prev) =>
+          writable.some((board) => board.id === prev) ? prev : (def?.id ?? ""),
+        );
       })
-      .catch(() => setError("게시판 목록을 불러오지 못했습니다."));
+      .catch(() => {
+        if (active) setError("게시판 목록을 불러오지 못했습니다.");
+      });
+    return () => {
+      active = false;
+    };
     // userRank는 user 변경 시에만 바뀌므로 의존성에 포함
-  }, [userRank]);
+  }, [userRank, gameTitle]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,7 +150,7 @@ export default function WritePostPage() {
         boardId,
         tags: tags.length > 0 ? tags : undefined,
       });
-      router.push(`/community/${post.id}`);
+      router.push(`/community/${post.id}?game=${GAMES[gameTitle].slug}`);
     } catch (err: any) {
       setError(err.message || "게시글 작성에 실패했습니다.");
     } finally {
@@ -178,7 +190,7 @@ export default function WritePostPage() {
         <Button
           variant="ghost"
           className="mb-4"
-          onClick={() => router.push("/community")}
+          onClick={() => router.push(scopedSectionPath("community", gameTitle))}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           목록으로
@@ -293,7 +305,9 @@ export default function WritePostPage() {
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => router.push("/community")}
+                  onClick={() =>
+                    router.push(scopedSectionPath("community", gameTitle))
+                  }
                 >
                   취소
                 </Button>

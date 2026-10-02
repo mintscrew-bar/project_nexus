@@ -36,6 +36,7 @@ import { ClanEmblem, ClanTag } from "@/components/domain/ClanEmblem";
 import { ClansTour } from "@/components/onboarding/PrimaryPageTours";
 import ClanDetailClient from "./[id]/_ClanDetailClient";
 import { useClanGame, type ClanGameTitle } from "@/lib/clan-game";
+import { GameSectionTabs } from "@/components/GameSectionTabs";
 
 interface Clan {
   id: string;
@@ -369,6 +370,7 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
       <ClansTour />
       <div className="flex-grow p-4 md:p-6 animate-fade-in">
         <div className="container mx-auto max-w-[1600px]">
+          <GameSectionTabs section="clans" game={gameTitle} />
           <div className="mb-6">
             <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
               {gameTitle === "PUBG"

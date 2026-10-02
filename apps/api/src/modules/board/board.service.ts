@@ -6,7 +6,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { UserRole } from "@nexus/database";
+import { GameTitle, UserRole } from "@nexus/database";
 import { CreateBoardDto } from "./dto/create-board.dto";
 import { UpdateBoardDto } from "./dto/update-board.dto";
 
@@ -35,9 +35,14 @@ export class BoardService {
   /**
    * 공개용 게시판 목록: 삭제/숨김/비활성 제외, order 오름차순
    */
-  async listPublic() {
+  async listPublic(gameTitle?: GameTitle) {
     return this.prisma.board.findMany({
-      where: { isDeleted: false, isHidden: false, isActive: true },
+      where: {
+        isDeleted: false,
+        isHidden: false,
+        isActive: true,
+        ...(gameTitle ? { OR: [{ gameTitle }, { gameTitle: null }] } : {}),
+      },
       orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     });
   }
@@ -101,6 +106,7 @@ export class BoardService {
     return this.prisma.board.create({
       data: {
         slug,
+        gameTitle: dto.gameTitle ?? null,
         name: dto.name,
         fullName: dto.fullName ?? null,
         description: dto.description ?? null,
@@ -121,6 +127,7 @@ export class BoardService {
     await this.getByIdOrThrow(id);
 
     const data: Record<string, unknown> = {};
+    if (dto.gameTitle !== undefined) data.gameTitle = dto.gameTitle;
 
     if (dto.slug !== undefined) {
       const slug = this.slugify(dto.slug);

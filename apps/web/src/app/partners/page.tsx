@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Bot, BookOpen, Radio, Shield, Users } from "lucide-react";
 import { absoluteUrl } from "@/lib/seo";
-import { DEFAULT_GAME_PREFIX } from "@/lib/game-links";
 
 export const metadata: Metadata = {
   title: "NEXUS 파트너 안내",
@@ -25,13 +24,11 @@ export const metadata: Metadata = {
 
 const partnerCards = [
   {
-    // 게임 맥락이 없는 페이지라 기본 게임으로 보낸다.
-    // 맨 `/profile` 은 308 로 같은 곳에 붙지만 한 번 더 튕긴다.
-    href: `${DEFAULT_GAME_PREFIX}/profile`,
+    href: "/settings?tab=broadcast",
     icon: Radio,
     title: "스트리머로 함께하기",
     body: "프로필에서 방송 채널과 소개를 정리하고, 시참 내전과 커뮤니티 내전 운영에 NEXUS를 활용해요.",
-    cta: "프로필 설정하기",
+    cta: "방송 채널 연결하기",
   },
   {
     href: "/clans",
@@ -70,8 +67,8 @@ export default function PartnersPage() {
             스트리머, 클랜을 찾고 있어요
           </h1>
           <p className="mt-5 text-sm leading-relaxed text-text-secondary md:text-lg">
-            방송 파티와 클랜 내전을 더 쉽고 재밌게 운영할 수 있도록, 기존 기능으로
-            바로 이어지는 안내를 모아두었습니다.
+            방송 파티와 클랜 내전을 더 쉽고 재밌게 운영할 수 있도록, 기존
+            기능으로 바로 이어지는 안내를 모아두었습니다.
           </p>
         </div>
 
@@ -107,9 +104,9 @@ export default function PartnersPage() {
           <div className="flex items-start gap-3">
             <Shield className="mt-0.5 h-5 w-5 shrink-0 text-accent-primary" />
             <p className="text-sm leading-relaxed text-text-secondary">
-              파트너 페이지는 새 기능 신청 폼이 아니라, 기존 NEXUS 기능으로 빠르게
-              이동하는 안내 허브입니다. 세부 협업 문의는 Discord 커뮤니티에서 이어갈
-              수 있습니다.
+              파트너 페이지는 새 기능 신청 폼이 아니라, 기존 NEXUS 기능으로
+              빠르게 이동하는 안내 허브입니다. 세부 협업 문의는 Discord
+              커뮤니티에서 이어갈 수 있습니다.
             </p>
           </div>
         </div>

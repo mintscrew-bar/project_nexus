@@ -8,19 +8,14 @@ import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { resetOnboardingGuides } from "@/lib/onboarding";
 import { userApi } from "@/lib/api-client";
-import { useGameFromPath } from "@/hooks/useCurrentGame";
-import { enabledGames, GAMES } from "@nexus/types";
+import { useNavigationGame } from "@/hooks/useCurrentGame";
+import { myProfilePath } from "@/lib/profile-routes";
 
 export function UserMenu() {
   const { user, isAuthenticated, isLoading, logout } = useAuthStore();
-  // 프로필은 게임별 화면이다(롤은 Riot 계정·티어·포지션, 배그는 스팀·카카오
-  // 계정 — 겹치지 않는 데이터라 한 화면에 합치면 반쪽이 빈다).
-  //
-  // 그래서 **경로에 게임이 적혀 있을 때만** 그 게임 프로필로 보낸다. 종합
-  // 홈·클랜·커뮤니티·설정처럼 게임이 없는 화면에서 기본 게임으로 떨어뜨리면
-  // 배그만 하는 사람도 롤 프로필로 끌려갔다. 그 자리에서는 게임 이름을 달아
-  // 두 줄로 펼쳐서 사용자가 고르게 한다.
-  const gameInPath = useGameFromPath();
+  // 사람의 프로필은 하나다. 게임 경로에서는 해당 기록 탭을 처음 열어 줄 뿐,
+  // 메뉴에 롤/배그 프로필을 따로 만들지 않는다.
+  const gameInPath = useNavigationGame();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -86,28 +81,14 @@ export function UserMenu() {
           </div>
 
           <div className="p-1">
-            {gameInPath ? (
-              <Link
-                href={`/${GAMES[gameInPath].slug}/profile`}
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
-              >
-                <User className="h-4 w-4" />
-                <span>프로필</span>
-              </Link>
-            ) : (
-              enabledGames().map((game) => (
-                <Link
-                  key={game.title}
-                  href={`/${game.slug}/profile`}
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
-                >
-                  <User className="h-4 w-4" />
-                  <span>{game.shortLabel} 프로필</span>
-                </Link>
-              ))
-            )}
+            <Link
+              href={myProfilePath(gameInPath)}
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
+            >
+              <User className="h-4 w-4" />
+              <span>내 프로필</span>
+            </Link>
             <Link
               href="/settings"
               onClick={() => setIsOpen(false)}

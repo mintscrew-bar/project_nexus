@@ -94,6 +94,27 @@ describe("ChzzkOAuthService", () => {
     expect(mockedAxios.post).not.toHaveBeenCalled();
   });
 
+  it("OAuth를 다녀와도 연결 전에 선택한 게임을 보존한다", async () => {
+    await service.createAuthorizationUrl("user-1", ["PUBG"]);
+    const stored = redis.set.mock.calls[0][1];
+    expect(JSON.parse(stored)).toEqual({ userId: "user-1", games: ["PUBG"] });
+    redis.getdel.mockResolvedValue(stored);
+    mockedAxios.post.mockResolvedValue({
+      data: { content: { accessToken: "token" } },
+    } as any);
+    mockedAxios.get.mockResolvedValue({
+      data: { content: { channelId: "channel-1", channelName: "배그 채널" } },
+    } as any);
+    prisma.streamerProfile.findFirst.mockResolvedValue(null);
+    await service.completeAuthorization("code", "state");
+    expect(prisma.streamerProfile.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ games: ["PUBG"] }),
+        update: expect.objectContaining({ games: ["PUBG"] }),
+      }),
+    );
+  });
+
   it("redirects back to the broadcast settings tab", () => {
     expect(service.getSettingsRedirect("success")).toBe(
       "https://example.com/settings?tab=broadcast&chzzk_oauth=success",

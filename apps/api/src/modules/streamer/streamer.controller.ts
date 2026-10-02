@@ -23,6 +23,8 @@ import { StreamerService } from "./streamer.service";
 import { StreamerVerificationService } from "./streamer-verification.service";
 import { VerifyChannelDto } from "./dto";
 import { ChzzkOAuthService } from "./chzzk-oauth.service";
+import { GameScopeQueryDto } from "@/common/dto/game-scope.dto";
+import { StartStreamerOAuthDto } from "../user/dto/upsert-streamer-profile.dto";
 
 @Controller("streamers")
 export class StreamerController {
@@ -38,8 +40,11 @@ export class StreamerController {
   @Get()
   @UseGuards(OptionalJwtGuard)
   @Throttle({ default: { limit: 120, ttl: 60000 } })
-  list(@CurrentUser("id") viewerId?: string) {
-    return this.streamerService.listStreamers(viewerId);
+  list(
+    @CurrentUser("id") viewerId?: string,
+    @Query() query: GameScopeQueryDto = {},
+  ) {
+    return this.streamerService.listStreamers(viewerId, query.gameTitle);
   }
 
   // ── 팔로우 ────────────────────────────────────────────────────────────
@@ -87,8 +92,11 @@ export class StreamerController {
   @Post("verify/chzzk/oauth")
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  startChzzkOAuth(@CurrentUser("sub") userId: string) {
-    return this.chzzkOAuth.createAuthorizationUrl(userId);
+  startChzzkOAuth(
+    @CurrentUser("sub") userId: string,
+    @Body() dto: StartStreamerOAuthDto = {},
+  ) {
+    return this.chzzkOAuth.createAuthorizationUrl(userId, dto.games);
   }
 
   @Get("verify/chzzk/callback")

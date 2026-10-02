@@ -65,7 +65,7 @@ const nextConfig = {
   // dev 서버를 두 개 띄울 때(운영 확인용 미리보기 등) 경로를 안 나누면
   // 둘이 같은 디렉터리에 써서 vendor 청크가 반쪽만 남는다 —
   // "Cannot find module './vendor-chunks/...'" 가 그 증상이다.
-  distDir: process.env.NEXT_DIST_DIR || '.next',
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   reactStrictMode: true,
   poweredByHeader: false,
   env: {
@@ -133,7 +133,7 @@ const nextConfig = {
       },
       {
         source:
-          "/:path(admin|api|auth|dashboard|profile|settings|role-selection|draft|auction|broadcast|broadcast-control|dev|dm)(.*)",
+          "/:path(admin|api|auth|dashboard|me|profile|settings|role-selection|draft|auction|broadcast|broadcast-control|dev|dm)(.*)",
         headers: [
           ...denyFramingHeaders,
           {
@@ -204,10 +204,14 @@ const nextConfig = {
       },
       {
         // 게임별 주소에서도 기존 개인 화면의 캐시·프레임 정책을 유지한다.
-        source: "/:game(lol|pubg)/:path(profile|role-selection|draft|auction)(.*)",
+        source:
+          "/:game(lol|pubg)/:path(profile|role-selection|draft|auction)(.*)",
         headers: [
           ...denyFramingHeaders,
-          { key: "Cache-Control", value: "private, no-store, max-age=0, must-revalidate" },
+          {
+            key: "Cache-Control",
+            value: "private, no-store, max-age=0, must-revalidate",
+          },
           { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
         ],
       },
@@ -228,7 +232,6 @@ const nextConfig = {
       "tournaments",
       "auction",
       "draft",
-      "profile",
       "role-selection",
     ];
     const gameRedirects = MOVED_TO_GAME.flatMap((path) => [
@@ -241,6 +244,29 @@ const nextConfig = {
     ]);
 
     return [
+      // 내 프로필은 사람 기준 `/me` 하나다. 기존 `/profile → /lol/profile`
+      // 영구 리다이렉트가 브라우저에 캐시돼도 `/lol/profile → /me`에서 끝나
+      // 서로 되돌아가는 루프가 생기지 않는다.
+      {
+        source: "/profile",
+        destination: "/me",
+        permanent: false,
+      },
+      {
+        source: "/profile/:id",
+        destination: "/users/:id?game=lol",
+        permanent: false,
+      },
+      {
+        source: "/:game(lol|pubg)/profile/:id",
+        destination: "/users/:id?game=:game",
+        permanent: false,
+      },
+      {
+        source: "/:game(lol|pubg)/profile",
+        destination: "/me?game=:game",
+        permanent: false,
+      },
       ...gameRedirects,
       {
         source: "/lab",

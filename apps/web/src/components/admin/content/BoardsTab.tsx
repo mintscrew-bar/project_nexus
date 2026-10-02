@@ -29,6 +29,7 @@ import type { AddToast } from "../shared";
 
 /** 빈 폼 기본값 */
 const emptyForm: BoardInput = {
+  gameTitle: null,
   name: "",
   slug: "",
   fullName: "",
@@ -90,6 +91,7 @@ export function BoardsTab({ addToast }: { addToast: AddToast }) {
   const openEdit = (board: Board) => {
     setEditing(board);
     setForm({
+      gameTitle: board.gameTitle ?? null,
       name: board.name,
       slug: board.slug,
       fullName: board.fullName ?? "",
@@ -196,10 +198,7 @@ export function BoardsTab({ addToast }: { addToast: AddToast }) {
             </div>
           )}
           {boards.map((board, i) => (
-            <div
-              key={board.id}
-              className="flex items-center gap-3 p-3 sm:p-4"
-            >
+            <div key={board.id} className="flex items-center gap-3 p-3 sm:p-4">
               {/* 순서 이동 */}
               <div className="flex flex-col">
                 <button
@@ -222,7 +221,9 @@ export function BoardsTab({ addToast }: { addToast: AddToast }) {
 
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`font-semibold ${board.color || "text-text-primary"}`}>
+                  <span
+                    className={`font-semibold ${board.color || "text-text-primary"}`}
+                  >
                     {board.name}
                   </span>
                   <span className="text-xs text-text-muted">/{board.slug}</span>
@@ -282,6 +283,26 @@ export function BoardsTab({ addToast }: { addToast: AddToast }) {
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-sm font-semibold text-text-primary">
+              게시판 게임 범위
+            </label>
+            <Select
+              value={form.gameTitle ?? "COMMON"}
+              options={[
+                { value: "COMMON", label: "공통" },
+                { value: "LOL", label: "리그 오브 레전드" },
+                { value: "PUBG", label: "배틀그라운드" },
+              ]}
+              onChange={(value) =>
+                setForm({
+                  ...form,
+                  gameTitle:
+                    value === "COMMON" ? null : (value as "LOL" | "PUBG"),
+                })
+              }
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-text-primary">
               이름 *
             </label>
             <Input
@@ -302,7 +323,8 @@ export function BoardsTab({ addToast }: { addToast: AddToast }) {
             />
             {editing && (
               <p className="mt-1 text-xs text-text-muted">
-                기존 글 링크 보존을 위해 슬러그는 수정 시 변경하지 않는 것을 권장합니다.
+                기존 글 링크 보존을 위해 슬러그는 수정 시 변경하지 않는 것을
+                권장합니다.
               </p>
             )}
           </div>
@@ -335,9 +357,7 @@ export function BoardsTab({ addToast }: { addToast: AddToast }) {
               </label>
               <Input
                 value={form.iconName ?? ""}
-                onChange={(e) =>
-                  setForm({ ...form, iconName: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, iconName: e.target.value })}
                 placeholder="예: MessageCircle"
               />
             </div>
@@ -362,7 +382,8 @@ export function BoardsTab({ addToast }: { addToast: AddToast }) {
               onChange={(v) =>
                 setForm({
                   ...form,
-                  writeRole: v === "ALL" ? null : (v as BoardInput["writeRole"]),
+                  writeRole:
+                    v === "ALL" ? null : (v as BoardInput["writeRole"]),
                 })
               }
             />

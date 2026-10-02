@@ -199,9 +199,16 @@ export class StreamerService {
    * 라이브 전용 목록이 아니라 "등록된 스트리머 목록"이고, 방송 중인 사람이
    * 위로 올라오는 형태다. 등록자가 적은 초기에도 페이지가 비지 않게 하려는 의도다.
    */
-  async listStreamers(viewerId?: string): Promise<StreamerListItem[]> {
+  async listStreamers(
+    viewerId?: string,
+    gameTitle?: GameTitle,
+  ): Promise<StreamerListItem[]> {
     const profiles = await this.prisma.streamerProfile.findMany({
-      where: { isActive: true, verifiedAt: { not: null } },
+      where: {
+        isActive: true,
+        verifiedAt: { not: null },
+        ...(gameTitle ? { games: { has: gameTitle } } : {}),
+      },
       include: {
         user: { select: { id: true, username: true, avatar: true } },
       },
@@ -222,6 +229,7 @@ export class StreamerService {
 
     const activeRooms = await this.findActiveRooms(
       profiles.map((profile) => profile.userId),
+      gameTitle,
     );
 
     const followedIds = viewerId
@@ -324,12 +332,14 @@ export class StreamerService {
   /** 스트리머들이 지금 호스트로 잡고 있는 진행 중 방을 찾는다. */
   private async findActiveRooms(
     userIds: string[],
+    gameTitle?: GameTitle,
   ): Promise<Map<string, ActiveRoomInfo>> {
     if (userIds.length === 0) return new Map();
 
     const rooms = await this.prisma.room.findMany({
       where: {
         hostId: { in: userIds },
+        ...(gameTitle ? { gameTitle } : {}),
         isPrivate: false,
         status: {
           in: [

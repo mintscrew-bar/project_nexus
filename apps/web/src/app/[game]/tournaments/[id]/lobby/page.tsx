@@ -490,7 +490,7 @@ export default function TournamentLobbyPage() {
       <LobbyErrorState
         error="NOT_AUTHENTICATED::내전 방에 입장하려면 로그인이 필요합니다. 로그인하면 이 방으로 다시 돌아옵니다."
         onGoSettings={() => router.push("/settings")}
-        onGoProfile={() => router.push(`${gamePrefix}/profile`)}
+        onGoProfile={() => router.push(`/settings/game-accounts${gamePrefix}`)}
         loginHref={`/auth/login?redirect=${encodeURIComponent(`${gamePrefix}/tournaments/${roomId}/lobby`)}`}
       />
     );
@@ -501,7 +501,7 @@ export default function TournamentLobbyPage() {
       <LobbyErrorState
         error={error}
         onGoSettings={() => router.push("/settings")}
-        onGoProfile={() => router.push(`${gamePrefix}/profile`)}
+        onGoProfile={() => router.push(`/settings/game-accounts${gamePrefix}`)}
       />
     );
   }
@@ -511,7 +511,7 @@ export default function TournamentLobbyPage() {
       <LobbyErrorState
         error="CONNECT_TIMEOUT::방이 삭제되었거나 네트워크 연결이 불안정할 수 있습니다. 다시 시도하거나 내전 목록에서 방을 확인해 주세요."
         onGoSettings={() => router.push("/settings")}
-        onGoProfile={() => router.push(`${gamePrefix}/profile`)}
+        onGoProfile={() => router.push(`/settings/game-accounts${gamePrefix}`)}
         onRetry={handleRetryConnect}
       />
     );

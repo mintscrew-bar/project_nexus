@@ -31,8 +31,9 @@ import {
   releaseBodyScrollLock,
 } from "@/lib/body-scroll-lock";
 import { GameSwitcher } from "@/components/layout/GameSwitcher";
-import { gamePath, useCurrentGame } from "@/hooks/useCurrentGame";
-import { GAMES } from "@nexus/types";
+import { gamePath, useNavigationGame } from "@/hooks/useCurrentGame";
+import { myProfilePath } from "@/lib/profile-routes";
+import { scopedSectionPath } from "@/lib/scoped-section-routes";
 
 interface MobileMenuProps {
   className?: string;
@@ -41,7 +42,7 @@ interface MobileMenuProps {
 export function MobileMenu({ className }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const currentGame = useCurrentGame();
+  const currentGame = useNavigationGame();
   const { user, isAuthenticated } = useAuthStore();
   const { resolvedTheme, toggleTheme } = usePersistentTheme();
   const [mounted, setMounted] = useState(false);
@@ -133,27 +134,39 @@ export function MobileMenu({ className }: MobileMenuProps) {
     },
     // 클랜은 게임별로 갈린다. 경로에 프리픽스는 없지만 쿼리로 게임을 넘긴다.
     {
-      href: `/clans?game=${GAMES[currentGame].slug}`,
+      href: scopedSectionPath("clans", currentGame),
       label: "클랜",
       icon: Users,
     },
-    { href: "/streamers", label: "스트리머", icon: Radio },
-    { href: "/community", label: "커뮤니티", icon: MessageSquare },
+    {
+      href: scopedSectionPath("streamers", currentGame),
+      label: "스트리머",
+      icon: Radio,
+    },
+    {
+      href: scopedSectionPath("community", currentGame),
+      label: "커뮤니티",
+      icon: MessageSquare,
+    },
     { href: gamePath(currentGame, "/guide"), label: "가이드", icon: BookOpen },
   ];
 
   const sidebarItems = [
     {
-      href: gamePath(currentGame, "/profile"),
-      label: "마이페이지",
+      href: myProfilePath(currentGame),
+      label: "내 프로필",
       icon: User,
     },
     { href: gamePath(currentGame, "/ranking"), label: "랭킹", icon: Trophy },
     { href: "/settings", label: "설정", icon: Settings },
   ];
 
-  const isActive = (href: string) =>
-    pathname === href || (href !== "/" && pathname.startsWith(href));
+  const isActive = (href: string) => {
+    const path = href.split("?")[0];
+    return (
+      pathname === path || (path !== "/" && pathname.startsWith(`${path}/`))
+    );
+  };
 
   return (
     <div className={cn("nav:hidden", className)}>

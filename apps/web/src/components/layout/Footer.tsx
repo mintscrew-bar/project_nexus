@@ -1,12 +1,13 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useGamePrefix } from "@/hooks/useCurrentGame";
+import Link from "next/link";
+import { gamePath, useNavigationGame } from "@/hooks/useCurrentGame";
+import { scopedSectionPath } from "@/lib/scoped-section-routes";
 
 export function Footer() {
   // 가이드는 게임마다 다른 글이다. 기본 게임으로 박아 두면 배그 화면 하단의
   // "가이드"가 롤 가이드로 간다.
-  const gamePrefix = useGamePrefix();
+  const game = useNavigationGame();
 
   return (
     <footer className="bg-bg-secondary border-t border-bg-tertiary px-6 py-5">
@@ -15,22 +16,40 @@ export function Footer() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <p>&copy; {new Date().getFullYear()} Project Nexus</p>
           <nav className="flex flex-wrap justify-center gap-x-4 gap-y-2 sm:justify-end">
-            <Link href="/about" className="hover:text-text-secondary transition-colors duration-150">
+            <Link
+              href="/about"
+              className="hover:text-text-secondary transition-colors duration-150"
+            >
               서비스 소개
             </Link>
-            <Link href={`${gamePrefix}/guide`} className="hover:text-text-secondary transition-colors duration-150">
+            <Link
+              href={gamePath(game, "/guide")}
+              className="hover:text-text-secondary transition-colors duration-150"
+            >
               가이드 · 자료
             </Link>
-            <Link href="/community" className="hover:text-text-secondary transition-colors duration-150">
+            <Link
+              href={scopedSectionPath("community", game)}
+              className="hover:text-text-secondary transition-colors duration-150"
+            >
               커뮤니티
             </Link>
-            <Link href="/contact" className="hover:text-text-secondary transition-colors duration-150">
+            <Link
+              href="/contact"
+              className="hover:text-text-secondary transition-colors duration-150"
+            >
               문의
             </Link>
-            <Link href="/privacy" className="hover:text-text-secondary transition-colors duration-150">
+            <Link
+              href="/privacy"
+              className="hover:text-text-secondary transition-colors duration-150"
+            >
               개인정보처리방침
             </Link>
-            <Link href="/terms" className="hover:text-text-secondary transition-colors duration-150">
+            <Link
+              href="/terms"
+              className="hover:text-text-secondary transition-colors duration-150"
+            >
               이용약관
             </Link>
           </nav>
@@ -38,7 +57,11 @@ export function Footer() {
 
         {/* Riot Games Attribution — API 정책 필수 표기 */}
         <p className="text-xs text-text-tertiary/70 text-center sm:text-left leading-relaxed">
-          Project Nexus isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. League of Legends and Riot Games are trademarks or registered trademarks of Riot Games, Inc.
+          Project Nexus isn&apos;t endorsed by Riot Games and doesn&apos;t
+          reflect the views or opinions of Riot Games or anyone officially
+          involved in producing or managing Riot Games properties. League of
+          Legends and Riot Games are trademarks or registered trademarks of Riot
+          Games, Inc.
         </p>
       </div>
     </footer>

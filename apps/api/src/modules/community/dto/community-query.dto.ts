@@ -1,11 +1,15 @@
 import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
-import { PostCategory } from "@nexus/database";
+import { GameTitle, PostCategory } from "@nexus/database";
 
 /**
  * 게시글 목록 조회 쿼리 파라미터 DTO
  * category는 Prisma PostCategory enum으로 검증
  */
 export class ListPostsQueryDto {
+  @IsOptional()
+  @IsEnum(GameTitle)
+  gameTitle?: GameTitle;
+
   @IsOptional()
   @IsEnum(PostCategory, {
     message: `category는 ${Object.values(PostCategory).join(", ")} 중 하나여야 합니다.`,
@@ -54,6 +58,10 @@ export class ListPostsQueryDto {
  * limit만 필요한 쿼리 파라미터 DTO (인기 태그 등)
  */
 export class LimitQueryDto {
+  @IsOptional()
+  @IsEnum(GameTitle)
+  gameTitle?: GameTitle;
+
   @IsOptional()
   @IsInt({ message: "limit는 정수여야 합니다." })
   @Min(1, { message: "limit는 1 이상이어야 합니다." })

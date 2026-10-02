@@ -48,11 +48,11 @@ import { AddAccountModal } from "@/components/domain/AddAccountModal";
 import { BroadcastTokenSection } from "./_components/BroadcastTokenSection";
 import { StreamerSettingsSection } from "./_components/StreamerSettingsSection";
 import { useRiotStore } from "@/stores/riot-store";
-import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { enabledGames } from "@nexus/types";
 import { pubgApi } from "@/lib/api-client";
 import { useSfxStore } from "@/stores/sfx-store";
 import { GAME_SFX, playSfx } from "@/lib/sfx";
+import { gameAccountSettingsPath } from "@/lib/profile-routes";
 
 type SettingsTab =
   | "accounts"
@@ -116,7 +116,6 @@ const DISCORD_GUILD_STATUS_META: Record<
 
 export default function SettingsPage() {
   const router = useRouter();
-  const gamePrefix = useGamePrefix();
   const { user, isAuthenticated, isLoading, logout, deleteAccount, fetchUser } =
     useAuthStore();
   const { champions, championMap, fetchChampions } = useDdragonStore();
@@ -792,7 +791,7 @@ export default function SettingsPage() {
                               variant={hasRiot ? "outline" : "primary"}
                               onClick={() => {
                                 if (hasRiot) {
-                                  router.push(`${gamePrefix}/profile`);
+                                  router.push(gameAccountSettingsPath("LOL"));
                                   return;
                                 }
                                 setShowRiotModal(true);
@@ -814,7 +813,7 @@ export default function SettingsPage() {
                               size="sm"
                               variant={hasRoles ? "outline" : "primary"}
                               onClick={() =>
-                                router.push(`${gamePrefix}/profile`)
+                                router.push(gameAccountSettingsPath("LOL"))
                               }
                             >
                               {hasRoles ? "수정" : "설정하기"}
@@ -959,7 +958,7 @@ export default function SettingsPage() {
                                 setShowRiotModal(true);
                                 return;
                               }
-                              router.push(`/${game.slug}/profile`);
+                              router.push(gameAccountSettingsPath(game.title));
                             }}
                           >
                             {linked ? "계정 관리" : "등록하기"}

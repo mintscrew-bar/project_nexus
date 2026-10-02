@@ -55,6 +55,9 @@ describe("StreamerController", () => {
 
     await controller.startChzzkOAuth("user-1");
 
-    expect(chzzkOAuth.createAuthorizationUrl).toHaveBeenCalledWith("user-1");
+    expect(chzzkOAuth.createAuthorizationUrl).toHaveBeenCalledWith(
+      "user-1",
+      undefined,
+    );
   });
 });

@@ -66,6 +66,7 @@ export class CommunityController {
       category: query.category,
       boardId: query.boardId,
       boardSlug: query.boardSlug,
+      gameTitle: query.gameTitle,
       search: query.search,
       authorId: query.authorId,
       tag: query.tag,
@@ -78,7 +79,10 @@ export class CommunityController {
   // 인기 태그 조회
   @Get("tags/popular")
   async getPopularTags(@Query() query: LimitQueryDto) {
-    return this.communityService.getPopularTags(query.limit ?? 20);
+    return this.communityService.getPopularTags(
+      query.limit ?? 20,
+      query.gameTitle,
+    );
   }
 
   @Get("posts/:id")
