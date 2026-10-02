@@ -11,7 +11,7 @@ import {
   IsObject,
 } from "class-validator";
 import { Transform } from "class-transformer";
-import { PostCategory } from "@nexus/database";
+import { GameTitle, PostCategory } from "@nexus/database";
 import { sanitizeHtml, stripAllHtml } from "@/common/utils/sanitize";
 
 const CONTENT_FORMATS = ["MARKDOWN", "RICHTEXT"] as const;
@@ -45,6 +45,15 @@ export class CreatePostDto {
   @IsOptional()
   @IsObject({ message: "본문 JSON 형식이 올바르지 않습니다." })
   contentJson?: Record<string, unknown>;
+
+  /**
+   * 작성 화면의 게임 범위(선택). 게시판이 그 게임의 것이 아니면 거부한다.
+   * 게시판이 곧 게임을 결정하므로 필수는 아니다 — 게임을 바꾼 뒤에도 열려 있던 오래된
+   * 화면이 이전 게임의 게시판 ID 로 글을 올리는 것을 막는 안전망이다.
+   */
+  @IsOptional()
+  @IsEnum(GameTitle)
+  gameTitle?: GameTitle;
 
   /** 소속 게시판 id (신규). boardId 또는 category 중 하나는 필수 */
   @IsOptional()

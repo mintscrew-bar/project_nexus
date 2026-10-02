@@ -1807,6 +1807,8 @@ export const communityApi = {
     contentFormat?: "MARKDOWN" | "RICHTEXT";
     contentJson?: unknown;
     boardId?: string;
+    /** 작성 화면의 게임. 게시판이 다른 게임의 것이면 서버가 거부한다 */
+    gameTitle?: GameTitle;
     category?: "NOTICE" | "FREE" | "TIP" | "QNA";
     tags?: string[];
   }) => {

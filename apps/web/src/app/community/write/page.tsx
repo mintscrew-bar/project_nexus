@@ -107,8 +107,13 @@ export default function WritePostPage() {
         const writable = data.filter(
           (b) => !b.writeRole || userRank >= (ROLE_RANK[b.writeRole] ?? 0),
         );
-        // 자유게시판(free) 우선, 없으면 첫 작성 가능 게시판
-        const def = writable.find((b) => b.slug === "free") ?? writable[0];
+        // 현재 게임의 게시판을 우선한다. 공통 게시판(공지)이 정렬상 앞서 있어도 기본값이 되면 안 된다.
+        // 그 안에서 자유게시판을 우선하고(롤 `free`, 배그 `pubg-free`), 없으면 첫 작성 가능 게시판.
+        const own = writable.filter((b) => b.gameTitle === gameTitle);
+        const pool = own.length > 0 ? own : writable;
+        const def =
+          pool.find((b) => b.slug === "free" || b.slug.endsWith("-free")) ??
+          pool[0];
         setBoardId((prev) =>
           writable.some((board) => board.id === prev) ? prev : (def?.id ?? ""),
         );
@@ -148,6 +153,7 @@ export default function WritePostPage() {
         contentFormat: "RICHTEXT",
         contentJson,
         boardId,
+        gameTitle,
         tags: tags.length > 0 ? tags : undefined,
       });
       router.push(`/community/${post.id}?game=${GAMES[gameTitle].slug}`);

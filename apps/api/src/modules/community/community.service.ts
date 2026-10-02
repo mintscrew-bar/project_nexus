@@ -41,6 +41,8 @@ export interface CreatePostDto {
   boardId?: string;
   /** 레거시 카테고리 (하위호환) */
   category?: PostCategory;
+  /** 작성 화면의 게임(선택). 게시판이 다른 게임의 것이면 거부한다 */
+  gameTitle?: GameTitle;
   tags?: string[]; // 태그명 배열 (소문자 정규화)
 }
 
@@ -171,6 +173,14 @@ export class CommunityService {
       boardId,
       user?.role ?? UserRole.USER,
     );
+    // 작성 화면이 알려 준 게임과 게시판의 게임이 다르면 거부한다.
+    // 공통 게시판(gameTitle null, 예: 공지)은 어느 게임에서나 쓸 수 있다.
+    // 속도 제한을 올리기 전에 검사해, 거부된 요청이 작성 횟수를 쓰지 않게 한다.
+    if (dto.gameTitle && board.gameTitle && board.gameTitle !== dto.gameTitle) {
+      throw new BadRequestException(
+        "선택한 게임의 게시판이 아닙니다. 게임을 바꾼 뒤라면 새로고침해주세요.",
+      );
+    }
     // 레거시 category 스냅샷 (기본 게시판이면 enum, 커스텀이면 null)
     const categorySnapshot: PostCategory | null =
       SLUG_TO_CATEGORY[board.slug] ?? null;
