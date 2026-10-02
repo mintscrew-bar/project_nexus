@@ -172,6 +172,12 @@ export class SnakeDraftGateway
         data.roomId,
       );
 
+      // 재시작으로 복원된 드래프트면 픽 타이머가 없다 — 첫 재접속이 다시 건다(H2).
+      // 방송(read-only) 연결은 부작용을 일으키면 안 된다.
+      if (!client.isBroadcast) {
+        this._ensurePickTimer(data.roomId);
+      }
+
       return {
         success: true,
         state,
@@ -394,6 +400,56 @@ export class SnakeDraftGateway
   emitSessionAborted(roomId: string, data: any) {
     this.cleanupRoom(roomId);
     this.server.to(`draft:${roomId}`).emit("session-aborted", data);
+  }
+
+  /**
+   * 진행 중인 드래프트에 픽 타이머가 없으면 `timerEnd` 로 다시 건다.
+   *
+   * 서비스는 재시작 때 상태를 복원하지만 setTimeout 은 복원할 수 없다. 마감이 이미
+   * 지났으면 `_schedulePickTimer` 가 지연 0 으로 걸어 곧바로 자동 픽이 나간다
+   * (복원 때 서비스가 최소 남은 시간을 보장해 둔다). 이미 걸려 있거나 픽을
+   * 처리 중이면 건드리지 않는다 — 합류가 정상 진행 중인 타이머를 갈아엎으면 안 된다.
+   */
+  private _ensurePickTimer(roomId: string) {
+    if (this.pickTimers.has(roomId)) return;
+    if (
+      this.autoPickingRooms.has(roomId) ||
+      this.manualPickingRooms.has(roomId)
+    )
+      return;
+
+    const state = this.snakeDraftService.getDraftState(roomId);
+    if (!state) return;
+
+    // 마지막 픽 직후 완료 처리 전에 죽은 경우: 고를 선수가 없다.
+    if (state.availablePlayers.length === 0) {
+      void this._completeRecoveredDraft(roomId);
+      return;
+    }
+    this._schedulePickTimer(roomId, state.timerEnd);
+  }
+
+  /** 복원된 상태가 이미 모든 픽을 마쳤을 때 완료 처리를 이어서 한다 */
+  private async _completeRecoveredDraft(roomId: string) {
+    if (this.completingDrafts.has(roomId)) return;
+    this.completingDrafts.add(roomId);
+    try {
+      const finalState =
+        await this.snakeDraftService.getClientDraftState(roomId);
+      await this.snakeDraftService.completeDraft(roomId);
+      this.server.to(`draft:${roomId}`).emit("draft-complete", {
+        teams: finalState?.teams ?? [],
+      });
+      await this.roleSelectionGateway.advanceAfterTeams(roomId);
+    } catch (error) {
+      console.error(
+        "[SnakeDraft] Recovered draft completion error for room %s:",
+        roomId,
+        error,
+      );
+    } finally {
+      this.completingDrafts.delete(roomId);
+    }
   }
 
   private _cancelPickTimer(roomId: string) {

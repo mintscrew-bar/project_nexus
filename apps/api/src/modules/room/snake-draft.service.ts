@@ -6,9 +6,11 @@ import {
   ForbiddenException,
   Optional,
   Inject,
+  OnModuleInit,
 } from "@nestjs/common";
 import { randomInt } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
+import { RedisService } from "../redis/redis.service";
 import { startBlocked } from "./start-blocked";
 import { RoomStatus, TeamMode, TeamCaptainSelection } from "@nexus/database";
 import { Prisma } from "@prisma/client";
@@ -46,8 +48,43 @@ export interface SnakeDraftState {
   timerEnd: number;
 }
 
+/** Redis 키 — 진행 중인 드래프트 상태 */
+const DRAFT_STATE_KEY = (roomId: string) => `snake-draft:state:${roomId}`;
+/** 진행 중인 드래프트 최대 지속 시간. 경매(4시간)와 같게 둔다 */
+const DRAFT_STATE_TTL_SECONDS = 4 * 60 * 60;
+/**
+ * 재시작 직후 복원한 드래프트의 최소 남은 시간(ms).
+ * 배포로 끊긴 동안 마감이 지났다고 팀장이 막 재접속하는 순간 자동 픽이 나가면
+ * 억울하다. 복원 시점부터 이만큼은 보장한다.
+ */
+const RESTORE_MIN_REMAINING_MS = 15_000;
+
+/**
+ * DB 에 남은 픽 기록을 기준으로 저장된 드래프트 상태를 바로잡는다.
+ *
+ * 상태는 픽마다 Redis 에 저장하지만, DB 트랜잭션과 Redis 저장 사이에서 죽으면
+ * Redis 가 한 픽 뒤처진다. 픽 기록(DB)이 사실이므로 차례·라운드·남은 선수를
+ * 거기서 다시 계산한다(executePick 의 갱신 규칙과 같다).
+ */
+export function reconcileDraftState(
+  state: SnakeDraftState,
+  pickedUserIds: string[],
+): SnakeDraftState {
+  const picked = new Set(pickedUserIds);
+  const currentTeamIndex = pickedUserIds.length;
+  const currentRound = Math.floor(currentTeamIndex / state.numTeams) + 1;
+  return {
+    ...state,
+    availablePlayers: state.availablePlayers.filter((id) => !picked.has(id)),
+    currentTeamIndex,
+    currentRound,
+    // 라운드 경계마다 뒤집히므로 지나간 경계 수의 홀짝이다.
+    isReversing: (currentRound - 1) % 2 === 1,
+  };
+}
+
 @Injectable()
-export class SnakeDraftService {
+export class SnakeDraftService implements OnModuleInit {
   private readonly logger = new Logger(SnakeDraftService.name);
 
   private draftStates = new Map<string, SnakeDraftState>();
@@ -58,9 +95,101 @@ export class SnakeDraftService {
     private readonly prisma: PrismaService,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
+    @Optional() private readonly redis?: RedisService,
   ) {
     this.discordVoiceService = discordVoice;
     this.discordBotService = discordBot;
+  }
+
+  // ========================================
+  // 재시작 복구 (소켓 점검 H2)
+  //
+  // 상태가 인메모리 Map 뿐이라 재시작하면 차례·마감이 사라지고 방이 DRAFT 에 걸렸다.
+  // 경매와 같은 방식으로 Redis 에 저장하고 부팅 때 복원한다. 픽 결과는 DB 가 사실이다.
+  // 타이머(setTimeout)는 게이트웨이가 첫 재접속 때 timerEnd 로 다시 건다.
+  // ========================================
+
+  async onModuleInit() {
+    try {
+      await this.restoreStates();
+    } catch (error) {
+      this.logger.warn(
+        `드래프트 상태 복원 실패 (정상 시작으로 계속): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /** 진행 중인 스네이크 드래프트 방의 상태를 Redis → 메모리로 복원 */
+  private async restoreStates() {
+    if (!this.redis) return;
+    const rooms = await this.prisma.room.findMany({
+      where: { status: RoomStatus.DRAFT, teamMode: TeamMode.SNAKE_DRAFT },
+      select: { id: true },
+    });
+
+    let restored = 0;
+    for (const { id: roomId } of rooms) {
+      const raw = await this.redis.get(DRAFT_STATE_KEY(roomId));
+      if (!raw) {
+        // 이 배포 이전에 시작된 드래프트는 저장된 상태가 없다 — 호스트가 "내전 종료"로 빠져나온다.
+        this.logger.warn(`방 ${roomId}: 저장된 드래프트 상태 없음 — 복원 불가`);
+        continue;
+      }
+      try {
+        const saved = JSON.parse(raw) as SnakeDraftState;
+        const picks = await this.prisma.snakeDraftPick.findMany({
+          where: { roomId },
+          orderBy: { pickNumber: "asc" },
+          select: { userId: true },
+        });
+        const state = reconcileDraftState(
+          saved,
+          picks.map((p: { userId: string }) => p.userId),
+        );
+        state.timerEnd = Math.max(
+          state.timerEnd,
+          Date.now() + RESTORE_MIN_REMAINING_MS,
+        );
+        this.draftStates.set(roomId, state);
+        this.persistState(state);
+        restored++;
+      } catch (error) {
+        this.logger.warn(
+          `방 ${roomId}: 드래프트 상태 손상 — 무시 (${
+            error instanceof Error ? error.message : String(error)
+          })`,
+        );
+      }
+    }
+    if (restored > 0) {
+      this.logger.log(`드래프트 상태 ${restored}건 복원됨`);
+    }
+  }
+
+  /** 현재 상태를 Redis 에 저장 (실패해도 진행은 막지 않는다) */
+  private persistState(state: SnakeDraftState): void {
+    if (!this.redis) return;
+    this.redis
+      .set(
+        DRAFT_STATE_KEY(state.roomId),
+        JSON.stringify(state),
+        DRAFT_STATE_TTL_SECONDS,
+      )
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `드래프트 상태 저장 실패 (${state.roomId}): ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      );
+  }
+
+  /** 메모리와 Redis 에서 상태를 지운다 */
+  private deleteState(roomId: string): void {
+    this.draftStates.delete(roomId);
+    this.redis?.del(DRAFT_STATE_KEY(roomId)).catch(() => undefined);
   }
 
   // ========================================
@@ -272,6 +401,7 @@ export class SnakeDraftService {
     };
 
     this.draftStates.set(roomId, draftState);
+    this.persistState(draftState);
 
     return {
       teams,
@@ -488,6 +618,7 @@ export class SnakeDraftService {
       state.isReversing = !state.isReversing;
     }
 
+    this.persistState(state);
     return state;
   }
 
@@ -513,7 +644,7 @@ export class SnakeDraftService {
       console.warn("Failed to assign teams to Discord channels:", error);
     }
 
-    this.draftStates.delete(roomId);
+    this.deleteState(roomId);
 
     return { message: "Draft completed" };
   }
@@ -615,7 +746,7 @@ export class SnakeDraftService {
   }
 
   clearDraftState(roomId: string): void {
-    this.draftStates.delete(roomId);
+    this.deleteState(roomId);
   }
 
   async cleanupBotOnlyRoomOnHostDisconnect(
