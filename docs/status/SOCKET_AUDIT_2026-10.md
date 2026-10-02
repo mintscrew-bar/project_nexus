@@ -107,7 +107,7 @@
 - [x] Task 5: M1 — 게이트웨이 공통 입력 검증(`roomId` 등 문자열 id 가드)
 - [x] Task 6: M2·M3 — 재평가 결과 조치 없음(REST 가 이미 로그인 사용자에게 열려 있음). 참가자 전용화는 REST 와 함께 후속 정책 결정
 - [x] Task 7: M5 — 쓰기 이벤트 소켓 레이트 리밋(방·역할 선택·RPS·프레즌스)
-- [ ] Task 8: M4 — 가위바위보 상태 Redis 저장
+- [x] Task 8: M4 — 가위바위보 상태 Redis 저장
 - [ ] Task 9: L1·L2·L5 — 죽은 이벤트·리스너 정리
 
 ### 수정 메모 — H2 (스네이크 드래프트)
@@ -145,3 +145,13 @@
   가위바위보(`rps:*`, 10/10초), 경매 보조 조작(`volunteer-captain`·`finalize-volunteers`·`select-manual-captains`·`vote-item-skip`·`retry-role-selection`, 15/10초), 프레즌스(`set-status`·`get-friends-status`, 10/10초).
 - 제외: `join/leave`·`start-game`(자체 락)·`subscribe-friend`(스토어에서 쓰지 않음)·읽기 전용 조회. 채팅·입찰·픽은 기존 한도 유지.
 - 역할 선택·매치·프레즌스 게이트웨이에 `RedisService` 를 선택 주입했다. `rps:submit` 은 `async` 가 됐다.
+
+### 수정 메모 — M4 (가위바위보)
+- 서버: 상태를 알릴 때(`broadcastRpsState`)마다 Redis(`rps:state:{matchId}`, TTL 10분)에 저장한다. 변경 지점마다 따로 저장하지 않고 이 함수 한 곳에 건 이유는 모든 상태 변경 뒤에 이 함수가 불리기 때문이다.
+  진영이 확정되면(done) 저장본을 지운다 — 진영은 DB 가 사실이다.
+- 복원은 지연 방식이다: `join-match`·`rps:submit`·`rps:choose-side`·`rps:start` 가 메모리에 없는 판을 만나면 Redis 에서 복원하고 **타이머를 새로 건다**(제출 30초 / 진영 선택 30초, 봇 자동 진행 포함).
+  이미 시작된 매치(`join-match` 에서 PENDING 이 아님)는 복원하지 않는다. 같은 매치의 동시 복원은 한 번으로 합친다.
+- **클라이언트(원래 더 큰 문제):** `MatchDetailModal` 은 `join-match` 를 모달을 열 때 한 번만 보내고 재연결 처리가 없었다. 순단 한 번이면 서버에서는 새 소켓이라 방 멤버십이 사라져
+  RPS 이벤트가 더 오지 않고 모달이 멈춘 것처럼 보였다(재시작이 아니어도 발생). 소켓 매니저의 `reconnect` 때 다시 입장한다 — 서버는 입장 시 진행 중인 판을 복원해 현재 상태를 보내 준다.
+- 저장하지 않는 것: 준비 대기(`rpsReadyStates`) — 준비는 다시 누르면 되고 봇은 자동 준비된다.
+- 한계: 이 배포 *직전*에 진행 중이던 판은 저장본이 없어 복원되지 않는다(준비부터 다시).

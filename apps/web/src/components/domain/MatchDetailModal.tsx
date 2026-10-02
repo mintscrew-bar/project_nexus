@@ -154,6 +154,12 @@ export function MatchDetailModal({
     if (!socket) return;
     const matchId = match.id;
     socket.emit('join-match', { matchId });
+    // 재연결(순단·서버 재시작)하면 서버에서는 새 소켓이라 방 멤버십이 사라진다.
+    // 다시 입장하지 않으면 가위바위보 이벤트가 더 오지 않아 모달이 멈춘 것처럼 보인다
+    // (2026-10-02 소켓 점검 M4). 서버는 join-match 때 진행 중인 판을 복원해 현재 상태를 보내 준다.
+    // manager 의 reconnect 는 최초 연결에는 발생하지 않아 join 이 두 번 가지 않는다.
+    const rejoin = () => socket.emit('join-match', { matchId });
+    socket.io.on('reconnect', rejoin);
 
     const onState = (data: any) => {
       if (data?.matchId === matchId) setRps(data as RpsStateData);
@@ -181,6 +187,7 @@ export function MatchDetailModal({
       socket.off('rps:reveal', onReveal);
       socket.off('rps:error', onError);
       socket.off('rps:ready-state', onReadyState);
+      socket.io.off('reconnect', rejoin);
       socket.emit('leave-match', { matchId });
     };
   }, [isOpen, match?.id]);

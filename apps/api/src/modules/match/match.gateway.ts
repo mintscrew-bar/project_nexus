@@ -32,8 +32,8 @@ interface AuthenticatedSocket extends Socket {
 }
 
 // ── 가위바위보 진영 결정 ──
-type RpsHand = "rock" | "paper" | "scissors";
-interface RpsState {
+export type RpsHand = "rock" | "paper" | "scissors";
+export interface RpsState {
   matchId: string;
   teamAId: string;
   teamBId: string;
@@ -49,6 +49,50 @@ interface RpsState {
   blueSideTeamId?: string;
   /** 다전제 세트 번호 (단판이면 1) */
   gameNumber: number;
+}
+
+/** Redis 에 저장하는 형태. Map 은 JSON 이 안 되어 [userId, 손] 배열로 바꾼다 */
+type PersistedRps = Omit<RpsState, "submissions"> & {
+  submissions: [string, RpsHand][];
+};
+
+const RPS_STATE_KEY = (matchId: string) => `rps:state:${matchId}`;
+/** 한 판은 길어야 몇 분이다. 끝나면 지우고, 못 지워도 이 시간 뒤 사라진다 */
+const RPS_STATE_TTL_SECONDS = 600;
+
+const RPS_PHASES = ["throw", "side", "done"];
+const RPS_HANDS = ["rock", "paper", "scissors"];
+
+export function serializeRps(state: RpsState): string {
+  const persisted: PersistedRps = {
+    ...state,
+    submissions: Array.from(state.submissions.entries()),
+  };
+  return JSON.stringify(persisted);
+}
+
+/** 손상됐거나 모양이 틀린 값은 null — 복원하지 않고 새로 시작하게 둔다 */
+export function deserializeRps(raw: string): RpsState | null {
+  try {
+    const parsed = JSON.parse(raw) as PersistedRps;
+    if (
+      !parsed ||
+      typeof parsed.matchId !== "string" ||
+      !RPS_PHASES.includes(parsed.phase) ||
+      !Array.isArray(parsed.submissions) ||
+      !parsed.submissions.every(
+        (entry) =>
+          Array.isArray(entry) &&
+          typeof entry[0] === "string" &&
+          RPS_HANDS.includes(entry[1]),
+      )
+    ) {
+      return null;
+    }
+    return { ...parsed, submissions: new Map(parsed.submissions) };
+  } catch {
+    return null;
+  }
 }
 
 // 양 팀장 준비 완료 대기 상태
@@ -85,8 +129,13 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly RPS_THROW_TIMEOUT = 30000; // 팀장 미제출 시 자동 랜덤
   private readonly RPS_SIDE_TIMEOUT = 30000; // 진영 미선택 시 자동 랜덤
   private readonly startingMatches = new Set<string>();
-  // 양 팀장 준비 완료 대기 (RPS 시작 전)
+  // 양 팀장 준비 완료 대기 (RPS 시작 전). 저장하지 않는다 — 준비는 다시 누르면 되고 봇은 자동 준비된다.
   private readonly rpsReadyStates = new Map<string, RpsReadyEntry>();
+  // 같은 매치를 동시에 복원하지 않게 진행 중인 복원을 공유한다
+  private readonly rpsRestores = new Map<
+    string,
+    Promise<RpsState | undefined>
+  >();
 
   constructor(
     private readonly authService: AuthService,
@@ -156,7 +205,12 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.join(`match:${data.matchId}`);
 
       // 진행 중인 가위바위보가 있으면 현재 상태를 이 클라이언트에 전달
-      const rps = this.rpsStates.get(data.matchId);
+      // 재시작·재연결 뒤라면 Redis 에서 복원한다. 이미 시작된 매치는 복원하지 않는다.
+      const rps =
+        this.rpsStates.get(data.matchId) ??
+        (match.status === "PENDING"
+          ? await this.restoreRps(data.matchId)
+          : undefined);
       if (rps) {
         client.emit("rps:state", this.rpsStatePayload(rps));
       }
@@ -258,9 +312,88 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private broadcastRpsState(state: RpsState) {
+    // 상태가 바뀔 때마다 이 함수가 불리므로 여기서 저장하면 변경 지점을 빠뜨리지 않는다.
+    this.persistRps(state);
     this.server
       .to(`match:${state.matchId}`)
       .emit("rps:state", this.rpsStatePayload(state));
+  }
+
+  // ── 재시작 복구 (소켓 점검 M4) ──
+  // 상태가 인메모리 Map 뿐이라 배포(재시작)하면 진행 중이던 판이 사라지고 모달이 멈췄다.
+  // 진영이 확정되면 DB 가 사실이므로, 끝난(done) 상태는 저장하지 않고 지운다.
+
+  /** 상태를 Redis 에 저장한다(끝났으면 지운다). 실패해도 진행은 막지 않는다 */
+  private persistRps(state: RpsState) {
+    if (!this.redisService) return;
+    const key = RPS_STATE_KEY(state.matchId);
+    const op =
+      state.phase === "done"
+        ? this.redisService.del(key)
+        : this.redisService.set(
+            key,
+            serializeRps(state),
+            RPS_STATE_TTL_SECONDS,
+          );
+    op.catch((error: unknown) =>
+      console.warn(
+        `[Match] RPS 상태 저장 실패 (${state.matchId}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      ),
+    );
+  }
+
+  /**
+   * 메모리에 없는 판을 Redis 에서 복원한다. 있으면 그대로 돌려준다.
+   * 타이머는 저장하지 못하므로 복원하면서 새로 건다(제출 30초 / 진영 선택 30초).
+   */
+  private restoreRps(matchId: string): Promise<RpsState | undefined> {
+    const live = this.rpsStates.get(matchId);
+    if (live) return Promise.resolve(live);
+    if (!this.redisService) return Promise.resolve(undefined);
+
+    const pending = this.rpsRestores.get(matchId);
+    if (pending) return pending;
+
+    const task = (async () => {
+      try {
+        const raw = await this.redisService!.get(RPS_STATE_KEY(matchId));
+        if (!raw) return undefined;
+        const state = deserializeRps(raw);
+        if (!state || state.matchId !== matchId || state.phase === "done") {
+          return undefined;
+        }
+        // 읽는 사이 다른 경로가 만들었다면 그쪽이 최신이다.
+        const existing = this.rpsStates.get(matchId);
+        if (existing) return existing;
+
+        this.rpsStates.set(matchId, state);
+        this.rearmRps(state);
+        return state;
+      } catch (error) {
+        console.warn(
+          `[Match] RPS 상태 복원 실패 (${matchId}): ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return undefined;
+      } finally {
+        this.rpsRestores.delete(matchId);
+      }
+    })();
+    this.rpsRestores.set(matchId, task);
+    return task;
+  }
+
+  /** 복원한 판의 타이머와 봇 진행을 다시 시작한다 */
+  private rearmRps(state: RpsState) {
+    if (state.phase === "throw") {
+      this.armRpsThrowTimeout(state.matchId);
+      void this.autoAdvanceBotRpsThrow(state.matchId);
+    } else if (state.phase === "side") {
+      void this.beginSidePhase(state.matchId);
+    }
   }
 
   private clearRpsTimer(matchId: string) {
@@ -678,7 +811,8 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     try {
       // 이미 진행 중이면 새로 만들지 않고 현재 상태만 다시 알림
-      const existing = this.rpsStates.get(data.matchId);
+      // (재시작으로 메모리에서 사라졌어도 Redis 에 있으면 이어간다)
+      const existing = await this.restoreRps(data.matchId);
       if (existing && existing.phase !== "done") {
         this.broadcastRpsState(existing);
         return { success: true, alreadyRunning: true };
@@ -725,7 +859,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
     if (limited) return { success: false, error: limited };
 
-    const state = this.rpsStates.get(data.matchId);
+    const state = await this.restoreRps(data.matchId);
     if (!state || state.phase !== "throw") {
       return { success: false, error: "제출 단계가 아닙니다." };
     }
@@ -769,7 +903,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
     if (limited) return { success: false, error: limited };
 
-    const state = this.rpsStates.get(data.matchId);
+    const state = await this.restoreRps(data.matchId);
     if (!state || state.phase !== "side" || !state.winnerTeamId) {
       return { success: false, error: "진영 선택 단계가 아닙니다." };
     }
