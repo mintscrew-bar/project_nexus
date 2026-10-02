@@ -152,6 +152,12 @@ export class RoleSelectionGateway
         });
       }
 
+      // 재시작으로 복원된 세션이면 타이머가 없다 — 첫 재접속이 다시 건다(H3).
+      // 방송(read-only) 연결은 부작용을 일으키면 안 된다.
+      if (!client.isBroadcast) {
+        this.ensureTimerRunning(data.roomId);
+      }
+
       const roleSelectionData =
         await this.roleSelectionService.getRoleSelectionData(data.roomId);
 
@@ -238,6 +244,21 @@ export class RoleSelectionGateway
   // ========================================
   // Timer Management
   // ========================================
+
+  /**
+   * 진행 중인 역할 선택에 타이머가 없으면 다시 건다.
+   *
+   * 서비스는 재시작 때 상태를 복원하지만 setTimeout/interval 은 복원할 수 없다.
+   * 이미 걸려 있으면(정상 진행) 건드리지 않고, 완료 처리 중이어도 건드리지 않는다.
+   * 마감이 이미 지났으면 `startTimer` 가 지연 0 으로 걸어 곧바로 자동 배정이 돈다
+   * (복원 때 서비스가 최소 남은 시간을 보장해 둔다).
+   */
+  private ensureTimerRunning(roomId: string) {
+    if (this.roomResolveTimers.has(roomId)) return;
+    if (this.completingRooms.has(roomId)) return;
+    if (!this.roleSelectionService.getRoleSelectionState(roomId)) return;
+    this.startTimer(roomId);
+  }
 
   startTimer(roomId: string) {
     // 기존 타이머(interval + resolve timeout) 모두 정리

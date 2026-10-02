@@ -1,12 +1,16 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
   Inject,
+  Optional,
+  OnModuleInit,
   forwardRef,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { RedisService } from "../redis/redis.service";
 import { GameTitle, Prisma, RoomStatus, Role, TeamMode } from "@nexus/database";
 import { MatchService } from "../match/match.service";
 import { getGame } from "@nexus/types";
@@ -30,8 +34,28 @@ export interface RoleSelectionCaptainReadyState {
   allReady: boolean;
 }
 
+/** 재시작 복구용으로 Redis 에 저장하는 한 덩어리 (소켓 점검 H3) */
+interface PersistedRoleSelection {
+  state: RoleSelectionState;
+  /** userId → 사용한 연장 횟수 */
+  extended: Record<string, number>;
+  /** 다음 단계 준비를 마친 팀장 */
+  ready: string[];
+}
+
+const ROLE_SELECTION_KEY = (roomId: string) => `role-selection:state:${roomId}`;
+/** 역할 선택은 수 분이면 끝난다. 2시간이면 연장을 다 써도 충분하고 방치된 키도 곧 사라진다 */
+const ROLE_SELECTION_TTL_SECONDS = 2 * 60 * 60;
+/**
+ * 재시작 직후 복원한 세션의 최소 남은 시간(ms).
+ * 배포로 끊긴 동안 마감이 지났어도, 참가자가 막 재접속하는 순간 자동 배정이
+ * 돌지 않게 복원 시점부터 이만큼은 보장한다.
+ */
+const RESTORE_MIN_REMAINING_MS = 15_000;
+
 @Injectable()
-export class RoleSelectionService {
+export class RoleSelectionService implements OnModuleInit {
+  private readonly logger = new Logger(RoleSelectionService.name);
   private roleSelectionStates = new Map<string, RoleSelectionState>();
   private readyCaptains = new Map<string, Set<string>>();
   // roomId → (userId → 사용한 연장 횟수). 인당 EXTENSION_MAX_PER_USER 회까지 허용한다.
@@ -41,7 +65,120 @@ export class RoleSelectionService {
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => MatchService))
     private readonly matchService: MatchService,
+    @Optional() private readonly redis?: RedisService,
   ) {}
+
+  // ========================================
+  // 재시작 복구 (소켓 점검 H3)
+  //
+  // 상태·준비·연장 횟수가 전부 인메모리 Map 이라 재시작하면 "역할 선택이 진행 중이 아닙니다"
+  // 로 막히고 방이 ROLE_SELECTION 에 고정됐다(재시작도 DRAFT_COMPLETED 만 허용).
+  // Redis 에 저장하고 부팅 때 복원한다. 타이머(setTimeout)는 게이트웨이가 첫 재접속 때 다시 건다.
+  // ========================================
+
+  async onModuleInit() {
+    try {
+      await this.restoreStates();
+    } catch (error) {
+      this.logger.warn(
+        `역할 선택 상태 복원 실패 (정상 시작으로 계속): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /** ROLE_SELECTION 방의 상태를 Redis → 메모리로 복원한다 */
+  private async restoreStates() {
+    const rooms = await this.prisma.room.findMany({
+      where: { status: RoomStatus.ROLE_SELECTION },
+      select: { id: true },
+    });
+
+    let restored = 0;
+    for (const { id: roomId } of rooms) {
+      const saved = this.redis ? await this.readPersisted(roomId) : null;
+      const now = Date.now();
+      // 저장본이 없는 방(이 변경 이전에 시작됐거나 키가 만료됨)은 새 타이머로 이어간다.
+      // 이미 고른 역할은 DB 에 있으므로 남은 사람만 마감 때 자동 배정되고, 방을 영구히
+      // 멈춰 두는 것보다 낫다. 연장 횟수는 알 수 없어 처음부터 센다.
+      const state: RoleSelectionState = saved?.state ?? {
+        roomId,
+        startedAt: now,
+        timerEnd: now + ROLE_SELECTION_TIME_MS,
+      };
+      state.timerEnd = Math.max(state.timerEnd, now + RESTORE_MIN_REMAINING_MS);
+
+      this.roleSelectionStates.set(roomId, state);
+      if (saved?.ready.length) {
+        this.readyCaptains.set(roomId, new Set(saved.ready));
+      }
+      if (saved && Object.keys(saved.extended).length > 0) {
+        this.extendedUsers.set(roomId, new Map(Object.entries(saved.extended)));
+      }
+      this.persist(roomId);
+      restored++;
+      if (!saved) {
+        this.logger.warn(`방 ${roomId}: 저장된 상태 없음 — 새 타이머로 이어감`);
+      }
+    }
+    if (restored > 0) {
+      this.logger.log(`역할 선택 상태 ${restored}건 복원됨`);
+    }
+  }
+
+  private async readPersisted(
+    roomId: string,
+  ): Promise<PersistedRoleSelection | null> {
+    const raw = await this.redis!.get(ROLE_SELECTION_KEY(roomId));
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as PersistedRoleSelection;
+      if (!parsed?.state || typeof parsed.state.timerEnd !== "number") {
+        return null;
+      }
+      return {
+        state: parsed.state,
+        extended: parsed.extended ?? {},
+        ready: Array.isArray(parsed.ready) ? parsed.ready : [],
+      };
+    } catch {
+      this.logger.warn(`방 ${roomId}: 저장된 역할 선택 상태 손상 — 무시`);
+      return null;
+    }
+  }
+
+  /** 현재 상태·준비·연장 횟수를 Redis 에 저장 (실패해도 진행은 막지 않는다) */
+  private persist(roomId: string): void {
+    const state = this.roleSelectionStates.get(roomId);
+    if (!this.redis || !state) return;
+    const payload: PersistedRoleSelection = {
+      state,
+      extended: Object.fromEntries(this.extendedUsers.get(roomId) ?? []),
+      ready: [...(this.readyCaptains.get(roomId) ?? [])],
+    };
+    this.redis
+      .set(
+        ROLE_SELECTION_KEY(roomId),
+        JSON.stringify(payload),
+        ROLE_SELECTION_TTL_SECONDS,
+      )
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `역할 선택 상태 저장 실패 (${roomId}): ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      );
+  }
+
+  /** 메모리와 Redis 에서 방의 역할 선택 상태를 모두 지운다 */
+  private forget(roomId: string): void {
+    this.roleSelectionStates.delete(roomId);
+    this.extendedUsers.delete(roomId);
+    this.readyCaptains.delete(roomId);
+    this.redis?.del(ROLE_SELECTION_KEY(roomId)).catch(() => undefined);
+  }
 
   /**
    * 역할 동시 선택 충돌(P2034) 발생 시 직렬화 트랜잭션을 재시도한다.
@@ -120,6 +257,7 @@ export class RoleSelectionService {
 
     this.roleSelectionStates.set(roomId, state);
     this.readyCaptains.delete(roomId);
+    this.persist(roomId);
 
     return {
       room,
@@ -540,9 +678,7 @@ export class RoleSelectionService {
     }
 
     // Clean up state
-    this.roleSelectionStates.delete(roomId);
-    this.extendedUsers.delete(roomId);
-    this.readyCaptains.delete(roomId);
+    this.forget(roomId);
 
     return updatedRoom;
   }
@@ -556,9 +692,7 @@ export class RoleSelectionService {
   }
 
   clearRoleSelectionState(roomId: string): void {
-    this.roleSelectionStates.delete(roomId);
-    this.extendedUsers.delete(roomId);
-    this.readyCaptains.delete(roomId);
+    this.forget(roomId);
   }
 
   async getCaptainReadyState(
@@ -609,6 +743,7 @@ export class RoleSelectionService {
       this.readyCaptains.set(roomId, ready);
     }
     ready.add(userId);
+    this.persist(roomId);
 
     return this.getCaptainReadyState(roomId);
   }
@@ -638,6 +773,7 @@ export class RoleSelectionService {
     const nextUsed = used + 1;
     extended.set(userId, nextUsed);
     state.timerEnd += EXTENSION_TIME_MS;
+    this.persist(roomId);
 
     return {
       timerEnd: state.timerEnd,
