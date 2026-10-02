@@ -534,6 +534,34 @@ export const auctionSocketHelpers = {
     auctionSocket?.on("auction-complete", callback);
   },
 
+  /**
+   * 경매 단계 오류. 경매 완료 뒤 역할 선택 시작이 3번 실패하면 `retryable: true` 로 온다.
+   * 예전엔 서버만 보내고 듣는 곳이 없어 호스트 화면이 말없이 멈췄다(소켓 점검 H1).
+   */
+  onAuctionError: (callback: (data: any) => void) => {
+    auctionSocket?.on("auction-error", callback);
+  },
+
+  /** 호스트의 역할 선택 수동 재시작 */
+  retryRoleSelection: (roomId: string): Promise<any> => {
+    return new Promise((resolve) => {
+      if (!auctionSocket?.connected) {
+        resolve({ error: "소켓이 연결되어 있지 않습니다." });
+        return;
+      }
+      // 서버가 최대 3회(500ms 간격) 재시도하므로 넉넉히 기다린다.
+      const timeout = setTimeout(() => resolve({ error: "timeout" }), 15000);
+      auctionSocket.emit(
+        "retry-role-selection",
+        { roomId },
+        (response: any) => {
+          clearTimeout(timeout);
+          resolve(response ?? {});
+        },
+      );
+    });
+  },
+
   onTimerUpdate: (callback: (data: any) => void) => {
     auctionSocket?.on("timer-update", callback);
   },
@@ -637,6 +665,7 @@ export const auctionSocketHelpers = {
     auctionSocket?.off("player-sold");
     auctionSocket?.off("player-unsold");
     auctionSocket?.off("auction-complete");
+    auctionSocket?.off("auction-error");
     auctionSocket?.off("timer-update");
     auctionSocket?.off("bid-resolved");
     auctionSocket?.off("timer-expired");

@@ -705,6 +705,8 @@ export default function AuctionRoomPage() {
     error,
     placeBid,
     voteItemSkip,
+    retryRoleSelection,
+    stageError,
     captainSelectionPhase,
     volunteerAsCaptain,
     finalizeVolunteers,
@@ -714,6 +716,17 @@ export default function AuctionRoomPage() {
     clearSessionAbort,
     lastSoldEvent,
   } = useAuction(auctionId);
+
+  // 경매 종료 뒤 역할 선택 시작 실패(소켓 점검 H1). 호스트만 다시 시작할 수 있다.
+  const [isRetryingStage, setIsRetryingStage] = useState(false);
+  const handleRetryStage = async () => {
+    setIsRetryingStage(true);
+    try {
+      await retryRoleSelection();
+    } finally {
+      setIsRetryingStage(false);
+    }
+  };
 
   const isHost =
     user?.id === (captainSelectionPhase?.hostId ?? auctionState?.hostId);
@@ -1583,6 +1596,37 @@ export default function AuctionRoomPage() {
             </Button>
           </div>
         </div>
+
+        {/* 단계 오류 — 경매 완료 뒤 역할 선택이 안 열렸을 때 호스트가 직접 다시 시작한다 */}
+        {stageError && (
+          <div
+            role="alert"
+            className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent-danger/40 bg-accent-danger/10 px-4 py-3"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-accent-danger">
+                다음 단계로 넘어가지 못했습니다
+              </p>
+              <p className="mt-0.5 text-xs text-text-secondary">
+                {isHost && stageError.retryable
+                  ? "아래 버튼으로 역할 선택을 다시 시작할 수 있습니다."
+                  : stageError.retryable
+                    ? "방장이 역할 선택을 다시 시작할 때까지 기다려 주세요."
+                    : stageError.message}
+              </p>
+            </div>
+            {isHost && stageError.retryable && (
+              <Button
+                size="sm"
+                variant="primary"
+                isLoading={isRetryingStage}
+                onClick={() => void handleRetryStage()}
+              >
+                역할 선택 다시 시작
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* 모바일 입찰 에러 */}
         {error && auctionState && (

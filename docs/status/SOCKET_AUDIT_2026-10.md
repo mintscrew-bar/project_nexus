@@ -58,7 +58,7 @@
 - `app.module.ts` `onApplicationShutdown` 은 진행 중인 방이 없어질 때까지 최대 60초 기다린다. 그러나 `docker-compose.prod.yml` 에
   `stop_grace_period` 가 없어 Docker 기본 10초 뒤 SIGKILL — 드레인이 사실상 동작하지 않는다.
 - 60초로도 한 판(드래프트·경매 수 분)을 못 기다린다. H2·H3 복구가 들어가기 전까지는 배포 시각이 곧 장애 시각이다.
-- 수정: `api` 서비스에 `stop_grace_period: 75s`(드레인 60초 + 여유). 장시간 게임은 H2·H3·경매 복구로 이어받는다.
+- 수정: `api` 서비스에 `stop_grace_period: 90s`(PM2 kill_timeout 75초 + 여유). 장시간 게임은 H2·H3·경매 복구로 이어받는다.
 
 ## 중간 (보고서에 기록, 우선순위 협의)
 
@@ -97,10 +97,10 @@
 
 ## TODO
 
-- [ ] Task 1: H1 — 경매 화면에서 역할 선택 시작 실패를 호스트에게 알리고 재시도 버튼 제공
+- [x] Task 1: H1 — 경매 화면에서 역할 선택 시작 실패를 호스트에게 알리고 재시도 버튼 제공
 - [ ] Task 2: H2 — 스네이크 드래프트 상태 Redis 저장·부팅 복원·픽 타이머 재무장
 - [ ] Task 3: H3 — 역할 선택 상태 Redis 저장·부팅 복원·타이머 재무장
-- [ ] Task 4: H4 — `docker-compose.prod.yml` api `stop_grace_period` 75s
+- [x] Task 4: H4 — `docker-compose.prod.yml` api `stop_grace_period` 90s
 - [ ] Task 5: M1 — 게이트웨이 공통 입력 검증(`roomId` 등 문자열 id 가드)
 - [ ] Task 6: M2·M3 — `join-scrim`·`join-match` 참가자 확인
 - [ ] Task 7: M5 — 쓰기 이벤트 소켓 레이트 리밋(방·역할 선택·RPS·프레즌스)

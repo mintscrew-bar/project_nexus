@@ -88,6 +88,11 @@ interface AuctionStoreState {
   captainSelectionPhase: CaptainSelectionPhase | null;
   sessionAbortedAt: number | null;
   sessionAbortMessage: string | null;
+  /**
+   * 경매 단계 오류(서버 `auction-error`). `retryable` 이면 호스트가 역할 선택을
+   * 다시 시작할 수 있다. 다음 경매 시작·재시도 성공 때 지운다.
+   */
+  stageError: { message: string; retryable: boolean } | null;
   /** 최근 낙찰 정보 (피드백 표시용, 일정 시간 후 자동 클리어) */
   lastSoldEvent: { playerName: string; teamName: string; price: number; timestamp: number } | null;
   processedSoldPlayerIds: Set<string>;
@@ -101,6 +106,8 @@ interface AuctionStoreState {
   disconnectFromAuction: () => void;
   placeBid: (amount: number) => Promise<void>;
   voteItemSkip: () => Promise<void>;
+  /** 호스트: 역할 선택 시작 실패 후 수동 재시작. 실패하면 stageError 를 갱신한다 */
+  retryRoleSelection: () => Promise<void>;
   setCurrentUserId: (userId: string) => void;
 
   // Captain selection
@@ -212,6 +219,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
   captainSelectionPhase: null,
   sessionAbortedAt: null,
   sessionAbortMessage: null,
+  stageError: null,
   lastSoldEvent: null,
   processedSoldPlayerIds: new Set(),
 
@@ -254,6 +262,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       error: null,
       sessionAbortedAt: null,
       sessionAbortMessage: null,
+      stageError: null,
     });
     const socket = connectAuctionSocket();
     // Clear existing listeners (game events + raw socket events) to prevent duplication
@@ -407,6 +416,15 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
 
     // timer-update는 무시 — timerEnd는 initial state·new-bid에서 절대값으로 설정됨.
     // 정수 timeLeft로 재계산하면 최대 1초 drift가 발생해 표시가 오락가락하는 문제 있음.
+    auctionSocketHelpers.onAuctionError((data: { error?: string; message?: string; retryable?: boolean }) => {
+      set({
+        stageError: {
+          message: data?.error || data?.message || '경매 처리 중 오류가 발생했습니다.',
+          retryable: !!data?.retryable,
+        },
+      });
+    });
+
     auctionSocketHelpers.onTimerUpdate((_data: { timeLeft: number }) => { /* no-op */ });
 
     auctionSocketHelpers.onBidResolved((data: {
@@ -616,6 +634,7 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       captainSelectionPhase: null,
       sessionAbortedAt: null,
       sessionAbortMessage: null,
+      stageError: null,
       lastSoldEvent: null,
       processedSoldPlayerIds: new Set(),
     });
@@ -637,6 +656,19 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
         if (bidErrorToken === token && get().error === msg) set({ error: null });
       }, 3000);
     }
+  },
+
+  retryRoleSelection: async () => {
+    const roomId = get().auctionState?.roomId;
+    if (!roomId) return;
+
+    const response = await auctionSocketHelpers.retryRoleSelection(roomId);
+    if (response?.error) {
+      // 서버가 이미 auction-error 를 다시 보냈겠지만 응답 쪽 문구가 더 구체적이다.
+      set({ stageError: { message: response.error, retryable: true } });
+      return;
+    }
+    set({ stageError: null });
   },
 
   voteItemSkip: async () => {

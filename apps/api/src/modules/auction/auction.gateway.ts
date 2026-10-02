@@ -641,13 +641,18 @@ export class AuctionGateway
     this.server.to(`room:${roomId}`).emit(event, data);
   }
 
-  /** 역할 선택 시작 (최대 2회 재시도, 500ms 간격) */
+  /**
+   * 역할 선택 시작 (최대 2회 재시도, 500ms 간격).
+   * @returns 시작에 성공했는가. 호출자(수동 재시도 핸들러)가 응답에 반영한다 —
+   *          예전엔 항상 resolve 라서 재시도가 또 실패해도 `success: true` 가 나갔다.
+   */
   private async _startRoleSelectionWithRetry(
     roomId: string,
     attempt = 1,
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       await this.roleSelectionGateway.advanceAfterTeams(roomId);
+      return true;
     } catch (error) {
       console.error(
         `[Auction] Failed to start role selection for room ${roomId} (attempt ${attempt}):`,
@@ -669,6 +674,7 @@ export class AuctionGateway
         error: message,
         retryable: true,
       });
+      return false;
     }
   }
 
@@ -694,7 +700,12 @@ export class AuctionGateway
     }
 
     try {
-      await this._startRoleSelectionWithRetry(data.roomId);
+      const started = await this._startRoleSelectionWithRetry(data.roomId);
+      if (!started) {
+        return {
+          error: "역할 선택을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.",
+        };
+      }
       return { success: true };
     } catch (error: any) {
       return { error: error.message };
