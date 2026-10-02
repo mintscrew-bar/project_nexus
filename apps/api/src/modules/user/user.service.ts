@@ -501,6 +501,15 @@ export class UserService {
     platform: StreamerPlatform,
     games: GameTitle[],
   ) {
+    // 연동하지 않은 플랫폼이면 Prisma P2025(500)가 아니라 404 로 알린다.
+    const profile = await this.prisma.streamerProfile.findUnique({
+      where: { userId_platform: { userId, platform } },
+      select: { id: true },
+    });
+    if (!profile) {
+      throw new NotFoundException("연동된 스트리머 채널을 찾을 수 없습니다.");
+    }
+
     return this.prisma.streamerProfile.update({
       where: { userId_platform: { userId, platform } },
       data: { games: Array.from(new Set(games)) },

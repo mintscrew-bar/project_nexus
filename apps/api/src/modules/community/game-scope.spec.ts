@@ -51,18 +51,16 @@ describe("공유 섹션 게임 범위", () => {
   it("스트리머 목록과 참가 가능한 방이 같은 게임으로 제한된다", async () => {
     const prisma = {
       streamerProfile: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue([
-            {
-              userId: "host",
-              user: { id: "host", username: "호스트", avatar: null },
-              platform: "SOOP",
-              channelUrl: "https://example.com",
-              verifiedAt: new Date(),
-              lastLiveAt: null,
-            },
-          ]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            userId: "host",
+            user: { id: "host", username: "호스트", avatar: null },
+            platform: "SOOP",
+            channelUrl: "https://example.com",
+            verifiedAt: new Date(),
+            lastLiveAt: null,
+          },
+        ]),
       },
       room: { findMany: jest.fn().mockResolvedValue([]) },
     };
