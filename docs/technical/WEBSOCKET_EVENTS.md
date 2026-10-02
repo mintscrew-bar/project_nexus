@@ -1,272 +1,306 @@
 # WebSocket Events
 
-> 기준일: 2026-04-27 (9개 gateway 직접 추출)
+> 자동 생성 — `node scripts/socket-inventory.mjs --md` (2026-10-02).
+> 손으로 고치지 않는다. 정적 분석이라 변수로 만든 이벤트 이름은 빠질 수 있다.
 > REST 엔드포인트는 [API_REFERENCE.md](./API_REFERENCE.md) 참조
 
 ## 공통
 
-- 전송 방식: `websocket` only (polling fallback 없음)
-- 인증: 연결 시 `auth.token` 콜백으로 JWT accessToken 전달
-- 모든 namespace에서 토큰 만료 시 연결이 끊어진다
-
-```javascript
-const socket = io("https://api.example.com/room", {
-  transports: ["websocket"],
-  auth: { token: accessToken },
-});
-```
-
----
-
-## 1. Room (`/room`)
-
-방 목록 구독, 로비 채팅, 준비 상태, 게임 시작을 담당한다.
-
-### Client → Server
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `subscribe-room-list` | — | 방 목록 실시간 구독 시작 |
-| `unsubscribe-room-list` | — | 구독 해제 |
-| `join-room` | `{ roomId, password? }` | 방 입장 |
-| `leave-room` | `{ roomId }` | 방 퇴장 |
-| `toggle-ready` | `{ roomId }` | 준비 상태 토글 |
-| `toggle-spectator` | `{ roomId }` | 관전 모드 토글 |
-| `start-game` | `{ roomId }` | 게임 시작 (호스트) |
-| `send-message` | `{ roomId, content }` | 채팅 전송 |
-| `is-typing` | `{ roomId, isTyping }` | 타이핑 상태 |
-
-### Server → Client
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `room-list-updated` | `{ type: "add"\|"update"\|"remove", room?, roomId? }` | 방 목록 변경 |
-| `user-joined` | `{ userId, username }` | 유저 입장 |
-| `user-left` | `{ userId, username }` | 유저 퇴장 |
-| `room-updated` | room 객체 | 방 정보 변경 |
-| `host-changed` | `{ newHostId }` | 호스트 변경 |
-| `ready-status-changed` | `{ userId, isReady }` | 준비 상태 변경 |
-| `all-ready` | — | 전원 준비 완료 |
-| `participant-role-changed` | `{ userId, newRole }` | 참가자 역할 변경 |
-| `new-message` | message 객체 | 새 채팅 메시지 |
-| `user-typing` | `{ userId, username }` | 타이핑 중 |
-| `user-stopped-typing` | `{ userId }` | 타이핑 종료 |
-| `draft-started` | draft 상태 객체 | 드래프트 시작 알림 |
-| `game-starting` | `{ roomId, teamMode }` | 게임 시작 알림 |
-| `voice-status-changed` | `{ userId, inVoice }` | Discord 음성채널 상태 |
-
----
-
-## 2. Auction (`/auction`)
-
-경매 입찰, 팀장 선출, 낙찰/유찰 처리를 담당한다.
-
-### Client → Server
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `join-room` | `{ roomId }` | 경매방 입장 |
-| `leave-room` | `{ roomId }` | 경매방 퇴장 |
-| `volunteer-captain` | `{ roomId }` | 팀장 자원 |
-| `finalize-volunteers` | `{ roomId, selectedUserIds? }` | 자원자 중 팀장 확정 |
-| `select-manual-captains` | `{ roomId, userIds }` | 팀장 수동 지정 |
-| `place-bid` | `{ roomId, amount }` | 입찰 (100골드 단위) |
-| `resolve-bid` | `{ roomId }` | 입찰 확정 |
-| `retry-role-selection` | `{ roomId }` | 역할 선택 재시도 |
-
-### Server → Client
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `volunteer-list-updated` | volunteer 데이터 | 자원자 목록 변경 |
-| `captain-selection-phase` | `{ mode, requiredCount, volunteers, timerEnd, participants, hostId }` | 팀장 선출 단계 |
-| `captains-confirmed` | `{ captainUserIds, teams }` | 팀장 확정 |
-| `auction-started` | `{ teams, players, auctionState }` | 경매 시작 |
-| `bid-placed` | `{ userId, teamId, username, amount, timerEnd, timestamp }` | 입찰 발생 |
-| `bid-resolved` | resolved 결과 + state + teams + players | 낙찰/유찰 결정 |
-| `player-sold` | `{ player, team, price }` | 낙찰 |
-| `player-unsold` | `{ player }` | 유찰 |
-| `timer-update` | `{ timeLeft }` | 타이머 업데이트 |
-| `timer-expired` | — | 타이머 만료 |
-| `auction-complete` | `{ teams }` | 경매 완료 |
-| `auction-error` | `{ error, retryable? }` | 에러 |
-| `session-aborted` | abort 데이터 | 세션 중단 |
-
-> 입찰 규칙: 티어별 시작 골드 (Iron 3000 ~ Diamond+ 2000), 100골드 단위, 5초 소프트 타이머, 유찰 시 다음 사이클, 팀장 골드 소진 시 500골드 보너스.
-
----
-
-## 3. Snake Draft (`/snake-draft`)
-
-스네이크 순서 드래프트 픽을 담당한다.
-
-### Client → Server
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `join-draft-room` | `{ roomId }` | 드래프트 입장 |
-| `leave-draft-room` | `{ roomId }` | 드래프트 퇴장 |
-| `make-pick` | `{ roomId, targetPlayerId }` | 선수 픽 |
-| `get-draft-state` | `{ roomId }` | 현재 상태 조회 |
-
-### Server → Client
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `draft-started` | draft 상태 객체 | 드래프트 시작 |
-| `pick-made` | `{ teamId, player, nextTeamId, timerEnd }` | 픽 완료 |
-| `auto-pick-made` | `{ teamId, playerId, username }` | 자동 픽 |
-| `next-pick` | `{ currentTeamId, timerEnd }` | 다음 턴 |
-| `draft-complete` | `{ teams }` | 드래프트 완료 |
-| `timer-expired` | — | 타이머 만료 |
-| `session-aborted` | abort 데이터 | 세션 중단 |
-
-> 드래프트 규칙: 스네이크 순서 (A→B→C→C→B→A), 30초 픽 타이머, 만료 시 자동 픽.
-
----
-
-## 4. Role Selection (`/role-selection`)
-
-경매/드래프트 완료 후 포지션 선택을 담당한다.
-
-### Client → Server
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `join-room` | `{ roomId }` | 역할 선택 입장 |
-| `select-role` | `{ roomId, role }` | 포지션 선택 |
-
-### Server → Client
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `role-selection-started` | 역할 선택 데이터 | 단계 시작 |
-| `role-selected` | `{ userId, username, teamId, role, memberId }` | 역할 선택 완료 |
-| `timer-tick` | `{ timeRemaining }` | 타이머 |
-| `role-selection-completed` | `{ room }` | 전원 선택 완료 |
-| `role-selection-timeout` | `{ message }` | 타임아웃 |
-| `role-selection-error` | `{ message, error }` | 에러 |
-| `session-aborted` | abort 데이터 | 세션 중단 |
-
----
-
-## 5. Match (`/match`)
-
-매치 시작/결과, 토너먼트 브래킷 업데이트를 담당한다.
-
-### Client → Server
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `join-match` | `{ matchId }` | 매치 입장 |
-| `leave-match` | `{ matchId }` | 매치 퇴장 |
-| `join-bracket` | `{ roomId }` | 브래킷 뷰 입장 |
-| `leave-bracket` | `{ roomId }` | 브래킷 뷰 퇴장 |
-
-### Server → Client
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `match-started` | `{ tournamentCode? }` | 매치 시작 |
-| `match-result` | `{ winnerId }` | 매치 결과 |
-| `tournament-code-generated` | `{ code }` | Tournament Code 생성 |
-| `bracket-generated` | `{ bracket }` | 브래킷 생성 |
-| `bracket-updated` | `{ matches }` | 브래킷 업데이트 |
-| `bracket-complete` | — | 브래킷 완료 |
-| `tournament-completed` | `{ standings, completedAt }` | 토너먼트 종료 |
-| `tournament-completed-error` | `{ error, roomId }` | 종료 처리 에러 |
-| `session-aborted` | abort 데이터 | 세션 중단 |
-
----
-
-## 6. Clan (`/clan`)
-
-클랜 채팅, 멤버 변경 알림을 담당한다.
-
-### Client → Server
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `join-clan-chat` | `{ clanId }` | 클랜 채팅 입장 |
-| `leave-clan-chat` | `{ clanId }` | 클랜 채팅 퇴장 |
-| `send-clan-message` | `{ clanId, content }` | 메시지 전송 |
-| `is-typing` | `{ clanId, isTyping }` | 타이핑 상태 |
-
-### Server → Client
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `new-clan-message` | message 객체 | 새 메시지 |
-| `clan-message-deleted` | `{ messageId }` | 메시지 삭제 |
-| `user-typing` | `{ userId, username }` | 타이핑 중 |
-| `user-stopped-typing` | `{ userId }` | 타이핑 종료 |
-| `member-joined` | `{ user }` | 멤버 가입 |
-| `member-left` | `{ userId, username }` | 멤버 탈퇴 |
-| `member-kicked` | `{ userId, username, kickedBy }` | 멤버 추방 |
-| `member-promoted` | `{ userId, username, newRole }` | 역할 변경 |
-| `ownership-transferred` | `{ oldOwnerId, newOwnerId }` | 오너 이전 |
-| `clan-updated` | clan 객체 | 클랜 정보 변경 |
-| `clan-deleted` | — | 클랜 삭제 |
-| `clan-announcement-created` | announcement 객체 | 공지 생성 |
-| `clan-announcement-deleted` | `{ announcementId }` | 공지 삭제 |
-| `clan-join-request-received` | request 데이터 | 가입 신청 |
-| `clan-join-request-resolved` | `{ requestId, accepted }` | 가입 신청 처리 |
-
----
-
-## 7. DM (`/dm`)
-
-1:1 다이렉트 메시지를 담당한다.
-
-### Client → Server
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `send-dm` | `{ receiverId, content }` | DM 전송 |
-| `is-typing` | `{ receiverId, isTyping }` | 타이핑 상태 |
-| `mark-read` | `{ senderId }` | 읽음 처리 |
-
-### Server → Client
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `new-dm` | message 객체 | 새 DM |
-| `dm-unread-count` | `{ total }` | 안 읽은 수 |
-| `dm-typing` | `{ userId, username }` | 타이핑 중 |
-| `dm-stopped-typing` | `{ userId }` | 타이핑 종료 |
-
----
-
-## 8. Notification (`notification`)
-
-서버 발신 전용. 실시간 알림 푸시를 담당한다.
-
-> Client → Server 이벤트 없음. 서버가 단방향으로 push한다.
-
-### Server → Client
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `notification` | notification 객체 | 새 알림 |
-| `unread-count` | `{ count }` | 안 읽은 알림 수 |
-
----
-
-## 9. Presence (`/presence`)
-
-온라인/자리비움 상태 관리를 담당한다.
-
-### Client → Server
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `set-status` | `{ status: "ONLINE"\|"AWAY" }` | 내 상태 변경 |
-| `get-friends-status` | — | 친구 상태 일괄 요청 |
-| `subscribe-friend` | `{ friendId }` | 특정 친구 상태 구독 |
-| `unsubscribe-friend` | `{ friendId }` | 구독 해제 |
-
-### Server → Client
-
-| 이벤트 | 페이로드 | 설명 |
-|--------|---------|------|
-| `friend-status-changed` | `{ userId, status, lastSeenAt }` | 친구 상태 변경 |
+- 전송: 클라이언트는 `transports: ["websocket", "polling"]` (polling 폴백 허용) — `apps/web/src/lib/socket-client.ts`
+- 인증: 연결 시 `auth.token` 콜백으로 JWT accessToken 전달 (방송 오버레이는 broadcast 토큰)
+- 어댑터: Redis (`apps/api/src/adapters/redis-io.adapter.ts`)
+
+## /auction
+
+파일: `apps/api/src/modules/auction/auction.gateway.ts`
+
+### 클라이언트 → 서버
+
+| 이벤트                   | 핸들러                 | 클라이언트 호출 |
+| ------------------------ | ---------------------- | --------------- |
+| `join-room`              | auction.gateway.ts:214 | 5곳             |
+| `leave-room`             | auction.gateway.ts:317 | 2곳             |
+| `volunteer-captain`      | auction.gateway.ts:330 | 1곳             |
+| `finalize-volunteers`    | auction.gateway.ts:350 | 1곳             |
+| `select-manual-captains` | auction.gateway.ts:373 | 1곳             |
+| `place-bid`              | auction.gateway.ts:432 | 1곳             |
+| `vote-item-skip`         | auction.gateway.ts:539 | 1곳             |
+| `retry-role-selection`   | auction.gateway.ts:680 | **없음**        |
+
+### 서버 → 클라이언트
+
+| 이벤트                    | emit 위치 수 | 클라이언트 리스너 |
+| ------------------------- | ------------ | ----------------- |
+| `volunteer-list-updated`  | 1            | 2곳               |
+| `captain-selection-phase` | 1            | 2곳               |
+| `volunteer-finalized`     | 1            | 1곳               |
+| `captains-confirmed`      | 1            | 2곳               |
+| `auction-started`         | 2            | 2곳               |
+| `bid-placed`              | 2            | 2곳               |
+| `item-skip-vote-updated`  | 1            | 1곳               |
+| `auction-item-started`    | 1            | 2곳               |
+| `player-sold`             | 1            | 2곳               |
+| `player-unsold`           | 1            | 2곳               |
+| `timer-update`            | 1            | 2곳               |
+| `timer-expired`           | 1            | 1곳               |
+| `auction-error`           | 2            | **없음**          |
+| `session-aborted`         | 1            | 2곳               |
+| `bid-resolved`            | 1            | 2곳               |
+| `auction-complete`        | 1            | 2곳               |
+
+## /clan
+
+파일: `apps/api/src/modules/clan/clan.gateway.ts`
+
+### 클라이언트 → 서버
+
+| 이벤트              | 핸들러              | 클라이언트 호출 |
+| ------------------- | ------------------- | --------------- |
+| `join-clan-chat`    | clan.gateway.ts:103 | 1곳             |
+| `leave-clan-chat`   | clan.gateway.ts:129 | 1곳             |
+| `send-clan-message` | clan.gateway.ts:146 | 1곳             |
+| `is-typing`         | clan.gateway.ts:183 | 1곳             |
+
+### 서버 → 클라이언트
+
+| 이벤트                       | emit 위치 수 | 클라이언트 리스너 |
+| ---------------------------- | ------------ | ----------------- |
+| `new-clan-message`           | 1            | 1곳               |
+| `user-typing`                | 1            | 1곳               |
+| `user-stopped-typing`        | 1            | 1곳               |
+| `member-joined`              | 1            | 1곳               |
+| `member-left`                | 1            | 1곳               |
+| `member-kicked`              | 1            | 1곳               |
+| `member-promoted`            | 1            | 1곳               |
+| `ownership-transferred`      | 1            | 1곳               |
+| `clan-updated`               | 1            | 1곳               |
+| `clan-deleted`               | 1            | 1곳               |
+| `clan-message-deleted`       | 1            | 1곳               |
+| `clan-announcement-created`  | 1            | 1곳               |
+| `clan-announcement-deleted`  | 1            | 1곳               |
+| `clan-join-request-received` | 1            | 1곳               |
+| `clan-join-request-resolved` | 1            | **없음**          |
+
+## /dm
+
+파일: `apps/api/src/modules/dm/dm.gateway.ts`
+
+### 클라이언트 → 서버
+
+| 이벤트      | 핸들러            | 클라이언트 호출 |
+| ----------- | ----------------- | --------------- |
+| `send-dm`   | dm.gateway.ts:130 | 1곳             |
+| `is-typing` | dm.gateway.ts:212 | 1곳             |
+| `mark-read` | dm.gateway.ts:261 | 1곳             |
+
+### 서버 → 클라이언트
+
+| 이벤트              | emit 위치 수 | 클라이언트 리스너 |
+| ------------------- | ------------ | ----------------- |
+| `dm-unread-count`   | 3            | 1곳               |
+| `dm-stopped-typing` | 3            | 1곳               |
+| `new-dm`            | 2            | 1곳               |
+| `dm-typing`         | 1            | 1곳               |
+
+## /match
+
+파일: `apps/api/src/modules/match/match.gateway.ts`
+
+### 클라이언트 → 서버
+
+| 이벤트              | 핸들러               | 클라이언트 호출 |
+| ------------------- | -------------------- | --------------- |
+| `join-match`        | match.gateway.ts:136 | 3곳             |
+| `leave-match`       | match.gateway.ts:188 | 2곳             |
+| `join-bracket`      | match.gateway.ts:196 | 2곳             |
+| `leave-bracket`     | match.gateway.ts:222 | 1곳             |
+| `rps:captain-ready` | match.gateway.ts:599 | 1곳             |
+| `rps:start`         | match.gateway.ts:653 | 1곳             |
+| `rps:submit`        | match.gateway.ts:689 | 1곳             |
+| `rps:choose-side`   | match.gateway.ts:725 | 1곳             |
+
+### 서버 → 클라이언트
+
+| 이벤트                       | emit 위치 수 | 클라이언트 리스너 |
+| ---------------------------- | ------------ | ----------------- |
+| `rps:state`                  | 2            | 2곳               |
+| `rps:ready-state`            | 1            | 2곳               |
+| `rps:reveal`                 | 2            | 2곳               |
+| `rps:error`                  | 1            | 1곳               |
+| `rps:done`                   | 1            | 1곳               |
+| `rps:invite`                 | 1            | 2곳               |
+| `match-started`              | 2            | 2곳               |
+| `match-result`               | 2            | 2곳               |
+| `bracket-generated`          | 1            | 2곳               |
+| `broadcast-focus-updated`    | 1            | 1곳               |
+| `broadcast-control-updated`  | 1            | 1곳               |
+| `bracket-updated`            | 1            | 2곳               |
+| `series-updated`             | 1            | 1곳               |
+| `bracket-complete`           | 1            | 2곳               |
+| `tournament-code-generated`  | 1            | 1곳               |
+| `session-aborted`            | 1            | 2곳               |
+| `tournament-completed`       | 1            | 2곳               |
+| `tournament-completed-error` | 1            | **없음**          |
+
+## /notification
+
+파일: `apps/api/src/modules/notification/notification.gateway.ts`
+
+### 클라이언트 → 서버
+
+| 이벤트 | 핸들러 | 클라이언트 호출 |
+| ------ | ------ | --------------- |
+
+### 서버 → 클라이언트
+
+| 이벤트         | emit 위치 수 | 클라이언트 리스너 |
+| -------------- | ------------ | ----------------- |
+| `notification` | 1            | 1곳               |
+| `unread-count` | 1            | 1곳               |
+| `room-invite`  | 1            | 1곳               |
+
+## /presence
+
+파일: `apps/api/src/modules/presence/presence.gateway.ts`
+
+### 클라이언트 → 서버
+
+| 이벤트               | 핸들러                  | 클라이언트 호출 |
+| -------------------- | ----------------------- | --------------- |
+| `set-status`         | presence.gateway.ts:122 | 1곳             |
+| `get-friends-status` | presence.gateway.ts:139 | 1곳             |
+| `subscribe-friend`   | presence.gateway.ts:151 | 1곳             |
+| `unsubscribe-friend` | presence.gateway.ts:177 | 1곳             |
+
+### 서버 → 클라이언트
+
+| 이벤트                  | emit 위치 수 | 클라이언트 리스너 |
+| ----------------------- | ------------ | ----------------- |
+| `friend-status-changed` | 2            | 1곳               |
+
+## /role-selection
+
+파일: `apps/api/src/modules/role-selection/role-selection.gateway.ts`
+
+### 클라이언트 → 서버
+
+| 이벤트               | 핸들러                        | 클라이언트 호출 |
+| -------------------- | ----------------------------- | --------------- |
+| `join-room`          | role-selection.gateway.ts:125 | 5곳             |
+| `cancel-role`        | role-selection.gateway.ts:178 | 1곳             |
+| `select-role`        | role-selection.gateway.ts:202 | 1곳             |
+| `extend-timer`       | role-selection.gateway.ts:446 | 1곳             |
+| `mark-captain-ready` | role-selection.gateway.ts:512 | 1곳             |
+
+### 서버 → 클라이언트
+
+| 이벤트                      | emit 위치 수 | 클라이언트 리스너 |
+| --------------------------- | ------------ | ----------------- |
+| `role-cancelled`            | 1            | 2곳               |
+| `role-selected`             | 1            | 2곳               |
+| `timer-tick`                | 2            | 1곳               |
+| `role-selection-navigation` | 1            | 1곳               |
+| `role-selection-completed`  | 1            | 2곳               |
+| `role-selection-error`      | 2            | 1곳               |
+| `role-selection-timeout`    | 1            | 1곳               |
+| `role-selection-started`    | 1            | 2곳               |
+| `timer-extended`            | 1            | 1곳               |
+| `captain-ready-updated`     | 1            | 1곳               |
+| `session-aborted`           | 1            | 2곳               |
+
+## /room
+
+파일: `apps/api/src/modules/room/room.gateway.ts`
+
+### 클라이언트 → 서버
+
+| 이벤트                  | 핸들러               | 클라이언트 호출 |
+| ----------------------- | -------------------- | --------------- |
+| `subscribe-room-list`   | room.gateway.ts:376  | 1곳             |
+| `unsubscribe-room-list` | room.gateway.ts:387  | 1곳             |
+| `join-room`             | room.gateway.ts:464  | 5곳             |
+| `leave-room`            | room.gateway.ts:547  | 3곳             |
+| `toggle-ready`          | room.gateway.ts:602  | 1곳             |
+| `toggle-spectator`      | room.gateway.ts:635  | 1곳             |
+| `select-team`           | room.gateway.ts:665  | 1곳             |
+| `start-game`            | room.gateway.ts:689  | 1곳             |
+| `auto-balance-reroll`   | room.gateway.ts:925  | 1곳             |
+| `auto-balance-swap`     | room.gateway.ts:951  | 1곳             |
+| `auto-balance-undo`     | room.gateway.ts:981  | 1곳             |
+| `auto-balance-confirm`  | room.gateway.ts:1009 | 1곳             |
+| `send-message`          | room.gateway.ts:1057 | 3곳             |
+| `is-typing`             | room.gateway.ts:1094 | 1곳             |
+
+### 서버 → 클라이언트
+
+| 이벤트                     | emit 위치 수 | 클라이언트 리스너 |
+| -------------------------- | ------------ | ----------------- |
+| `room-left`                | 1            | 1곳               |
+| `user-left`                | 5            | 2곳               |
+| `room-start-alert`         | 1            | 1곳               |
+| `room-list-updated`        | 3            | 1곳               |
+| `user-joined`              | 1            | 2곳               |
+| `host-changed`             | 2            | **없음**          |
+| `room-updated`             | 10           | 2곳               |
+| `ready-status-changed`     | 1            | 2곳               |
+| `all-ready`                | 1            | 1곳               |
+| `participant-role-changed` | 1            | 1곳               |
+| `participant-team-changed` | 1            | 1곳               |
+| `draft-started`            | 1            | 1곳               |
+| `game-starting`            | 2            | 1곳               |
+| `new-message`              | 1            | 3곳               |
+| `user-typing`              | 1            | 1곳               |
+| `auction-started`          | 1            | 1곳               |
+| `snake-draft-started`      | 1            | **없음**          |
+| `role-selection-started`   | 1            | 1곳               |
+| `user-stopped-typing`      | 1            | 1곳               |
+| `voice-status-changed`     | 1            | 1곳               |
+| `participant-kicked`       | 1            | 1곳               |
+
+## /scrim
+
+파일: `apps/api/src/modules/scrim/scrim.gateway.ts`
+
+### 클라이언트 → 서버
+
+| 이벤트        | 핸들러              | 클라이언트 호출 |
+| ------------- | ------------------- | --------------- |
+| `join-scrim`  | scrim.gateway.ts:63 | 1곳             |
+| `leave-scrim` | scrim.gateway.ts:72 | 1곳             |
+
+### 서버 → 클라이언트
+
+| 이벤트            | emit 위치 수 | 클라이언트 리스너 |
+| ----------------- | ------------ | ----------------- |
+| `scrim-created`   | 1            | 1곳               |
+| `scrim-started`   | 1            | 1곳               |
+| `scrim-ready`     | 1            | 1곳               |
+| `round-started`   | 1            | 1곳               |
+| `round-completed` | 2            | 1곳               |
+| `scrim-updated`   | 1            | 1곳               |
+| `scrim-completed` | 1            | 1곳               |
+
+## /snake-draft
+
+파일: `apps/api/src/modules/room/snake-draft.gateway.ts`
+
+### 클라이언트 → 서버
+
+| 이벤트             | 핸들러                     | 클라이언트 호출 |
+| ------------------ | -------------------------- | --------------- |
+| `join-draft-room`  | snake-draft.gateway.ts:139 | 2곳             |
+| `leave-draft-room` | snake-draft.gateway.ts:187 | 1곳             |
+| `make-pick`        | snake-draft.gateway.ts:196 | 1곳             |
+| `get-draft-state`  | snake-draft.gateway.ts:347 | 1곳             |
+
+### 서버 → 클라이언트
+
+| 이벤트            | emit 위치 수 | 클라이언트 리스너 |
+| ----------------- | ------------ | ----------------- |
+| `pick-made`       | 2            | 2곳               |
+| `draft-complete`  | 2            | 2곳               |
+| `next-pick`       | 2            | 2곳               |
+| `draft-started`   | 1            | 2곳               |
+| `timer-expired`   | 1            | 1곳               |
+| `auto-pick-made`  | 1            | 1곳               |
+| `session-aborted` | 1            | 2곳               |
