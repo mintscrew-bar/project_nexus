@@ -425,6 +425,10 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
       });
     });
 
+    auctionSocketHelpers.onAuctionErrorCleared(() => {
+      set({ stageError: null });
+    });
+
     auctionSocketHelpers.onTimerUpdate((_data: { timeLeft: number }) => { /* no-op */ });
 
     auctionSocketHelpers.onBidResolved((data: {
@@ -665,7 +669,14 @@ export const useAuctionStore = create<AuctionStoreState>((set, get) => ({
     const response = await auctionSocketHelpers.retryRoleSelection(roomId);
     if (response?.error) {
       // 서버가 이미 auction-error 를 다시 보냈겠지만 응답 쪽 문구가 더 구체적이다.
-      set({ stageError: { message: response.error, retryable: true } });
+      // 재시도로 풀릴 수 있는 실패(서버가 retryable 로 표시)만 버튼을 남긴다 —
+      // "호스트만 가능합니다"·"단계가 아닙니다"까지 재시도 버튼 옆에 두면 안 된다.
+      set({
+        stageError: {
+          message: response.error,
+          retryable: response.retryable === true,
+        },
+      });
       return;
     }
     set({ stageError: null });

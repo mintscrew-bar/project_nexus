@@ -414,7 +414,8 @@ export class SnakeDraftGateway
     if (this.pickTimers.has(roomId)) return;
     if (
       this.autoPickingRooms.has(roomId) ||
-      this.manualPickingRooms.has(roomId)
+      this.manualPickingRooms.has(roomId) ||
+      this.completingDrafts.has(roomId)
     )
       return;
 

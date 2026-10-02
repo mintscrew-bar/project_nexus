@@ -384,6 +384,15 @@ describe("SnakeDraftGateway 픽 타이머 재무장", () => {
     expect(schedule).not.toHaveBeenCalled();
   });
 
+  it("정상 완료 처리 중이면 타이머를 새로 걸지 않는다", async () => {
+    const { gateway, schedule } = build(makeState());
+    (gateway as any).completingDrafts.add("room-1");
+
+    await gateway.handleJoinDraftRoom(client(), { roomId: "room-1" });
+
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
   it("방송(읽기 전용) 연결은 타이머를 건드리지 않는다", async () => {
     const { gateway, schedule } = build(makeState());
 

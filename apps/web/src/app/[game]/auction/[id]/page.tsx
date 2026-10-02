@@ -33,6 +33,7 @@ import {
 } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
+import { AuctionStageError } from "@/components/domain/AuctionStageError";
 import { cn } from "@/lib/utils";
 import { getTierIcon } from "@/lib/tier-icon";
 import {
@@ -748,6 +749,11 @@ export default function AuctionRoomPage() {
   useEffect(() => {
     if (hasRedirected.current) return;
     if (auctionState?.status !== "COMPLETED") return;
+    // 역할 선택이 열리지 않았다면 이동하지 않고 여기서 호스트의 재시도를 기다린다.
+    // 이동하면 역할 선택 화면에 빈 상태로 도착하고, 그쪽엔 재시도 수단이 없다.
+    // 재시도가 풀리면(서버가 auction-error-cleared 를 방송) stageError 가 지워져
+    // 이 효과가 다시 돌며 카운트다운을 재개한다.
+    if (stageError?.retryable) return;
 
     setCompleteCountdown(5);
     const interval = setInterval(() => {
@@ -768,7 +774,14 @@ export default function AuctionRoomPage() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [auctionState?.status, auctionId, goToNextStage, gamePrefix, game]);
+  }, [
+    auctionState?.status,
+    auctionId,
+    goToNextStage,
+    gamePrefix,
+    game,
+    stageError?.retryable,
+  ]);
   useEffect(() => {
     if (
       hasRedirected.current ||
@@ -1387,10 +1400,22 @@ export default function AuctionRoomPage() {
               경매 완료!
             </h1>
             <p className="text-text-secondary">
-              {completeCountdown > 0
-                ? `${completeCountdown}초 후 역할 선택으로 이동합니다...`
-                : "이동 중..."}
+              {stageError?.retryable
+                ? "역할 선택이 열리지 않아 이동을 멈췄습니다."
+                : completeCountdown > 0
+                  ? `${completeCountdown}초 후 역할 선택으로 이동합니다...`
+                  : "이동 중..."}
             </p>
+            {stageError && (
+              <div className="mt-4">
+                <AuctionStageError
+                  stageError={stageError}
+                  isHost={isHost}
+                  isRetrying={isRetryingStage}
+                  onRetry={() => void handleRetryStage()}
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -1599,32 +1624,13 @@ export default function AuctionRoomPage() {
 
         {/* 단계 오류 — 경매 완료 뒤 역할 선택이 안 열렸을 때 호스트가 직접 다시 시작한다 */}
         {stageError && (
-          <div
-            role="alert"
-            className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent-danger/40 bg-accent-danger/10 px-4 py-3"
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-accent-danger">
-                다음 단계로 넘어가지 못했습니다
-              </p>
-              <p className="mt-0.5 text-xs text-text-secondary">
-                {isHost && stageError.retryable
-                  ? "아래 버튼으로 역할 선택을 다시 시작할 수 있습니다."
-                  : stageError.retryable
-                    ? "방장이 역할 선택을 다시 시작할 때까지 기다려 주세요."
-                    : stageError.message}
-              </p>
-            </div>
-            {isHost && stageError.retryable && (
-              <Button
-                size="sm"
-                variant="primary"
-                isLoading={isRetryingStage}
-                onClick={() => void handleRetryStage()}
-              >
-                역할 선택 다시 시작
-              </Button>
-            )}
+          <div className="mb-3">
+            <AuctionStageError
+              stageError={stageError}
+              isHost={isHost}
+              isRetrying={isRetryingStage}
+              onRetry={() => void handleRetryStage()}
+            />
           </div>
         )}
 

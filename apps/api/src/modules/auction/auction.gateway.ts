@@ -15,6 +15,7 @@ import { RoleSelectionService } from "../role-selection/role-selection.service";
 import { RoleSelectionGateway } from "../role-selection/role-selection.gateway";
 import { RedisService } from "../redis/redis.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { RoomStatus } from "@nexus/database";
 import { resolveBroadcastRoomId } from "../broadcast/broadcast-resolve.util";
 
 interface AuthenticatedSocket extends Socket {
@@ -696,20 +697,60 @@ export class AuctionGateway
       data.roomId,
     );
     if (!isHost) {
-      return { error: "호스트만 역할 선택을 재시작할 수 있습니다." };
+      return {
+        error: "호스트만 역할 선택을 재시작할 수 있습니다.",
+        retryable: false,
+      };
     }
 
     try {
+      // 이미 다음 단계로 넘어갔는지 먼저 본다. startRoleSelection 은 DRAFT_COMPLETED 만
+      // 받으므로, 더블클릭·오래된 버튼·유실된 응답으로 이미 시작된 뒤에 재시도하면 3번 다
+      // 실패해 "넘어가지 못했습니다"가 전원에게 다시 방송되는데 실제로는 진행 중이었다.
+      const room = await this.prisma.room.findUnique({
+        where: { id: data.roomId },
+        select: { status: true },
+      });
+      if (!room) {
+        return { error: "방을 찾을 수 없습니다.", retryable: false };
+      }
+      if (room.status !== RoomStatus.DRAFT_COMPLETED) {
+        const notReachedYet: RoomStatus[] = [
+          RoomStatus.WAITING,
+          RoomStatus.TEAM_SELECTION,
+          RoomStatus.DRAFT,
+        ];
+        if (notReachedYet.includes(room.status)) {
+          return {
+            error: "역할 선택을 시작할 수 있는 단계가 아닙니다.",
+            retryable: false,
+          };
+        }
+        // 이미 시작됨 — 오류 화면에 남은 사람들도 풀어 준다.
+        this._emitAuctionErrorCleared(data.roomId);
+        return { success: true, alreadyStarted: true };
+      }
+
       const started = await this._startRoleSelectionWithRetry(data.roomId);
       if (!started) {
         return {
           error: "역할 선택을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.",
+          retryable: true,
         };
       }
+      this._emitAuctionErrorCleared(data.roomId);
       return { success: true };
     } catch (error: any) {
-      return { error: error.message };
+      return { error: error.message, retryable: false };
     }
+  }
+
+  /**
+   * 경매 단계 오류가 해소됐음을 방 전체에 알린다. 오류 배너가 떠 있는 모든 참가자가
+   * 경매 화면의 자동 이동을 다시 시작한다 — 호스트의 재시도 성공을 다른 사람은 알 길이 없었다.
+   */
+  private _emitAuctionErrorCleared(roomId: string): void {
+    this.server.to(`room:${roomId}`).emit("auction-error-cleared", { roomId });
   }
 
   cleanupRoom(roomId: string): void {

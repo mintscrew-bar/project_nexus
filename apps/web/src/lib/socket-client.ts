@@ -542,6 +542,11 @@ export const auctionSocketHelpers = {
     auctionSocket?.on("auction-error", callback);
   },
 
+  /** 단계 오류 해소(호스트 재시도 성공). 오류 배너를 지우고 자동 이동을 재개한다 */
+  onAuctionErrorCleared: (callback: (data: any) => void) => {
+    auctionSocket?.on("auction-error-cleared", callback);
+  },
+
   /** 호스트의 역할 선택 수동 재시작 */
   retryRoleSelection: (roomId: string): Promise<any> => {
     return new Promise((resolve) => {
@@ -666,6 +671,7 @@ export const auctionSocketHelpers = {
     auctionSocket?.off("player-unsold");
     auctionSocket?.off("auction-complete");
     auctionSocket?.off("auction-error");
+    auctionSocket?.off("auction-error-cleared");
     auctionSocket?.off("timer-update");
     auctionSocket?.off("bid-resolved");
     auctionSocket?.off("timer-expired");
