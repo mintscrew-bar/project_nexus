@@ -1,6 +1,8 @@
+import { RedisService } from "../redis/redis.service";
+import { guardAction } from "../../common/utils/chat-rate-limit";
 import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
 import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
-import { UseFilters } from "@nestjs/common";
+import { UseFilters, Optional } from "@nestjs/common";
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -91,6 +93,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly matchService: MatchService,
     private readonly matchSeriesService: MatchSeriesService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly redisService?: RedisService,
   ) {}
 
   /** 방송 토큰(원문) → 현재 송출 중인 roomId. read-only 방송 연결 인증용. */
@@ -605,6 +608,13 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ matchId: f.id() })) data: { matchId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "rps",
+      client.userId ?? client.id,
+    );
+    if (limited) return { success: false, error: limited };
+
     try {
       // 이미 RPS 진행 중이면 중복 처리 방지
       const existing = this.rpsStates.get(data.matchId);
@@ -659,6 +669,13 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ matchId: f.id() })) data: { matchId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "rps",
+      client.userId ?? client.id,
+    );
+    if (limited) return { success: false, error: limited };
+
     try {
       // 이미 진행 중이면 새로 만들지 않고 현재 상태만 다시 알림
       const existing = this.rpsStates.get(data.matchId);
@@ -691,7 +708,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // 팀장이 손을 냄
   @SubscribeMessage("rps:submit")
-  handleRpsSubmit(
+  async handleRpsSubmit(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(
       wsPayload({
@@ -701,6 +718,13 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     )
     data: { matchId: string; hand: RpsHand },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "rps",
+      client.userId ?? client.id,
+    );
+    if (limited) return { success: false, error: limited };
+
     const state = this.rpsStates.get(data.matchId);
     if (!state || state.phase !== "throw") {
       return { success: false, error: "제출 단계가 아닙니다." };
@@ -738,6 +762,13 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody(wsPayload({ matchId: f.id(), side: f.oneOf(["blue", "red"]) }))
     data: { matchId: string; side: "blue" | "red" },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "rps",
+      client.userId ?? client.id,
+    );
+    if (limited) return { success: false, error: limited };
+
     const state = this.rpsStates.get(data.matchId);
     if (!state || state.phase !== "side" || !state.winnerTeamId) {
       return { success: false, error: "진영 선택 단계가 아닙니다." };

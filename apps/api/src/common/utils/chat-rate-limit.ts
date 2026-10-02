@@ -72,6 +72,52 @@ async function checkLimit(
   }
 }
 
+/**
+ * 채팅이 아닌 쓰기 이벤트(준비 토글·팀 선택·역할 선택·가위바위보 등) 한도 (소켓 점검 M5).
+ *
+ * 사람이 버튼을 누르는 속도보다 넉넉하게 잡는다. 목적은 한 소켓이 초당 수백 번 보내
+ * DB 쓰기와 방 전체 브로드캐스트를 일으키는 걸 막는 것이지 정상 조작을 늦추는 게 아니다.
+ * 키는 유저 단위로 묶어(이벤트별이 아니라 그룹별) 이벤트를 번갈아 보내는 우회도 같이 센다.
+ */
+export const ACTION_RATE_LIMITS = {
+  /** 방 로비: 준비·관전·팀 선택·자동 밸런스 조작 */
+  room: { limit: 20, windowSeconds: 10 },
+  /** 역할 선택: 역할 고르기·취소·연장·다음 단계 준비 */
+  roleSelection: { limit: 15, windowSeconds: 10 },
+  /** 가위바위보: 제출·진영 선택·준비·시작 (한 판에 몇 번 안 쓴다) */
+  rps: { limit: 10, windowSeconds: 10 },
+  /** 경매 진행 보조 조작: 팀장 지원·확정·스킵 투표·재시도 */
+  auctionAction: { limit: 15, windowSeconds: 10 },
+  /** 프레즌스: 상태 변경·친구 상태 조회(DB 조회) */
+  presence: { limit: 10, windowSeconds: 10 },
+} as const satisfies Record<string, RateLimitConfig>;
+
+export type ActionRateLimitGroup = keyof typeof ACTION_RATE_LIMITS;
+
+/**
+ * 쓰기 이벤트 허용 여부를 확인하고, 막혔으면 사용자에게 보여줄 문구를 돌려준다.
+ * 허용이면 null. Redis 가 없거나 실패하면 통과시킨다(채팅과 같은 판단).
+ *
+ * @param subject 유저 ID(없으면 소켓 ID)
+ */
+export async function guardAction(
+  redis: RateLimitChecker | null | undefined,
+  group: ActionRateLimitGroup,
+  subject: string,
+): Promise<string | null> {
+  const result = await checkLimit(
+    redis,
+    `ws:action:${group}:${subject}`,
+    ACTION_RATE_LIMITS[group],
+  );
+  return result.allowed ? null : actionRateLimitMessage(result.retryIn);
+}
+
+/** 사용자에게 보여줄 한국어 안내 문구 */
+export function actionRateLimitMessage(retryIn: number): string {
+  return `요청이 너무 빠릅니다. ${Math.max(1, retryIn)}초 후에 다시 시도해주세요.`;
+}
+
 export function checkChatRateLimit(
   redis: RateLimitChecker | null | undefined,
   key: string,

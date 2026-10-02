@@ -1,4 +1,5 @@
-﻿import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
+﻿import { guardAction } from "../../common/utils/chat-rate-limit";
+import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
 import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
 import { UseFilters } from "@nestjs/common";
 import {
@@ -337,6 +338,13 @@ export class AuctionGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "auctionAction",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     if (!client.userId) return { error: "Unauthorized" };
     try {
       const result = await this.auctionService.handleVolunteer(
@@ -363,6 +371,13 @@ export class AuctionGateway
     )
     data: { roomId: string; selectedUserIds?: string[] },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "auctionAction",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     if (!client.userId) return { error: "Unauthorized" };
     try {
       const result = await this.auctionService.finalizeVolunteers(
@@ -387,6 +402,13 @@ export class AuctionGateway
     @MessageBody(wsPayload({ roomId: f.id(), userIds: f.idList() }))
     data: { roomId: string; userIds: string[] },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "auctionAction",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     if (!client.userId) return { error: "Unauthorized" };
     try {
       const result = await this.auctionService.selectManualCaptains(
@@ -553,6 +575,13 @@ export class AuctionGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "auctionAction",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     if (!client.userId) return { error: "Unauthorized" };
 
     try {
@@ -700,6 +729,13 @@ export class AuctionGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "auctionAction",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     if (!client.userId) return { error: "Unauthorized" };
 
     // 호스트만 역할 선택 재시작 가능

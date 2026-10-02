@@ -1,6 +1,8 @@
+import { RedisService } from "../redis/redis.service";
+import { guardAction } from "../../common/utils/chat-rate-limit";
 import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
 import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
-import { UseFilters } from "@nestjs/common";
+import { UseFilters, Optional } from "@nestjs/common";
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -47,6 +49,7 @@ export class PresenceGateway
     private readonly presenceService: PresenceService,
     private readonly authService: AuthService,
     private readonly friendService: FriendService,
+    @Optional() private readonly redisService?: RedisService,
   ) {}
 
   onModuleDestroy() {
@@ -129,6 +132,13 @@ export class PresenceGateway
     @MessageBody(wsPayload({ status: f.oneOf(["ONLINE", "AWAY"]) }))
     data: { status: "ONLINE" | "AWAY" },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "presence",
+      client.userId ?? client.id,
+    );
+    if (limited) return { success: false, error: limited };
+
     if (!client.userId) {
       return { error: "Unauthorized" };
     }
@@ -143,6 +153,13 @@ export class PresenceGateway
 
   @SubscribeMessage("get-friends-status")
   async handleGetFriendsStatus(@ConnectedSocket() client: AuthenticatedSocket) {
+    const limited = await guardAction(
+      this.redisService,
+      "presence",
+      client.userId ?? client.id,
+    );
+    if (limited) return { success: false, error: limited };
+
     if (!client.userId) {
       return { error: "Unauthorized" };
     }

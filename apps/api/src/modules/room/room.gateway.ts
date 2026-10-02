@@ -1,3 +1,4 @@
+import { guardAction } from "../../common/utils/chat-rate-limit";
 import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
 import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
 import { UseFilters } from "@nestjs/common";
@@ -614,6 +615,13 @@ export class RoomGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "room",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };
@@ -647,6 +655,13 @@ export class RoomGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "room",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };
@@ -678,6 +693,13 @@ export class RoomGateway
     @MessageBody(wsPayload({ roomId: f.id(), teamId: f.idOpt() }))
     data: { roomId: string; teamId: string | null },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "room",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };
@@ -944,6 +966,13 @@ export class RoomGateway
     )
     data: { roomId: string; pinnedUserIds?: string[] },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "room",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     try {
       const room = await this.roomService.createAutoBalancedTeams(
         client.userId!,
@@ -973,6 +1002,13 @@ export class RoomGateway
     )
     data: { roomId: string; userIdA: string; userIdB: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "room",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     try {
       const room = await this.roomService.swapAutoBalanceMembers(
         client.userId!,
@@ -1003,6 +1039,13 @@ export class RoomGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "room",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     try {
       const room = await this.roomService.undoAutoBalancedTeams(
         client.userId!,
@@ -1031,6 +1074,13 @@ export class RoomGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "room",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     let confirmationClaimed = false;
     try {
       // 권한·상태 검증과 팀별 음성채널 이동을 함께 처리한다.

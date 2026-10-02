@@ -1,6 +1,8 @@
+import { RedisService } from "../redis/redis.service";
+import { guardAction } from "../../common/utils/chat-rate-limit";
 import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
 import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
-import { UseFilters } from "@nestjs/common";
+import { UseFilters, Optional } from "@nestjs/common";
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -74,6 +76,7 @@ export class RoleSelectionGateway
     private readonly matchGateway: MatchGateway,
     @Inject(forwardRef(() => MatchService))
     private readonly matchService: MatchService,
+    @Optional() private readonly redisService?: RedisService,
   ) {}
 
   onModuleDestroy() {
@@ -193,6 +196,13 @@ export class RoleSelectionGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "roleSelection",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };
@@ -218,6 +228,13 @@ export class RoleSelectionGateway
     @MessageBody(wsPayload({ roomId: f.id(), role: f.oneOf(ROLES) }))
     data: { roomId: string; role: Role },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "roleSelection",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };
@@ -477,6 +494,13 @@ export class RoleSelectionGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "roleSelection",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };
@@ -543,6 +567,13 @@ export class RoleSelectionGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
+    const limited = await guardAction(
+      this.redisService,
+      "roleSelection",
+      client.userId ?? client.id,
+    );
+    if (limited) return { error: limited };
+
     try {
       if (!client.userId) {
         return { error: "Unauthorized" };

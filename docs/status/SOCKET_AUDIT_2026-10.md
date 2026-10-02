@@ -66,8 +66,11 @@
   페이로드는 TS 타입 표기뿐이라 런타임에서 아무것도 보장하지 않는다. Prisma 는 `undefined` 필드를 where 에서 **지우므로**
   `findFirst({ where: { userId, roomId: data.roomId } })` 형태의 참가자 확인이 `roomId` 누락 시 "아무 방에나 참가 중이면 통과"가 된다
   (드래프트·역할 선택 join). 실제 악용은 어렵지만 방어선이 없다. → 공통 `assertId`/`@UsePipes` 도입.
-- **M2. `join-scrim` 에 참가자 확인이 없다.** 인증된 사용자는 누구나 `scrim:{roomId}` 룸에 들어가 스크림 상태 갱신을 받는다(`scrim.gateway.ts`).
-- **M3. `join-match` 에 참가자 확인이 없고**, 없는 `matchId` 면 `match.status` 에서 TypeError(try/catch 로 에러 응답은 나감). 참가자가 아니어도 RPS 상태를 받는다.
+- **M2·M3. `join-scrim`·`join-match` 에 참가자 확인이 없다 → 재평가(2026-10-02): 결함 아님, 조치 없음.**
+  같은 데이터를 REST 가 이미 로그인한 누구에게나 연다 — `GET /rooms/:roomId/scrim`, `GET /matches/bracket/:roomId`, `GET /matches/:id` 는 `JwtAuthGuard` 만 있고 참가자 확인이 없다.
+  소켓만 막아도 같은 정보를 REST 로 그대로 볼 수 있어 보호가 되지 않고, 방송을 보는 관전자의 실시간 갱신만 끊긴다. 방 ID 는 공개 목록에 나온다.
+  참가자 전용으로 바꾸려면 REST 와 소켓을 **같이** 정책으로 정해야 한다(후속 과제). RPS 상태 페이로드는 제출한 사람의 ID 만 담고 손 모양은 공개 이벤트 전까지 싣지 않는다.
+  (최초 보고서의 "없는 `matchId` 면 `match.status` TypeError" 는 틀렸다 — `findById` 가 `NotFoundException("Match not found")` 를 던지고 핸들러 try/catch 가 `{ success: false }` 로 응답한다.)
 - **M4. 가위바위보 상태가 인메모리**(위 표). 호스트가 다시 시작하면 되지만, 진영 확정 직전 재시작이면 한 판이 날아간다.
 - **M5. 쓰기 이벤트 레이트 리밋 공백.** 경매 입찰·드래프트 픽·채팅/DM 외에는 없다 — 방 `toggle-ready`·`select-team`, 역할 선택 이벤트,
   `rps:*`, `set-status`. 한 소켓이 초당 수백 번 보내도 막을 곳이 없다(HTTP 쪽 스로틀러와 별개).
@@ -102,8 +105,8 @@
 - [x] Task 3: H3 — 역할 선택 상태 Redis 저장·부팅 복원·타이머 재무장
 - [x] Task 4: H4 — `docker-compose.prod.yml` api `stop_grace_period` 90s
 - [x] Task 5: M1 — 게이트웨이 공통 입력 검증(`roomId` 등 문자열 id 가드)
-- [ ] Task 6: M2·M3 — `join-scrim`·`join-match` 참가자 확인
-- [ ] Task 7: M5 — 쓰기 이벤트 소켓 레이트 리밋(방·역할 선택·RPS·프레즌스)
+- [x] Task 6: M2·M3 — 재평가 결과 조치 없음(REST 가 이미 로그인 사용자에게 열려 있음). 참가자 전용화는 REST 와 함께 후속 정책 결정
+- [x] Task 7: M5 — 쓰기 이벤트 소켓 레이트 리밋(방·역할 선택·RPS·프레즌스)
 - [ ] Task 8: M4 — 가위바위보 상태 Redis 저장
 - [ ] Task 9: L1·L2·L5 — 죽은 이벤트·리스너 정리
 
@@ -135,3 +138,10 @@
 - `ws-ack-exception.filter.ts`: 검증 실패를 ack 로 `{ success: false, error }` 돌려준다. 기본 필터는 `exception` 이벤트만 보내 ack 를 기다리는 호출부가
   영원히 대기했다(일부 호출부는 타임아웃이 없다). **ack 는 필터 인자의 마지막이 아니라 `[client, data, ack, pattern]` 중 함수인 인자**다 — 처음엔 마지막 인자로 찾았다가 실제 연결 테스트에서 잡았다.
 - 본문이 있는 49개 핸들러 전부에 적용했고, 새 핸들러가 검증을 빼먹으면 `ws-payload.pipe.spec.ts` 의 정적 가드가 실패한다.
+
+### 수정 메모 — M5 (쓰기 이벤트 레이트 리밋)
+- `common/utils/chat-rate-limit.ts` 에 `guardAction(redis, group, subject)` 와 그룹별 한도(`ACTION_RATE_LIMITS`)를 추가했다. 키는 `ws:action:{group}:{userId}` — 이벤트를 번갈아 보내는 우회도 같은 한도로 센다. Redis 가 없거나 실패하면 통과(채팅·경매와 같은 판단).
+- 적용: 방(`toggle-ready`·`toggle-spectator`·`select-team`·`auto-balance-*`, 20/10초), 역할 선택(`select-role`·`cancel-role`·`extend-timer`·`mark-captain-ready`, 15/10초),
+  가위바위보(`rps:*`, 10/10초), 경매 보조 조작(`volunteer-captain`·`finalize-volunteers`·`select-manual-captains`·`vote-item-skip`·`retry-role-selection`, 15/10초), 프레즌스(`set-status`·`get-friends-status`, 10/10초).
+- 제외: `join/leave`·`start-game`(자체 락)·`subscribe-friend`(스토어에서 쓰지 않음)·읽기 전용 조회. 채팅·입찰·픽은 기존 한도 유지.
+- 역할 선택·매치·프레즌스 게이트웨이에 `RedisService` 를 선택 주입했다. `rps:submit` 은 `async` 가 됐다.
