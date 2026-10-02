@@ -1,3 +1,6 @@
+import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
+import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
+import { UseFilters } from "@nestjs/common";
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -34,6 +37,7 @@ interface AuthenticatedSocket extends Socket {
   maxHttpBufferSize: 1e4,
   transports: ["websocket", "polling"],
 })
+@UseFilters(new WsAckExceptionFilter())
 export class ClanGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
@@ -103,7 +107,7 @@ export class ClanGateway
   @SubscribeMessage("join-clan-chat")
   async handleJoinClanChat(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { clanId: string },
+    @MessageBody(wsPayload({ clanId: f.id() })) data: { clanId: string },
   ) {
     // Verify user is a member of this clan
     const userClan = await this.clanService.getUserClan(client.userId!); // Assert client.userId is string
@@ -129,7 +133,7 @@ export class ClanGateway
   @SubscribeMessage("leave-clan-chat")
   async handleLeaveClanChat(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { clanId: string },
+    @MessageBody(wsPayload({ clanId: f.id() })) data: { clanId: string },
   ) {
     if (!client.userId) return;
 
@@ -146,7 +150,8 @@ export class ClanGateway
   @SubscribeMessage("send-clan-message")
   async handleSendMessage(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { clanId: string; content: string },
+    @MessageBody(wsPayload({ clanId: f.id(), content: f.str() }))
+    data: { clanId: string; content: string },
   ) {
     if (!client.userId) {
       return { error: "Unauthorized" };
@@ -183,7 +188,8 @@ export class ClanGateway
   @SubscribeMessage("is-typing")
   async handleIsTyping(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { clanId: string; isTyping: boolean },
+    @MessageBody(wsPayload({ clanId: f.id(), isTyping: f.bool() }))
+    data: { clanId: string; isTyping: boolean },
   ) {
     if (!client.userId || !client.username) {
       return;

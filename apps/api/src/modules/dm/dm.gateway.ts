@@ -1,3 +1,6 @@
+import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
+import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
+import { UseFilters } from "@nestjs/common";
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -34,6 +37,7 @@ interface AuthenticatedSocket extends Socket {
   maxHttpBufferSize: 1e4,
   transports: ["websocket", "polling"],
 })
+@UseFilters(new WsAckExceptionFilter())
 export class DmGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
@@ -130,7 +134,8 @@ export class DmGateway
   @SubscribeMessage("send-dm")
   async handleSendDm(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { receiverId: string; content: string },
+    @MessageBody(wsPayload({ receiverId: f.id(), content: f.str() }))
+    data: { receiverId: string; content: string },
   ) {
     if (!client.userId) return;
     const { receiverId, content } = data;
@@ -212,7 +217,8 @@ export class DmGateway
   @SubscribeMessage("is-typing")
   async handleTyping(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { receiverId: string; isTyping: boolean },
+    @MessageBody(wsPayload({ receiverId: f.id(), isTyping: f.bool() }))
+    data: { receiverId: string; isTyping: boolean },
   ) {
     if (!client.userId) return;
 
@@ -261,7 +267,7 @@ export class DmGateway
   @SubscribeMessage("mark-read")
   async handleMarkRead(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { senderId: string },
+    @MessageBody(wsPayload({ senderId: f.id() })) data: { senderId: string },
   ) {
     if (!client.userId) return;
     try {

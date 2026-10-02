@@ -1,3 +1,6 @@
+import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
+import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
+import { UseFilters } from "@nestjs/common";
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -45,6 +48,7 @@ interface AuthenticatedSocket extends Socket {
   maxHttpBufferSize: 1e4,
   transports: ["websocket", "polling"],
 })
+@UseFilters(new WsAckExceptionFilter())
 export class RoomGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
@@ -464,7 +468,13 @@ export class RoomGateway
   @SubscribeMessage("join-room")
   async handleJoinRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody()
+    @MessageBody(
+      wsPayload({
+        roomId: f.id(),
+        password: f.str({ max: 200, optional: true }),
+        asSpectator: f.bool({ optional: true }),
+      }),
+    )
     data: { roomId: string; password?: string; asSpectator?: boolean },
   ) {
     try {
@@ -547,7 +557,7 @@ export class RoomGateway
   @SubscribeMessage("leave-room")
   async handleLeaveRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     try {
       if (!client.userId) {
@@ -602,7 +612,7 @@ export class RoomGateway
   @SubscribeMessage("toggle-ready")
   async handleToggleReady(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     try {
       if (!client.userId) {
@@ -635,7 +645,7 @@ export class RoomGateway
   @SubscribeMessage("toggle-spectator")
   async handleToggleSpectator(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     try {
       if (!client.userId) {
@@ -665,7 +675,8 @@ export class RoomGateway
   @SubscribeMessage("select-team")
   async handleSelectTeam(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string; teamId: string | null },
+    @MessageBody(wsPayload({ roomId: f.id(), teamId: f.idOpt() }))
+    data: { roomId: string; teamId: string | null },
   ) {
     try {
       if (!client.userId) {
@@ -689,7 +700,7 @@ export class RoomGateway
   @SubscribeMessage("start-game")
   async handleStartGame(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     let coreStartSucceeded = false;
     try {
@@ -925,7 +936,13 @@ export class RoomGateway
   @SubscribeMessage("auto-balance-reroll")
   async handleAutoBalanceReroll(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string; pinnedUserIds?: string[] },
+    @MessageBody(
+      wsPayload({
+        roomId: f.id(),
+        pinnedUserIds: f.idList({ optional: true }),
+      }),
+    )
+    data: { roomId: string; pinnedUserIds?: string[] },
   ) {
     try {
       const room = await this.roomService.createAutoBalancedTeams(
@@ -951,7 +968,10 @@ export class RoomGateway
   @SubscribeMessage("auto-balance-swap")
   async handleAutoBalanceSwap(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string; userIdA: string; userIdB: string },
+    @MessageBody(
+      wsPayload({ roomId: f.id(), userIdA: f.id(), userIdB: f.id() }),
+    )
+    data: { roomId: string; userIdA: string; userIdB: string },
   ) {
     try {
       const room = await this.roomService.swapAutoBalanceMembers(
@@ -981,7 +1001,7 @@ export class RoomGateway
   @SubscribeMessage("auto-balance-undo")
   async handleAutoBalanceUndo(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     try {
       const room = await this.roomService.undoAutoBalancedTeams(
@@ -1009,7 +1029,7 @@ export class RoomGateway
   @SubscribeMessage("auto-balance-confirm")
   async handleAutoBalanceConfirm(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     let confirmationClaimed = false;
     try {
@@ -1057,7 +1077,8 @@ export class RoomGateway
   @SubscribeMessage("send-message")
   async handleSendMessage(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string; content: string },
+    @MessageBody(wsPayload({ roomId: f.id(), content: f.str() }))
+    data: { roomId: string; content: string },
   ) {
     try {
       if (!client.userId) {
@@ -1094,7 +1115,8 @@ export class RoomGateway
   @SubscribeMessage("is-typing")
   async handleIsTyping(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string; isTyping: boolean },
+    @MessageBody(wsPayload({ roomId: f.id(), isTyping: f.bool() }))
+    data: { roomId: string; isTyping: boolean },
   ) {
     if (!client.userId || !client.username) {
       return;

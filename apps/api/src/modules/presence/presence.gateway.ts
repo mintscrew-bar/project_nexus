@@ -1,3 +1,6 @@
+import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
+import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
+import { UseFilters } from "@nestjs/common";
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -30,6 +33,7 @@ interface AuthenticatedSocket extends Socket {
   maxHttpBufferSize: 1e4,
   transports: ["websocket", "polling"],
 })
+@UseFilters(new WsAckExceptionFilter())
 export class PresenceGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
@@ -122,7 +126,8 @@ export class PresenceGateway
   @SubscribeMessage("set-status")
   async handleSetStatus(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { status: "ONLINE" | "AWAY" },
+    @MessageBody(wsPayload({ status: f.oneOf(["ONLINE", "AWAY"]) }))
+    data: { status: "ONLINE" | "AWAY" },
   ) {
     if (!client.userId) {
       return { error: "Unauthorized" };
@@ -151,7 +156,7 @@ export class PresenceGateway
   @SubscribeMessage("subscribe-friend")
   async handleSubscribeFriend(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { friendId: string },
+    @MessageBody(wsPayload({ friendId: f.id() })) data: { friendId: string },
   ) {
     if (!client.userId) {
       return { error: "Unauthorized" };
@@ -177,7 +182,7 @@ export class PresenceGateway
   @SubscribeMessage("unsubscribe-friend")
   handleUnsubscribeFriend(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { friendId: string },
+    @MessageBody(wsPayload({ friendId: f.id() })) data: { friendId: string },
   ) {
     if (!client.userId) {
       return { error: "Unauthorized" };

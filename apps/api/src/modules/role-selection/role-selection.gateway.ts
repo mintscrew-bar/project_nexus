@@ -1,3 +1,6 @@
+import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
+import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
+import { UseFilters } from "@nestjs/common";
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -24,6 +27,9 @@ import {
   getRoomStagePath,
 } from "@nexus/types";
 
+/** select-role 에서 받을 수 있는 역할 값 */
+const ROLES = Object.values(Role);
+
 interface AuthenticatedSocket extends Socket {
   userId?: string;
   username?: string;
@@ -43,6 +49,7 @@ interface AuthenticatedSocket extends Socket {
   maxHttpBufferSize: 1e4,
   transports: ["websocket", "polling"],
 })
+@UseFilters(new WsAckExceptionFilter())
 export class RoleSelectionGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
@@ -125,7 +132,7 @@ export class RoleSelectionGateway
   @SubscribeMessage("join-room")
   async handleJoinRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     try {
       // 방송(read-only) 연결은 자기 방만 구독 가능
@@ -184,7 +191,7 @@ export class RoleSelectionGateway
   @SubscribeMessage("cancel-role")
   async handleCancelRole(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     try {
       if (!client.userId) {
@@ -208,7 +215,8 @@ export class RoleSelectionGateway
   @SubscribeMessage("select-role")
   async handleSelectRole(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string; role: Role },
+    @MessageBody(wsPayload({ roomId: f.id(), role: f.oneOf(ROLES) }))
+    data: { roomId: string; role: Role },
   ) {
     try {
       if (!client.userId) {
@@ -467,7 +475,7 @@ export class RoleSelectionGateway
   @SubscribeMessage("extend-timer")
   async handleExtendTimer(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     try {
       if (!client.userId) {
@@ -533,7 +541,7 @@ export class RoleSelectionGateway
   @SubscribeMessage("mark-captain-ready")
   async handleMarkCaptainReady(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     try {
       if (!client.userId) {

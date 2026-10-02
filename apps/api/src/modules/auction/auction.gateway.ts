@@ -1,4 +1,7 @@
-﻿import {
+﻿import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
+import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
+import { UseFilters } from "@nestjs/common";
+import {
   WebSocketGateway,
   WebSocketServer,
   SubscribeMessage,
@@ -37,6 +40,7 @@ interface AuthenticatedSocket extends Socket {
   maxHttpBufferSize: 1e4,
   transports: ["websocket", "polling"],
 })
+@UseFilters(new WsAckExceptionFilter())
 export class AuctionGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
@@ -215,7 +219,7 @@ export class AuctionGateway
   @SubscribeMessage("join-room")
   async handleJoinRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     try {
       // 방송(read-only) 연결은 자기 방만 구독 가능
@@ -318,7 +322,7 @@ export class AuctionGateway
   @SubscribeMessage("leave-room")
   handleLeaveRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     client.leave(`room:${data.roomId}`);
     this.connectedUsers.delete(client.id);
@@ -331,7 +335,7 @@ export class AuctionGateway
   @SubscribeMessage("volunteer-captain")
   async handleVolunteerCaptain(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     if (!client.userId) return { error: "Unauthorized" };
     try {
@@ -351,7 +355,13 @@ export class AuctionGateway
   @SubscribeMessage("finalize-volunteers")
   async handleFinalizeVolunteers(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string; selectedUserIds?: string[] },
+    @MessageBody(
+      wsPayload({
+        roomId: f.id(),
+        selectedUserIds: f.idList({ optional: true }),
+      }),
+    )
+    data: { roomId: string; selectedUserIds?: string[] },
   ) {
     if (!client.userId) return { error: "Unauthorized" };
     try {
@@ -374,7 +384,8 @@ export class AuctionGateway
   @SubscribeMessage("select-manual-captains")
   async handleSelectManualCaptains(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string; userIds: string[] },
+    @MessageBody(wsPayload({ roomId: f.id(), userIds: f.idList() }))
+    data: { roomId: string; userIds: string[] },
   ) {
     if (!client.userId) return { error: "Unauthorized" };
     try {
@@ -433,7 +444,7 @@ export class AuctionGateway
   @SubscribeMessage("place-bid")
   async handleBid(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody()
+    @MessageBody(wsPayload({ roomId: f.id(), amount: f.int({ min: 1 }) }))
     data: {
       roomId: string;
       amount: number;
@@ -540,7 +551,7 @@ export class AuctionGateway
   @SubscribeMessage("vote-item-skip")
   async handleVoteItemSkip(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     if (!client.userId) return { error: "Unauthorized" };
 
@@ -687,7 +698,7 @@ export class AuctionGateway
   @SubscribeMessage("retry-role-selection")
   async handleRetryRoleSelection(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     if (!client.userId) return { error: "Unauthorized" };
 

@@ -1,3 +1,6 @@
+import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
+import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
+import { UseFilters } from "@nestjs/common";
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -31,6 +34,7 @@ interface AuthenticatedSocket extends Socket {
   maxHttpBufferSize: 1e4,
   transports: ["websocket"],
 })
+@UseFilters(new WsAckExceptionFilter())
 export class ScrimGateway implements OnGatewayConnection {
   @WebSocketServer()
   server: Server;
@@ -63,7 +67,7 @@ export class ScrimGateway implements OnGatewayConnection {
   @SubscribeMessage("join-scrim")
   handleJoin(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     if (!client.userId || !data?.roomId) return;
     client.join(this.room(data.roomId));
@@ -72,7 +76,7 @@ export class ScrimGateway implements OnGatewayConnection {
   @SubscribeMessage("leave-scrim")
   handleLeave(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     if (!data?.roomId) return;
     client.leave(this.room(data.roomId));

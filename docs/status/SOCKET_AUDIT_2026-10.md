@@ -101,7 +101,7 @@
 - [x] Task 2: H2 — 스네이크 드래프트 상태 Redis 저장·부팅 복원·픽 타이머 재무장
 - [x] Task 3: H3 — 역할 선택 상태 Redis 저장·부팅 복원·타이머 재무장
 - [x] Task 4: H4 — `docker-compose.prod.yml` api `stop_grace_period` 90s
-- [ ] Task 5: M1 — 게이트웨이 공통 입력 검증(`roomId` 등 문자열 id 가드)
+- [x] Task 5: M1 — 게이트웨이 공통 입력 검증(`roomId` 등 문자열 id 가드)
 - [ ] Task 6: M2·M3 — `join-scrim`·`join-match` 참가자 확인
 - [ ] Task 7: M5 — 쓰기 이벤트 소켓 레이트 리밋(방·역할 선택·RPS·프레즌스)
 - [ ] Task 8: M4 — 가위바위보 상태 Redis 저장
@@ -128,3 +128,10 @@
 - **저장본이 없는 방(이 변경 이전에 시작된 역할 선택, 키 만료, 손상)은 새 타이머로 이어간다.** 이미 고른 역할은 DB 에 있어 남은 사람만 마감 때 자동 배정된다 —
   이 배포 직전에 진행 중이던 역할 선택도 복구된다(드래프트와 달리 상태를 새로 만들 수 있다).
 - 타이머는 첫 참가자가 `join-room` 할 때 다시 건다(방송 연결·완료 처리 중·이미 도는 타이머는 건드리지 않음).
+
+### 수정 메모 — M1 (입력 검증)
+- `apps/api/src/common/ws/ws-payload.pipe.ts`: 이벤트마다 스키마를 명시하는 파이프(`@MessageBody(wsPayload({ roomId: f.id() }))`).
+  식별자는 `[A-Za-z0-9_-]{1,64}`, 필수 식별자가 없거나 객체·배열이면 거부 — Prisma 가 `undefined` 를 where 에서 지우는 문제와 필터 객체 주입을 막는다.
+- `ws-ack-exception.filter.ts`: 검증 실패를 ack 로 `{ success: false, error }` 돌려준다. 기본 필터는 `exception` 이벤트만 보내 ack 를 기다리는 호출부가
+  영원히 대기했다(일부 호출부는 타임아웃이 없다). **ack 는 필터 인자의 마지막이 아니라 `[client, data, ack, pattern]` 중 함수인 인자**다 — 처음엔 마지막 인자로 찾았다가 실제 연결 테스트에서 잡았다.
+- 본문이 있는 49개 핸들러 전부에 적용했고, 새 핸들러가 검증을 빼먹으면 `ws-payload.pipe.spec.ts` 의 정적 가드가 실패한다.

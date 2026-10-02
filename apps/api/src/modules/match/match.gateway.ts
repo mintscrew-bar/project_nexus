@@ -1,3 +1,6 @@
+import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
+import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
+import { UseFilters } from "@nestjs/common";
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -69,6 +72,7 @@ interface RpsReadyEntry {
   maxHttpBufferSize: 1e4,
   transports: ["websocket", "polling"],
 })
+@UseFilters(new WsAckExceptionFilter())
 export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
@@ -136,7 +140,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("join-match")
   async handleJoinMatch(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { matchId: string },
+    @MessageBody(wsPayload({ matchId: f.id() })) data: { matchId: string },
   ) {
     try {
       const match = await this.matchService.findById(data.matchId);
@@ -188,7 +192,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("leave-match")
   handleLeaveMatch(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { matchId: string },
+    @MessageBody(wsPayload({ matchId: f.id() })) data: { matchId: string },
   ) {
     client.leave(`match:${data.matchId}`);
   }
@@ -196,7 +200,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("join-bracket")
   async handleJoinBracket(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     try {
       // 방송 연결은 자기 방만 구독 가능
@@ -222,7 +226,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("leave-bracket")
   handleLeaveBracket(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     client.leave(`bracket:${data.roomId}`);
   }
@@ -599,7 +603,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("rps:captain-ready")
   async handleRpsCaptainReady(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { matchId: string },
+    @MessageBody(wsPayload({ matchId: f.id() })) data: { matchId: string },
   ) {
     try {
       // 이미 RPS 진행 중이면 중복 처리 방지
@@ -653,7 +657,7 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("rps:start")
   async handleRpsStart(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { matchId: string },
+    @MessageBody(wsPayload({ matchId: f.id() })) data: { matchId: string },
   ) {
     try {
       // 이미 진행 중이면 새로 만들지 않고 현재 상태만 다시 알림
@@ -689,7 +693,13 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("rps:submit")
   handleRpsSubmit(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { matchId: string; hand: RpsHand },
+    @MessageBody(
+      wsPayload({
+        matchId: f.id(),
+        hand: f.oneOf(["rock", "paper", "scissors"]),
+      }),
+    )
+    data: { matchId: string; hand: RpsHand },
   ) {
     const state = this.rpsStates.get(data.matchId);
     if (!state || state.phase !== "throw") {
@@ -725,7 +735,8 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("rps:choose-side")
   async handleRpsChooseSide(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { matchId: string; side: "blue" | "red" },
+    @MessageBody(wsPayload({ matchId: f.id(), side: f.oneOf(["blue", "red"]) }))
+    data: { matchId: string; side: "blue" | "red" },
   ) {
     const state = this.rpsStates.get(data.matchId);
     if (!state || state.phase !== "side" || !state.winnerTeamId) {

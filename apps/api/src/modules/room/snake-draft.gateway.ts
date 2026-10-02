@@ -1,3 +1,6 @@
+import { wsPayload, f } from "../../common/ws/ws-payload.pipe";
+import { WsAckExceptionFilter } from "../../common/ws/ws-ack-exception.filter";
+import { UseFilters } from "@nestjs/common";
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -36,6 +39,7 @@ interface AuthenticatedSocket extends Socket {
   maxHttpBufferSize: 1e4,
   transports: ["websocket", "polling"],
 })
+@UseFilters(new WsAckExceptionFilter())
 export class SnakeDraftGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
@@ -139,7 +143,7 @@ export class SnakeDraftGateway
   @SubscribeMessage("join-draft-room")
   async handleJoinDraftRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     try {
       // 방송(read-only) 연결은 자기 방만 구독 가능
@@ -193,7 +197,7 @@ export class SnakeDraftGateway
   @SubscribeMessage("leave-draft-room")
   handleLeaveDraftRoom(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     client.leave(`draft:${data.roomId}`);
     this.connectedUsers.delete(client.id);
@@ -202,7 +206,7 @@ export class SnakeDraftGateway
   @SubscribeMessage("make-pick")
   async handleMakePick(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody()
+    @MessageBody(wsPayload({ roomId: f.id(), targetPlayerId: f.id() }))
     data: {
       roomId: string;
       targetPlayerId: string;
@@ -353,7 +357,7 @@ export class SnakeDraftGateway
   @SubscribeMessage("get-draft-state")
   async handleGetDraftState(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { roomId: string },
+    @MessageBody(wsPayload({ roomId: f.id() })) data: { roomId: string },
   ) {
     const state = await this.snakeDraftService.getClientDraftState(data.roomId);
 
