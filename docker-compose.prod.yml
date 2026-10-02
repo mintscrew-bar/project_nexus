@@ -61,6 +61,11 @@ services:
     container_name: nexus-api
     logging: *default-logging
     restart: unless-stopped
+    # 종료 유예. 앱은 SIGTERM 을 받으면 진행 중인 방이 끝나기를 최대 60초 기다리고
+    # (app.module.ts DRAIN_TIMEOUT_MS), PM2 는 kill_timeout 75초까지 기다린다
+    # (ecosystem.config.js). Docker 기본값 10초면 그 전에 SIGKILL 이 와서 드레인이
+    # 한 번도 끝까지 돈 적이 없다(2026-10-02 소켓 점검 H4). 75초 + 여유.
+    stop_grace_period: 90s
     mem_limit: 1536m
     memswap_limit: 1536m
     cpus: "2.0"
