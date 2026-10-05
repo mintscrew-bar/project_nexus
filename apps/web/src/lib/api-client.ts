@@ -1290,6 +1290,22 @@ export interface PubgHistoryResponse {
   };
 }
 
+/** 배그 내전 기록 검색 결과 */
+export interface PubgPlayerSearchResult {
+  userId: string;
+  username: string;
+  avatar: string | null;
+  /** 대표(또는 검색어와 일치한) PUBG 계정. 본인이 게임 계정 공개를 껐으면 null */
+  pubgAccount: {
+    playerName: string;
+    platform: "STEAM" | "KAKAO" | null;
+    pubgTier: string | null;
+    nexusTier: string | null;
+  } | null;
+  /** 상대가 내전 전적을 공개하지 않는다 */
+  historyHidden: boolean;
+}
+
 export const pubgApi = {
   getAccounts: async () => {
     const response = await apiClient.get("/pubg/accounts");
@@ -1316,7 +1332,18 @@ export const pubgApi = {
     await apiClient.delete(`/pubg/accounts/${accountId}`);
   },
 
-  /** 배그 전적 — 스크림 참가 이력 + 킬내기 결과 */
+  /**
+   * 배그 내전 기록 검색 — 닉네임 또는 PUBG 닉네임으로 NEXUS 유저를 찾는다.
+   * PUBG API 예산을 쓰지 않는 DB 검색이다. 2자 이상.
+   */
+  searchPlayers: async (q: string, limit = 10) => {
+    const response = await apiClient.get("/pubg/search", {
+      params: { q, limit },
+    });
+    return response.data as PubgPlayerSearchResult[];
+  },
+
+  /** 배그 전적 — 스크림 참가 이력 + 킬내기 결과. 남의 전적은 공개한 경우만(403 이면 비공개) */
   getHistory: async (userId: string) => {
     const response = await apiClient.get(`/pubg/history/${userId}`);
     return response.data as PubgHistoryResponse;

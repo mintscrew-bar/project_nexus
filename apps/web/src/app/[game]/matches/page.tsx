@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { PubgMatchesPage } from "./_PubgMatchesPage";
@@ -19,7 +19,7 @@ import {
   Sparkles,
   ChevronRight,
 } from "lucide-react";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, LoadingSpinner } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { statsApi } from "@/lib/api-client";
 import { MatchesTour } from "@/components/onboarding/PrimaryPageTours";
@@ -538,7 +538,16 @@ function LolMatchesPage() {
 export default function MatchesPage() {
   const pathname = usePathname();
   return pathname.startsWith("/pubg/") ? (
-    <PubgMatchesPage />
+    // PubgMatchesPage 가 useSearchParams(?user=)를 쓰므로 Suspense 가 필요하다.
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center py-24">
+          <LoadingSpinner />
+        </div>
+      }
+    >
+      <PubgMatchesPage />
+    </Suspense>
   ) : (
     <LolMatchesPage />
   );

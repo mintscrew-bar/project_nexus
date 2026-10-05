@@ -70,6 +70,8 @@ export function PubgProfileSection({
 }) {
   const [history, setHistory] = useState<PubgHistoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  // 상대가 내전 전적을 공개하지 않으면 서버가 403 을 준다. 실패와 구분해 안내한다.
+  const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,8 +79,9 @@ export function PubgProfileSection({
       try {
         const data = await pubgApi.getHistory(userId);
         if (!cancelled) setHistory(data);
-      } catch {
+      } catch (error: any) {
         // 전적을 못 불러와도 계정 카드는 보여준다.
+        if (!cancelled && error?.response?.status === 403) setHidden(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -144,6 +147,12 @@ export function PubgProfileSection({
 
       {loading ? (
         <Skeleton className="h-40 w-full" />
+      ) : hidden ? (
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-text-secondary">
+            이 유저는 내전 전적을 공개하지 않습니다.
+          </CardContent>
+        </Card>
       ) : (
         history && <PubgMatchHistory history={history} />
       )}
