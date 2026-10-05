@@ -16,7 +16,8 @@ import { RoomInvitePopup } from "@/components/rooms/RoomInvitePopup";
 import { IconCdnFallback } from "./IconCdnFallback";
 import { PubgSurfaceGrain } from "./PubgSurfaceGrain";
 import { useLobbyStore } from "@/stores/lobby-store";
-import { useCurrentGame } from "@/hooks/useCurrentGame";
+import { useCurrentGame, useGameFromPath } from "@/hooks/useCurrentGame";
+import { useExplicitGameContext } from "@/components/GameNavigationProvider";
 import { gameFromSlug } from "@nexus/types";
 import { rememberGame } from "@/lib/last-game";
 import { withoutGamePrefix } from "@/lib/game-links";
@@ -24,6 +25,7 @@ import { withoutGamePrefix } from "@/lib/game-links";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const currentGame = useCurrentGame();
+  const pathGame = useGameFromPath();
   const { isAuthenticated } = useAuthStore();
 
   // ---------------------------------------------------------------
@@ -61,7 +63,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (gameFromSlug(pathname.split("/")[1])) rememberGame(currentGame);
   }, [pathname, currentGame]);
 
-  const themeClass = currentGame === "PUBG" ? "game-pubg" : null;
+  // 테마는 주소에 **명시된** 게임만 따른다: 경로(`/pubg/...`) 또는 공용 섹션의 `?game=pubg`
+  // (커뮤니티·클랜·스트리머·`/me`). 마지막으로 본 게임으로 추정하면 배그를 마지막으로 본
+  // 사람이 중립인 종합 홈에 와도 배그 테마가 되므로 `useNavigationGame` 은 쓰지 않는다.
+  // 경로의 게임은 렌더 중에 바로 알 수 있어(SSR 포함) 깜빡임이 없고, 쿼리의 게임은 제공자가
+  // 마운트 뒤에 알려 준다. 공용 섹션 사이를 옮겨 다닐 때는 직전 값이 유지돼 테마가 꺼졌다 켜지지 않는다.
+  const explicitGame = useExplicitGameContext();
+  const themeGame = pathGame ?? explicitGame;
+  const themeClass = themeGame === "PUBG" ? "game-pubg" : null;
   useEffect(() => {
     if (!themeClass) return;
     document.body.classList.add(themeClass);

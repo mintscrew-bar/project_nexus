@@ -129,6 +129,30 @@ export function gameFromSlug(slug: string | undefined | null): GameTitle | null 
   return found ?? null;
 }
 
+/**
+ * 주소에 **명시된** 게임. 경로 첫 칸(`/pubg/tournaments`) → 게임 계정 관리
+ * (`/settings/game-accounts/pubg`) → `?game=pubg` 순으로 본다. 어느 것도 없으면 null.
+ *
+ * 마지막으로 본 게임이나 기본 게임으로 **추정하지 않는다.** 테마처럼 "지금 이 화면이
+ * 어느 게임인가"만 따라야 하는 곳에 쓰려는 것이다 — 추정까지 섞으면 배그를 마지막으로 본
+ * 사람이 중립인 종합 홈에 와도 배그 테마가 된다.
+ *
+ * @param gameParam `?game=` 쿼리 값(`lol`·`pubg`)
+ */
+export function explicitGameFromLocation(
+  pathname: string,
+  gameParam?: string | null,
+): GameTitle | null {
+  const segments = pathname.split("/");
+  return (
+    gameFromSlug(segments[1]) ??
+    (pathname.startsWith("/settings/game-accounts/")
+      ? gameFromSlug(segments[3])
+      : null) ??
+    gameFromSlug(gameParam)
+  );
+}
+
 /** 실제로 방을 만들 수 있는 게임만 */
 export function enabledGames(): GameDefinition[] {
   return GAME_TITLES.map((title) => GAMES[title]).filter((game) => game.enabled);

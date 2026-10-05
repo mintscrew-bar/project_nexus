@@ -259,6 +259,7 @@ export {
   DEFAULT_GAME,
   getGame,
   gameFromSlug,
+  explicitGameFromLocation,
   enabledGames,
   teamCountForRoomSize,
   teamCountForParticipants,
