@@ -1,3 +1,4 @@
+import plugin from "tailwindcss/plugin";
 import type { Config } from "tailwindcss";
 
 const config: Config = {
@@ -175,7 +176,15 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `pubg:` 변형 — 배그 테마(`.game-pubg`) 아래에서만 적용된다.
+    // 토큰을 거치지 않고 색이 박힌 곳(보라·남색 장식 등)을 롤 화면은 그대로 두고
+    // 배그에서만 덮어쓸 때 쓴다: `text-violet-400 pubg:text-accent-primary`.
+    // `.game-pubg` 는 래퍼와 body 양쪽에 붙어 포털 모달까지 덮는다.
+    plugin(({ addVariant }) => {
+      addVariant("pubg", ".game-pubg &");
+    }),
+  ],
 };
 
 export default config;

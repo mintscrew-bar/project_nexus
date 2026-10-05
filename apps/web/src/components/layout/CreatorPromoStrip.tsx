@@ -33,15 +33,15 @@ export function CreatorPromoStrip() {
   };
 
   return (
-    <aside className="relative flex-shrink-0 overflow-hidden border-b border-white/[0.06] bg-[radial-gradient(circle_at_12%_50%,rgba(124,58,237,0.2),transparent_34%),linear-gradient(110deg,#16131b_0%,#181420_55%,#111014_100%)]">
-      <div className="pointer-events-none absolute inset-y-0 left-[18%] w-px rotate-[24deg] bg-gradient-to-b from-transparent via-violet-400/15 to-transparent" />
-      <div className="pointer-events-none absolute -right-16 top-1/2 h-32 w-32 -translate-y-1/2 rounded-full border border-violet-300/[0.06]" />
+    <aside className="relative flex-shrink-0 overflow-hidden border-b border-white/[0.06] bg-[radial-gradient(circle_at_12%_50%,rgba(124,58,237,0.2),transparent_34%),linear-gradient(110deg,#16131b_0%,#181420_55%,#111014_100%)] pubg:bg-[radial-gradient(circle_at_12%_50%,rgba(242,169,0,0.14),transparent_34%),linear-gradient(110deg,#141414_0%,#171717_55%,#0f0f0f_100%)]">
+      <div className="pointer-events-none absolute inset-y-0 left-[18%] w-px rotate-[24deg] bg-gradient-to-b from-transparent via-violet-400/15 pubg:via-accent-primary/15 to-transparent" />
+      <div className="pointer-events-none absolute -right-16 top-1/2 h-32 w-32 -translate-y-1/2 rounded-full border border-violet-300/[0.06] pubg:border-accent-primary/[0.06]" />
 
       <div className="relative mx-auto flex min-h-12 max-w-7xl items-center justify-between gap-4 px-4 py-2 md:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="h-7 w-0.5 flex-shrink-0 bg-gradient-to-b from-violet-400 to-indigo-600" />
+          <span className="h-7 w-0.5 flex-shrink-0 bg-gradient-to-b from-violet-400 to-indigo-600 pubg:from-accent-primary pubg:to-accent-active" />
           <div className="min-w-0 leading-none">
-            <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-violet-300/80 sm:text-[10px]">
+            <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-violet-300/80 pubg:text-accent-gold/80 sm:text-[10px]">
               Partner Program
             </p>
             <p className="truncate text-xs font-black text-zinc-100 sm:text-sm">
@@ -61,7 +61,7 @@ export function CreatorPromoStrip() {
           <button
             type="button"
             onClick={dismiss}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 pubg:focus-visible:ring-accent-primary"
             aria-label="파트너 모집 안내 닫기"
           >
             <X className="h-4 w-4" />

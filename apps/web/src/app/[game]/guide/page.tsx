@@ -113,7 +113,7 @@ type GuideVisual = ReturnType<typeof buildCategories>[number]["visual"];
 
 function VisualShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex h-full min-h-52 items-center justify-center overflow-hidden bg-[#111521] p-6 md:p-8">
+    <div className="relative flex h-full min-h-52 items-center justify-center overflow-hidden bg-[#111521] pubg:bg-bg-secondary p-6 md:p-8">
       <div
         aria-hidden="true"
         className="absolute inset-0 opacity-30"
@@ -129,7 +129,7 @@ function GuideCardVisual({ type }: { type: GuideVisual }) {
   if (type === "start") {
     return (
       <VisualShell>
-        <div className="mx-auto h-full w-full rounded-2xl bg-[#1a1f2c] p-4 shadow-2xl">
+        <div className="mx-auto h-full w-full rounded-2xl bg-[#1a1f2c] pubg:bg-bg-tertiary p-4 shadow-2xl">
           <div className="flex items-center justify-between">
             <div className="h-2.5 w-24 rounded-full bg-white/80" />
             <div className="h-2 w-2 rounded-full bg-white/25" />
@@ -144,7 +144,7 @@ function GuideCardVisual({ type }: { type: GuideVisual }) {
           </div>
           <div className="mt-4 flex items-center justify-between rounded-xl bg-white/[0.04] px-4 py-3">
             <div className="flex -space-x-1.5">
-              {Array.from({ length: 5 }).map((_, index) => <span key={index} className="h-6 w-6 rounded-full border-2 border-[#1d2230] bg-gradient-to-br from-slate-400/80 to-slate-700" />)}
+              {Array.from({ length: 5 }).map((_, index) => <span key={index} className="h-6 w-6 rounded-full border-2 border-[#1d2230] pubg:border-bg-tertiary bg-gradient-to-br from-slate-400/80 to-slate-700" />)}
             </div>
             <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400"><Check className="h-3.5 w-3.5" /> 준비 완료</span>
           </div>
@@ -228,7 +228,7 @@ function GuideCardVisual({ type }: { type: GuideVisual }) {
   if (type === "discord") {
     return (
       <VisualShell>
-        <div className="grid h-full w-full grid-cols-[1fr_118px] overflow-hidden rounded-2xl bg-[#1a1f2c] shadow-2xl">
+        <div className="grid h-full w-full grid-cols-[1fr_118px] overflow-hidden rounded-2xl bg-[#1a1f2c] pubg:bg-bg-tertiary shadow-2xl">
           <div className="p-4">
             <div className="flex items-center gap-2 text-sm font-bold text-white"><Mic2 className="h-4 w-4 text-emerald-400" /> 내전 대기실</div>
             <div className="mt-3 space-y-1.5">
@@ -246,7 +246,7 @@ function GuideCardVisual({ type }: { type: GuideVisual }) {
             <p className="mt-3 text-[10px] text-white/30">연동 상태</p>
             <p className="mt-1 text-xs font-bold text-emerald-400">연결됨</p>
             <div className="mt-4 flex -space-x-1.5">
-              {Array.from({ length: 4 }).map((_, index) => <span key={index} className="h-6 w-6 rounded-full border-2 border-[#161a24] bg-slate-600" />)}
+              {Array.from({ length: 4 }).map((_, index) => <span key={index} className="h-6 w-6 rounded-full border-2 border-[#161a24] pubg:border-bg-secondary bg-slate-600" />)}
             </div>
             <p className="mt-auto text-[9px] leading-4 text-white/25">음성 채널 자동 이동</p>
           </div>
@@ -259,7 +259,7 @@ function GuideCardVisual({ type }: { type: GuideVisual }) {
     const bars = [38, 62, 48, 76, 58, 88, 70];
     return (
       <VisualShell>
-        <div className="grid h-full w-full grid-cols-[1fr_118px] overflow-hidden rounded-2xl bg-[#1a1f2c] shadow-2xl">
+        <div className="grid h-full w-full grid-cols-[1fr_118px] overflow-hidden rounded-2xl bg-[#1a1f2c] pubg:bg-bg-tertiary shadow-2xl">
           <div className="p-4">
             <div className="flex items-center justify-between">
               <div><p className="text-[10px] text-white/35">최근 경기 흐름</p><p className="mt-1 text-lg font-black text-white">5승 2패</p></div>
@@ -336,7 +336,7 @@ export default async function GuidePage({
               <h1 className="text-4xl font-black leading-[1.02] tracking-[-0.055em] text-text-primary sm:text-5xl lg:text-6xl">
                 {game === "PUBG" ? "배그 내전 가이드를" : "필요한 가이드를"}
                 <br />
-                <span className="bg-gradient-to-r from-accent-primary via-violet-400 to-cyan-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-accent-primary via-violet-400 to-cyan-400 pubg:via-accent-gold pubg:to-accent-hover bg-clip-text text-transparent">
                   페이지별로 빠르게
                 </span>
               </h1>

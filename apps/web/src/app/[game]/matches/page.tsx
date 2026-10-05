@@ -58,7 +58,7 @@ const FEATURE_CARDS: Array<{
     index: "01",
     title: "매치 상세 분석",
     description: "KDA, CS, 딜량과 시야 점수를 경기별로 비교합니다.",
-    tone: "text-cyan-300 bg-cyan-300/[0.08] border-cyan-300/10",
+    tone: "text-cyan-300 pubg:text-accent-gold bg-cyan-300/[0.08] pubg:bg-accent-primary/[0.08] border-cyan-300/10 pubg:border-accent-primary/10",
   },
   {
     icon: Trophy,
@@ -72,7 +72,7 @@ const FEATURE_CARDS: Array<{
     index: "03",
     title: "포지션 분석",
     description: "선호 포지션과 라인별 성적 변화를 한눈에 보여줍니다.",
-    tone: "text-violet-300 bg-violet-300/[0.08] border-violet-300/10",
+    tone: "text-violet-300 pubg:text-accent-gold bg-violet-300/[0.08] pubg:bg-accent-primary/[0.08] border-violet-300/10 pubg:border-accent-primary/10",
   },
   {
     icon: Swords,
@@ -246,10 +246,10 @@ function LolMatchesPage() {
         />
         <div
           aria-hidden="true"
-          className="absolute left-1/2 top-0 -z-10 h-[420px] w-[820px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/20 blur-[140px]"
+          className="absolute left-1/2 top-0 -z-10 h-[420px] w-[820px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/20 pubg:bg-accent-primary/20 blur-[140px]"
         />
         <div className="container mx-auto max-w-[1480px] px-4 py-12 text-center md:px-6 md:py-20">
-          <div className="mx-auto mb-5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-violet-200/75">
+          <div className="mx-auto mb-5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-violet-200/75 pubg:text-accent-gold/75">
             <Sparkles className="h-3.5 w-3.5" />
             Nexus match intelligence
           </div>
@@ -330,7 +330,7 @@ function LolMatchesPage() {
                       setShowDropdown(true);
                     }
                   }}
-                  className="h-12 border-white/[0.08] bg-white/[0.04] pl-12 text-sm text-white placeholder:text-white/25 focus:ring-violet-400 md:h-14 md:text-base"
+                  className="h-12 border-white/[0.08] bg-white/[0.04] pl-12 text-sm text-white placeholder:text-white/25 focus:ring-violet-400 pubg:focus:ring-accent-primary md:h-14 md:text-base"
                 />
 
                 {/* Search Results Dropdown */}
@@ -390,7 +390,7 @@ function LolMatchesPage() {
               <Button
                 onClick={handleSearch}
                 size="lg"
-                className="h-12 bg-white px-5 text-sm font-bold text-[#111218] hover:bg-violet-100 md:h-14 md:px-8 md:text-base"
+                className="h-12 bg-white px-5 text-sm font-bold text-[#111218] hover:bg-violet-100 pubg:hover:bg-accent-gold md:h-14 md:px-8 md:text-base"
               >
                 검색
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -421,7 +421,7 @@ function LolMatchesPage() {
           >
             <div className="flex items-center justify-between border-b border-white/[0.05] px-5 py-4">
               <h2 className="flex items-center gap-2 text-sm font-bold text-text-primary">
-                <Clock className="h-4 w-4 text-violet-400" />
+                <Clock className="h-4 w-4 text-violet-400 pubg:text-accent-primary" />
                 최근 검색 기록
               </h2>
               {recentSearches.length > 0 && (
@@ -437,8 +437,8 @@ function LolMatchesPage() {
 
             {recentSearches.length === 0 ? (
               <div className="px-5 py-14 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/10">
-                  <Clock className="h-6 w-6 text-violet-400/70" />
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/10 pubg:bg-accent-primary/10">
+                  <Clock className="h-6 w-6 text-violet-400/70 pubg:text-accent-primary/70" />
                 </div>
                 <p className="mt-4 text-sm font-semibold text-text-secondary">
                   최근 검색 기록이 없습니다
@@ -459,7 +459,7 @@ function LolMatchesPage() {
                       <span
                         className={`flex h-9 w-9 items-center justify-center rounded-xl ${
                           search.type === "summoner"
-                            ? "bg-violet-500/10 text-violet-400"
+                            ? "bg-violet-500/10 pubg:bg-accent-primary/10 text-violet-400 pubg:text-accent-primary"
                             : "bg-emerald-500/10 text-emerald-400"
                         }`}
                       >
@@ -479,7 +479,7 @@ function LolMatchesPage() {
                         </p>
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 flex-shrink-0 text-text-tertiary transition-transform group-hover:translate-x-0.5 group-hover:text-violet-400" />
+                    <ChevronRight className="h-4 w-4 flex-shrink-0 text-text-tertiary transition-transform group-hover:translate-x-0.5 group-hover:text-violet-400 pubg:group-hover:text-accent-primary" />
                   </button>
                 ))}
               </div>
@@ -489,7 +489,7 @@ function LolMatchesPage() {
           {/* Popular Features */}
           <section data-tour="matches-features">
             <div className="mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-400/70">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-400/70 pubg:text-accent-primary/70">
                 Match analysis
               </p>
               <h2 className="mt-1 text-xl font-black tracking-[-0.025em] text-text-primary">
@@ -501,7 +501,7 @@ function LolMatchesPage() {
               {FEATURE_CARDS.map((feature) => (
                 <div
                   key={feature.index}
-                  className="group min-h-[150px] rounded-2xl border border-white/[0.06] bg-bg-secondary/60 p-5 transition-all hover:-translate-y-0.5 hover:border-violet-400/20"
+                  className="group min-h-[150px] rounded-2xl border border-white/[0.06] bg-bg-secondary/60 p-5 transition-all hover:-translate-y-0.5 hover:border-violet-400/20 pubg:hover:border-accent-primary/20"
                 >
                   <div className="flex items-start justify-between">
                     <span
