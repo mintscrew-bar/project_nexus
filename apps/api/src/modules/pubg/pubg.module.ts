@@ -8,6 +8,7 @@ import { PubgApiService } from "./pubg-api.service";
 import { PubgRateLimiterService } from "./pubg-rate-limiter.service";
 import { PubgHistoryService } from "./pubg-history.service";
 import { PubgRankingService } from "./pubg-ranking.service";
+import { PubgSearchService } from "./pubg-search.service";
 
 @Module({
   imports: [DiscordModule],
@@ -18,6 +19,7 @@ import { PubgRankingService } from "./pubg-ranking.service";
     PubgRateLimiterService,
     PubgHistoryService,
     PubgRankingService,
+    PubgSearchService,
     // 봇이 꺼져 있어도 결과 보고는 되어야 해서 선택 의존으로 넣는다.
     { provide: "DISCORD_BOT_SERVICE", useExisting: DiscordBotService },
   ],

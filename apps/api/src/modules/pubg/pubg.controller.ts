@@ -15,14 +15,17 @@ import {
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Public } from "../auth/decorators/public.decorator";
+import { Throttle } from "@nestjs/throttler";
 import {
   LookupPubgPlayerDto,
   RegisterPubgAccountDto,
+  SearchPubgPlayersQueryDto,
   UpdatePubgScoreDto,
 } from "./dto";
 import { PubgService } from "./pubg.service";
 import { PubgHistoryService } from "./pubg-history.service";
 import { PubgRankingService } from "./pubg-ranking.service";
+import { PubgSearchService } from "./pubg-search.service";
 
 @Controller("pubg")
 @UseGuards(JwtAuthGuard)
@@ -31,6 +34,7 @@ export class PubgController {
     private readonly pubgService: PubgService,
     private readonly historyService: PubgHistoryService,
     private readonly rankingService: PubgRankingService,
+    private readonly searchService: PubgSearchService,
   ) {}
 
   @Get("accounts")
@@ -88,9 +92,26 @@ export class PubgController {
     return this.rankingService.getRanking(parsedPage, parsedLimit);
   }
 
-  /** 배그 전적 — 스크림 참가 이력과 킬내기 결과를 시간순으로 섞어 돌려준다. */
+  /**
+   * 배그 내전 기록 검색 — 닉네임 또는 PUBG 닉네임으로 NEXUS 유저를 찾는다.
+   * PUBG API 를 부르지 않는다(앱 전체 10 req/분 예산을 쓰지 않는다). 로그인한 사용자만.
+   */
+  @Get("search")
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  searchPlayers(@Query() query: SearchPubgPlayersQueryDto) {
+    return this.searchService.searchPlayers(query.q, query.limit);
+  }
+
+  /**
+   * 배그 전적 — 스크림 참가 이력과 킬내기 결과를 시간순으로 섞어 돌려준다.
+   * 남의 전적은 그 사람이 공개했을 때만(`showMatchHistory`).
+   */
   @Get("history/:userId")
-  getUserHistory(@Param("userId") userId: string) {
+  async getUserHistory(
+    @CurrentUser("sub") requesterId: string,
+    @Param("userId") userId: string,
+  ) {
+    await this.historyService.assertHistoryVisible(requesterId, userId);
     return this.historyService.getUserHistory(userId);
   }
 

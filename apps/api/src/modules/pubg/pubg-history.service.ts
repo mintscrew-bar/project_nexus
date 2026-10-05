@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import type { PubgGameMode } from "@nexus/types";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -32,6 +32,23 @@ export interface PubgHistoryItem {
 @Injectable()
 export class PubgHistoryService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * 남의 내전 전적을 열어도 되는지 확인한다. 본인은 항상 볼 수 있다.
+   *
+   * `showMatchHistory` 설정이 있었지만 어디서도 지키지 않아, 검색으로 남의 기록을 열 수 있게 되면서
+   * 배그 전적부터 적용한다. 설정 행이 없으면 기본값(공개)이다.
+   */
+  async assertHistoryVisible(requesterId: string, targetUserId: string) {
+    if (requesterId === targetUserId) return;
+    const settings = await this.prisma.userSettings.findUnique({
+      where: { userId: targetUserId },
+      select: { showMatchHistory: true },
+    });
+    if (settings?.showMatchHistory === false) {
+      throw new ForbiddenException("이 유저는 내전 전적을 공개하지 않습니다.");
+    }
+  }
 
   async getUserHistory(userId: string, limit = DEFAULT_LIMIT) {
     const memberships = await this.prisma.teamMember.findMany({
