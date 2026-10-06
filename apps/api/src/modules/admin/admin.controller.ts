@@ -84,6 +84,12 @@ export class AdminController {
     return this.adminService.getInternalMatchDetail(matchId);
   }
 
+  @Post("matches/:id/retry-collection")
+  @Roles(UserRole.ADMIN)
+  retryMatchCollection(@Param("id") matchId: string, @Request() req: any) {
+    return this.adminService.retryMatchCollection(matchId, req.user.sub);
+  }
+
   // ── 스크림 기록 (배그) ─────────────────────────────────────────────────────
   // 배그 내전 결과는 `Match` 가 아니라 `Scrim` 에 쌓인다(라운드·포인트 구조).
   @Get("scrims")

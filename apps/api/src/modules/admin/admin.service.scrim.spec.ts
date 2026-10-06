@@ -6,6 +6,7 @@ import { AdminService } from "./admin.service";
  */
 function makeService(overrides: Record<string, any> = {}) {
   const prisma: any = {
+    match: { findUnique: jest.fn(), update: jest.fn().mockResolvedValue({}) },
     scrim: { findUnique: jest.fn(), update: jest.fn().mockResolvedValue({}) },
     scrimRound: {
       findFirst: jest.fn(),
@@ -178,6 +179,60 @@ describe("AdminService 스크림 조치", () => {
 
       expect(detail.pendingMatches).toBe(2);
       expect(detail.collectorState).toBeUndefined();
+    });
+  });
+
+  describe("retryMatchCollection (롤)", () => {
+    const base = {
+      id: "m1",
+      isInternal: true,
+      status: "COMPLETED",
+      dataCollected: false,
+      collectAttempts: 10,
+      tournamentCode: "KR-ABC",
+      riotMatchId: null,
+    };
+
+    it("시도 횟수를 0 으로 돌려 수집기가 다시 보게 한다", async () => {
+      const { service, prisma } = makeService();
+      prisma.match.findUnique.mockResolvedValue(base);
+
+      await service.retryMatchCollection("m1", "admin-1");
+
+      expect(prisma.match.update).toHaveBeenCalledWith({
+        where: { id: "m1" },
+        data: { collectAttempts: 0, lastCollectAttemptAt: null },
+      });
+      expect(prisma.adminAuditLog.create.mock.calls[0][0].data).toMatchObject({
+        action: "MATCH_COLLECT_RETRY",
+        details: { previousAttempts: 10 },
+      });
+    });
+
+    it.each([
+      [
+        "수집 불가(코드·매치 ID 없음)",
+        { tournamentCode: null },
+        "가져올 수 없습니다",
+      ],
+      ["이미 수집됨", { dataCollected: true }, "이미 전적이"],
+      ["아직 안 끝남", { status: "IN_PROGRESS" }, "끝난 경기만"],
+    ])("%s 는 거부한다", async (_n, over, message) => {
+      const { service, prisma } = makeService();
+      prisma.match.findUnique.mockResolvedValue({ ...base, ...over });
+
+      await expect(service.retryMatchCollection("m1", "a")).rejects.toThrow(
+        message,
+      );
+      expect(prisma.match.update).not.toHaveBeenCalled();
+    });
+
+    it("외부 랭크 매치나 없는 경기는 404", async () => {
+      const { service, prisma } = makeService();
+      prisma.match.findUnique.mockResolvedValue({ ...base, isInternal: false });
+      await expect(service.retryMatchCollection("m1", "a")).rejects.toThrow(
+        "찾을 수 없습니다",
+      );
     });
   });
 });

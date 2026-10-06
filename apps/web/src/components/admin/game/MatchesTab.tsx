@@ -81,7 +81,13 @@ function sortByPosition<T extends { position: string }>(list: T[]) {
   });
 }
 
-export function MatchesTab({ addToast }: { addToast: AddToast }) {
+export function MatchesTab({
+  addToast,
+  isAdmin = false,
+}: {
+  addToast: AddToast;
+  isAdmin?: boolean;
+}) {
   const [matches, setMatches] = useState<AdminInternalMatch[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -327,6 +333,7 @@ export function MatchesTab({ addToast }: { addToast: AddToast }) {
       {detailId && (
         <MatchDetailModal
           matchId={detailId}
+          isAdmin={isAdmin}
           onClose={() => setDetailId(null)}
           addToast={addToast}
         />
@@ -337,13 +344,16 @@ export function MatchesTab({ addToast }: { addToast: AddToast }) {
 
 function MatchDetailModal({
   matchId,
+  isAdmin,
   onClose,
   addToast,
 }: {
   matchId: string;
+  isAdmin: boolean;
   onClose: () => void;
   addToast: AddToast;
 }) {
+  const [retrying, setRetrying] = useState(false);
   const [detail, setDetail] = useState<AdminInternalMatchDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -462,6 +472,39 @@ function MatchDetailModal({
                   ` · 마지막 시도 ${formatDateTime(detail.lastCollectAttemptAt)}`}
               </p>
             )}
+            {/* 시도 상한을 넘기면 수집기가 이 경기를 더 안 본다. Riot 쪽 문제가
+                풀린 뒤 횟수를 0 으로 돌려 다시 대상에 넣는다. */}
+            {isAdmin &&
+              !detail.dataCollected &&
+              detail.status === "COMPLETED" &&
+              (detail.tournamentCode || detail.riotMatchId) && (
+                <button
+                  type="button"
+                  disabled={retrying}
+                  onClick={async () => {
+                    setRetrying(true);
+                    try {
+                      await adminApi.retryMatchCollection(detail.id);
+                      addToast("다음 수집 주기에 다시 가져옵니다.", "success");
+                      setDetail({
+                        ...detail,
+                        collectAttempts: 0,
+                        lastCollectAttemptAt: null,
+                      });
+                    } catch (error: any) {
+                      addToast(
+                        error?.response?.data?.message ?? "처리 실패",
+                        "error",
+                      );
+                    } finally {
+                      setRetrying(false);
+                    }
+                  }}
+                  className="mt-2 rounded-lg bg-bg-tertiary px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary disabled:opacity-50"
+                >
+                  수집 재시도 (시도 횟수 초기화)
+                </button>
+              )}
           </div>
 
           {/* 팀별 스코어보드 */}

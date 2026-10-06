@@ -1437,6 +1437,51 @@ export class AdminService {
   //   · 내부 내전 매치 — isInternal=true이며 방 삭제 후에도 스냅샷으로 보존되는 경기
   //   · 외부 랭크 인제스트 매치 — queueId로 식별되는 캐시 데이터
 
+  /**
+   * 전적 수집을 포기한(시도 상한 초과) 내전을 다시 수집 대상으로 되돌린다.
+   *
+   * 수집기는 시도 횟수가 상한을 넘으면 대상에서 뺀다. Riot 장애나 키 문제가
+   * 풀린 뒤에도 그 경기들은 영영 안 걷히므로 운영자가 횟수를 0으로 돌려준다.
+   * 토너먼트 코드도 매치 ID 도 없는 경기는 어차피 수집할 수 없어 거부한다.
+   */
+  async retryMatchCollection(matchId: string, adminId: string) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: {
+        id: true,
+        isInternal: true,
+        status: true,
+        dataCollected: true,
+        collectAttempts: true,
+        tournamentCode: true,
+        riotMatchId: true,
+      },
+    });
+    if (!match || !match.isInternal)
+      throw new NotFoundException("내전 기록을 찾을 수 없습니다.");
+    if (match.status !== "COMPLETED")
+      throw new BadRequestException("끝난 경기만 다시 수집할 수 있습니다.");
+    if (match.dataCollected)
+      throw new BadRequestException("이미 전적이 수집된 경기입니다.");
+    if (!match.tournamentCode && !match.riotMatchId)
+      throw new BadRequestException(
+        "토너먼트 코드 없이 만든 방이라 Riot 에서 전적을 가져올 수 없습니다.",
+      );
+
+    await this.prisma.match.update({
+      where: { id: matchId },
+      data: { collectAttempts: 0, lastCollectAttemptAt: null },
+    });
+    await this.logAction(
+      adminId,
+      AdminAction.MATCH_COLLECT_RETRY,
+      "match",
+      matchId,
+      { previousAttempts: match.collectAttempts },
+    );
+    return { ok: true };
+  }
+
   /** 스크림 상세 — 라운드별 팀 결과와 수집 상태까지 */
   async getScrimDetail(scrimId: string) {
     const scrim = await this.prisma.scrim.findUnique({

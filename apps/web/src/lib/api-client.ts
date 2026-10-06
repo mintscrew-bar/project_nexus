@@ -2873,6 +2873,12 @@ export const adminApi = {
     const response = await apiClient.get(`/admin/matches/${matchId}`);
     return response.data as AdminInternalMatchDetail;
   },
+  retryMatchCollection: async (matchId: string) => {
+    const response = await apiClient.post(
+      `/admin/matches/${matchId}/retry-collection`,
+    );
+    return response.data;
+  },
   closeRoom: async (roomId: string) => {
     const response = await apiClient.post(`/admin/rooms/${roomId}/close`);
     return response.data;

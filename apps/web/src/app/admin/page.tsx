@@ -363,7 +363,9 @@ function AdminPageInner() {
           {activeTab === "scrims" && (
             <ScrimsTab addToast={addToast} isAdmin={isAdmin} />
           )}
-          {activeTab === "matches" && <MatchesTab addToast={addToast} />}
+          {activeTab === "matches" && (
+            <MatchesTab addToast={addToast} isAdmin={isAdmin} />
+          )}
           {activeTab === "discord" && (
             <DiscordGuildLinksTab addToast={addToast} />
           )}
