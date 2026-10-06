@@ -101,7 +101,7 @@ describe("AdminService 게임 구분", () => {
 
       // 방·클랜은 게임 컬럼이 있다
       expect(prisma.room.count).toHaveBeenCalledWith({
-        where: { gameTitle: "PUBG" },
+        where: expect.objectContaining({ gameTitle: "PUBG" }),
       });
       expect(prisma.clan.count).toHaveBeenCalledWith({
         where: { gameTitle: "PUBG" },
@@ -126,8 +126,20 @@ describe("AdminService 게임 구분", () => {
       const { service, prisma } = makeService();
       const stats = await service.getStats();
 
-      expect(prisma.room.count).toHaveBeenCalledWith({ where: {} });
+      // 게임 필터는 없지만 봇이 연 방은 늘 뺀다
+      const where = prisma.room.count.mock.calls[0][0].where;
+      expect(where.gameTitle).toBeUndefined();
+      expect(where.NOT).toHaveProperty("host");
       expect(stats.gameTitle).toBeNull();
+    });
+
+    it("방 수에서 봇이 연 방을 뺀다 — 유저 수만 빼면 방이 부풀어 보인다", async () => {
+      const { service, prisma } = makeService();
+      await service.getStats({ gameTitle: "LOL" as any });
+
+      for (const call of prisma.room.count.mock.calls) {
+        expect(call[0].where.NOT).toHaveProperty("host");
+      }
     });
   });
 

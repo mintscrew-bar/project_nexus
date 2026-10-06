@@ -166,6 +166,9 @@ export class AdminService {
     // 테스트 봇은 실제 이용자 수에서 제외한다 (대시보드 "전체 유저"는 봇 미포함)
     const botWhere = this.getTestBotWhere();
     const gameWhere = gameTitle ? { gameTitle } : {};
+    // 봇이 연 방은 이용 지표가 아니다. 유저 수만 봇을 빼면 방 수가 부풀어
+    // "방은 있는데 사람이 없다" 처럼 보인다.
+    const realRoomWhere = { ...gameWhere, NOT: { host: botWhere } };
 
     const [
       totalUsers,
@@ -180,9 +183,9 @@ export class AdminService {
     ] = await Promise.all([
       this.prisma.user.count({ where: { NOT: botWhere } }),
       this.prisma.user.count({ where: botWhere }),
-      this.prisma.room.count({ where: gameWhere }),
+      this.prisma.room.count({ where: realRoomWhere }),
       this.prisma.room.count({
-        where: { ...gameWhere, status: { in: ["WAITING", "IN_PROGRESS"] } },
+        where: { ...realRoomWhere, status: { in: ["WAITING", "IN_PROGRESS"] } },
       }),
       this.prisma.match.count(),
       this.prisma.userReport.count({ where: { status: "PENDING" } }),
@@ -223,7 +226,9 @@ export class AdminService {
    */
   private async getGameStats(gameTitle: GameTitle) {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const gameWhere = { gameTitle };
+    // 봇이 연 방은 뺀다 (getStats 와 같은 기준)
+    const gameWhere = { gameTitle, NOT: { host: this.getTestBotWhere() } };
+    const botRoom = { NOT: { host: this.getTestBotWhere() } };
 
     const [
       waitingRooms,
@@ -264,9 +269,13 @@ export class AdminService {
           }),
       gameTitle === "PUBG"
         ? Promise.all([
-            this.prisma.scrim.count(),
-            this.prisma.scrim.count({ where: { createdAt: { gte: since } } }),
-            this.prisma.scrim.count({ where: { status: "IN_PROGRESS" } }),
+            this.prisma.scrim.count({ where: { room: botRoom } }),
+            this.prisma.scrim.count({
+              where: { createdAt: { gte: since }, room: botRoom },
+            }),
+            this.prisma.scrim.count({
+              where: { status: "IN_PROGRESS", room: botRoom },
+            }),
           ])
         : Promise.all([
             this.prisma.match.count({ where: { isInternal: true } }),
