@@ -18,7 +18,7 @@ import { MatchesTab } from "@/components/admin/game/MatchesTab";
 import { ScrimsTab } from "@/components/admin/game/ScrimsTab";
 import {
   AdminGameScopeProvider,
-  AdminGameSwitch,
+  AdminGameTabs,
   useAdminGameScope,
 } from "@/components/admin/game-scope";
 import type { GameTitle } from "@nexus/types";
@@ -65,13 +65,24 @@ interface TabItem {
   label: string;
   icon: React.ReactNode;
   /**
-   * 이 탭이 다루는 게임. 있으면 전역 스위치가 다른 게임일 때 숨긴다.
+   * 이 탭이 속한 곳.
    *
-   * 롤 내전(`Match`)과 배그 스크림(`Scrim`)은 진행 방식도 데이터도 달라
-   * 탭이 갈렸다. "롤을 보는 중" 인데 배그 전용 탭이 남아 있으면 전역
-   * 스위치가 전역이 아니게 된다. 비우면 게임과 무관한 탭이다.
+   * - `common`(기본): 게임과 무관한 운영(유저·신고·공지·시스템). 상단 "공통" 탭에서만 보인다.
+   * - `game`: 두 게임 모두에 있는 탭(방·클랜·커뮤니티 등). 게임 탭 안에서 그 게임 데이터만 보인다.
+   * - `LOL`/`PUBG`: 그 게임에만 있는 탭. 롤 내전(`Match`)과 배그 스크림(`Scrim`)은
+   *   진행 방식도 데이터도 달라 탭이 갈렸다.
+   *
+   * 대시보드는 `common` 이면서 게임 탭에서도 보여야 해서 `all` 로 둔다.
    */
-  game?: GameTitle;
+  scope?: "common" | "game" | "all" | GameTitle;
+}
+
+/** 탭이 현재 게임 범위(`null` = 공통)에서 보이는가 */
+function isTabInScope(tab: TabItem, game: GameTitle | null): boolean {
+  const scope = tab.scope ?? "common";
+  if (scope === "all") return true;
+  if (game === null) return scope === "common";
+  return scope === "game" || scope === game;
 }
 
 /** 사이드바 그룹 — label이 null이면 헤더 없이 단독으로 표시한다. */
@@ -100,6 +111,7 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       {
         id: "dashboard",
+        scope: "all",
         label: "대시보드",
         icon: <Activity className="h-4 w-4" />,
       },
@@ -123,6 +135,7 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       {
         id: "community",
+        scope: "game",
         label: "커뮤니티",
         icon: <BookOpen className="h-4 w-4" />,
       },
@@ -133,6 +146,7 @@ const TAB_GROUPS: TabGroup[] = [
       },
       {
         id: "streamers",
+        scope: "game",
         label: "스트리머",
         icon: <Radio className="h-4 w-4" />,
       },
@@ -141,18 +155,28 @@ const TAB_GROUPS: TabGroup[] = [
   {
     label: "게임 운영",
     tabs: [
-      { id: "clans", label: "클랜 관리", icon: <Shield className="h-4 w-4" /> },
-      { id: "rooms", label: "방 관리", icon: <Home className="h-4 w-4" /> },
+      {
+        id: "clans",
+        scope: "game",
+        label: "클랜 관리",
+        icon: <Shield className="h-4 w-4" />,
+      },
+      {
+        id: "rooms",
+        scope: "game",
+        label: "방 관리",
+        icon: <Home className="h-4 w-4" />,
+      },
       {
         id: "scrims",
-        label: "스크림 기록 (배그)",
+        scope: "PUBG",
+        label: "스크림 기록",
         icon: <Crosshair className="h-4 w-4" />,
-        game: "PUBG",
       },
       {
         id: "matches",
-        game: "LOL",
-        label: "내전 기록 (롤)",
+        scope: "LOL",
+        label: "내전 기록",
         icon: <Swords className="h-4 w-4" />,
       },
     ],
@@ -172,6 +196,7 @@ const TAB_GROUPS: TabGroup[] = [
       },
       {
         id: "rehearsal",
+        scope: "LOL",
         label: "경매 리허설",
         icon: <FlaskConical className="h-4 w-4" />,
       },
@@ -185,7 +210,7 @@ const isAdminTab = (value: string | null): value is Tab =>
   !!value && ALL_TABS.some((tab) => tab.id === value);
 
 function AdminPageInner() {
-  const { game } = useAdminGameScope();
+  const { game, setGame } = useAdminGameScope();
   // 권한 가드는 admin/layout.tsx에서 처리 (미인증/USER → notFound)
   const { user } = useAuthStore();
   const { addToast } = useToast();
@@ -202,8 +227,7 @@ function AdminPageInner() {
       tabs: group.tabs.filter(
         (tab) =>
           (isAdmin || MODERATOR_TABS.includes(tab.id)) &&
-          // 게임 전용 탭은 그 게임을 보는 중이거나 전체일 때만 보인다.
-          (!tab.game || !game || tab.game === game),
+          isTabInScope(tab, game),
       ),
     })).filter((group) => group.tabs.length > 0);
   }, [isAdmin, game]);
@@ -233,13 +257,24 @@ function AdminPageInner() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
+    // 옛 링크(`?tab=matches`)는 게임 없이 들어온다. 그 탭이 한 게임 전용이면
+    // 그 게임으로 범위를 맞춰 준다. 안 그러면 공통 범위에서 탭이 사라져 대시보드로 튕긴다.
+    const requested = ALL_TABS.find((t) => t.id === tab);
+    if (
+      requested &&
+      game === null &&
+      (requested.scope === "LOL" || requested.scope === "PUBG")
+    ) {
+      setGame(requested.scope);
+      return;
+    }
     const nextTab =
       isAdminTab(tab) && visibleTabIds.includes(tab) ? tab : "dashboard";
     setActiveTab(nextTab);
     if (tab && tab !== nextTab) {
       router.replace(buildHref("dashboard"), { scroll: false });
     }
-  }, [searchParams, router, visibleTabIds, buildHref]);
+  }, [searchParams, router, visibleTabIds, buildHref, game, setGame]);
 
   const handleTabChange = useCallback(
     (tab: Tab) => {
@@ -250,92 +285,89 @@ function AdminPageInner() {
   );
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)]">
-      {/* 사이드바 — 모바일에서는 상단 가로 스크롤 탭바, 데스크톱에서는 세로 사이드바 */}
-      <aside className="flex flex-shrink-0 flex-col border-b border-bg-tertiary bg-bg-secondary md:w-52 md:border-b-0 md:border-r">
-        <div className="hidden flex-col gap-3 border-b border-bg-tertiary/80 px-4 py-4 md:flex">
-          <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-accent-primary" />
-            <span className="font-bold text-text-primary text-sm">
-              관리자 패널
-            </span>
-          </div>
-          {/* 전역 게임 범위. 여기서 한 번 정하면 아래 탭들이 따라간다 —
-              탭을 옮길 때마다 다시 고르지 않아도 된다. */}
-          <AdminGameSwitch />
-        </div>
-        {/* 모바일에서는 가로 탭바 위에 한 줄로 */}
-        <div className="flex items-center justify-end border-b border-bg-tertiary/80 px-3 py-2 md:hidden">
-          <AdminGameSwitch />
-        </div>
-        <nav
-          className="scrollbar-none flex gap-1 overflow-x-auto p-1.5 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:p-2"
-          aria-label="관리자 메뉴"
-        >
-          {visibleGroups.map((group, groupIndex) => (
-            <div key={group.label ?? "__root__"} className="contents">
-              {/* 모바일(가로 탭바)에서는 그룹 헤더 대신 세로 구분선으로 경계를 표시 */}
-              {groupIndex > 0 && (
-                <div
-                  className="my-1.5 w-px flex-shrink-0 self-stretch bg-bg-tertiary md:hidden"
-                  aria-hidden
-                />
-              )}
-              {group.label && (
-                <p className="hidden px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted md:block">
-                  {group.label}
-                </p>
-              )}
-              {group.tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  aria-current={activeTab === tab.id ? "page" : undefined}
-                  className={`flex flex-shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm transition-all duration-200 md:w-full ${
-                    activeTab === tab.id
-                      ? "border-accent-primary/30 bg-bg-tertiary font-semibold text-accent-primary"
-                      : "border-transparent text-text-secondary hover:-translate-y-px hover:border-bg-elevated hover:bg-bg-tertiary/70 hover:text-text-primary md:hover:translate-y-0 md:hover:translate-x-0.5"
-                  }`}
-                >
-                  {tab.icon}
-                  {tab.label}
-                </button>
-              ))}
+    <div className="flex h-[calc(100vh-64px)] flex-col">
+      {/* 상단 게임 탭. 공통 / 롤 / 배그 — 고른 게임의 메뉴만 아래 사이드바에 뜬다. */}
+      <AdminGameTabs />
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        {/* 사이드바 — 모바일에서는 상단 가로 스크롤 탭바, 데스크톱에서는 세로 사이드바 */}
+        <aside className="flex flex-shrink-0 flex-col border-b border-bg-tertiary bg-bg-secondary md:w-52 md:border-b-0 md:border-r">
+          <div className="hidden flex-col gap-3 border-b border-bg-tertiary/80 px-4 py-4 md:flex">
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-accent-primary" />
+              <span className="font-bold text-text-primary text-sm">
+                관리자 패널
+              </span>
             </div>
-          ))}
-        </nav>
-      </aside>
+          </div>
+          <nav
+            className="scrollbar-none flex gap-1 overflow-x-auto p-1.5 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:p-2"
+            aria-label="관리자 메뉴"
+          >
+            {visibleGroups.map((group, groupIndex) => (
+              <div key={group.label ?? "__root__"} className="contents">
+                {/* 모바일(가로 탭바)에서는 그룹 헤더 대신 세로 구분선으로 경계를 표시 */}
+                {groupIndex > 0 && (
+                  <div
+                    className="my-1.5 w-px flex-shrink-0 self-stretch bg-bg-tertiary md:hidden"
+                    aria-hidden
+                  />
+                )}
+                {group.label && (
+                  <p className="hidden px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted md:block">
+                    {group.label}
+                  </p>
+                )}
+                {group.tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    aria-current={activeTab === tab.id ? "page" : undefined}
+                    className={`flex flex-shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm transition-all duration-200 md:w-full ${
+                      activeTab === tab.id
+                        ? "border-accent-primary/30 bg-bg-tertiary font-semibold text-accent-primary"
+                        : "border-transparent text-text-secondary hover:-translate-y-px hover:border-bg-elevated hover:bg-bg-tertiary/70 hover:text-text-primary md:hover:translate-y-0 md:hover:translate-x-0.5"
+                    }`}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </nav>
+        </aside>
 
-      {/* 메인 콘텐츠 */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-6">
-        {activeTab === "dashboard" && <DashboardTab addToast={addToast} />}
-        {activeTab === "users" && (
-          <UsersTab
-            addToast={addToast}
-            currentUserId={user?.id}
-            isAdmin={isAdmin}
-          />
-        )}
-        {activeTab === "reports" && <ReportsTab addToast={addToast} />}
-        {activeTab === "appeals" && <AppealsTab addToast={addToast} />}
-        {activeTab === "chatlogs" && <ChatLogsTab />}
-        {activeTab === "errors" && <ErrorLogsTab />}
-        {activeTab === "community" && (
-          <CommunityTab addToast={addToast} isAdmin={isAdmin} />
-        )}
-        {activeTab === "announcements" && (
-          <AnnouncementsTab addToast={addToast} />
-        )}
-        {activeTab === "streamers" && <StreamersTab addToast={addToast} />}
-        {activeTab === "clans" && <ClansTab addToast={addToast} />}
-        {activeTab === "rooms" && <RoomsTab addToast={addToast} />}
-        {activeTab === "scrims" && <ScrimsTab addToast={addToast} />}
-        {activeTab === "matches" && <MatchesTab addToast={addToast} />}
-        {activeTab === "discord" && (
-          <DiscordGuildLinksTab addToast={addToast} />
-        )}
-        {activeTab === "rehearsal" && <RehearsalTab addToast={addToast} />}
-      </main>
+        {/* 메인 콘텐츠 */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          {activeTab === "dashboard" && <DashboardTab addToast={addToast} />}
+          {activeTab === "users" && (
+            <UsersTab
+              addToast={addToast}
+              currentUserId={user?.id}
+              isAdmin={isAdmin}
+            />
+          )}
+          {activeTab === "reports" && <ReportsTab addToast={addToast} />}
+          {activeTab === "appeals" && <AppealsTab addToast={addToast} />}
+          {activeTab === "chatlogs" && <ChatLogsTab />}
+          {activeTab === "errors" && <ErrorLogsTab />}
+          {activeTab === "community" && (
+            <CommunityTab addToast={addToast} isAdmin={isAdmin} />
+          )}
+          {activeTab === "announcements" && (
+            <AnnouncementsTab addToast={addToast} />
+          )}
+          {activeTab === "streamers" && <StreamersTab addToast={addToast} />}
+          {activeTab === "clans" && <ClansTab addToast={addToast} />}
+          {activeTab === "rooms" && <RoomsTab addToast={addToast} />}
+          {activeTab === "scrims" && <ScrimsTab addToast={addToast} />}
+          {activeTab === "matches" && <MatchesTab addToast={addToast} />}
+          {activeTab === "discord" && (
+            <DiscordGuildLinksTab addToast={addToast} />
+          )}
+          {activeTab === "rehearsal" && <RehearsalTab addToast={addToast} />}
+        </main>
+      </div>
     </div>
   );
 }

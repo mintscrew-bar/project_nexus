@@ -74,11 +74,16 @@ export function useAdminGameScope(): AdminGameScope {
   return ctx;
 }
 
-/** 상단 전역 스위치. 전체 / 롤 / 배그 */
-export function AdminGameSwitch() {
+/**
+ * 상단 게임 탭. 공통 / 롤 / 배그.
+ *
+ * 스위치가 사이드바 안에 있을 때는 "필터" 로 읽혀 메뉴가 그대로인 채 숫자만
+ * 바뀌었다. 탭으로 올리면 게임마다 자기 메뉴를 갖는 별개의 작업 공간이 된다.
+ */
+export function AdminGameTabs() {
   const { game, setGame } = useAdminGameScope();
   const options: Array<{ value: GameTitle | null; label: string }> = [
-    { value: null, label: "전체" },
+    { value: null, label: "공통" },
     ...enabledGames().map((g) => ({
       value: g.title as GameTitle | null,
       label: g.shortLabel,
@@ -87,8 +92,8 @@ export function AdminGameSwitch() {
 
   return (
     <div
-      className="flex items-center gap-0.5 rounded-lg bg-bg-tertiary p-1"
-      role="group"
+      className="flex flex-shrink-0 items-end gap-1 border-b border-bg-tertiary bg-bg-secondary px-3 pt-2"
+      role="tablist"
       aria-label="관리할 게임"
     >
       {options.map((opt) => {
@@ -97,12 +102,13 @@ export function AdminGameSwitch() {
           <button
             key={opt.label}
             type="button"
+            role="tab"
+            aria-selected={active}
             onClick={() => setGame(opt.value)}
-            aria-pressed={active}
-            className={`rounded-md px-3 py-1 text-xs font-bold transition-colors ${
+            className={`-mb-px rounded-t-lg border border-b-0 px-5 py-2 text-sm font-bold transition-colors ${
               active
-                ? "bg-bg-secondary text-text-primary shadow-sm"
-                : "text-text-secondary hover:text-text-primary"
+                ? "border-bg-tertiary bg-bg-primary text-accent-primary"
+                : "border-transparent text-text-secondary hover:text-text-primary"
             }`}
           >
             {opt.label}
