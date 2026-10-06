@@ -4,7 +4,6 @@ import {
   IsOptional,
   IsString,
   MaxLength,
-  ValidateIf,
 } from "class-validator";
 import { KeepRaw } from "../../../common/keep-raw.decorator";
 
