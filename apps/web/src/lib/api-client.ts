@@ -2557,6 +2557,26 @@ export interface AdminInternalMatch {
   _count: { participants: number };
 }
 
+/** 일별 운영 지표 한 줄. null 은 "그날은 기록이 없었다" 이지 0 이 아니다 */
+export interface AdminDailyStat {
+  date: string;
+  scope: "ALL" | "LOL" | "PUBG";
+  totalUsers: number | null;
+  newUsers: number | null;
+  active1d: number | null;
+  active7d: number | null;
+  active30d: number | null;
+  roomsEnded: number | null;
+  roomsStarted: number | null;
+  records: number | null;
+}
+
+export interface AdminCohort {
+  weekStart: string;
+  signups: number;
+  activeNow: number;
+}
+
 /** 관리자 방 깔때기 — RoomOutcome 이 쌓이기 시작한 뒤의 방만 집계된다 */
 export interface AdminRoomFunnel {
   days: number;
@@ -2849,6 +2869,18 @@ export const adminApi = {
   }) => {
     const response = await apiClient.get("/admin/scrims", { params });
     return response.data;
+  },
+  getStatsSeries: async (scope: "ALL" | "LOL" | "PUBG", days = 30) => {
+    const response = await apiClient.get("/admin/stats/series", {
+      params: { scope, days },
+    });
+    return response.data as AdminDailyStat[];
+  },
+  getCohortSurvival: async (weeks = 8) => {
+    const response = await apiClient.get("/admin/stats/cohorts", {
+      params: { weeks },
+    });
+    return response.data as AdminCohort[];
   },
   getRoomFunnel: async (params?: { gameTitle?: GameTitle; days?: number }) => {
     const response = await apiClient.get("/admin/room-funnel", { params });

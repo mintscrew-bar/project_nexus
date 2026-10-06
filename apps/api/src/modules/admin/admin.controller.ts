@@ -13,6 +13,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
+import { AdminStatsSnapshotService } from "./admin-stats-snapshot.service";
 import { AdminService } from "./admin.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -33,6 +34,7 @@ import {
   AdminRecomputeStatsQueryDto,
   SendUserMessageDto,
   AdminRoomFunnelQueryDto,
+  AdminStatsSeriesQueryDto,
 } from "./dto/admin-query.dto";
 
 @Controller("admin")
@@ -45,6 +47,7 @@ export class AdminController {
     private readonly roomGateway: RoomGateway,
     @Inject(forwardRef(() => RoomService))
     private readonly roomService: RoomService,
+    private readonly statsSnapshot: AdminStatsSnapshotService,
   ) {}
 
   // ── Stats ──────────────────────────────────────────────────────────────────
@@ -61,6 +64,18 @@ export class AdminController {
       gameTitle: query.gameTitle,
       days: query.days,
     });
+  }
+
+  @Get("stats/series")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  getStatsSeries(@Query() query: AdminStatsSeriesQueryDto) {
+    return this.statsSnapshot.getSeries(query.scope, query.days);
+  }
+
+  @Get("stats/cohorts")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  getCohorts(@Query("weeks") weeks?: string) {
+    return this.statsSnapshot.getCohortSurvival(Number(weeks) || 8);
   }
 
   @Post("matches/recompute-stats")

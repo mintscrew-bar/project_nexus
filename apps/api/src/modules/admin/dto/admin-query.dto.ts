@@ -236,3 +236,18 @@ export class AdminRoomFunnelQueryDto extends AdminGameQueryDto {
   @Max(90, { message: "days는 90 이하여야 합니다." })
   days: number = 30;
 }
+
+/** 일별 지표 시계열 — 범위와 기간(일) */
+export class AdminStatsSeriesQueryDto {
+  @IsOptional()
+  @IsIn(["ALL", "LOL", "PUBG"], {
+    message: "scope는 ALL, LOL, PUBG 중 하나여야 합니다.",
+  })
+  scope: "ALL" | "LOL" | "PUBG" = "ALL";
+
+  @IsOptional()
+  @IsInt({ message: "days는 정수여야 합니다." })
+  @Min(1, { message: "days는 1 이상이어야 합니다." })
+  @Max(365, { message: "days는 365 이하여야 합니다." })
+  days: number = 30;
+}

@@ -162,6 +162,46 @@ export class AdminStatsSnapshotService implements OnApplicationBootstrap {
     }
   }
 
+  /**
+   * 가입 주 코호트별로 "지금도 접속하는 비율".
+   *
+   * 과거 주차의 접속 이력은 없어서(마지막 접속 한 칸뿐) 정통 리텐션 곡선은 못 만든다.
+   * 대신 각 코호트가 **오늘 기준 최근 7일 안에 접속했는가** 를 본다. 오래된 코호트일수록
+   * 낮은 게 정상이고, 같은 나이의 코호트끼리 비교할 때 의미가 있다.
+   */
+  async getCohortSurvival(weeks: number) {
+    const n = Math.min(Math.max(weeks, 1), 26);
+    const now = new Date();
+    const activeSince = new Date(now.getTime() - 7 * 86_400_000);
+    const notBot = { NOT: TEST_BOT_USER_WHERE };
+
+    // 이번 주 월요일(KST) 00:00 을 기준으로 거꾸로 센다.
+    const today = kstDateOf(now);
+    const dow = (today.getUTCDay() + 6) % 7; // 월=0
+    const thisMonday = addDays(today, -dow);
+
+    const cohorts = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const weekStart = addDays(thisMonday, -7 * i);
+      const { start } = kstDayRange(weekStart);
+      const end = new Date(start.getTime() + 7 * 86_400_000);
+      const [signups, active] = await Promise.all([
+        this.prisma.user.count({
+          where: { createdAt: { gte: start, lt: end }, ...notBot },
+        }),
+        this.prisma.user.count({
+          where: {
+            createdAt: { gte: start, lt: end },
+            lastSeenAt: { gte: activeSince },
+            ...notBot,
+          },
+        }),
+      ]);
+      cohorts.push({ weekStart, signups, activeNow: active });
+    }
+    return cohorts;
+  }
+
   /** 기간 안의 시계열. 오래된 날부터. */
   async getSeries(scope: "ALL" | "LOL" | "PUBG", days: number) {
     const clamped = Math.min(Math.max(days, 1), 365);

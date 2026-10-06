@@ -24,6 +24,7 @@ import {
 import { StatCard, type AddToast } from "./shared";
 import { useAdminGameScope } from "./game-scope";
 import { RoomFunnelCard } from "./RoomFunnelCard";
+import { TrendCards } from "./TrendCards";
 import { GAMES } from "@nexus/types";
 
 export function DashboardTab({ addToast }: { addToast: AddToast }) {
@@ -212,6 +213,7 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
       )}
 
       {game && <RoomFunnelCard game={game} />}
+      <TrendCards game={game} />
 
       <Card>
         <CardHeader className="pb-3">

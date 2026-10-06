@@ -148,3 +148,36 @@ describe("AdminStatsSnapshotService 실행", () => {
     expect(prisma.adminDailyStat.upsert).toHaveBeenCalledTimes(9);
   });
 });
+
+describe("AdminStatsSnapshotService.getCohortSurvival", () => {
+  it("주 단위 코호트를 오래된 주부터 돌려주고, 봇을 뺀다", async () => {
+    const { service, prisma } = make();
+    prisma.user.count
+      .mockResolvedValueOnce(10)
+      .mockResolvedValueOnce(4)
+      .mockResolvedValueOnce(6)
+      .mockResolvedValueOnce(3);
+
+    const cohorts = await service.getCohortSurvival(2);
+
+    expect(cohorts).toHaveLength(2);
+    expect(cohorts[0].weekStart.getTime()).toBeLessThan(
+      cohorts[1].weekStart.getTime(),
+    );
+    expect(cohorts[0]).toMatchObject({ signups: 10, activeNow: 4 });
+    expect(cohorts[1]).toMatchObject({ signups: 6, activeNow: 3 });
+    expect(prisma.user.count.mock.calls[0][0].where.NOT).toBeDefined();
+  });
+
+  it("코호트 시작은 월요일이다", async () => {
+    const { service } = make();
+    const cohorts = await service.getCohortSurvival(3);
+    for (const c of cohorts) expect(c.weekStart.getUTCDay()).toBe(1);
+  });
+
+  it("주 수는 1~26 으로 보정한다", async () => {
+    const { service } = make();
+    expect(await service.getCohortSurvival(0)).toHaveLength(1);
+    expect(await service.getCohortSurvival(999)).toHaveLength(26);
+  });
+});
