@@ -3,6 +3,7 @@ import "@/styles/pretendard.css";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AppShell } from "@/components/layout/AppShell";
+import { SignupAttributionCapture } from "@/components/analytics/SignupAttributionCapture";
 import { ThirdPartyScripts } from "@/components/analytics/ThirdPartyScripts";
 import { ADSENSE_CLIENT } from "@/lib/adsense";
 import {
@@ -133,6 +134,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
         />
+        <SignupAttributionCapture />
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>

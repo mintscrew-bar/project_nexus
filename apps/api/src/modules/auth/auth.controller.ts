@@ -22,6 +22,10 @@ import { CurrentUser } from "./decorators/current-user.decorator";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
 import { getClientIp } from "../../common/utils/client-ip";
+import {
+  ATTRIBUTION_COOKIE,
+  parseAttributionCookie,
+} from "../common/signup-attribution.util";
 
 @Controller("auth")
 export class AuthController {
@@ -73,8 +77,15 @@ export class AuthController {
   @Post("register")
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.CREATED)
-  async register(@Body() dto: RegisterDto, @Res() res: Response) {
-    const tokens = await this.authService.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const tokens = await this.authService.register(
+      dto,
+      parseAttributionCookie(req.cookies?.[ATTRIBUTION_COOKIE]),
+    );
 
     this.setRefreshTokenCookie(res, tokens.refreshToken);
 
@@ -169,6 +180,10 @@ export class AuthController {
       await this.authService.checkAccountStatus(user.id);
 
       if (isNewUser) {
+        await this.authService.recordSignupAttribution(
+          user.id,
+          parseAttributionCookie(req.cookies?.[ATTRIBUTION_COOKIE]),
+        );
         // 신규 가입: 약관 동의 없이 임시 토큰으로 /auth/agree 페이지로 이동
         const pendingToken = await this.authService.generatePendingTermsToken(
           user.id,

@@ -27,6 +27,12 @@ model User {
   updatedAt                      DateTime              @updatedAt
   status                         UserStatus            @default(OFFLINE)
   lastSeenAt                     DateTime?
+  /// 가입 유입 경로 (첫 방문 쿠키 기준, 가입 시 한 번만 기록하고 바꾸지 않는다).
+  /// null 은 "쿠키가 없었다" — 이 기능 이전 가입자이거나 쿠키를 막은 사람이다.
+  signupSource                   String?
+  signupMedium                   String?
+  /// 외부 유입이면 리퍼러의 호스트만 (경로·쿼리는 저장하지 않는다)
+  signupReferrer                 String?
   reputationScore                Float?
   isBanned                       Boolean               @default(false)
   banReason                      String?

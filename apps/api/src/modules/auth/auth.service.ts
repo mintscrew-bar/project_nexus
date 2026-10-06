@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -23,6 +24,7 @@ import {
   encryptSensitive,
   sensitiveLookup,
 } from "../../common/security/data-protection";
+import type { SignupAttribution } from "../common/signup-attribution.util";
 
 const REFRESH_COOKIE_PREFIX = "v2";
 const REFRESH_TOKEN_HASH_PREFIX = "sha256:";
@@ -59,6 +61,8 @@ export interface LoginDto {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -331,7 +335,43 @@ export class AuthService {
   // Email Registration & Login
   // ========================================
 
-  async register(dto: RegisterDto) {
+  /**
+   * 가입 유입 경로를 유저에 **한 번만** 기록한다.
+   *
+   * 이미 값이 있거나(재호출) 가입한 지 오래된 계정이면 건드리지 않는다. OAuth 로
+   * 기존 계정을 연결할 때도 `isNewUser` 가 true 일 수 있어, 가입 직후 계정으로만
+   * 한정하지 않으면 예전 계정에 지금의 유입 경로가 찍힌다. 통계용 부가 기록이라
+   * 실패해도 가입·로그인을 막지 않는다.
+   */
+  async recordSignupAttribution(
+    userId: string,
+    attribution: SignupAttribution | null,
+  ): Promise<void> {
+    if (!attribution) return;
+    try {
+      await this.prisma.user.updateMany({
+        where: {
+          id: userId,
+          signupSource: null,
+          createdAt: { gte: new Date(Date.now() - 10 * 60_000) },
+        },
+        data: {
+          signupSource: attribution.source,
+          signupMedium: attribution.medium,
+          signupReferrer: attribution.referrer,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `가입 유입 경로 기록 실패 (${userId}): ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async register(
+    dto: RegisterDto,
+    attribution: SignupAttribution | null = null,
+  ) {
     // Validate terms agreement
     if (!dto.termsOfService || !dto.privacyPolicy || !dto.ageVerification) {
       throw new BadRequestException("Must agree to required terms");
@@ -376,6 +416,8 @@ export class AuthService {
         },
       },
     });
+
+    await this.recordSignupAttribution(user.id, attribution);
 
     return this.generateTokens(user);
   }

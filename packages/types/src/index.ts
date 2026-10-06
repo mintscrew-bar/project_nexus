@@ -370,3 +370,4 @@ export {
   ROLE_SELECTION_TIME_MS,
   ROLE_SELECTION_EXTENSION_MS,
 } from './role-selection';
+export * from "./signup-attribution";
