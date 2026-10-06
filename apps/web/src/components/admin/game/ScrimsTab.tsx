@@ -130,7 +130,7 @@ function ScrimDetailModal({
     confirmText: string,
     action: () => Promise<unknown>,
     done: string,
-    options: { title: string; label: string } = {
+    options: { title: string; label: string; danger?: boolean } = {
       title: "확인",
       label: "진행",
     },
@@ -139,7 +139,7 @@ function ScrimDetailModal({
       title: options.title,
       message: confirmText,
       confirmLabel: options.label,
-      danger: true,
+      danger: options.danger ?? true,
     });
     if (!ok) return;
     setBusy(true);
@@ -216,6 +216,7 @@ function ScrimDetailModal({
                           `${round.roundNumber}라운드 결과 ${round.results.length}팀을 지우고 처음 상태로 되돌립니다. 계속할까요?`,
                           () => adminApi.resetScrimRound(detail.id, round.id),
                           "라운드를 되돌렸습니다.",
+                          { title: "라운드 결과 초기화", label: "초기화" },
                         )
                       }
                     >
@@ -271,7 +272,7 @@ function ScrimDetailModal({
                       "수집 오류를 지우고 다음 수집 주기에 다시 가져오게 합니다.",
                       () => adminApi.retryScrimCollection(detail.id),
                       "다음 수집 주기에 다시 확인합니다.",
-                      { title: "수집 재시도", label: "재시도" },
+                      { title: "수집 재시도", label: "재시도", danger: false },
                     )
                   }
                 >

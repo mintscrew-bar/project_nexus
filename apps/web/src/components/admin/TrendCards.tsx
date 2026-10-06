@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   adminApi,
   type AdminCohort,
@@ -27,7 +27,18 @@ const DAY_OPTIONS = [14, 30, 90];
  * null(기록 없음)은 0 으로 그리지 않고 선을 끊는다 — 0 은 "없었다" 가 아니라 "0 이었다" 다.
  */
 function LineChart({ rows, lines }: { rows: AdminDailyStat[]; lines: Line[] }) {
-  const W = 600;
+  // 카드 폭에 맞춘다. viewBox 비율을 고정하면 넓은 카드에서 그래프가 가운데에 좁게 놓인다.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [W, setW] = useState(600);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => setW(Math.max(280, Math.round(el.clientWidth)));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   const H = 160;
   const pad = { l: 36, r: 8, t: 8, b: 20 };
   const innerW = W - pad.l - pad.r;
@@ -57,8 +68,8 @@ function LineChart({ rows, lines }: { rows: AdminDailyStat[]; lines: Line[] }) {
   };
 
   return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-40 w-full" role="img">
+    <div ref={wrapRef}>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img">
         {[0, 0.5, 1].map((t) => (
           <g key={t}>
             <line

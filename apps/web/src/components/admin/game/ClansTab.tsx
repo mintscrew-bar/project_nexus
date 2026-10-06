@@ -169,6 +169,7 @@ export function ClansTab({ addToast }: { addToast: AddToast }) {
                         <Button
                           size="sm"
                           variant="danger"
+                          aria-label={`${clan.name} 클랜 삭제`}
                           onClick={() => handleDelete(clan)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
