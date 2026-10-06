@@ -32,6 +32,7 @@ import {
   AdminInternalMatchesQueryDto,
   AdminRecomputeStatsQueryDto,
   SendUserMessageDto,
+  AdminRoomFunnelQueryDto,
 } from "./dto/admin-query.dto";
 
 @Controller("admin")
@@ -51,6 +52,15 @@ export class AdminController {
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   getStats(@Query() query: AdminGameQueryDto) {
     return this.adminService.getStats({ gameTitle: query.gameTitle });
+  }
+
+  @Get("room-funnel")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  getRoomFunnel(@Query() query: AdminRoomFunnelQueryDto) {
+    return this.adminService.getRoomFunnel({
+      gameTitle: query.gameTitle,
+      days: query.days,
+    });
   }
 
   @Post("matches/recompute-stats")

@@ -1,3 +1,4 @@
+import { computeRoomFunnel } from "./room-funnel";
 import {
   Injectable,
   Logger,
@@ -113,6 +114,9 @@ function validateFutureDate(dateStr: string, fieldName: string): Date {
   }
   return date;
 }
+
+/** 깔때기 한 번에 읽는 최대 행 수 */
+const ROOM_FUNNEL_ROW_LIMIT = 5000;
 
 @Injectable()
 export class AdminService {
@@ -1489,6 +1493,52 @@ export class AdminService {
       { previousAttempts: match.collectAttempts },
     );
     return { ok: true };
+  }
+
+  /**
+   * 방 깔때기. `RoomOutcome` 이 쌓이기 시작한 뒤의 방만 집계된다.
+   * 응답의 `since` 는 요청 기간이고 `firstRecordAt` 은 실제 첫 기록 시각이다 —
+   * 둘이 다르면 기록이 아직 기간을 못 채운 것이라 화면이 그렇게 알려야 한다.
+   */
+  async getRoomFunnel(params: { gameTitle?: GameTitle; days?: number }) {
+    const days = Math.min(Math.max(params.days ?? 30, 1), 90);
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const where = {
+      endedAt: { gte: since },
+      ...(params.gameTitle ? { gameTitle: params.gameTitle } : {}),
+    };
+
+    const [rows, first] = await Promise.all([
+      this.prisma.roomOutcome.findMany({
+        where,
+        select: {
+          createdAt: true,
+          startedAt: true,
+          maxParticipants: true,
+          participantCount: true,
+          humanCount: true,
+          hadResult: true,
+          hostIsBot: true,
+        },
+        // 상한을 둬서 기간이 길어도 메모리를 지킨다. 넘치면 잘렸다고 알린다.
+        orderBy: { endedAt: "desc" },
+        take: ROOM_FUNNEL_ROW_LIMIT + 1,
+      }),
+      this.prisma.roomOutcome.findFirst({
+        orderBy: { endedAt: "asc" },
+        select: { endedAt: true },
+      }),
+    ]);
+
+    const truncated = rows.length > ROOM_FUNNEL_ROW_LIMIT;
+    return {
+      days,
+      gameTitle: params.gameTitle ?? null,
+      since,
+      firstRecordAt: first?.endedAt ?? null,
+      truncated,
+      ...computeRoomFunnel(rows.slice(0, ROOM_FUNNEL_ROW_LIMIT)),
+    };
   }
 
   /** 스크림 상세 — 라운드별 팀 결과와 수집 상태까지 */
