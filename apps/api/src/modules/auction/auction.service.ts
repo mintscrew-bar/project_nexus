@@ -1245,6 +1245,72 @@ export class AuctionService implements OnModuleInit {
   }
 
   /**
+   * 포기 정족수에 드는 팀. 만석 팀은 입찰 불가라 뺀다. 만석 기준은 게임별 팀 정원이다 —
+   * 5로 두면 이미 찬 배그 팀이 정족수에 남아 마감이 오지 않는다.
+   */
+  private _foldEligibleTeamIds(room: any): Set<string> {
+    const teamSize = teamSizeForRoom(room);
+    return new Set(
+      room.teams
+        .filter((team: any) => (team._count?.members ?? 0) < teamSize)
+        .map((team: any) => team.id),
+    );
+  }
+
+  /**
+   * 포기로 이번 매물이 끝났는가. 포기할 때와 입찰할 때 **같은 규칙**으로 판단한다.
+   *  - 입찰자가 있으면: 입찰자를 뺀 나머지가 전부 포기
+   *  - 입찰자가 없으면: 전원 포기 (유찰)
+   */
+  private _isClosedByFolds(
+    state: AuctionState,
+    eligibleTeamIds: Set<string>,
+  ): boolean {
+    const folded = new Set(state.skipTeamIds ?? []);
+    const remaining = [...eligibleTeamIds].filter((id) => !folded.has(id));
+    return state.currentHighestBidder
+      ? remaining.every((id) => id === state.currentHighestBidder)
+      : remaining.length === 0;
+  }
+
+  /**
+   * 입찰 직후, 다른 팀이 모두 이미 포기한 상태인지 본다.
+   *
+   * 포기할 때만 마감을 판정하면 순서에 따라 결과가 달라진다. "상대가 먼저 포기 → 내가
+   * 입찰" 이면 남은 경쟁자가 없는데도 판정이 돌지 않아, 입찰로 연장된 타이머가 끝날
+   * 때까지 기다렸다(2026-10-06 제보). 마감이면 타이머를 지금으로 당기고 true 를 돌려준다
+   * — 게이트웨이가 포기 때와 같은 방식으로 즉시 낙찰 처리한다.
+   */
+  async closeIfOthersFolded(roomId: string): Promise<boolean> {
+    const state = this.auctionStates.get(roomId);
+    // 포기한 팀이 없거나 입찰자가 없으면 볼 것이 없다 (일반 입찰 경로)
+    if (!state?.currentHighestBidder || !(state.skipTeamIds ?? []).length) {
+      return false;
+    }
+
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        teams: {
+          select: {
+            id: true,
+            captainId: true,
+            _count: { select: { members: true } },
+          },
+        },
+      },
+    });
+    if (!room) return false;
+
+    if (!this._isClosedByFolds(state, this._foldEligibleTeamIds(room))) {
+      return false;
+    }
+    state.timerEnd = Date.now();
+    this._setAuctionState(roomId, state);
+    return true;
+  }
+
+  /**
    * 현재 매물 입찰 포기(fold).
    *
    * 포기한 팀은 이번 매물에 입찰할 수 없고(placeBid에서 차단), 매물이 바뀌면
@@ -1306,14 +1372,7 @@ export class AuctionService implements OnModuleInit {
       throw new BadRequestException("현재 최고 입찰자는 포기할 수 없습니다.");
     }
 
-    // 만석 팀은 입찰 불가라 정족수에서 뺀다. 만석 기준은 게임별 팀 정원이다 —
-    // 5로 두면 이미 찬 배그 팀이 정족수에 남아 마감이 오지 않는다.
-    const foldTeamSize = teamSizeForRoom(room);
-    const eligibleTeamIds = new Set(
-      room.teams
-        .filter((team: any) => (team._count?.members ?? 0) < foldTeamSize)
-        .map((team: any) => team.id),
-    );
+    const eligibleTeamIds = this._foldEligibleTeamIds(room);
 
     const folded = new Set(state.skipTeamIds ?? []);
     folded.add(captainTeam.id);
@@ -1321,19 +1380,13 @@ export class AuctionService implements OnModuleInit {
     state.skipTeamIds = [...folded].filter((id) => eligibleTeamIds.has(id));
 
     const highestBidderTeamId = state.currentHighestBidder;
-    // 아직 포기하지 않은 입찰 가능 팀
-    const remaining = [...eligibleTeamIds].filter(
-      (id) => !state.skipTeamIds!.includes(id),
-    );
 
     // 표시용 정족수: 입찰자가 있으면 그 팀은 포기 대상이 아니므로 뺀다.
     state.skipVotesRequired = highestBidderTeamId
       ? Math.max(eligibleTeamIds.size - 1, 0)
       : eligibleTeamIds.size;
 
-    const shouldResolve = highestBidderTeamId
-      ? remaining.every((id) => id === highestBidderTeamId)
-      : remaining.length === 0;
+    const shouldResolve = this._isClosedByFolds(state, eligibleTeamIds);
 
     if (shouldResolve) {
       state.timerEnd = Date.now();

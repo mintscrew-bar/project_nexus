@@ -538,18 +538,24 @@ export class AuctionGateway
     }
 
     try {
-      const state = await this._withRoomBidLock(data.roomId, async () => {
+      const result = await this._withRoomBidLock(data.roomId, async () => {
         if (this.resolvingRooms.has(data.roomId)) {
           throw new Error(
             "현재 낙찰 처리 중입니다. 잠시 후 다시 시도해주세요.",
           );
         }
-        return this.auctionService.placeBid(
+        const placed = await this.auctionService.placeBid(
           client.userId!,
           data.roomId,
           data.amount,
         );
+        // 다른 팀이 모두 이미 포기했으면 이 입찰로 낙찰이 확정된다 (같은 락 안에서 판정)
+        const closed = await this.auctionService.closeIfOthersFolded(
+          data.roomId,
+        );
+        return { placed, closed };
       });
+      const state = result.placed;
 
       // Broadcast to all clients in the room
       this.server.to(`room:${data.roomId}`).emit("bid-placed", {
@@ -561,7 +567,8 @@ export class AuctionGateway
         serverNow: Date.now(),
         timestamp: new Date().toISOString(),
       });
-      this._scheduleBidResolve(data.roomId, state.timerEnd);
+      if (result.closed) this._closeFoldedItem(data.roomId);
+      else this._scheduleBidResolve(data.roomId, state.timerEnd);
 
       return { success: true, state };
     } catch (error: any) {
@@ -598,14 +605,7 @@ export class AuctionGateway
 
       // 입찰자만 남았거나 전원이 포기 → 즉시 마감 (낙찰 또는 유찰)
       if (foldResult.allCaptainsAgreed) {
-        this._cancelBidResolve(data.roomId);
-        this.emitTimerExpired(data.roomId);
-        this._resolveCurrentBidAndAdvance(data.roomId).catch((error) => {
-          console.error(
-            `[Auction] Failed to resolve folded item in room ${data.roomId}:`,
-            error,
-          );
-        });
+        this._closeFoldedItem(data.roomId);
       }
 
       return { success: true, skipVote: foldResult };
@@ -878,12 +878,19 @@ export class AuctionGateway
     if (minBid > bot.availableToBid) return;
 
     try {
-      const newState = await this._withRoomBidLock(roomId, async () => {
+      const result = await this._withRoomBidLock(roomId, async () => {
         if (this.resolvingRooms.has(roomId)) {
           throw new Error("Resolving bid");
         }
-        return this.auctionService.placeBid(botCaptainId, roomId, minBid);
+        const placed = await this.auctionService.placeBid(
+          botCaptainId,
+          roomId,
+          minBid,
+        );
+        const closed = await this.auctionService.closeIfOthersFolded(roomId);
+        return { placed, closed };
       });
+      const newState = result.placed;
 
       this.server.to(`room:${roomId}`).emit("bid-placed", {
         userId: botCaptainId,
@@ -894,7 +901,8 @@ export class AuctionGateway
         serverNow: Date.now(),
         timestamp: new Date().toISOString(),
       });
-      this._scheduleBidResolve(roomId, newState.timerEnd);
+      if (result.closed) this._closeFoldedItem(roomId);
+      else this._scheduleBidResolve(roomId, newState.timerEnd);
     } catch {
       // Ignore races such as timer expiry or stale state.
     }
@@ -907,6 +915,21 @@ export class AuctionGateway
         this.botBidTimers.delete(key);
       }
     }
+  }
+
+  /**
+   * 포기로 끝난 매물을 즉시 마감한다 (낙찰 또는 유찰). 포기 직후와, 다른 팀이 모두 포기한
+   * 뒤의 입찰 직후 두 경로가 같이 쓴다.
+   */
+  private _closeFoldedItem(roomId: string): void {
+    this._cancelBidResolve(roomId);
+    this.emitTimerExpired(roomId);
+    this._resolveCurrentBidAndAdvance(roomId).catch((error) => {
+      console.error(
+        `[Auction] Failed to resolve folded item in room ${roomId}:`,
+        error,
+      );
+    });
   }
 
   private _cancelBidResolve(roomId: string): void {

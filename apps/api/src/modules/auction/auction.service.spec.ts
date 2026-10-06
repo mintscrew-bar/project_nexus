@@ -783,6 +783,63 @@ describe("AuctionService", () => {
       expect(beforeFinalFold.timerEnd).toBeLessThanOrEqual(Date.now());
     });
 
+    describe("포기 뒤의 입찰 (2026-10-06 제보: 상대가 먼저 포기하면 다음 매물로 안 넘어감)", () => {
+      it("다른 팀이 모두 포기한 뒤 입찰하면 즉시 마감한다 — 포기 때와 같은 규칙", async () => {
+        const state = (service as any).auctionStates.get(roomId);
+        // team-2, team-3 이 입찰 전에 포기했고, 이제 team-1 이 입찰했다
+        state.skipTeamIds = ["team-2", "team-3"];
+        state.currentHighestBid = 100;
+        state.currentHighestBidder = "team-1";
+
+        await expect(service.closeIfOthersFolded(roomId)).resolves.toBe(true);
+        // 연장된 타이머를 기다리지 않도록 지금으로 당긴다
+        expect(state.timerEnd).toBeLessThanOrEqual(Date.now());
+      });
+
+      it("아직 포기하지 않은 경쟁 팀이 있으면 마감하지 않는다", async () => {
+        const state = (service as any).auctionStates.get(roomId);
+        state.skipTeamIds = ["team-2"];
+        state.currentHighestBid = 100;
+        state.currentHighestBidder = "team-1";
+        const before = state.timerEnd;
+
+        await expect(service.closeIfOthersFolded(roomId)).resolves.toBe(false);
+        expect(state.timerEnd).toBe(before);
+      });
+
+      it("포기한 팀이 없으면 DB 를 보지 않고 일반 입찰로 둔다", async () => {
+        const state = (service as any).auctionStates.get(roomId);
+        state.currentHighestBidder = "team-1";
+        prisma.room.findUnique.mockClear();
+
+        await expect(service.closeIfOthersFolded(roomId)).resolves.toBe(false);
+        expect(prisma.room.findUnique).not.toHaveBeenCalled();
+      });
+
+      it("만석 팀은 경쟁자로 치지 않는다 — 남은 팀이 만석이면 포기 안 해도 마감", async () => {
+        prisma.room.findUnique.mockResolvedValue({
+          id: roomId,
+          participants: [currentPlayer],
+          teams: [
+            { id: "team-1", captainId: "captain-1", _count: { members: 2 } },
+            { id: "team-2", captainId: "captain-2", _count: { members: 2 } },
+            // 만석(롤 5인) — 입찰할 수 없으므로 정족수에서 빠진다
+            { id: "team-3", captainId: "captain-3", _count: { members: 5 } },
+          ],
+        });
+        const state = (service as any).auctionStates.get(roomId);
+        state.skipTeamIds = ["team-2"];
+        state.currentHighestBidder = "team-1";
+
+        await expect(service.closeIfOthersFolded(roomId)).resolves.toBe(true);
+      });
+
+      it("상태가 없으면 false (경매 종료 직후 등)", async () => {
+        (service as any).auctionStates.delete(roomId);
+        await expect(service.closeIfOthersFolded(roomId)).resolves.toBe(false);
+      });
+    });
+
     it("입찰자가 있으면 나머지 전원이 포기할 때 즉시 낙찰로 마감한다", async () => {
       const state = (service as any).auctionStates.get(roomId);
       state.currentHighestBid = 300;
