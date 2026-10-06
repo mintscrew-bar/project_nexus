@@ -2571,6 +2571,14 @@ export interface AdminDailyStat {
   records: number | null;
 }
 
+export interface AdminSignupSource {
+  /** null 은 이 기능 이전 가입자이거나 쿠키를 막은 사람 */
+  source: string | null;
+  signups: number;
+  linked: number;
+  played: number;
+}
+
 export interface AdminCohort {
   weekStart: string;
   signups: number;
@@ -2875,6 +2883,12 @@ export const adminApi = {
       params: { scope, days },
     });
     return response.data as AdminDailyStat[];
+  },
+  getSignupSources: async (days = 30) => {
+    const response = await apiClient.get("/admin/stats/signup-sources", {
+      params: { days },
+    });
+    return response.data as AdminSignupSource[];
   },
   getCohortSurvival: async (weeks = 8) => {
     const response = await apiClient.get("/admin/stats/cohorts", {

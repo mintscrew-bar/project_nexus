@@ -202,6 +202,62 @@ export class AdminStatsSnapshotService implements OnApplicationBootstrap {
     return cohorts;
   }
 
+  /**
+   * 유입 경로별 가입과 그 뒤의 진행.
+   *
+   * - `linked`: 라이엇 또는 PUBG 계정을 연동한 가입자
+   * - `played`: **롤** 내전을 끝까지 치러 로스터 스냅샷이 남은 가입자. 배그 스크림은
+   *   결과가 유저가 아니라 팀 이름으로 쌓여서 유저 단위로는 셀 수 없다.
+   *
+   * `source` 가 null 이면 이 기능 이전 가입자이거나 쿠키를 막은 사람이다. 섞어 버리면
+   * 유입 경로 성과가 희석되므로 따로 보여 준다.
+   */
+  async getSignupSources(days: number) {
+    const since = new Date(
+      Date.now() - Math.min(Math.max(days, 1), 365) * 86_400_000,
+    );
+    const base = { createdAt: { gte: since }, NOT: TEST_BOT_USER_WHERE };
+
+    const groups = await this.prisma.user.groupBy({
+      by: ["signupSource"],
+      where: base,
+      _count: { _all: true },
+      orderBy: { _count: { signupSource: "desc" } },
+      take: 20,
+    });
+
+    return Promise.all(
+      groups.map(async (g) => {
+        const where = { ...base, signupSource: g.signupSource };
+        const [linked, played] = await Promise.all([
+          this.prisma.user.count({
+            where: {
+              ...where,
+              OR: [
+                { riotAccounts: { some: {} } },
+                { pubgAccounts: { some: {} } },
+              ],
+            },
+          }),
+          this.prisma.user.count({
+            where: {
+              ...where,
+              matchRosterSnapshots: {
+                some: { match: { isInternal: true, status: "COMPLETED" } },
+              },
+            },
+          }),
+        ]);
+        return {
+          source: g.signupSource,
+          signups: g._count._all,
+          linked,
+          played,
+        };
+      }),
+    );
+  }
+
   /** 기간 안의 시계열. 오래된 날부터. */
   async getSeries(scope: "ALL" | "LOL" | "PUBG", days: number) {
     const clamped = Math.min(Math.max(days, 1), 365);

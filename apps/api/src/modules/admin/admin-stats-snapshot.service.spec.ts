@@ -181,3 +181,50 @@ describe("AdminStatsSnapshotService.getCohortSurvival", () => {
     expect(await service.getCohortSurvival(999)).toHaveLength(26);
   });
 });
+
+describe("AdminStatsSnapshotService.getSignupSources", () => {
+  it("유입 경로별로 가입·연동·내전 완주를 센다 — 경로 없음(null)은 따로 둔다", async () => {
+    const { service, prisma } = make();
+    prisma.user.groupBy = jest.fn().mockResolvedValue([
+      { signupSource: "youtube", _count: { _all: 5 } },
+      { signupSource: null, _count: { _all: 20 } },
+    ]);
+    prisma.user.count
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(4)
+      .mockResolvedValueOnce(0);
+
+    const rows = await service.getSignupSources(30);
+
+    expect(rows).toEqual([
+      { source: "youtube", signups: 5, linked: 3, played: 1 },
+      { source: null, signups: 20, linked: 4, played: 0 },
+    ]);
+  });
+
+  it("봇을 빼고 기간으로 좁힌다", async () => {
+    const { service, prisma } = make();
+    prisma.user.groupBy = jest.fn().mockResolvedValue([]);
+    await service.getSignupSources(7);
+
+    const where = prisma.user.groupBy.mock.calls[0][0].where;
+    expect(where.NOT).toBeDefined();
+    const days = (Date.now() - where.createdAt.gte.getTime()) / 86_400_000;
+    expect(days).toBeCloseTo(7, 1);
+  });
+
+  it("내전 완주는 끝난 내부 내전의 로스터로만 센다", async () => {
+    const { service, prisma } = make();
+    prisma.user.groupBy = jest
+      .fn()
+      .mockResolvedValue([{ signupSource: "x", _count: { _all: 1 } }]);
+    await service.getSignupSources(30);
+
+    const playedWhere = prisma.user.count.mock.calls[1][0].where;
+    expect(playedWhere.matchRosterSnapshots.some.match).toEqual({
+      isInternal: true,
+      status: "COMPLETED",
+    });
+  });
+});

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   adminApi,
   type AdminCohort,
+  type AdminSignupSource,
   type AdminDailyStat,
 } from "@/lib/api-client";
 import type { GameTitle } from "@nexus/types";
@@ -124,6 +125,7 @@ export function TrendCards({ game }: { game: GameTitle | null }) {
   const [days, setDays] = useState(30);
   const [rows, setRows] = useState<AdminDailyStat[] | null>(null);
   const [cohorts, setCohorts] = useState<AdminCohort[] | null>(null);
+  const [sources, setSources] = useState<AdminSignupSource[] | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -146,10 +148,14 @@ export function TrendCards({ game }: { game: GameTitle | null }) {
       .getCohortSurvival(8)
       .then((r) => !cancelled && setCohorts(r))
       .catch(() => undefined);
+    adminApi
+      .getSignupSources(days)
+      .then((r) => !cancelled && setSources(r))
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [game]);
+  }, [game, days]);
 
   const userLines: Line[] = [
     {
@@ -246,6 +252,55 @@ export function TrendCards({ game }: { game: GameTitle | null }) {
           )}
         </CardContent>
       </Card>
+
+      {!game && sources && sources.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              유입 경로별 가입 ({days}일)
+            </CardTitle>
+            <p className="text-[11px] text-text-muted">
+              연동 = 라이엇·PUBG 계정을 연결한 가입자, 내전 완주 = 롤 내전을
+              끝까지 친 가입자(배그는 유저 단위로 셀 수 없음). 경로 없음은 기능
+              도입 이전 가입자이거나 쿠키를 막은 사람입니다.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-xs">
+              <thead className="text-text-muted">
+                <tr>
+                  <th className="py-1 text-left font-medium">경로</th>
+                  <th className="text-right font-medium">가입</th>
+                  <th className="text-right font-medium">연동</th>
+                  <th className="text-right font-medium">내전 완주</th>
+                </tr>
+              </thead>
+              <tbody className="tabular-nums text-text-secondary">
+                {sources.map((s) => (
+                  <tr key={s.source ?? "__none__"}>
+                    <td className="py-0.5 text-text-primary">
+                      {s.source ?? "경로 없음"}
+                    </td>
+                    <td className="text-right">{s.signups}</td>
+                    <td className="text-right">
+                      {s.linked}
+                      <span className="ml-1 text-text-muted">
+                        ({Math.round((s.linked / s.signups) * 100)}%)
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      {s.played}
+                      <span className="ml-1 text-text-muted">
+                        ({Math.round((s.played / s.signups) * 100)}%)
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
 
       {!game && cohorts && (
         <Card>

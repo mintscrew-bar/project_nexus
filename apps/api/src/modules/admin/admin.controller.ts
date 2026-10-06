@@ -72,6 +72,12 @@ export class AdminController {
     return this.statsSnapshot.getSeries(query.scope, query.days);
   }
 
+  @Get("stats/signup-sources")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  getSignupSources(@Query("days") days?: string) {
+    return this.statsSnapshot.getSignupSources(Number(days) || 30);
+  }
+
   @Get("stats/cohorts")
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   getCohorts(@Query("weeks") weeks?: string) {
