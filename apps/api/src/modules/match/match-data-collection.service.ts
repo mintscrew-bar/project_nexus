@@ -3,6 +3,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RiotMatchService, MatchDto } from "../riot/riot-match.service";
 import { RankingService } from "../ranking/ranking.service";
 import { normalizeRiotPosition } from "./position-normalizer";
+import { MAX_COLLECT_ATTEMPTS } from "./match-collect.constants";
 
 type CrossrefExpectedMember = {
   puuid: string;
@@ -24,7 +25,6 @@ type CrossrefCandidateScore = {
 };
 
 /** 복구 큐에서 이 횟수만큼 실패하면 대상에서 제외한다. */
-export const MAX_COLLECT_ATTEMPTS = 10;
 /**
  * 한 사이클에서 실제로 처리할 매치 수.
  *

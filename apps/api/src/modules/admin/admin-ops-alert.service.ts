@@ -3,7 +3,7 @@ import { Cron } from "@nestjs/schedule";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
-import { MAX_COLLECT_ATTEMPTS } from "../match/match-data-collection.service";
+import { MAX_COLLECT_ATTEMPTS } from "../match/match-collect.constants";
 
 /** 같은 사유의 알림은 이 시간 안에 다시 보내지 않는다 */
 const REPEAT_SUPPRESS_MS = 6 * 60 * 60_000;
