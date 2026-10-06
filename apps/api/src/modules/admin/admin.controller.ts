@@ -41,8 +41,12 @@ import {
   AdminAuditLogsQueryDto,
 } from "./dto/admin-query.dto";
 import {
+  AddBotsDto,
   BanUserDto,
   BotCleanupDto,
+  PinPostDto,
+  RestrictUserDto,
+  UpdateUserRoleDto,
   ReviewAppealDto,
   ReviewReportDto,
   SendAnnouncementDto,
@@ -254,10 +258,14 @@ export class AdminController {
   @Roles(UserRole.ADMIN)
   updateUserRole(
     @Param("id") targetUserId: string,
-    @Body("role") role: UserRole,
+    @Body() body: UpdateUserRoleDto,
     @Request() req: any,
   ) {
-    return this.adminService.updateUserRole(targetUserId, role, req.user.sub);
+    return this.adminService.updateUserRole(
+      targetUserId,
+      body.role,
+      req.user.sub,
+    );
   }
 
   @Post("users/:id/ban")
@@ -285,13 +293,13 @@ export class AdminController {
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   restrictUser(
     @Param("id") targetUserId: string,
-    @Body("restrictedUntil") restrictedUntil: string,
+    @Body() body: RestrictUserDto,
     @Request() req: any,
   ) {
     return this.adminService.restrictUser(
       targetUserId,
       req.user.sub,
-      restrictedUntil,
+      body.restrictedUntil,
     );
   }
 
@@ -396,10 +404,10 @@ export class AdminController {
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   pinPost(
     @Param("id") postId: string,
-    @Body("isPinned") isPinned: boolean,
+    @Body() body: PinPostDto,
     @Request() req: any,
   ) {
-    return this.adminService.pinPost(postId, isPinned, req.user.sub);
+    return this.adminService.pinPost(postId, body.isPinned, req.user.sub);
   }
 
   @Delete("comments/:id")
@@ -457,13 +465,13 @@ export class AdminController {
   @Roles(UserRole.ADMIN)
   async addBotToRoom(
     @Param("id") roomId: string,
-    @Body("count") count = 1,
+    @Body() body: AddBotsDto,
     @Request() req: any,
   ) {
     const result = await this.adminService.addBotToRoom(
       roomId,
       req.user.sub,
-      count,
+      body.count ?? 1,
     );
 
     // 봇 추가 후 실시간 업데이트

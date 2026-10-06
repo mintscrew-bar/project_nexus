@@ -17,7 +17,7 @@ import { AuthGuard } from "@nestjs/passport";
 import { Throttle } from "@nestjs/throttler";
 import { CookieOptions, Request, Response } from "express";
 import { AuthService } from "./auth.service";
-import { AgreeToTermsDto, LoginDto, RegisterDto } from "./dto";
+import { AgreeToTermsDto, ExchangeCodeDto, LoginDto, RegisterDto } from "./dto";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
@@ -250,11 +250,8 @@ export class AuthController {
    */
   @Post("exchange")
   @HttpCode(HttpStatus.OK)
-  async exchangeCode(@Body("code") code: string, @Res() res: Response) {
-    if (!code) {
-      throw new BadRequestException("코드가 필요합니다.");
-    }
-    const tokens = await this.authService.exchangeOAuthCode(code);
+  async exchangeCode(@Body() body: ExchangeCodeDto, @Res() res: Response) {
+    const tokens = await this.authService.exchangeOAuthCode(body.code);
 
     this.setRefreshTokenCookie(res, tokens.refreshToken);
 

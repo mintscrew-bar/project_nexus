@@ -2,8 +2,12 @@ import "reflect-metadata";
 import { BadRequestException, ValidationPipe } from "@nestjs/common";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../../../common/validation-pipe.options";
 import {
+  AddBotsDto,
   BanUserDto,
   BotCleanupDto,
+  PinPostDto,
+  RestrictUserDto,
+  UpdateUserRoleDto,
   ReviewAppealDto,
   ReviewReportDto,
   SendAnnouncementDto,
@@ -166,4 +170,54 @@ describe("ReviewAppealDto", () => {
     ["메모가 너무 김", { status: "APPROVED", adminNote: "가".repeat(1001) }],
     ["모르는 키", { status: "APPROVED", reviewer: "x" }],
   ])("거부한다: %s", (_n, body) => rejects(ReviewAppealDto, body));
+});
+
+describe("UpdateUserRoleDto", () => {
+  it.each(["USER", "MODERATOR", "ADMIN"])("클라이언트 payload: %s", (role) =>
+    expect(run(UpdateUserRoleDto, { role })).resolves.toEqual({ role }),
+  );
+  it.each([
+    ["열거값이 아님", { role: "SUPERADMIN" }],
+    ["없음", {}],
+    ["소문자", { role: "admin" }],
+    ["모르는 키", { role: "USER", force: true }],
+  ])("거부한다: %s", (_n, body) => rejects(UpdateUserRoleDto, body));
+});
+
+describe("RestrictUserDto", () => {
+  it("클라이언트 payload: ISO 날짜 문자열", () =>
+    expect(
+      run(RestrictUserDto, { restrictedUntil: "2099-01-01T00:00:00.000Z" }),
+    ).resolves.toBeDefined());
+  it.each([
+    ["없음", {}],
+    ["문자열이 아님", { restrictedUntil: 20990101 }],
+    ["너무 김", { restrictedUntil: "a".repeat(41) }],
+    ["모르는 키", { restrictedUntil: "2099-01-01", reason: "x" }],
+  ])("거부한다: %s", (_n, body) => rejects(RestrictUserDto, body));
+});
+
+describe("PinPostDto", () => {
+  it.each([true, false])("클라이언트 payload: %s", (isPinned) =>
+    expect(run(PinPostDto, { isPinned })).resolves.toEqual({ isPinned }),
+  );
+  it.each([
+    ["문자열 'false' (고정으로 처리되는 것을 막는다)", { isPinned: "false" }],
+    ["없음", {}],
+    ["숫자 0", { isPinned: 0 }],
+  ])("거부한다: %s", (_n, body) => rejects(PinPostDto, body));
+});
+
+describe("AddBotsDto", () => {
+  it("클라이언트 payload: { count: 1 }", () =>
+    expect(run(AddBotsDto, { count: 1 })).resolves.toEqual({ count: 1 }));
+  it("생략하면 컨트롤러가 1 로 처리한다", () =>
+    expect(run(AddBotsDto, {})).resolves.toBeDefined());
+  it.each([
+    ["0", { count: 0 }],
+    ["소수", { count: 1.5 }],
+    ["문자열 '3' (암묵 변환 방지)", { count: "3" }],
+    ["51", { count: 51 }],
+    ["모르는 키", { count: 1, fill: true }],
+  ])("거부한다: %s", (_n, body) => rejects(AddBotsDto, body));
 });

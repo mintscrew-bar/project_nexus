@@ -5,3 +5,4 @@ export {
   UpdateStreamerGamesDto,
 } from "./upsert-streamer-profile.dto";
 export { UpsertStreamerLinkDto } from "./streamer-link.dto";
+export { SubmitAppealDto } from "./submit-appeal.dto";

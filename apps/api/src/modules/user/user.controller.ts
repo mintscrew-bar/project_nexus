@@ -29,6 +29,7 @@ import {
   UpsertStreamerProfileDto,
   UpdateStreamerGamesDto,
   UpsertStreamerLinkDto,
+  SubmitAppealDto,
 } from "./dto";
 import { UploadService } from "../upload/upload.service";
 import { StreamerPlatform } from "@nexus/database";
@@ -242,9 +243,9 @@ export class UserController {
   @Post("me/appeals")
   async submitAppeal(
     @CurrentUser("sub") userId: string,
-    @Body("reason") reason: string,
+    @Body() body: SubmitAppealDto,
   ) {
-    return this.userService.submitAppeal(userId, reason);
+    return this.userService.submitAppeal(userId, body.reason);
   }
 
   /**

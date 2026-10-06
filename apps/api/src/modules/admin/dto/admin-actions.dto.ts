@@ -1,9 +1,14 @@
+import { UserRole } from "@nexus/database";
 import {
   IsBoolean,
+  IsEnum,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from "class-validator";
 import { KeepRaw } from "../../../common/keep-raw.decorator";
@@ -97,4 +102,35 @@ export class ReviewAppealDto {
   @IsString()
   @MaxLength(1000, { message: "처리 메모는 1000자 이하여야 합니다." })
   adminNote?: string;
+}
+
+/** 유저 권한 변경 (ADMIN). 자기 자신·ADMIN 승격 제한은 서비스가 검사한다. */
+export class UpdateUserRoleDto {
+  @IsEnum(UserRole, { message: "유효한 권한 값을 선택해주세요." })
+  role!: UserRole;
+}
+
+/** 유저 이용 제한. 날짜 해석·미래 여부는 서비스가 검사한다. */
+export class RestrictUserDto {
+  @KeepRaw()
+  @IsString({ message: "restrictedUntil은 문자열이어야 합니다." })
+  @MaxLength(40, { message: "restrictedUntil 형식이 올바르지 않습니다." })
+  restrictedUntil!: string;
+}
+
+/** 글 고정/해제. 불리언이 문자열 "false" 로 와서 고정으로 처리되는 것을 막는다. */
+export class PinPostDto {
+  @KeepRaw()
+  @IsBoolean({ message: "isPinned는 true 또는 false여야 합니다." })
+  isPinned!: boolean;
+}
+
+/** 방에 테스트 봇 추가 (ADMIN). 생략하면 1명 — 정원 초과는 서비스가 막는다. */
+export class AddBotsDto {
+  @KeepRaw()
+  @IsOptional()
+  @IsInt({ message: "count는 정수여야 합니다." })
+  @Min(1)
+  @Max(50)
+  count?: number;
 }
