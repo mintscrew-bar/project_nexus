@@ -124,18 +124,29 @@ describe("AdminStatsSnapshotService 실행", () => {
 
   it("기동 시 비어 있으면 백필하고, 이미 있으면 하지 않는다", async () => {
     const empty = make({ existing: 0 });
-    await empty.service.onApplicationBootstrap();
+    await empty.service.backfillIfEmpty();
     expect(empty.prisma.adminDailyStat.upsert).toHaveBeenCalled();
 
     const filled = make({ existing: 10 });
-    await filled.service.onApplicationBootstrap();
+    await filled.service.backfillIfEmpty();
     expect(filled.prisma.adminDailyStat.upsert).not.toHaveBeenCalled();
   });
 
   it("기동 시 백필이 실패해도 던지지 않는다", async () => {
     const { service, prisma } = make();
     prisma.adminDailyStat.count.mockRejectedValue(new Error("no table"));
-    await expect(service.onApplicationBootstrap()).resolves.toBeUndefined();
+    await expect(service.backfillIfEmpty()).resolves.toBeUndefined();
+  });
+
+  it("기동 훅은 백필을 기다리지 않는다 — 서버 준비를 막지 않는다", async () => {
+    const { service, prisma } = make({ existing: 0 });
+    // 백필이 영원히 끝나지 않아도 훅은 즉시 돌아와야 한다.
+    prisma.adminDailyStat.count.mockReturnValue(new Promise(() => undefined));
+
+    const result = service.onApplicationBootstrap();
+
+    expect(result).toBeUndefined(); // Promise 를 돌려주지 않는다 = Nest 가 기다리지 않는다
+    expect(prisma.adminDailyStat.upsert).not.toHaveBeenCalled();
   });
 
   it("백필은 오늘을 뺀 지난 N일을 채운다", async () => {

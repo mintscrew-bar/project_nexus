@@ -29,11 +29,22 @@ export class AdminStatsSnapshotService implements OnApplicationBootstrap {
     private readonly redis: RedisService,
   ) {}
 
-  /** 비어 있으면 가능한 지표만 거꾸로 채운다. 실패해도 서버 기동을 막지 않는다. */
-  async onApplicationBootstrap() {
+  /**
+   * 기동 직후 백그라운드로 시작한다. 60일치 백필은 쿼리가 수백 개라 `await` 하면 그동안
+   * API 가 준비 상태가 되지 않고, DB 가 느리면 헬스체크 유예(60초)를 넘겨 재시작 루프로
+   * 갈 수 있다. 서버 기동을 절대 막지 않는다.
+   */
+  onApplicationBootstrap() {
+    void this.backfillIfEmpty();
+  }
+
+  /** 비어 있으면 가능한 지표만 거꾸로 채운다. 실패는 로그만 남긴다. */
+  async backfillIfEmpty() {
     try {
       const existing = await this.prisma.adminDailyStat.count();
-      if (existing === 0) await this.backfill(INITIAL_BACKFILL_DAYS);
+      if (existing > 0) return;
+      await this.backfill(INITIAL_BACKFILL_DAYS);
+      this.logger.log(`일별 지표 초기 백필 완료 (${INITIAL_BACKFILL_DAYS}일)`);
     } catch (error) {
       this.logger.warn(`일별 지표 초기 백필 실패: ${(error as Error).message}`);
     }
