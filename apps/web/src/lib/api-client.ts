@@ -2833,6 +2833,26 @@ export const adminApi = {
     const response = await apiClient.get("/admin/scrims", { params });
     return response.data;
   },
+  getScrimDetail: async (scrimId: string) => {
+    const response = await apiClient.get(`/admin/scrims/${scrimId}`);
+    return response.data;
+  },
+  resetScrimRound: async (scrimId: string, roundId: string) => {
+    const response = await apiClient.post(
+      `/admin/scrims/${scrimId}/rounds/${roundId}/reset`,
+    );
+    return response.data;
+  },
+  retryScrimCollection: async (scrimId: string) => {
+    const response = await apiClient.post(
+      `/admin/scrims/${scrimId}/retry-collection`,
+    );
+    return response.data;
+  },
+  cancelScrim: async (scrimId: string) => {
+    const response = await apiClient.post(`/admin/scrims/${scrimId}/cancel`);
+    return response.data;
+  },
   // 실제 진행된 내전 기록 (외부 랭크 인제스트 매치는 제외)
   getInternalMatches: async (params?: {
     page?: number;
