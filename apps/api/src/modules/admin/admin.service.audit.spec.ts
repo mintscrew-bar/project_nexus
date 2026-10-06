@@ -77,3 +77,61 @@ describe("AdminService.getAuditLogs", () => {
     expect(arg.take).toBe(20);
   });
 });
+
+describe("AdminService.exportDataset", () => {
+  function makeExport() {
+    const prisma: any = {
+      adminDailyStat: { findMany: jest.fn().mockResolvedValue([]) },
+      roomOutcome: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new AdminService(
+      prisma,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, prisma };
+  }
+
+  it("일별 지표는 범위를 골라 머리글과 함께 내보낸다", async () => {
+    const { service, prisma } = makeExport();
+    prisma.adminDailyStat.findMany.mockResolvedValue([
+      {
+        date: new Date("2026-10-05T00:00:00Z"),
+        scope: "ALL",
+        totalUsers: 10,
+        newUsers: 1,
+        active1d: null,
+        active7d: 3,
+        active30d: 5,
+        roomsEnded: null,
+        roomsStarted: null,
+        records: 2,
+      },
+    ]);
+    const file = await service.exportDataset("daily-stats", {});
+
+    expect(prisma.adminDailyStat.findMany.mock.calls[0][0].where.scope).toBe(
+      "ALL",
+    );
+    expect(file.filename).toMatch(/^daily-stats-all-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(file.csv).toContain("2026-10-05,ALL,10,1,,3,5,,,2");
+  });
+
+  it("방 기록에는 유저 식별 정보가 없다", async () => {
+    const { service } = makeExport();
+    const file = await service.exportDataset("room-outcomes", {});
+    expect(file.csv).not.toMatch(/userId|username|hostId/);
+  });
+
+  it("모르는 데이터셋은 404", async () => {
+    const { service } = makeExport();
+    await expect(service.exportDataset("users", {})).rejects.toThrow(
+      "내보낼 수 없는",
+    );
+  });
+});

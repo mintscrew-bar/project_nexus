@@ -212,7 +212,22 @@ export function TrendCards({ game }: { game: GameTitle | null }) {
               <TrendingUp className="h-4 w-4 text-accent-primary" />
               {game ? "일별 추이" : "활성 유저 추이"}
             </CardTitle>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() =>
+                  adminApi
+                    .downloadExport("daily-stats", {
+                      gameTitle: game ?? undefined,
+                      days,
+                    })
+                    .catch(() => undefined)
+                }
+                className="mr-1 rounded-md bg-bg-tertiary px-2.5 py-1 text-xs font-medium text-text-secondary hover:text-text-primary"
+                title="이 기간의 일별 지표를 CSV 로 저장"
+              >
+                CSV
+              </button>
               {DAY_OPTIONS.map((d) => (
                 <button
                   key={d}

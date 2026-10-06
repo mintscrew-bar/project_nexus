@@ -54,7 +54,19 @@ export function RoomFunnelCard({ game }: { game: GameTitle }) {
           <CardTitle className="flex items-center gap-2 text-base">
             <Filter className="h-4 w-4 text-accent-primary" />방 깔때기
           </CardTitle>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() =>
+                adminApi
+                  .downloadExport("room-outcomes", { gameTitle: game, days })
+                  .catch(() => undefined)
+              }
+              className="mr-1 rounded-md bg-bg-tertiary px-2.5 py-1 text-xs font-medium text-text-secondary hover:text-text-primary"
+              title="이 기간의 방 기록을 CSV 로 저장 (유저 식별 정보 없음)"
+            >
+              CSV
+            </button>
             {DAY_OPTIONS.map((d) => (
               <button
                 key={d}

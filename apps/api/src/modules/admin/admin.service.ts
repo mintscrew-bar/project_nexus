@@ -1,4 +1,5 @@
 import { computeRoomFunnel } from "./room-funnel";
+import { toCsv } from "./csv";
 import {
   Injectable,
   Logger,
@@ -1493,6 +1494,80 @@ export class AdminService {
       { previousAttempts: match.collectAttempts },
     );
     return { ok: true };
+  }
+
+  /**
+   * CSV 내보내기. 개인 식별 정보(유저 ID·이름)는 담지 않는다 — 집계와 방 단위 기록뿐이다.
+   * 외부 도구에서 분석할 때 DB 에 직접 붙지 않아도 되게 하는 것이 목적이다.
+   */
+  async exportDataset(
+    dataset: string,
+    params: { gameTitle?: GameTitle; days?: number },
+  ) {
+    const days = Math.min(Math.max(params.days ?? 30, 1), 365);
+    const since = new Date(Date.now() - days * 86_400_000);
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    if (dataset === "daily-stats") {
+      const scope = params.gameTitle ?? "ALL";
+      const rows = await this.prisma.adminDailyStat.findMany({
+        where: { scope, date: { gte: since } },
+        orderBy: { date: "asc" },
+        take: 400,
+      });
+      return {
+        filename: `daily-stats-${scope.toLowerCase()}-${stamp}.csv`,
+        csv: toCsv(
+          [
+            { key: "date", header: "날짜" },
+            { key: "scope", header: "범위" },
+            { key: "totalUsers", header: "가입 누계" },
+            { key: "newUsers", header: "신규 가입" },
+            { key: "active1d", header: "일간 활성" },
+            { key: "active7d", header: "주간 활성" },
+            { key: "active30d", header: "월간 활성" },
+            { key: "roomsEnded", header: "끝난 방" },
+            { key: "roomsStarted", header: "시작한 방" },
+            { key: "records", header: "기록 수" },
+          ],
+          rows.map((r) => ({ ...r, date: r.date.toISOString().slice(0, 10) })),
+        ),
+      };
+    }
+
+    if (dataset === "room-outcomes") {
+      const rows = await this.prisma.roomOutcome.findMany({
+        where: {
+          endedAt: { gte: since },
+          ...(params.gameTitle ? { gameTitle: params.gameTitle } : {}),
+        },
+        orderBy: { endedAt: "asc" },
+        take: 20000,
+      });
+      return {
+        filename: `room-outcomes-${(params.gameTitle ?? "all").toLowerCase()}-${stamp}.csv`,
+        csv: toCsv(
+          [
+            { key: "gameTitle", header: "게임" },
+            { key: "createdAt", header: "생성" },
+            { key: "startedAt", header: "시작" },
+            { key: "completedAt", header: "완료" },
+            { key: "endedAt", header: "삭제" },
+            { key: "finalStatus", header: "삭제 시 상태" },
+            { key: "maxParticipants", header: "정원" },
+            { key: "participantCount", header: "참가자" },
+            { key: "humanCount", header: "사람" },
+            { key: "hostIsBot", header: "봇 방" },
+            { key: "isPrivate", header: "비공개" },
+            { key: "scheduled", header: "예약" },
+            { key: "hadResult", header: "결과 있음" },
+          ],
+          rows as unknown as Record<string, unknown>[],
+        ),
+      };
+    }
+
+    throw new NotFoundException("내보낼 수 없는 데이터입니다.");
   }
 
   /** 봇이 만든 흔적 미리보기 — 지우기 전에 건수를 본다 */

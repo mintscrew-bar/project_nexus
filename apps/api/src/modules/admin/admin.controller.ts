@@ -1,3 +1,4 @@
+import type { Response } from "express";
 import {
   BadRequestException,
   Controller,
@@ -10,6 +11,7 @@ import {
   Query,
   UseGuards,
   Request,
+  Res,
   Inject,
   forwardRef,
 } from "@nestjs/common";
@@ -88,6 +90,27 @@ export class AdminController {
       throw new BadRequestException("정리할 대상을 하나 이상 고르세요.");
     }
     return this.adminService.cleanupBotData({ rooms, matches }, req.user.sub);
+  }
+
+  // ── 내보내기 (ADMIN 전용, 개인 식별 정보 없음) ───────────────────────────────
+  @Get("export/:dataset")
+  @Roles(UserRole.ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async exportDataset(
+    @Param("dataset") dataset: string,
+    @Query() query: AdminRoomFunnelQueryDto,
+    @Res() res: Response,
+  ) {
+    const file = await this.adminService.exportDataset(dataset, {
+      gameTitle: query.gameTitle,
+      days: query.days,
+    });
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${file.filename}"`,
+    );
+    res.send(file.csv);
   }
 
   // ── 관리 기록 (ADMIN 전용) ─────────────────────────────────────────────────

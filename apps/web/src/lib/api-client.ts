@@ -2889,6 +2889,25 @@ export const adminApi = {
     const response = await apiClient.get("/admin/scrims", { params });
     return response.data;
   },
+  /** CSV 내보내기 — 파일로 저장한다. 인증 헤더가 필요해 링크가 아니라 blob 으로 받는다. */
+  downloadExport: async (
+    dataset: "daily-stats" | "room-outcomes",
+    params?: { gameTitle?: GameTitle; days?: number },
+  ) => {
+    const response = await apiClient.get(`/admin/export/${dataset}`, {
+      params,
+      responseType: "blob",
+    });
+    const disposition = String(response.headers["content-disposition"] ?? "");
+    const name =
+      /filename="([^"]+)"/.exec(disposition)?.[1] ?? `${dataset}.csv`;
+    const url = URL.createObjectURL(response.data as Blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
   getBotCleanupPreview: async () => {
     const response = await apiClient.get("/admin/bot-cleanup/preview");
     return response.data as { rooms: number; matches: number };
