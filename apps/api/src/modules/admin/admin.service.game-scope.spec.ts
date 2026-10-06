@@ -23,6 +23,7 @@ function makeService(overrides: Record<string, any> = {}) {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    streamerProfile: { count: jest.fn().mockResolvedValue(0) },
     post: {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
@@ -180,5 +181,32 @@ describe("AdminService 게임 구분", () => {
     expect(prisma.post.findMany.mock.calls[0][0].where).toEqual({
       isDeleted: false,
     });
+  });
+
+  it("게임을 고르면 그 게임 전용 지표를 채운다 — 배그는 스크림, 롤은 내전 기록", async () => {
+    const pubg = makeService({
+      scrim: { count: jest.fn().mockResolvedValue(4), findMany: jest.fn() },
+    });
+    const pubgStats: any = await pubg.service.getStats({
+      gameTitle: "PUBG" as any,
+    });
+    expect(pubgStats.game.totalRecords).toBe(4);
+    expect(pubgStats.game.needsAttentionLabel).toBe("진행 중 스크림");
+    expect(pubg.prisma.match.count).toHaveBeenCalledTimes(1); // 공통 totalMatches 한 번뿐
+
+    const lol = makeService({
+      match: { count: jest.fn().mockResolvedValue(9) },
+    });
+    const lolStats: any = await lol.service.getStats({
+      gameTitle: "LOL" as any,
+    });
+    expect(lolStats.game.totalRecords).toBe(9);
+    expect(lolStats.game.needsAttentionLabel).toBe("결과 수집 대기");
+  });
+
+  it("게임을 안 고르면 게임 전용 지표는 없다", async () => {
+    const { service } = makeService();
+    const stats: any = await service.getStats();
+    expect(stats.game).toBeNull();
   });
 });

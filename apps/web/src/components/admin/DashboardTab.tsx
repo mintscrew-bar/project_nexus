@@ -125,50 +125,90 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
         */}
         {game && (
           <p className="mt-1 text-xs text-text-tertiary">
-            방·클랜은 {gameLabel} 기준입니다. 유저·신고·매치는 게임과 무관해
-            전체 수치입니다.
+            {gameLabel} 기준 지표입니다. 가입 유저·신고는 게임과 무관해 공통
+            탭에서 봅니다.
           </p>
         )}
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard
-          icon={<Users className="h-5 w-5" />}
-          label="가입 유저"
-          value={stats.totalUsers}
-          sub={
-            stats.botUsers
-              ? `봇 ${stats.botUsers.toLocaleString()}명 제외`
-              : undefined
-          }
-        />
-        <StatCard
-          icon={<Home className="h-5 w-5" />}
-          label={game ? `${gameLabel} 방` : "전체 방"}
-          value={stats.totalRooms}
-        />
-        <StatCard
-          icon={<Activity className="h-5 w-5" />}
-          label={game ? `${gameLabel} 활성 방` : "활성 방"}
-          value={stats.activeRooms}
-        />
-        <StatCard
-          icon={<Sword className="h-5 w-5" />}
-          label="롤 내전 기록"
-          value={stats.totalMatches}
-          sub={`배그 스크림 ${(stats.totalScrims ?? 0).toLocaleString()}건`}
-        />
-        <StatCard
-          icon={<Flag className="h-5 w-5" />}
-          label="미처리 신고"
-          value={stats.pendingReports}
-          sub={`유저 ${stats.pendingUserReports ?? 0} / 게시글 ${stats.pendingPostReports ?? 0}`}
-        />
-        <StatCard
-          icon={<Shield className="h-5 w-5" />}
-          label={game ? `${gameLabel} 클랜` : "전체 클랜"}
-          value={stats.totalClans}
-        />
-      </div>
+      {game && stats.game ? (
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatCard
+            icon={<Activity className="h-5 w-5" />}
+            label={`${gameLabel} 활성 방`}
+            value={stats.activeRooms}
+            sub={`대기 ${stats.game.waitingRooms} / 진행 ${stats.game.inProgressRooms}`}
+          />
+          <StatCard
+            icon={<Home className="h-5 w-5" />}
+            label="최근 7일 새 방"
+            value={stats.game.newRooms7d}
+            sub={`전체 ${stats.totalRooms.toLocaleString()}개`}
+          />
+          <StatCard
+            icon={<Sword className="h-5 w-5" />}
+            label={game === "PUBG" ? "스크림 기록" : "내전 기록"}
+            value={stats.game.totalRecords}
+            sub={`최근 7일 ${stats.game.records7d.toLocaleString()}건`}
+          />
+          <StatCard
+            icon={<Flag className="h-5 w-5" />}
+            label={stats.game.needsAttentionLabel}
+            value={stats.game.needsAttention}
+          />
+          <StatCard
+            icon={<Users className="h-5 w-5" />}
+            label="계정 연동 유저"
+            value={stats.game.linkedAccounts}
+            sub={game === "PUBG" ? "PUBG 계정" : "라이엇 계정"}
+          />
+          <StatCard
+            icon={<Shield className="h-5 w-5" />}
+            label={`${gameLabel} 클랜`}
+            value={stats.totalClans}
+            sub={`스트리머 ${stats.game.streamers}명 · 대기 ${stats.game.pendingStreamers} · 글 7일 ${stats.game.posts7d}`}
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatCard
+            icon={<Users className="h-5 w-5" />}
+            label="가입 유저"
+            value={stats.totalUsers}
+            sub={
+              stats.botUsers
+                ? `봇 ${stats.botUsers.toLocaleString()}명 제외`
+                : undefined
+            }
+          />
+          <StatCard
+            icon={<Home className="h-5 w-5" />}
+            label={game ? `${gameLabel} 방` : "전체 방"}
+            value={stats.totalRooms}
+          />
+          <StatCard
+            icon={<Activity className="h-5 w-5" />}
+            label={game ? `${gameLabel} 활성 방` : "활성 방"}
+            value={stats.activeRooms}
+          />
+          <StatCard
+            icon={<Sword className="h-5 w-5" />}
+            label="롤 내전 기록"
+            value={stats.totalMatches}
+            sub={`배그 스크림 ${(stats.totalScrims ?? 0).toLocaleString()}건`}
+          />
+          <StatCard
+            icon={<Flag className="h-5 w-5" />}
+            label="미처리 신고"
+            value={stats.pendingReports}
+            sub={`유저 ${stats.pendingUserReports ?? 0} / 게시글 ${stats.pendingPostReports ?? 0}`}
+          />
+          <StatCard
+            icon={<Shield className="h-5 w-5" />}
+            label={game ? `${gameLabel} 클랜` : "전체 클랜"}
+            value={stats.totalClans}
+          />
+        </div>
+      )}
 
       <Card>
         <CardHeader className="pb-3">

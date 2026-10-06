@@ -192,6 +192,8 @@ export class AdminService {
       this.prisma.scrim.count(),
     ]);
 
+    const gameDetail = gameTitle ? await this.getGameStats(gameTitle) : null;
+
     return {
       totalUsers,
       botUsers,
@@ -199,6 +201,8 @@ export class AdminService {
       activeRooms,
       totalMatches,
       totalScrims,
+      /** 게임을 골랐을 때만 채워지는 게임 전용 지표 */
+      game: gameDetail,
       pendingReports: pendingUserReports + pendingPostReports,
       pendingUserReports,
       pendingPostReports,
@@ -207,6 +211,94 @@ export class AdminService {
       gameTitle: gameTitle ?? null,
       /** 위 숫자 중 게임으로 좁혀진 것 */
       scopedByGame: ["totalRooms", "activeRooms", "totalClans"],
+    };
+  }
+
+  /**
+   * 한 게임만의 운영 지표.
+   *
+   * 기록이 쌓이는 곳이 게임마다 다르다 — 롤은 `Match`, 배그는 `Scrim`.
+   * `Match` 에는 게임 컬럼이 없지만 배그는 `Match` 를 쓰지 않으므로
+   * 롤 지표로만 쓴다.
+   */
+  private async getGameStats(gameTitle: GameTitle) {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const gameWhere = { gameTitle };
+
+    const [
+      waitingRooms,
+      inProgressRooms,
+      newRooms7d,
+      streamers,
+      pendingStreamers,
+      posts7d,
+      linkedAccounts,
+      records,
+    ] = await Promise.all([
+      this.prisma.room.count({ where: { ...gameWhere, status: "WAITING" } }),
+      this.prisma.room.count({
+        where: { ...gameWhere, status: "IN_PROGRESS" },
+      }),
+      this.prisma.room.count({
+        where: { ...gameWhere, createdAt: { gte: since } },
+      }),
+      this.prisma.streamerProfile.count({
+        where: { games: { has: gameTitle }, verifiedAt: { not: null } },
+      }),
+      this.prisma.streamerProfile.count({
+        where: { games: { has: gameTitle }, verifiedAt: null },
+      }),
+      this.prisma.post.count({
+        where: {
+          isDeleted: false,
+          createdAt: { gte: since },
+          board: { gameTitle },
+        },
+      }),
+      gameTitle === "PUBG"
+        ? this.prisma.user.count({
+            where: { pubgAccounts: { some: {} }, NOT: this.getTestBotWhere() },
+          })
+        : this.prisma.user.count({
+            where: { riotAccounts: { some: {} }, NOT: this.getTestBotWhere() },
+          }),
+      gameTitle === "PUBG"
+        ? Promise.all([
+            this.prisma.scrim.count(),
+            this.prisma.scrim.count({ where: { createdAt: { gte: since } } }),
+            this.prisma.scrim.count({ where: { status: "IN_PROGRESS" } }),
+          ])
+        : Promise.all([
+            this.prisma.match.count({ where: { isInternal: true } }),
+            this.prisma.match.count({
+              where: { isInternal: true, createdAt: { gte: since } },
+            }),
+            // 끝났는데 Riot 결과를 아직 못 가져온 경기 — 운영자가 챙겨야 할 것
+            this.prisma.match.count({
+              where: {
+                isInternal: true,
+                status: "COMPLETED",
+                dataCollected: false,
+              },
+            }),
+          ]),
+    ]);
+
+    const [totalRecords, records7d, needsAttention] = records;
+    return {
+      waitingRooms,
+      inProgressRooms,
+      newRooms7d,
+      streamers,
+      pendingStreamers,
+      posts7d,
+      linkedAccounts,
+      totalRecords,
+      records7d,
+      /** 롤: 결과 수집 대기 / 배그: 진행 중 스크림 */
+      needsAttention,
+      needsAttentionLabel:
+        gameTitle === "PUBG" ? "진행 중 스크림" : "결과 수집 대기",
     };
   }
 
