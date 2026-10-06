@@ -8,6 +8,7 @@ import { DiscordModule } from "../discord/discord.module";
 import { DmModule } from "../dm/dm.module";
 import { NotificationModule } from "../notification/notification.module";
 import { AdminStatsSnapshotService } from "./admin-stats-snapshot.service";
+import { AdminOpsAlertService } from "./admin-ops-alert.service";
 import { ClientErrorLogController } from "./client-error-log.controller";
 
 @Module({
@@ -20,7 +21,7 @@ import { ClientErrorLogController } from "./client-error-log.controller";
     NotificationModule,
   ],
   controllers: [AdminController, ClientErrorLogController],
-  providers: [AdminService, AdminStatsSnapshotService],
+  providers: [AdminService, AdminStatsSnapshotService, AdminOpsAlertService],
   exports: [AdminService],
 })
 export class AdminModule {}

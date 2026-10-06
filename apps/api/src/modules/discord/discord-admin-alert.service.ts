@@ -185,6 +185,26 @@ export class DiscordAdminAlertService {
     });
   }
 
+  /** 수집이 막혀 운영자가 손봐야 하는 경기·스크림이 있을 때 */
+  async notifyCollectionIssue(params: {
+    kind: "LOL_STALLED" | "PUBG_ERROR";
+    count: number;
+    summary: string;
+  }) {
+    return this.send("OPERATION", {
+      title:
+        params.kind === "LOL_STALLED"
+          ? "롤 내전 전적 수집 중단"
+          : "배그 스크림 수집 오류",
+      message: params.summary,
+      fields: { 건수: params.count },
+      link:
+        params.kind === "LOL_STALLED"
+          ? "/admin?tab=matches&game=lol"
+          : "/admin?tab=scrims&game=pubg",
+    });
+  }
+
   async notifyTestAlert(params: {
     adminId: string;
     adminName?: string | null;

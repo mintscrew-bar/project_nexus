@@ -24,7 +24,7 @@ type CrossrefCandidateScore = {
 };
 
 /** 복구 큐에서 이 횟수만큼 실패하면 대상에서 제외한다. */
-const MAX_COLLECT_ATTEMPTS = 10;
+export const MAX_COLLECT_ATTEMPTS = 10;
 /**
  * 한 사이클에서 실제로 처리할 매치 수.
  *
