@@ -2557,6 +2557,17 @@ export interface AdminInternalMatch {
   _count: { participants: number };
 }
 
+export interface AdminAuditLogItem {
+  id: string;
+  adminId: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+  admin: { id: string; username: string };
+}
+
 /** 일별 운영 지표 한 줄. null 은 "그날은 기록이 없었다" 이지 0 이 아니다 */
 export interface AdminDailyStat {
   date: string;
@@ -2877,6 +2888,23 @@ export const adminApi = {
   }) => {
     const response = await apiClient.get("/admin/scrims", { params });
     return response.data;
+  },
+  getAuditLogs: async (params?: {
+    page?: number;
+    limit?: number;
+    action?: string;
+    adminId?: string;
+    targetType?: string;
+    from?: string;
+    to?: string;
+  }) => {
+    const response = await apiClient.get("/admin/audit-logs", { params });
+    return response.data as {
+      logs: AdminAuditLogItem[];
+      total: number;
+      page: number;
+      limit: number;
+    };
   },
   getStatsSeries: async (scope: "ALL" | "LOL" | "PUBG", days = 30) => {
     const response = await apiClient.get("/admin/stats/series", {

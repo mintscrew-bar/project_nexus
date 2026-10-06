@@ -1,8 +1,9 @@
-import { GameTitle, MatchStatus, UserRole } from "@nexus/database";
+import { AdminAction, GameTitle, MatchStatus, UserRole } from "@nexus/database";
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
   IsArray,
+  IsDateString,
   IsEnum,
   IsIn,
   IsInt,
@@ -250,4 +251,40 @@ export class AdminStatsSeriesQueryDto {
   @Min(1, { message: "days는 1 이상이어야 합니다." })
   @Max(365, { message: "days는 365 이하여야 합니다." })
   days: number = 30;
+}
+
+/** 관리 기록(감사 로그) 조회 */
+export class AdminAuditLogsQueryDto {
+  @IsOptional()
+  @IsInt({ message: "page는 정수여야 합니다." })
+  @Min(1, { message: "page는 1 이상이어야 합니다." })
+  page: number = 1;
+
+  @IsOptional()
+  @IsInt({ message: "limit는 정수여야 합니다." })
+  @Min(1, { message: "limit는 1 이상이어야 합니다." })
+  @Max(100, { message: "limit는 100 이하여야 합니다." })
+  limit: number = 50;
+
+  @IsOptional()
+  @IsEnum(AdminAction, { message: "유효한 관리 작업을 선택해주세요." })
+  action?: AdminAction;
+
+  @IsOptional()
+  @IsString()
+  adminId?: string;
+
+  @IsOptional()
+  @IsString()
+  targetType?: string;
+
+  /** 이 시각 이후 (ISO) */
+  @IsOptional()
+  @IsDateString({}, { message: "from은 ISO 날짜여야 합니다." })
+  from?: string;
+
+  /** 이 시각 이전 (ISO) */
+  @IsOptional()
+  @IsDateString({}, { message: "to는 ISO 날짜여야 합니다." })
+  to?: string;
 }

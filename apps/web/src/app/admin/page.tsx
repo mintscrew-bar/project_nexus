@@ -23,6 +23,7 @@ import {
 } from "@/components/admin/game-scope";
 import type { GameTitle } from "@nexus/types";
 import { DiscordGuildLinksTab } from "@/components/admin/system/DiscordGuildLinksTab";
+import { AuditLogsTab } from "@/components/admin/system/AuditLogsTab";
 import { ErrorLogsTab } from "@/components/admin/system/ErrorLogsTab";
 import { RehearsalTab } from "@/components/admin/system/RehearsalTab";
 import {
@@ -41,6 +42,7 @@ import {
   Crosshair,
   FlaskConical,
   Bug,
+  ClipboardList,
 } from "lucide-react";
 
 type Tab =
@@ -58,6 +60,7 @@ type Tab =
   | "appeals"
   | "discord"
   | "errors"
+  | "audit"
   | "rehearsal";
 
 interface TabItem {
@@ -184,6 +187,11 @@ const TAB_GROUPS: TabGroup[] = [
   {
     label: "시스템",
     tabs: [
+      {
+        id: "audit",
+        label: "관리 기록",
+        icon: <ClipboardList className="h-4 w-4" />,
+      },
       {
         id: "errors",
         label: "오류 로그",
@@ -351,6 +359,7 @@ function AdminPageInner() {
           {activeTab === "appeals" && <AppealsTab addToast={addToast} />}
           {activeTab === "chatlogs" && <ChatLogsTab />}
           {activeTab === "errors" && <ErrorLogsTab />}
+          {activeTab === "audit" && <AuditLogsTab addToast={addToast} />}
           {activeTab === "community" && (
             <CommunityTab addToast={addToast} isAdmin={isAdmin} />
           )}

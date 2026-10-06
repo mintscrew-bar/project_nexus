@@ -35,6 +35,7 @@ import {
   SendUserMessageDto,
   AdminRoomFunnelQueryDto,
   AdminStatsSeriesQueryDto,
+  AdminAuditLogsQueryDto,
 } from "./dto/admin-query.dto";
 
 @Controller("admin")
@@ -63,6 +64,21 @@ export class AdminController {
     return this.adminService.getRoomFunnel({
       gameTitle: query.gameTitle,
       days: query.days,
+    });
+  }
+
+  // ── 관리 기록 (ADMIN 전용) ─────────────────────────────────────────────────
+  @Get("audit-logs")
+  @Roles(UserRole.ADMIN)
+  getAuditLogs(@Query() query: AdminAuditLogsQueryDto) {
+    return this.adminService.getAuditLogs({
+      page: query.page,
+      limit: query.limit,
+      action: query.action,
+      adminId: query.adminId,
+      targetType: query.targetType,
+      from: query.from,
+      to: query.to,
     });
   }
 

@@ -1496,6 +1496,52 @@ export class AdminService {
   }
 
   /**
+   * 관리 기록 조회. 누가 언제 무엇을 했는지 — 매니저가 늘수록 필요하다.
+   * 주의: `AdminAuditLog.admin` 이 Cascade 라서 관리자 계정을 지우면 그 사람의 기록도
+   * 함께 사라진다. 스키마 결정이라 여기서는 읽기만 한다(바꾸려면 별도 마이그레이션).
+   */
+  async getAuditLogs(params: {
+    page: number;
+    limit: number;
+    action?: AdminAction;
+    adminId?: string;
+    targetType?: string;
+    from?: string;
+    to?: string;
+  }) {
+    const { page, action, adminId, targetType, from, to } = params;
+    const limit = clampLimit(params.limit);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.AdminAuditLogWhereInput = {
+      ...(action ? { action } : {}),
+      ...(adminId ? { adminId } : {}),
+      ...(targetType ? { targetType } : {}),
+      ...(from || to
+        ? {
+            createdAt: {
+              ...(from ? { gte: new Date(from) } : {}),
+              ...(to ? { lte: new Date(to) } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [logs, total] = await Promise.all([
+      this.prisma.adminAuditLog.findMany({
+        where,
+        include: { admin: { select: { id: true, username: true } } },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      this.prisma.adminAuditLog.count({ where }),
+    ]);
+
+    return { logs, total, page, limit };
+  }
+
+  /**
    * 방 깔때기. `RoomOutcome` 이 쌓이기 시작한 뒤의 방만 집계된다.
    * 응답의 `since` 는 요청 기간이고 `firstRecordAt` 은 실제 첫 기록 시각이다 —
    * 둘이 다르면 기록이 아직 기간을 못 채운 것이라 화면이 그렇게 알려야 한다.
