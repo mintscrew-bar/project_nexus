@@ -240,6 +240,12 @@ export class AdminController {
     });
   }
 
+  @Get("users/:id/activity")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  getUserActivity(@Param("id") userId: string) {
+    return this.adminService.getUserActivity(userId);
+  }
+
   @Patch("users/:id/role")
   @Roles(UserRole.ADMIN)
   updateUserRole(

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
-import { adminApi } from "@/lib/api-client";
+import { adminApi, type AdminUserActivity } from "@/lib/api-client";
 import {
   Card,
   CardContent,
@@ -58,6 +58,108 @@ const REASON_LABELS: Record<string, string> = {
   MISINFORMATION: "허위 정보",
   OTHER: "기타",
 };
+
+/**
+ * 신고 대상 유저의 최근 활동. 신고 하나를 판단하려고 유저·채팅·글 탭을 오가지 않게
+ * 같은 창에서 핵심만 보여 준다. 전문은 각 탭에서 본다.
+ */
+function TargetActivity({ userId }: { userId: string }) {
+  const [data, setData] = useState<AdminUserActivity | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setData(null);
+    setFailed(false);
+    adminApi
+      .getUserActivity(userId)
+      .then((r) => !cancelled && setData(r))
+      .catch(() => !cancelled && setFailed(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  if (failed)
+    return (
+      <p className="text-xs text-text-muted">
+        최근 활동을 불러오지 못했습니다.
+      </p>
+    );
+  if (!data)
+    return <p className="text-xs text-text-muted">최근 활동 불러오는 중…</p>;
+
+  const when = (iso: string) =>
+    new Date(iso).toLocaleDateString("ko-KR", {
+      month: "numeric",
+      day: "numeric",
+    });
+
+  return (
+    <div className="space-y-2 rounded-lg border border-bg-elevated bg-bg-secondary p-3 text-xs">
+      <p className="font-semibold text-text-primary">
+        {data.user.username} 최근 활동
+        <span className="ml-2 font-normal text-text-muted">
+          누적 신고 {data.reportCount}건{data.user.isBanned && " · 정지됨"}
+          {data.user.isRestricted && " · 이용 제한"}
+        </span>
+      </p>
+      {data.currentRooms.length > 0 && (
+        <p className="text-text-secondary">
+          지금 방: {data.currentRooms.map((r) => r.name).join(", ")}
+        </p>
+      )}
+      <div>
+        <p className="mb-0.5 text-text-muted">최근 채팅</p>
+        {data.chats.length === 0 ? (
+          <p className="text-text-muted">없음</p>
+        ) : (
+          data.chats.map((c) => (
+            <p key={c.id} className="break-all text-text-secondary">
+              <span className="text-text-muted">
+                {when(c.createdAt)}
+                {c.roomName ? ` ${c.roomName}` : ""}
+              </span>{" "}
+              {c.content}
+            </p>
+          ))
+        )}
+      </div>
+      <div>
+        <p className="mb-0.5 text-text-muted">최근 글</p>
+        {data.posts.length === 0 ? (
+          <p className="text-text-muted">없음</p>
+        ) : (
+          data.posts.map((p) => (
+            <p key={p.id} className="break-all text-text-secondary">
+              <span className="text-text-muted">{when(p.createdAt)}</span>{" "}
+              {p.title}
+              {p.isDeleted && (
+                <span className="text-text-muted"> (삭제됨)</span>
+              )}
+            </p>
+          ))
+        )}
+      </div>
+      {data.reports.length > 0 && (
+        <div>
+          <p className="mb-0.5 text-text-muted">이전 신고</p>
+          {data.reports.map((r) => (
+            <p key={r.id} className="text-text-secondary">
+              <span className="text-text-muted">{when(r.createdAt)}</span>{" "}
+              {REASON_LABELS[r.reason] ?? r.reason} ·{" "}
+              {r.status === "PENDING"
+                ? "대기"
+                : r.status === "APPROVED"
+                  ? "승인"
+                  : "거절"}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ReportsTab({ addToast }: { addToast: AddToast }) {
   const [reports, setReports] = useState<ReportItem[]>([]);
@@ -415,6 +517,11 @@ export function ReportsTab({ addToast }: { addToast: AddToast }) {
                   </div>
                 )}
             </div>
+            {reviewModal.category === "user" && (
+              <TargetActivity
+                userId={(reviewModal as UserReportItem).target.id}
+              />
+            )}
             <div className="flex gap-2">
               {(["APPROVED", "REJECTED"] as const).map((s) => (
                 <button

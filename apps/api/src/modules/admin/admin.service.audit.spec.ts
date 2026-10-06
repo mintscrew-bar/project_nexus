@@ -135,3 +135,72 @@ describe("AdminService.exportDataset", () => {
     );
   });
 });
+
+describe("AdminService.getUserActivity", () => {
+  function makeActivity(user: any = { id: "u1", username: "tester" }) {
+    const prisma: any = {
+      user: { findUnique: jest.fn().mockResolvedValue(user) },
+      userReport: {
+        count: jest.fn().mockResolvedValue(3),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      post: { findMany: jest.fn().mockResolvedValue([]) },
+      chatMessage: { findMany: jest.fn().mockResolvedValue([]) },
+      roomParticipant: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new AdminService(
+      prisma,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, prisma };
+  }
+
+  it("없는 유저는 404", async () => {
+    const { service } = makeActivity(null);
+    await expect(service.getUserActivity("x")).rejects.toThrow(
+      "찾을 수 없습니다",
+    );
+  });
+
+  it("긴 채팅은 120자로 줄이고, 최근 5건만 읽는다", async () => {
+    const { service, prisma } = makeActivity();
+    prisma.chatMessage.findMany.mockResolvedValue([
+      {
+        id: "c1",
+        content: "가".repeat(300),
+        roomName: "r",
+        createdAt: new Date(),
+      },
+    ]);
+    const res = await service.getUserActivity("u1");
+
+    expect(res.chats[0].content).toHaveLength(121);
+    expect(res.chats[0].content.endsWith("…")).toBe(true);
+    expect(prisma.chatMessage.findMany.mock.calls[0][0].take).toBe(5);
+    expect(res.reportCount).toBe(3);
+  });
+
+  it("지금 들어가 있는 방을 돌려준다", async () => {
+    const { service, prisma } = makeActivity();
+    prisma.roomParticipant.findMany.mockResolvedValue([
+      {
+        room: {
+          id: "r1",
+          name: "금요 내전",
+          status: "WAITING",
+          gameTitle: "LOL",
+        },
+      },
+    ]);
+    const res = await service.getUserActivity("u1");
+    expect(res.currentRooms).toEqual([
+      { id: "r1", name: "금요 내전", status: "WAITING", gameTitle: "LOL" },
+    ]);
+  });
+});

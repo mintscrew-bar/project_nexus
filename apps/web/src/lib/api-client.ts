@@ -2557,6 +2557,32 @@ export interface AdminInternalMatch {
   _count: { participants: number };
 }
 
+/** 신고 처리 중 보는 대상 유저의 최근 활동 */
+export interface AdminUserActivity {
+  user: {
+    id: string;
+    username: string;
+    isBanned: boolean;
+    isRestricted: boolean;
+    createdAt: string;
+  };
+  reportCount: number;
+  reports: { id: string; reason: string; status: string; createdAt: string }[];
+  posts: { id: string; title: string; isDeleted: boolean; createdAt: string }[];
+  chats: {
+    id: string;
+    content: string;
+    roomName: string | null;
+    createdAt: string;
+  }[];
+  currentRooms: {
+    id: string;
+    name: string;
+    status: string;
+    gameTitle: string;
+  }[];
+}
+
 export interface AdminAuditLogItem {
   id: string;
   adminId: string;
@@ -2907,6 +2933,10 @@ export const adminApi = {
     a.download = name;
     a.click();
     URL.revokeObjectURL(url);
+  },
+  getUserActivity: async (userId: string) => {
+    const response = await apiClient.get(`/admin/users/${userId}/activity`);
+    return response.data as AdminUserActivity;
   },
   getBotCleanupPreview: async () => {
     const response = await apiClient.get("/admin/bot-cleanup/preview");

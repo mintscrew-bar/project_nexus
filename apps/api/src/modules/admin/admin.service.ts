@@ -1497,6 +1497,68 @@ export class AdminService {
   }
 
   /**
+   * 신고 처리 중에 한 화면에서 볼 대상 유저의 최근 활동.
+   * 신고 → 유저 → 채팅 로그 → 글 탭을 오가지 않고 판단할 수 있게 핵심만 모은다.
+   * 채팅은 한 줄 미리보기로 자르고(전문은 채팅 로그 탭), 글은 삭제된 것도 표시한다.
+   */
+  async getUserActivity(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        isBanned: true,
+        isRestricted: true,
+        createdAt: true,
+      },
+    });
+    if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
+
+    const [reportCount, reports, posts, chats, rooms] = await Promise.all([
+      this.prisma.userReport.count({ where: { targetUserId: userId } }),
+      this.prisma.userReport.findMany({
+        where: { targetUserId: userId },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { id: true, reason: true, status: true, createdAt: true },
+      }),
+      this.prisma.post.findMany({
+        where: { authorId: userId },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { id: true, title: true, isDeleted: true, createdAt: true },
+      }),
+      this.prisma.chatMessage.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { id: true, content: true, roomName: true, createdAt: true },
+      }),
+      this.prisma.roomParticipant.findMany({
+        where: { userId },
+        select: {
+          room: {
+            select: { id: true, name: true, status: true, gameTitle: true },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      user,
+      reportCount,
+      reports,
+      posts,
+      chats: chats.map((c) => ({
+        ...c,
+        content:
+          c.content.length > 120 ? `${c.content.slice(0, 120)}…` : c.content,
+      })),
+      currentRooms: rooms.map((r) => r.room),
+    };
+  }
+
+  /**
    * CSV 내보내기. 개인 식별 정보(유저 ID·이름)는 담지 않는다 — 집계와 방 단위 기록뿐이다.
    * 외부 도구에서 분석할 때 DB 에 직접 붙지 않아도 되게 하는 것이 목적이다.
    */
