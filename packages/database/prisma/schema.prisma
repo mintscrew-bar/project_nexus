@@ -1874,6 +1874,7 @@ enum AdminAction {
   SCRIM_COLLECT_RETRY
   SCRIM_CANCEL
   MATCH_COLLECT_RETRY
+  BOT_CLEANUP
 }
 
 enum VoteType {
