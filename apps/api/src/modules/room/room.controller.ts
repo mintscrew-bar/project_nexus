@@ -17,7 +17,16 @@ import {
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { RoomService } from "./room.service";
-import { CreateRoomDto, ListRoomsQueryDto, ChatMessagesQueryDto } from "./dto";
+import {
+  CreateRoomDto,
+  ListRoomsQueryDto,
+  ChatMessagesQueryDto,
+  JoinRoomBodyDto,
+  SendRoomMessageDto,
+  SetBroadcastFocusDto,
+  SetBroadcastLiveDto,
+  SnakeDraftPickDto,
+} from "./dto";
 import { SnakeDraftService } from "./snake-draft.service";
 import { SnakeDraftGateway } from "./snake-draft.gateway";
 import { RoomGateway } from "./room.gateway";
@@ -156,9 +165,9 @@ export class RoomController {
   async setBroadcastLiveRoom(
     @CurrentUser("sub") userId: string,
     @Param("id") id: string,
-    @Body() body: { live: boolean },
+    @Body() body: SetBroadcastLiveDto,
   ) {
-    return this.roomService.setBroadcastLiveRoom(userId, id, !!body?.live);
+    return this.roomService.setBroadcastLiveRoom(userId, id, body.live);
   }
 
   // 호스트가 중계 중인 경기(focus) 설정/해제 → 방송 소켓에 알림
@@ -167,7 +176,7 @@ export class RoomController {
   async setBroadcastFocus(
     @CurrentUser("sub") userId: string,
     @Param("id") id: string,
-    @Body() body: { matchId: string | null },
+    @Body() body: SetBroadcastFocusDto,
   ) {
     const result = await this.roomService.setBroadcastFocus(
       userId,
@@ -188,7 +197,7 @@ export class RoomController {
     @CurrentUser("sub") userId: string,
     @CurrentUser("username") username: string,
     @Param("id") roomId: string,
-    @Body() body: { password?: string; asSpectator?: boolean },
+    @Body() body: JoinRoomBodyDto,
   ) {
     const result = await this.roomService.joinRoom(userId, {
       roomId,
@@ -388,7 +397,7 @@ export class RoomController {
   async sendMessage(
     @CurrentUser("sub") userId: string,
     @Param("id") roomId: string,
-    @Body() body: { content: string },
+    @Body() body: SendRoomMessageDto,
   ) {
     return this.roomService.sendChatMessage(userId, roomId, body.content);
   }
@@ -422,7 +431,7 @@ export class RoomController {
   async makeSnakeDraftPick(
     @CurrentUser("sub") userId: string,
     @Param("id") roomId: string,
-    @Body() body: { targetPlayerId: string },
+    @Body() body: SnakeDraftPickDto,
   ) {
     return this.snakeDraftService.makePick(userId, roomId, body.targetPlayerId);
   }
