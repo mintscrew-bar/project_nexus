@@ -23,6 +23,7 @@ import {
 } from "@/components/admin/game-scope";
 import type { GameTitle } from "@nexus/types";
 import { DiscordGuildLinksTab } from "@/components/admin/system/DiscordGuildLinksTab";
+import { BotCleanupTab } from "@/components/admin/system/BotCleanupTab";
 import { AuditLogsTab } from "@/components/admin/system/AuditLogsTab";
 import { ErrorLogsTab } from "@/components/admin/system/ErrorLogsTab";
 import { RehearsalTab } from "@/components/admin/system/RehearsalTab";
@@ -43,6 +44,7 @@ import {
   FlaskConical,
   Bug,
   ClipboardList,
+  Trash2,
 } from "lucide-react";
 
 type Tab =
@@ -61,6 +63,7 @@ type Tab =
   | "discord"
   | "errors"
   | "audit"
+  | "botcleanup"
   | "rehearsal";
 
 interface TabItem {
@@ -201,6 +204,11 @@ const TAB_GROUPS: TabGroup[] = [
         id: "discord",
         label: "디스코드 연동",
         icon: <Bot className="h-4 w-4" />,
+      },
+      {
+        id: "botcleanup",
+        label: "봇 정리",
+        icon: <Trash2 className="h-4 w-4" />,
       },
       {
         id: "rehearsal",
@@ -359,6 +367,7 @@ function AdminPageInner() {
           {activeTab === "appeals" && <AppealsTab addToast={addToast} />}
           {activeTab === "chatlogs" && <ChatLogsTab />}
           {activeTab === "errors" && <ErrorLogsTab />}
+          {activeTab === "botcleanup" && <BotCleanupTab addToast={addToast} />}
           {activeTab === "audit" && <AuditLogsTab addToast={addToast} />}
           {activeTab === "community" && (
             <CommunityTab addToast={addToast} isAdmin={isAdmin} />

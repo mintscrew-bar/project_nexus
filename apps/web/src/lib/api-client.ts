@@ -2889,6 +2889,18 @@ export const adminApi = {
     const response = await apiClient.get("/admin/scrims", { params });
     return response.data;
   },
+  getBotCleanupPreview: async () => {
+    const response = await apiClient.get("/admin/bot-cleanup/preview");
+    return response.data as { rooms: number; matches: number };
+  },
+  cleanupBotData: async (options: { rooms: boolean; matches: boolean }) => {
+    const response = await apiClient.post("/admin/bot-cleanup", options);
+    return response.data as {
+      roomsDeleted: number;
+      matchesDeleted: number;
+      remaining: { rooms: number; matches: number };
+    };
+  },
   getAuditLogs: async (params?: {
     page?: number;
     limit?: number;

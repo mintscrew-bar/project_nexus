@@ -1495,6 +1495,79 @@ export class AdminService {
     return { ok: true };
   }
 
+  /** 봇이 만든 흔적 미리보기 — 지우기 전에 건수를 본다 */
+  async getBotCleanupPreview() {
+    const [rooms, matches] = await Promise.all([
+      this.prisma.room.count({ where: { host: this.getTestBotWhere() } }),
+      this.prisma.match.count({ where: this.botOnlyMatchWhere() }),
+    ]);
+    return { rooms, matches };
+  }
+
+  /**
+   * 참가자가 **전부 봇**인 끝난 내전. 로스터 스냅샷이 하나도 없거나 사람이 한 명이라도
+   * 섞였으면(유저 연결이 끊긴 스냅샷 포함) 대상이 아니다 — 모르면 지우지 않는다.
+   */
+  private botOnlyMatchWhere(): Prisma.MatchWhereInput {
+    return {
+      isInternal: true,
+      rosterSnapshots: {
+        some: {},
+        every: { user: { is: this.getTestBotWhere() } },
+      },
+    };
+  }
+
+  /**
+   * 봇이 연 방과 봇끼리만 한 내전 기록을 정리한다.
+   *
+   * 유저 계정 자체는 지우지 않는다(리허설이 계속 쓴다). 지우는 건 방(참가자는 방에서
+   * 제거)과 기록뿐이고, 한 번에 처리하는 양에 상한을 둬 요청이 길어지지 않게 한다.
+   * 남았으면 `remaining` 으로 알려 다시 누르게 한다.
+   */
+  async cleanupBotData(
+    options: { rooms: boolean; matches: boolean },
+    adminId: string,
+  ) {
+    const BATCH = 200;
+    let roomsDeleted = 0;
+    let matchesDeleted = 0;
+
+    if (options.rooms) {
+      const rooms = await this.prisma.room.findMany({
+        where: { host: this.getTestBotWhere() },
+        select: { id: true },
+        take: BATCH,
+      });
+      for (const room of rooms) {
+        await this.roomService.deleteRoomData(room.id);
+        roomsDeleted++;
+      }
+    }
+
+    if (options.matches) {
+      const matches = await this.prisma.match.findMany({
+        where: this.botOnlyMatchWhere(),
+        select: { id: true },
+        take: BATCH,
+      });
+      if (matches.length > 0) {
+        const result = await this.prisma.match.deleteMany({
+          where: { id: { in: matches.map((m) => m.id) } },
+        });
+        matchesDeleted = result.count;
+      }
+    }
+
+    await this.logAction(adminId, AdminAction.BOT_CLEANUP, "bot", undefined, {
+      roomsDeleted,
+      matchesDeleted,
+    });
+
+    const remaining = await this.getBotCleanupPreview();
+    return { roomsDeleted, matchesDeleted, remaining };
+  }
+
   /**
    * 관리 기록 조회. 누가 언제 무엇을 했는지 — 매니저가 늘수록 필요하다.
    * 주의: `AdminAuditLog.admin` 이 Cascade 라서 관리자 계정을 지우면 그 사람의 기록도

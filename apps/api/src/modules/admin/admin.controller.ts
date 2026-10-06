@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -65,6 +66,28 @@ export class AdminController {
       gameTitle: query.gameTitle,
       days: query.days,
     });
+  }
+
+  // ── 테스트 봇 정리 (ADMIN 전용) ────────────────────────────────────────────
+  @Get("bot-cleanup/preview")
+  @Roles(UserRole.ADMIN)
+  getBotCleanupPreview() {
+    return this.adminService.getBotCleanupPreview();
+  }
+
+  @Post("bot-cleanup")
+  @Roles(UserRole.ADMIN)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async cleanupBotData(
+    @Body() body: { rooms?: boolean; matches?: boolean },
+    @Request() req: any,
+  ) {
+    const rooms = body?.rooms === true;
+    const matches = body?.matches === true;
+    if (!rooms && !matches) {
+      throw new BadRequestException("정리할 대상을 하나 이상 고르세요.");
+    }
+    return this.adminService.cleanupBotData({ rooms, matches }, req.user.sub);
   }
 
   // ── 관리 기록 (ADMIN 전용) ─────────────────────────────────────────────────
