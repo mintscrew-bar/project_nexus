@@ -47,6 +47,7 @@ import { BalanceScoreService } from "../common/balance-score.service";
 import { StatsService } from "../stats/stats.service";
 import { BALANCE_ROLES } from "../common/balance-score.util";
 import { recordRoomOutcome } from "../common/room-outcome.util";
+import type { UpdateRoomDto } from "./dto/update-room.dto";
 
 /**
  * 편성 점수가 없는 참가자에게 임시로 매기는 값.
@@ -2444,7 +2445,7 @@ export class RoomService {
   async updateRoomSettings(
     userId: string,
     roomId: string,
-    updates: Partial<CreateRoomDto>,
+    updates: UpdateRoomDto,
   ) {
     const room = await this.prisma.room.findUnique({
       where: { id: roomId },

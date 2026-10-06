@@ -26,6 +26,7 @@ import {
   SetBroadcastFocusDto,
   SetBroadcastLiveDto,
   SnakeDraftPickDto,
+  UpdateRoomDto,
 } from "./dto";
 import { SnakeDraftService } from "./snake-draft.service";
 import { SnakeDraftGateway } from "./snake-draft.gateway";
@@ -138,7 +139,7 @@ export class RoomController {
   async updateRoom(
     @CurrentUser("sub") userId: string,
     @Param("id") id: string,
-    @Body() updates: Partial<CreateRoomDto>,
+    @Body() updates: UpdateRoomDto,
   ) {
     const room = await this.roomService.updateRoomSettings(userId, id, updates);
     this.roomGateway.notifyRoomUpdate(id, "room-updated", room);
