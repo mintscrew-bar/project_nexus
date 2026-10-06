@@ -1,4 +1,4 @@
-import { AdminService } from "./admin.service";
+import { makeAdminService } from "./__tests__/make-admin-service";
 
 /**
  * 관리자 화면의 게임 구분.
@@ -34,16 +34,7 @@ function makeService(overrides: Record<string, any> = {}) {
     },
     ...overrides,
   };
-  const service = new AdminService(
-    prisma as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-  );
+  const service = makeAdminService({ prisma });
   return { service, prisma };
 }
 

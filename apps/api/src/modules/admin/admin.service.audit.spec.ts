@@ -1,4 +1,4 @@
-import { AdminService } from "./admin.service";
+import { makeAdminService } from "./__tests__/make-admin-service";
 
 function make() {
   const prisma: any = {
@@ -7,16 +7,7 @@ function make() {
       count: jest.fn().mockResolvedValue(0),
     },
   };
-  const service = new AdminService(
-    prisma,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-  );
+  const service = makeAdminService({ prisma });
   return { service, prisma };
 }
 
@@ -84,16 +75,7 @@ describe("AdminService.exportDataset", () => {
       adminDailyStat: { findMany: jest.fn().mockResolvedValue([]) },
       roomOutcome: { findMany: jest.fn().mockResolvedValue([]) },
     };
-    const service = new AdminService(
-      prisma,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-    );
+    const service = makeAdminService({ prisma });
     return { service, prisma };
   }
 
@@ -148,16 +130,7 @@ describe("AdminService.getUserActivity", () => {
       chatMessage: { findMany: jest.fn().mockResolvedValue([]) },
       roomParticipant: { findMany: jest.fn().mockResolvedValue([]) },
     };
-    const service = new AdminService(
-      prisma,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-    );
+    const service = makeAdminService({ prisma });
     return { service, prisma };
   }
 

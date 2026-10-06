@@ -1,4 +1,4 @@
-import { AdminService } from "./admin.service";
+import { makeAdminService } from "./__tests__/make-admin-service";
 
 function make() {
   const prisma: any = {
@@ -17,16 +17,7 @@ function make() {
     deleteRoomData: jest.fn().mockResolvedValue(undefined),
   };
   // 생성자 순서: prisma, discordBot, adminAlerts, discordVoice, roomService, ...
-  const service = new AdminService(
-    prisma,
-    {} as any,
-    {} as any,
-    {} as any,
-    roomService,
-    {} as any,
-    {} as any,
-    {} as any,
-  );
+  const service = makeAdminService({ prisma, roomService });
   return { service, prisma, roomService };
 }
 

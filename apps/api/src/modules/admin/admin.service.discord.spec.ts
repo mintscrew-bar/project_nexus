@@ -1,4 +1,4 @@
-import { AdminService } from "./admin.service";
+import { makeAdminService } from "./__tests__/make-admin-service";
 
 describe("AdminService Discord guild links", () => {
   it("repairs a missing guild name before returning the admin list", async () => {
@@ -25,16 +25,7 @@ describe("AdminService Discord guild links", () => {
         guildName: "복구된 Discord 서버",
       }),
     };
-    const service = new AdminService(
-      prisma as any,
-      discordBotService as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-    );
+    const service = makeAdminService({ prisma, discordBot: discordBotService });
 
     const result = await service.getDiscordGuildLinks();
 

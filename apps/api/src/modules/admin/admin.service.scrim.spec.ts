@@ -1,4 +1,4 @@
-import { AdminService } from "./admin.service";
+import { makeAdminService } from "./__tests__/make-admin-service";
 
 /**
  * 스크림 관리자 조치. 잘못 붙은 라운드를 되돌리고, 수집을 다시 걸고, 취소하는 일.
@@ -19,16 +19,7 @@ function makeService(overrides: Record<string, any> = {}) {
     $transaction: jest.fn().mockResolvedValue([]),
     ...overrides,
   };
-  const service = new AdminService(
-    prisma,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-  );
+  const service = makeAdminService({ prisma });
   return { service, prisma };
 }
 

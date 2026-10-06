@@ -1,4 +1,4 @@
-import { AdminService } from "./admin.service";
+import { makeAdminService } from "./__tests__/make-admin-service";
 
 function makeService(rows: any[], first: Date | null = null) {
   const prisma: any = {
@@ -7,16 +7,7 @@ function makeService(rows: any[], first: Date | null = null) {
       findFirst: jest.fn().mockResolvedValue(first ? { endedAt: first } : null),
     },
   };
-  const service = new AdminService(
-    prisma,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-  );
+  const service = makeAdminService({ prisma });
   return { service, prisma };
 }
 

@@ -1,4 +1,4 @@
-import { AdminService } from "./admin.service";
+import { makeAdminService } from "./__tests__/make-admin-service";
 
 /**
  * 관리자 봇 채우기.
@@ -47,16 +47,7 @@ describe("AdminService.addBotToRoom", () => {
     const adminAlerts = {
       notifyAdminOperation: jest.fn().mockResolvedValue(undefined),
     };
-    const service = new AdminService(
-      prisma as any,
-      {} as any,
-      adminAlerts as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-    );
+    const service = makeAdminService({ prisma, adminAlerts });
     // 봇 계정 생성은 DB 세부사항이라 여기서는 순서대로 돌려준다.
     const ensureBotUsers = jest
       .spyOn(service, "ensureBotUsers")
