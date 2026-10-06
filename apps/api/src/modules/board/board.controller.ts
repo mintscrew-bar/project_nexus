@@ -17,7 +17,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { UserRole } from "@nexus/database";
 import { BoardService } from "./board.service";
-import { CreateBoardDto, UpdateBoardDto } from "./dto";
+import { CreateBoardDto, UpdateBoardDto, ReorderBoardsDto } from "./dto";
 import { GameScopeQueryDto } from "@/common/dto/game-scope.dto";
 
 @Controller("boards")
@@ -45,8 +45,8 @@ export class BoardController {
   @Patch("admin/reorder")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  reorder(@Body() body: { items: Array<{ id: string; order: number }> }) {
-    return this.boardService.reorder(body.items ?? []);
+  reorder(@Body() body: ReorderBoardsDto) {
+    return this.boardService.reorder(body.items);
   }
 
   /** 게시판 생성 */

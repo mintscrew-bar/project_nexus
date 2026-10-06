@@ -14,6 +14,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { PresenceService } from "./presence.service";
 import { PresenceGateway } from "./presence.gateway";
 import { UserStatus } from "@nexus/database";
+import { UpdateMyStatusDto } from "./dto/update-my-status.dto";
 
 @Controller("presence")
 export class PresenceController {
@@ -35,7 +36,7 @@ export class PresenceController {
   @HttpCode(HttpStatus.OK)
   async updateMyStatus(
     @CurrentUser("sub") userId: string,
-    @Body() body: { status: "ONLINE" | "AWAY" },
+    @Body() body: UpdateMyStatusDto,
   ) {
     const status = body.status === "AWAY" ? UserStatus.AWAY : UserStatus.ONLINE;
 

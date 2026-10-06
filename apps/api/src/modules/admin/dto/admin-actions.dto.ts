@@ -84,3 +84,17 @@ export class BotCleanupDto {
   @IsBoolean({ message: "matches는 true 또는 false여야 합니다." })
   matches?: boolean;
 }
+
+/** 이의신청 처리 */
+export class ReviewAppealDto {
+  @IsIn(["APPROVED", "REJECTED"], {
+    message: "status는 APPROVED 또는 REJECTED여야 합니다.",
+  })
+  status!: "APPROVED" | "REJECTED";
+
+  @KeepRaw()
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000, { message: "처리 메모는 1000자 이하여야 합니다." })
+  adminNote?: string;
+}

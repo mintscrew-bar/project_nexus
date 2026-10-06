@@ -12,7 +12,7 @@ import { RoleSelectionService } from "./role-selection.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { PrismaService } from "../prisma/prisma.service";
-import { Role } from "@nexus/database";
+import { SelectRoleDto } from "./dto/select-role.dto";
 
 @Controller("role-selection")
 @UseGuards(JwtAuthGuard)
@@ -52,7 +52,7 @@ export class RoleSelectionController {
   async selectRole(
     @Param("roomId") roomId: string,
     @CurrentUser("sub") userId: string,
-    @Body() body: { role: Role },
+    @Body() body: SelectRoleDto,
   ) {
     return this.roleSelectionService.selectRole(userId, roomId, body.role);
   }

@@ -43,6 +43,7 @@ import {
 import {
   BanUserDto,
   BotCleanupDto,
+  ReviewAppealDto,
   ReviewReportDto,
   SendAnnouncementDto,
 } from "./dto/admin-actions.dto";
@@ -499,7 +500,7 @@ export class AdminController {
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   reviewAppeal(
     @Param("id") appealId: string,
-    @Body() body: { status: "APPROVED" | "REJECTED"; adminNote?: string },
+    @Body() body: ReviewAppealDto,
     @Request() req: any,
   ) {
     return this.adminService.reviewAppeal(

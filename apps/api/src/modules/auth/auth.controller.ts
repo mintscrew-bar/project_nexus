@@ -17,7 +17,7 @@ import { AuthGuard } from "@nestjs/passport";
 import { Throttle } from "@nestjs/throttler";
 import { CookieOptions, Request, Response } from "express";
 import { AuthService } from "./auth.service";
-import { LoginDto, RegisterDto } from "./dto";
+import { AgreeToTermsDto, LoginDto, RegisterDto } from "./dto";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
@@ -214,13 +214,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async agreeToTerms(
     @Query("token") pendingToken: string,
-    @Body()
-    dto: {
-      termsOfService: boolean;
-      privacyPolicy: boolean;
-      ageVerification: boolean;
-      marketingConsent?: boolean;
-    },
+    @Body() dto: AgreeToTermsDto,
     @Res() res: Response,
   ) {
     if (!pendingToken) {

@@ -34,6 +34,7 @@ import {
   CreatePostReportDto,
   ListPostsQueryDto,
   LimitQueryDto,
+  CommentLikedStatusDto,
 } from "./dto";
 import { OffsetPaginationDto } from "@/common/dto/pagination.dto";
 import { UserRole } from "@nexus/database";
@@ -226,7 +227,7 @@ export class CommunityController {
   @HttpCode(HttpStatus.OK)
   async getCommentLikedStatus(
     @CurrentUser("sub") userId: string,
-    @Body() body: { commentIds: string[] },
+    @Body() body: CommentLikedStatusDto,
   ) {
     return this.communityService.getCommentLikedStatus(userId, body.commentIds);
   }

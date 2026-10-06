@@ -4,6 +4,7 @@ import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../../../common/validation-pipe.
 import {
   BanUserDto,
   BotCleanupDto,
+  ReviewAppealDto,
   ReviewReportDto,
   SendAnnouncementDto,
 } from "./admin-actions.dto";
@@ -141,4 +142,28 @@ describe("BotCleanupDto", () => {
       BadRequestException,
     ),
   );
+});
+
+const rejects = (metatype: new () => object, body: unknown) =>
+  expect(run(metatype, body)).rejects.toBeInstanceOf(BadRequestException);
+
+describe("ReviewAppealDto", () => {
+  it("클라이언트 payload: adminNote 가 undefined 면 빠진다", async () => {
+    const wire = JSON.parse(
+      JSON.stringify({ status: "APPROVED", adminNote: undefined }),
+    );
+    await expect(run(ReviewAppealDto, wire)).resolves.toMatchObject({
+      status: "APPROVED",
+    });
+  });
+  it("메모를 보내는 경우도 받는다", () =>
+    expect(
+      run(ReviewAppealDto, { status: "REJECTED", adminNote: "근거 부족" }),
+    ).resolves.toMatchObject({ adminNote: "근거 부족" }));
+  it.each([
+    ["status 가 열거값이 아님", { status: "PENDING" }],
+    ["status 없음", {}],
+    ["메모가 너무 김", { status: "APPROVED", adminNote: "가".repeat(1001) }],
+    ["모르는 키", { status: "APPROVED", reviewer: "x" }],
+  ])("거부한다: %s", (_n, body) => rejects(ReviewAppealDto, body));
 });
