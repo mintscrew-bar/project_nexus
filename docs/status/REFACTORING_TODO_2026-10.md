@@ -14,11 +14,12 @@
 전역 `ValidationPipe` 는 **클래스(DTO)만** 검증한다. 인라인 타입 `@Body() body: { ... }` 은 검증도 허용 필드 걸러내기도 되지 않는다.
 컨트롤러의 인라인 `@Body()` 는 20곳 (room 5, admin 4, riot 3, reputation 2, match 2, role-selection·presence·community·board 각 1).
 
-- [ ] Task 1: admin 컨트롤러 인라인 `@Body()` 4곳 DTO 전환 — `ban`(reason·banUntil), `announcements`(title·message·link), `bot-cleanup`(rooms·matches), `reports/:id/review`. 길이·형식 제한 포함, DTO 검증 테스트 추가
+- [x] Task 1: admin 컨트롤러 인라인 `@Body()` 4곳 DTO 전환 — `ban`(reason·banUntil), `announcements`(title·message·link), `bot-cleanup`(rooms·matches), `reports/:id/review`. 길이·형식 제한 포함, DTO 검증 테스트 추가
 - [ ] Task 2: room 컨트롤러 5곳 DTO 전환
 - [ ] Task 3: riot·reputation·match 컨트롤러 7곳 DTO 전환
 - [ ] Task 4: role-selection·presence·community·board 컨트롤러 4곳 DTO 전환
 - [ ] Task 5: 단일 필드 `@Body("role")`, `@Body("restrictedUntil")`, `@Body("isPinned")` 도 DTO 로 (서비스가 직접 검사하는 곳은 검사를 DTO 로 옮기고 서비스 검사는 방어용으로 유지)
+- [ ] Task 25: **암묵 형변환이 검증을 무력화하는 문제** — 전역 `enableImplicitConversion: true` 때문에 JSON 본문의 `{ "flag": "false" }` 가 `Boolean("false")` = true 로 바뀐 뒤 `@IsBoolean` 이 돈다(문자열·숫자·객체도 `@IsString` 을 통과). Task 1 테스트에서 발견해 `common/keep-raw.decorator.ts` 의 `@KeepRaw()` 를 admin DTO 4개에 적용했다. **기존 DTO 의 `@IsBoolean` 38곳**(user/update-settings 14, clan/update-clan 5, auth/register 4, room/create-room 2, board 4 외)에도 같은 문제가 있다. 본문 DTO 의 문자열·불리언 필드에 적용하고, 쿼리 DTO 는 변환이 필요하니 제외한다. `@Transform(sanitizeHtml)` 을 쓰는 필드는 순서가 얽히므로 따로 본다. DTO 별 "문자열 'false' 가 거부된다" 테스트 추가
 - [ ] Task 6: 회귀 방지 테스트 — 컨트롤러 소스에 인라인 `@Body() x: {` 가 없음을 확인하는 테스트 (게이트웨이의 맨몸 `@MessageBody()` 검사와 같은 방식)
 
 ## Phase B — 방 삭제 경로 통합

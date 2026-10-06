@@ -40,6 +40,12 @@ import {
   AdminStatsSeriesQueryDto,
   AdminAuditLogsQueryDto,
 } from "./dto/admin-query.dto";
+import {
+  BanUserDto,
+  BotCleanupDto,
+  ReviewReportDto,
+  SendAnnouncementDto,
+} from "./dto/admin-actions.dto";
 
 @Controller("admin")
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -80,10 +86,7 @@ export class AdminController {
   @Post("bot-cleanup")
   @Roles(UserRole.ADMIN)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async cleanupBotData(
-    @Body() body: { rooms?: boolean; matches?: boolean },
-    @Request() req: any,
-  ) {
+  async cleanupBotData(@Body() body: BotCleanupDto, @Request() req: any) {
     const rooms = body?.rooms === true;
     const matches = body?.matches === true;
     if (!rooms && !matches) {
@@ -260,7 +263,7 @@ export class AdminController {
   @Roles(UserRole.ADMIN)
   banUser(
     @Param("id") targetUserId: string,
-    @Body() body: { reason: string; banUntil?: string },
+    @Body() body: BanUserDto,
     @Request() req: any,
   ) {
     return this.adminService.banUser(
@@ -314,12 +317,7 @@ export class AdminController {
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   reviewReport(
     @Param("id") reportId: string,
-    @Body()
-    body: {
-      status: "APPROVED" | "REJECTED";
-      reviewerNote: string;
-      category?: string;
-    },
+    @Body() body: ReviewReportDto,
     @Request() req: any,
   ) {
     return this.adminService.reviewReport(
@@ -327,17 +325,14 @@ export class AdminController {
       body.status,
       body.reviewerNote,
       req.user.sub,
-      (body.category as "user" | "post") || "user",
+      body.category ?? "user",
     );
   }
 
   // ── Announcements (ADMIN only) ──────────────────────────────────────────
   @Post("announcements")
   @Roles(UserRole.ADMIN)
-  sendAnnouncement(
-    @Body() body: { title: string; message: string; link?: string },
-    @Request() req: any,
-  ) {
+  sendAnnouncement(@Body() body: SendAnnouncementDto, @Request() req: any) {
     return this.adminService.sendAnnouncement(
       body.title,
       body.message,

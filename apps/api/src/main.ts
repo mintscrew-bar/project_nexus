@@ -6,6 +6,7 @@ import * as cookieParser from "cookie-parser";
 import * as dotenv from "dotenv";
 import { resolve } from "path";
 import { AppModule } from "./app.module";
+import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "./common/validation-pipe.options";
 import { GlobalExceptionFilter } from "./common/filters/global-exception.filter";
 import { RedisIoAdapter } from "./adapters/redis-io.adapter";
 
@@ -103,16 +104,7 @@ async function bootstrap() {
     allowedHeaders: ["Content-Type", "Authorization"],
   });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    }),
-  );
+  app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
 
   app.useGlobalFilters(new GlobalExceptionFilter());
 
