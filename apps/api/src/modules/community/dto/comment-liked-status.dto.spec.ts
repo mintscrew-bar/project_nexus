@@ -18,12 +18,12 @@ describe("CommentLikedStatusDto", () => {
     expect(
       run(CommentLikedStatusDto, { commentIds: [] }),
     ).resolves.toBeDefined());
-  it("200개까지 받고 201개는 거부한다", async () => {
+  it("1000개까지 받고 1001개는 거부한다 — 글 상세는 댓글·답글 id 를 전부 보낸다", async () => {
     const ids = (n: number) => Array.from({ length: n }, (_, i) => `c${i}`);
     await expect(
-      run(CommentLikedStatusDto, { commentIds: ids(200) }),
+      run(CommentLikedStatusDto, { commentIds: ids(1000) }),
     ).resolves.toBeDefined();
-    await rejects(CommentLikedStatusDto, { commentIds: ids(201) });
+    await rejects(CommentLikedStatusDto, { commentIds: ids(1001) });
   });
   it.each([
     ["없음 (예전엔 서비스에서 TypeError)", {}],

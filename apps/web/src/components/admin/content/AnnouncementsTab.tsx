@@ -44,6 +44,7 @@ export function AnnouncementsTab({ addToast }: { addToast: AddToast }) {
               <input
                 type="text"
                 value={title}
+                maxLength={100}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="공지 제목"
                 className="w-full px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-accent-primary"
@@ -55,6 +56,7 @@ export function AnnouncementsTab({ addToast }: { addToast: AddToast }) {
               </label>
               <textarea
                 value={message}
+                maxLength={2000}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="공지 내용"
                 rows={5}
@@ -68,6 +70,7 @@ export function AnnouncementsTab({ addToast }: { addToast: AddToast }) {
               <input
                 type="text"
                 value={link}
+                maxLength={500}
                 onChange={(e) => setLink(e.target.value)}
                 placeholder="https://..."
                 className="w-full px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-accent-primary"

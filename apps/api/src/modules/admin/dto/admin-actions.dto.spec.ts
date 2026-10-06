@@ -211,13 +211,15 @@ describe("PinPostDto", () => {
 describe("AddBotsDto", () => {
   it("클라이언트 payload: { count: 1 }", () =>
     expect(run(AddBotsDto, { count: 1 })).resolves.toEqual({ count: 1 }));
+  it("배틀로얄 빈 방 채우기: 99 를 받는다 (정원 100 - 방장 1)", () =>
+    expect(run(AddBotsDto, { count: 99 })).resolves.toEqual({ count: 99 }));
   it("생략하면 컨트롤러가 1 로 처리한다", () =>
     expect(run(AddBotsDto, {})).resolves.toBeDefined());
   it.each([
     ["0", { count: 0 }],
     ["소수", { count: 1.5 }],
     ["문자열 '3' (암묵 변환 방지)", { count: "3" }],
-    ["51", { count: 51 }],
+    ["101", { count: 101 }],
     ["모르는 키", { count: 1, fill: true }],
   ])("거부한다: %s", (_n, body) => rejects(AddBotsDto, body));
 });

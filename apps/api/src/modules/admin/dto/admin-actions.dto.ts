@@ -125,12 +125,16 @@ export class PinPostDto {
   isPinned!: boolean;
 }
 
-/** 방에 테스트 봇 추가 (ADMIN). 생략하면 1명 — 정원 초과는 서비스가 막는다. */
+/**
+ * 방에 테스트 봇 추가 (ADMIN). 생략하면 1명 — 정원 초과는 서비스가 막는다.
+ * 로비의 "봇 추가"는 남은 자리를 한 번에 채우려고 `정원 - 현재 인원` 을 보낸다.
+ * 배그 배틀로얄 정원이 100명이라 상한은 정원 상한(`CreateRoomDto.maxParticipants`)과 같은 100.
+ */
 export class AddBotsDto {
   @KeepRaw()
   @IsOptional()
   @IsInt({ message: "count는 정수여야 합니다." })
   @Min(1)
-  @Max(50)
+  @Max(100)
   count?: number;
 }

@@ -541,6 +541,7 @@ export function ReportsTab({ addToast }: { addToast: AddToast }) {
             </div>
             <textarea
               value={reviewNote}
+              maxLength={1000}
               onChange={(e) => setReviewNote(e.target.value)}
               placeholder="검토 메모 (선택)"
               rows={3}

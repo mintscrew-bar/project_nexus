@@ -220,6 +220,7 @@ export function AppealsTab({ addToast }: { addToast: AddToast }) {
               </label>
               <textarea
                 value={adminNote}
+                maxLength={1000}
                 onChange={(e) => setAdminNote(e.target.value)}
                 rows={3}
                 placeholder="유저에게 전달할 메모 (선택)"
