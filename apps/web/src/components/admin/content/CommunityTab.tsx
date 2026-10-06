@@ -8,6 +8,7 @@ import { Search, Pin, Trash2 } from "lucide-react";
 import { BoardsTab } from "./BoardsTab";
 import { useAdminGameScope } from "../game-scope";
 import { Pagination, type AddToast } from "../shared";
+import { useConfirm } from "../ConfirmDialog";
 
 interface AdminPost {
   id: string;
@@ -64,6 +65,7 @@ export function CommunityTab({
 
 /** 게시글 관리 (검색/고정/삭제) */
 function CommunityPostsTab({ addToast }: { addToast: AddToast }) {
+  const { confirm, dialog } = useConfirm();
   const [posts, setPosts] = useState<AdminPost[]>([]);
   const [total, setTotal] = useState(0);
   const { gameParam } = useAdminGameScope();
@@ -103,7 +105,13 @@ function CommunityPostsTab({ addToast }: { addToast: AddToast }) {
   }, [fetchPosts]);
 
   const handleDelete = async (post: AdminPost) => {
-    if (!confirm(`"${post.title}" 게시글을 삭제하시겠습니까?`)) return;
+    const ok = await confirm({
+      title: "게시글 삭제",
+      message: `"${post.title}" 게시글을 삭제합니다.`,
+      confirmLabel: "삭제",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await adminApi.deletePost(post.id);
       setPosts((prev) => prev.filter((p) => p.id !== post.id));
@@ -129,6 +137,7 @@ function CommunityPostsTab({ addToast }: { addToast: AddToast }) {
 
   return (
     <div className="space-y-4">
+      {dialog}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-text-primary">
           커뮤니티 관리

@@ -12,6 +12,7 @@ import {
 import { Search, Trash2 } from "lucide-react";
 import { Pagination, type AddToast } from "../shared";
 import { useAdminGameScope } from "../game-scope";
+import { useConfirm } from "../ConfirmDialog";
 
 interface AdminClan {
   id: string;
@@ -23,6 +24,7 @@ interface AdminClan {
 }
 
 export function ClansTab({ addToast }: { addToast: AddToast }) {
+  const { confirm, dialog } = useConfirm();
   const [clans, setClans] = useState<AdminClan[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -74,7 +76,14 @@ export function ClansTab({ addToast }: { addToast: AddToast }) {
   }, [fetchClans]);
 
   const handleDelete = async (clan: AdminClan) => {
-    if (!confirm(`"${clan.name}" 클랜을 삭제하시겠습니까?`)) return;
+    const ok = await confirm({
+      title: "클랜 삭제",
+      message: `"${clan.name}" 클랜을 삭제합니다. 멤버 구성과 클랜 채팅 연결이 사라지고 되돌릴 수 없습니다.`,
+      confirmLabel: "삭제",
+      danger: true,
+      requireText: clan.name,
+    });
+    if (!ok) return;
     try {
       await adminApi.deleteClan(clan.id);
       setClans((prev) => prev.filter((c) => c.id !== clan.id));
@@ -86,6 +95,7 @@ export function ClansTab({ addToast }: { addToast: AddToast }) {
 
   return (
     <div className="space-y-4">
+      {dialog}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-text-primary">클랜 관리</h2>
         <form

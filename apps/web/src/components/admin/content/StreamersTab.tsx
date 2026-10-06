@@ -12,6 +12,7 @@ import {
 import { CheckCircle, RefreshCw, Search, XCircle } from "lucide-react";
 import type { AddToast } from "../shared";
 import { useAdminGameScope } from "../game-scope";
+import { useConfirm } from "../ConfirmDialog";
 
 const PLATFORM_LABELS: Record<string, string> = {
   CHZZK: "치지직",
@@ -38,6 +39,7 @@ function formatDateTime(value: string | null): string {
 }
 
 export function StreamersTab({ addToast }: { addToast: AddToast }) {
+  const { confirm, dialog } = useConfirm();
   const { gameParam } = useAdminGameScope();
   const [streamers, setStreamers] = useState<AdminStreamerItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,10 +91,11 @@ export function StreamersTab({ addToast }: { addToast: AddToast }) {
     const next = !streamer.verifiedAt;
     if (
       next &&
-      !confirm(
-        `"${streamer.channelName ?? streamer.username}" 채널을 수동 인증하시겠습니까?\n` +
-          `채널이 실제 이 유저의 것인지 직접 확인한 경우에만 승인해주세요.`,
-      )
+      !(await confirm({
+        title: "스트리머 수동 인증",
+        message: `"${streamer.channelName ?? streamer.username}" 채널을 수동 인증합니다. 채널이 실제 이 유저의 것인지 직접 확인한 경우에만 승인해주세요.`,
+        confirmLabel: "인증 승인",
+      }))
     ) {
       return;
     }
@@ -127,6 +130,7 @@ export function StreamersTab({ addToast }: { addToast: AddToast }) {
 
   return (
     <div className="space-y-4">
+      {dialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-text-primary">

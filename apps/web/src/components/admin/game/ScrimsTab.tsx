@@ -12,6 +12,7 @@ import {
   Modal,
 } from "@/components/ui";
 import { Pagination, type AddToast } from "../shared";
+import { useConfirm } from "../ConfirmDialog";
 
 /**
  * 배그 스크림 기록.
@@ -110,6 +111,7 @@ function ScrimDetailModal({
 }) {
   const [detail, setDetail] = useState<ScrimDetail | null>(null);
   const [busy, setBusy] = useState(false);
+  const { confirm, dialog } = useConfirm();
 
   const load = useCallback(async () => {
     try {
@@ -128,8 +130,18 @@ function ScrimDetailModal({
     confirmText: string,
     action: () => Promise<unknown>,
     done: string,
+    options: { title: string; label: string } = {
+      title: "확인",
+      label: "진행",
+    },
   ) => {
-    if (!confirm(confirmText)) return;
+    const ok = await confirm({
+      title: options.title,
+      message: confirmText,
+      confirmLabel: options.label,
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await action();
@@ -147,6 +159,7 @@ function ScrimDetailModal({
 
   return (
     <Modal isOpen onClose={onClose} title="스크림 상세" size="lg">
+      {dialog}
       {!detail ? (
         <LoadingSpinner />
       ) : (
@@ -258,6 +271,7 @@ function ScrimDetailModal({
                       "수집 오류를 지우고 다음 수집 주기에 다시 가져오게 합니다.",
                       () => adminApi.retryScrimCollection(detail.id),
                       "다음 수집 주기에 다시 확인합니다.",
+                      { title: "수집 재시도", label: "재시도" },
                     )
                   }
                 >
@@ -273,6 +287,7 @@ function ScrimDetailModal({
                     "이 스크림을 취소 처리합니다. 방은 방 관리에서 따로 닫아야 합니다.",
                     () => adminApi.cancelScrim(detail.id),
                     "스크림을 취소했습니다.",
+                    { title: "스크림 취소", label: "취소 처리" },
                   )
                 }
               >

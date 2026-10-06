@@ -12,6 +12,7 @@ import {
 import { XCircle } from "lucide-react";
 import { Pagination, type AddToast } from "../shared";
 import { useAdminGameScope } from "../game-scope";
+import { useConfirm } from "../ConfirmDialog";
 
 interface AdminRoom {
   id: string;
@@ -23,6 +24,7 @@ interface AdminRoom {
 }
 
 export function RoomsTab({ addToast }: { addToast: AddToast }) {
+  const { confirm, dialog } = useConfirm();
   const [rooms, setRooms] = useState<AdminRoom[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -73,12 +75,13 @@ export function RoomsTab({ addToast }: { addToast: AddToast }) {
   }, [fetchRooms]);
 
   const handleClose = async (room: AdminRoom) => {
-    if (
-      !confirm(
-        `"${room.name}" 방을 삭제하시겠습니까? 참가자는 방에서 제거됩니다.`,
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "방 삭제",
+      message: `"${room.name}" 방을 삭제합니다. 참가자는 방에서 제거되고 되돌릴 수 없습니다.`,
+      confirmLabel: "삭제",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await adminApi.closeRoom(room.id);
       setRooms((prev) => prev.filter((r) => r.id !== room.id));
@@ -102,6 +105,7 @@ export function RoomsTab({ addToast }: { addToast: AddToast }) {
 
   return (
     <div className="space-y-4">
+      {dialog}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-text-primary">방 관리</h2>
         <select
