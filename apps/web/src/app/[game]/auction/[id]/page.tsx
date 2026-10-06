@@ -1680,7 +1680,11 @@ export default function AuctionRoomPage() {
             />
           </div>
 
-          <div className="min-h-0 overflow-y-auto pr-1">
+          {/*
+            가운데 열은 세로 flex — 매물 카드가 남는 높이를 채우고 입찰 패널은 바닥에
+            붙는다. 고해상도에서 카드 아래가 통째로 비던 문제(2026-10-06 운영자 제보).
+          */}
+          <div className="flex min-h-0 flex-col overflow-y-auto pr-1">
             <AuctionBoard
               auctionState={auctionState}
               teams={teams}
@@ -1690,7 +1694,7 @@ export default function AuctionRoomPage() {
               disabled={!isConnected}
               bidHistory={bidHistory}
               hideTeams
-              className="min-h-full"
+              className="flex-1"
               onVoteItemSkip={requestFold}
               isVotingItemSkip={isVotingItemSkip}
               teamSize={GAMES[game].teamSize}

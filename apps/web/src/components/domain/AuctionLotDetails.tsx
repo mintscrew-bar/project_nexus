@@ -86,6 +86,31 @@ function StatCell({
 }
 
 /**
+ * 화면 높이 구간에 따라 값을 고른다. `steps` 는 [최소 높이, 값] 을 큰 높이부터.
+ * SSR·첫 렌더는 기본값으로 그리고, 마운트 뒤와 창 크기가 바뀔 때 다시 고른다.
+ */
+function useViewportHeightStep(
+  steps: Array<[number, number]>,
+  fallback: number,
+): number {
+  const pick = React.useCallback(() => {
+    if (typeof window === "undefined") return fallback;
+    const height = window.innerHeight;
+    return steps.find(([min]) => height >= min)?.[1] ?? fallback;
+    // steps 는 호출부의 리터럴이라 내용이 바뀌지 않는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fallback]);
+  const [value, setValue] = React.useState(fallback);
+  React.useEffect(() => {
+    const update = () => setValue(pick());
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [pick]);
+  return value;
+}
+
+/**
  * 경매 매물 카드의 상단(선수 정보). 좌우 2단 + 타이머.
  *
  * - 왼쪽: 누구인가 — 아바타·이름·클랜·라이엇 ID·현재/최고 티어·주/부라인·내전 승률·평판
@@ -111,6 +136,16 @@ export function AuctionLotDetails({
 }) {
   const currentGame = useCurrentGame();
   const isLol = currentGame === "LOL";
+  // 라인 줄이 늘어난 만큼 챔피언 아이콘도 키운다. 줄 높이에 비해 아이콘이 작으면
+  // 줄마다 빈 띠가 생긴다(고해상도에서 매물 카드가 비어 보이던 원인).
+  const iconSize = useViewportHeightStep(
+    [
+      // 오른쪽 열 폭(약 390px)에 라벨·티어·아이콘 5개가 들어가는 최대치가 36px 이다.
+      [1000, 36],
+      [900, 32],
+    ],
+    28,
+  );
   const { data: profile } = useQuery({
     queryKey: ["hoverProfile", player.id, currentGame],
     queryFn: () => userApi.getHoverProfile(player.id, currentGame),
@@ -199,15 +234,70 @@ export function AuctionLotDetails({
     />
   );
 
+  // 내전 평균 지표 다섯 칸. 보통은 카드 아래 전체 폭 줄에 두지만, 키 큰 화면(1000px+)
+  // 에서는 왼쪽 열로 올려 승률·평판과 함께 쌓는다 — 카드가 늘어난 높이를 빈 칸이 아니라
+  // 내용으로 채운다(2026-10-06 운영자 제보: 고해상도에서 매물 카드가 비어 보임).
+  const metricCells = (
+    <>
+      <StatCell
+        large
+        label="KDA"
+        value={kdaRatio ?? "—"}
+        sub={kda ? `${kda.kills}/${kda.deaths}/${kda.assists}` : undefined}
+        valueClassName={
+          kda && kda.deaths > 0 && (kda.kills + kda.assists) / kda.deaths >= 3
+            ? "text-accent-gold"
+            : undefined
+        }
+      />
+      <StatCell
+        large
+        label="피해량"
+        value={kda?.damage != null ? kda.damage.toLocaleString() : "—"}
+      />
+      <StatCell large label="CS" value={kda?.cs != null ? kda.cs : "—"} />
+      <StatCell
+        large
+        label="시야"
+        value={kda?.vision != null ? kda.vision : "—"}
+      />
+      <StatCell
+        large
+        label="골드"
+        value={kda?.gold != null ? kda.gold.toLocaleString() : "—"}
+      />
+    </>
+  );
+  const recordCaption = (
+    <>
+      {/*
+        판수는 KDA 집계 판수(스탯이 수집된 판)가 아니라 사이트에 저장된
+        내전 전체 승패로 보여준다(2026-10-01 운영자 요청).
+      */}
+      {games > 0
+        ? `내전 ${stats!.wins}승 ${stats!.losses}패 · 승률 ${Math.round(stats!.winRate)}%`
+        : "내전 기록 없음"}
+      {/*
+        아래 지표는 스탯이 수집된 판만의 평균이다(토너먼트 코드 없는 판은
+        기록이 없다). 전체 판수와 다르면 몇 판 기준인지 밝힌다.
+      */}
+      {kda && kda.games !== games && (
+        <span className="text-text-muted"> · 지표는 {kda.games}판 기준</span>
+      )}
+    </>
+  );
+
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_auto] gap-x-5 gap-y-3 px-5 py-4">
+    // 카드가 세로로 늘어나면 위 행(선수 정보·라인 줄)이 그 높이를 가져가고, 아래 지표 줄은
+    // 제 높이를 유지한다. 라인 줄은 flex-1 이라 늘어난 높이를 다섯 줄이 나눠 갖는다.
+    <div className="grid flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_auto] grid-rows-[minmax(0,1fr)_auto] gap-x-5 gap-y-3 px-5 py-4">
       {/*
         ── 왼쪽: 누구인가 ──
         좌우 두 단은 그리드 행 높이(둘 중 큰 쪽)에 맞춰 늘어난다. 왼쪽은 위아래로
         벌리고(승률·평판이 바닥에 붙음), 오른쪽은 라인 줄이 나눠 채워 두 단의
         윗선·아랫선을 맞춘다(2026-10-01 운영자 요청).
       */}
-      <div className="flex min-w-0 flex-col justify-between gap-2.5">
+      <div className="flex min-w-0 flex-col gap-2.5 [@media(min-height:1000px)]:gap-3.5">
         <div className="flex items-center gap-3">
           <Avatar
             src={player.avatar}
@@ -231,7 +321,7 @@ export function AuctionLotDetails({
                 </span>
               )}
             </div>
-            <h2 className="truncate text-2xl font-bold leading-tight text-text-primary [@media(min-height:900px)]:text-[28px]">
+            <h2 className="truncate text-2xl font-bold leading-tight text-text-primary [@media(min-height:900px)]:text-[28px] [@media(min-height:1000px)]:text-[34px]">
               {player.username}
             </h2>
             {riot && (
@@ -301,10 +391,21 @@ export function AuctionLotDetails({
           </>
         )}
 
-        {/* 내전 승률 + 평판. 낮은 화면에선 아래 지표 줄로 옮긴다 */}
-        <div className="grid grid-cols-2 gap-2 [@media(max-height:820px)]:hidden">
-          {winRateCell}
-          {reputationCell}
+        {/*
+          내전 승률 + 평판은 왼쪽 열 바닥에 붙인다. 낮은 화면(820px 이하)에선 아래 지표
+          줄로 옮기고, 키 큰 화면(1000px 이상)에선 반대로 아래 지표 다섯 칸을 여기로 올린다.
+        */}
+        <div className="mt-auto [@media(max-height:820px)]:hidden">
+          <p className="mb-1 hidden text-[10px] font-medium text-text-tertiary [@media(min-height:1000px)]:block">
+            {recordCaption}
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {winRateCell}
+            {reputationCell}
+            <div className="hidden [@media(min-height:1000px)]:contents">
+              {metricCells}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -329,7 +430,7 @@ export function AuctionLotDetails({
                   row.kind === "other" && "[@media(max-height:820px)]:hidden",
                 )}
               >
-                <span className="flex w-[64px] flex-shrink-0 items-center gap-1 text-xs font-semibold text-text-secondary">
+                <span className="flex w-[64px] flex-shrink-0 items-center gap-1 text-xs font-semibold text-text-secondary [@media(min-height:1000px)]:w-[76px] [@media(min-height:1000px)]:text-sm">
                   <PositionIcon
                     position={row.role}
                     className="!h-3.5 !w-3.5"
@@ -339,7 +440,7 @@ export function AuctionLotDetails({
                 </span>
                 <span
                   className={cn(
-                    "w-[92px] flex-shrink-0 truncate text-[11px] font-bold",
+                    "w-[92px] flex-shrink-0 truncate text-[11px] font-bold [@media(min-height:1000px)]:text-[13px]",
                     row.roleTier
                       ? getTierColor(row.roleTier.tier)
                       : "text-text-muted",
@@ -362,7 +463,7 @@ export function AuctionLotDetails({
                         key={championId}
                         className={cn(index >= 3 && "max-[1700px]:hidden")}
                       >
-                        <ChampionIcon championId={championId} size={28} />
+                        <ChampionIcon championId={championId} size={iconSize} />
                       </span>
                     ))
                   ) : (
@@ -403,52 +504,12 @@ export function AuctionLotDetails({
         오른쪽 라인 목록 밑에 두면 좌우 높이가 어긋나고 칸이 좁았다.
         카드 전체 폭에 한 줄로 깔아 좌우 두 단을 받친다(2026-10-01 운영자 요청).
       */}
-      <div className="col-span-3">
+      <div className="col-span-3 [@media(min-height:1000px)]:hidden">
         <p className="mb-1 text-[10px] font-medium text-text-tertiary">
-          {/*
-            판수는 KDA 집계 판수(스탯이 수집된 판)가 아니라 사이트에 저장된
-            내전 전체 승패로 보여준다(2026-10-01 운영자 요청).
-          */}
-          {games > 0
-            ? `내전 ${stats!.wins}승 ${stats!.losses}패 · 승률 ${Math.round(stats!.winRate)}%`
-            : "내전 기록 없음"}
-          {/*
-            아래 지표는 스탯이 수집된 판만의 평균이다(토너먼트 코드 없는 판은
-            기록이 없다). 전체 판수와 다르면 몇 판 기준인지 밝힌다.
-          */}
-          {kda && kda.games !== games && (
-            <span className="text-text-muted">
-              {" "}
-              · 지표는 {kda.games}판 기준
-            </span>
-          )}
+          {recordCaption}
         </p>
         <div className="grid grid-cols-5 gap-2 [@media(max-height:820px)]:grid-cols-7">
-          <StatCell
-            label="KDA"
-            value={kdaRatio ?? "—"}
-            sub={kda ? `${kda.kills}/${kda.deaths}/${kda.assists}` : undefined}
-            valueClassName={
-              kda &&
-              kda.deaths > 0 &&
-              (kda.kills + kda.assists) / kda.deaths >= 3
-                ? "text-accent-gold"
-                : undefined
-            }
-          />
-          <StatCell
-            label="피해량"
-            value={kda?.damage != null ? kda.damage.toLocaleString() : "—"}
-          />
-          <StatCell label="CS" value={kda?.cs != null ? kda.cs : "—"} />
-          <StatCell
-            label="시야"
-            value={kda?.vision != null ? kda.vision : "—"}
-          />
-          <StatCell
-            label="골드"
-            value={kda?.gold != null ? kda.gold.toLocaleString() : "—"}
-          />
+          {metricCells}
           {/* 낮은 화면에서만: 왼쪽에서 옮겨 온 승률·평판 */}
           <div className="hidden [@media(max-height:820px)]:contents">
             {winRateCell}

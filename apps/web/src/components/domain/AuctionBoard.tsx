@@ -467,15 +467,16 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
           <Card
             variant="elevated"
             className={cn(
-              "hidden lg:block overflow-hidden border-bg-tertiary bg-bg-secondary p-0 shadow-none",
+              // 데스크톱에선 남는 세로 공간을 이 카드가 다 가진다 → 입찰 패널이 바닥에 붙는다.
+              "hidden lg:flex lg:flex-1 lg:flex-col overflow-hidden border-bg-tertiary bg-bg-secondary p-0 shadow-none",
               playerTransition && "animate-fade-in",
               yuchalShake && "animate-shake",
             )}
           >
-            <CardContent className="p-0">
+            <CardContent className="flex flex-1 flex-col p-0">
               {/* 상단: 선수 정보 좌우 2단 + 타이머. 누르면 프로필 모달 */}
               <div
-                className="cursor-pointer"
+                className="flex flex-1 cursor-pointer flex-col"
                 onClick={() => setProfileUserId(auctionState.currentPlayer!.id)}
               >
                 <AuctionLotDetails
