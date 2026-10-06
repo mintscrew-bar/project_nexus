@@ -2557,6 +2557,23 @@ export interface AdminInternalMatch {
   _count: { participants: number };
 }
 
+/** 관리자 방 깔때기 — RoomOutcome 이 쌓이기 시작한 뒤의 방만 집계된다 */
+export interface AdminRoomFunnel {
+  days: number;
+  gameTitle: GameTitle | null;
+  since: string;
+  firstRecordAt: string | null;
+  truncated: boolean;
+  created: number;
+  started: number;
+  withResult: number;
+  fullAtEnd: number;
+  emptied: number;
+  medianWaitMinutes: number | null;
+  avgHumansInStarted: number | null;
+  excludedBotRooms: number;
+}
+
 /** 관리자 내전 기록 상세 — 목록 필드에 팀/참가자 지표가 더해진다 */
 export interface AdminInternalMatchDetail extends Omit<
   AdminInternalMatch,
@@ -2832,6 +2849,10 @@ export const adminApi = {
   }) => {
     const response = await apiClient.get("/admin/scrims", { params });
     return response.data;
+  },
+  getRoomFunnel: async (params?: { gameTitle?: GameTitle; days?: number }) => {
+    const response = await apiClient.get("/admin/room-funnel", { params });
+    return response.data as AdminRoomFunnel;
   },
   getScrimDetail: async (scrimId: string) => {
     const response = await apiClient.get(`/admin/scrims/${scrimId}`);

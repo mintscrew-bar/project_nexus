@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { StatCard, type AddToast } from "./shared";
 import { useAdminGameScope } from "./game-scope";
+import { RoomFunnelCard } from "./RoomFunnelCard";
 import { GAMES } from "@nexus/types";
 
 export function DashboardTab({ addToast }: { addToast: AddToast }) {
@@ -209,6 +210,8 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
           />
         </div>
       )}
+
+      {game && <RoomFunnelCard game={game} />}
 
       <Card>
         <CardHeader className="pb-3">
