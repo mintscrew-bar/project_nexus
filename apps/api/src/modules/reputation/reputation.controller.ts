@@ -15,8 +15,12 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { ReputationService } from "./reputation.service";
-import { SubmitRatingDto, SubmitReportDto } from "./dto";
-import { ReportStatus } from "../community/community.types";
+import {
+  BanUserDto,
+  SubmitRatingDto,
+  SubmitReportDto,
+  UpdateReportStatusDto,
+} from "./dto";
 import { UserRole } from "@nexus/database";
 
 @Controller("reputation")
@@ -93,7 +97,7 @@ export class ReputationController {
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   async updateReportStatus(
     @Param("id") reportId: string,
-    @Body() body: { status: ReportStatus; reviewerNote?: string },
+    @Body() body: UpdateReportStatusDto,
   ) {
     return this.reputationService.updateReportStatus(
       reportId,
@@ -110,10 +114,7 @@ export class ReputationController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @HttpCode(HttpStatus.OK)
-  async banUser(
-    @Param("userId") userId: string,
-    @Body() body: { reason: string; duration?: number },
-  ) {
+  async banUser(@Param("userId") userId: string, @Body() body: BanUserDto) {
     return this.reputationService.banUser(userId, body.reason, body.duration);
   }
 

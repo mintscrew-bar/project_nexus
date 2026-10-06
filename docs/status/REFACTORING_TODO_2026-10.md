@@ -15,11 +15,12 @@
 컨트롤러의 인라인 `@Body()` 는 20곳 (room 5, admin 4, riot 3, reputation 2, match 2, role-selection·presence·community·board 각 1).
 
 - [x] Task 1: admin 컨트롤러 인라인 `@Body()` 4곳 DTO 전환 — `ban`(reason·banUntil), `announcements`(title·message·link), `bot-cleanup`(rooms·matches), `reports/:id/review`. 길이·형식 제한 포함, DTO 검증 테스트 추가
-- [ ] Task 2: room 컨트롤러 5곳 DTO 전환
-- [ ] Task 3: riot·reputation·match 컨트롤러 7곳 DTO 전환
+- [x] Task 2: room 컨트롤러 5곳 DTO 전환 (방송 고정·중계 경기·입장·채팅·드래프트 픽)
+- [x] Task 3: riot·reputation·match 컨트롤러 7곳 DTO 전환 (본문이 비면 서비스에서 TypeError 500 이 나던 곳 2곳 포함)
 - [ ] Task 4: role-selection·presence·community·board 컨트롤러 4곳 DTO 전환
 - [ ] Task 5: 단일 필드 `@Body("role")`, `@Body("restrictedUntil")`, `@Body("isPinned")` 도 DTO 로 (서비스가 직접 검사하는 곳은 검사를 DTO 로 옮기고 서비스 검사는 방어용으로 유지)
 - [ ] Task 25: **암묵 형변환이 검증을 무력화하는 문제** — 전역 `enableImplicitConversion: true` 때문에 JSON 본문의 `{ "flag": "false" }` 가 `Boolean("false")` = true 로 바뀐 뒤 `@IsBoolean` 이 돈다(문자열·숫자·객체도 `@IsString` 을 통과). Task 1 테스트에서 발견해 `common/keep-raw.decorator.ts` 의 `@KeepRaw()` 를 admin DTO 4개에 적용했다. **기존 DTO 의 `@IsBoolean` 38곳**(user/update-settings 14, clan/update-clan 5, auth/register 4, room/create-room 2, board 4 외)에도 같은 문제가 있다. 본문 DTO 의 문자열·불리언 필드에 적용하고, 쿼리 DTO 는 변환이 필요하니 제외한다. `@Transform(sanitizeHtml)` 을 쓰는 필드는 순서가 얽히므로 따로 본다. DTO 별 "문자열 'false' 가 거부된다" 테스트 추가
+- [ ] Task 26: **죽은 코드 후보** — `reputationApi.reviewReport`·`banUser`·`getPendingReports`(api-client)는 `/reputation/admin/...` 를 가리키는데 서버의 평판 컨트롤러에는 그 경로가 없다(`reports/:id/status`, `users/:userId/ban`). 호출하는 화면도 없다(관리자 화면은 `/admin/*` 를 쓴다). 서버 쪽 평판 관리자 엔드포인트도 웹에서 쓰이지 않는 것으로 보인다. 다른 호출부(디스코드 봇·스크립트)가 없는지 확인한 뒤 클라이언트 메서드와 서버 엔드포인트 제거를 검토한다
 - [ ] Task 6: 회귀 방지 테스트 — 컨트롤러 소스에 인라인 `@Body() x: {` 가 없음을 확인하는 테스트 (게이트웨이의 맨몸 `@MessageBody()` 검사와 같은 방식)
 
 ## Phase B — 방 삭제 경로 통합

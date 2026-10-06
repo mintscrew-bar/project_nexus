@@ -1063,7 +1063,7 @@ export const matchApi = {
 
   reportResult: async (
     matchId: string,
-    data: { winnerId: string; statsJson?: any },
+    data: { winnerId: string },
   ) => {
     const response = await apiClient.post(`/matches/${matchId}/result`, data);
     return response.data;

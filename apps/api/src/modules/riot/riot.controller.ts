@@ -18,7 +18,13 @@ import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { RiotService } from "./riot.service";
-import { RegisterRiotAccountDto, UpdateRiotAccountDto } from "./dto";
+import {
+  CreateTournamentDto,
+  RegisterRiotAccountDto,
+  StartVerificationDto,
+  UpdateChampionsDto,
+  UpdateRiotAccountDto,
+} from "./dto";
 import { DataDragonService } from "./data-dragon.service";
 import { RiotTournamentService } from "./riot-tournament.service";
 import { RiotSpectatorService } from "./riot-spectator.service";
@@ -42,7 +48,7 @@ export class RiotController {
   @UseGuards(JwtAuthGuard)
   async startVerification(
     @CurrentUser("sub") userId: string,
-    @Body() data: { gameName: string; tagLine: string },
+    @Body() data: StartVerificationDto,
   ) {
     return this.riotService.startVerification(
       userId,
@@ -122,7 +128,7 @@ export class RiotController {
     @CurrentUser("sub") userId: string,
     @Param("id") accountId: string,
     @Param("role") role: Role,
-    @Body() body: { championIds: string[] },
+    @Body() body: UpdateChampionsDto,
   ) {
     return this.riotService.updateChampionPreferences(
       userId,
@@ -233,7 +239,7 @@ export class RiotController {
   @Post("tournament/create")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  async createTournament(@Body() data: { providerId: string }) {
+  async createTournament(@Body() data: CreateTournamentDto) {
     return this.tournamentService.createTournamentManually(data.providerId);
   }
 

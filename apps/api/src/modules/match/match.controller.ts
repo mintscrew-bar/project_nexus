@@ -18,7 +18,7 @@ import {
   UserMatchesQueryDto,
   MatchHistoryQueryDto,
 } from "./dto/match-query.dto";
-import { VoteType } from "@nexus/database";
+import { ReportMatchResultDto, SubmitVoteDto } from "./dto/match-actions.dto";
 
 @Controller("matches")
 @UseGuards(JwtAuthGuard)
@@ -122,7 +122,7 @@ export class MatchController {
   async reportResult(
     @CurrentUser("sub") userId: string,
     @Param("id") matchId: string,
-    @Body() body: { winnerId: string },
+    @Body() body: ReportMatchResultDto,
   ) {
     const result = await this.matchService.reportMatchResult(
       userId,
@@ -176,7 +176,7 @@ export class MatchController {
   async submitVote(
     @CurrentUser("sub") userId: string,
     @Param("id") matchId: string,
-    @Body() body: { votedForId: string; voteType: VoteType },
+    @Body() body: SubmitVoteDto,
   ) {
     return this.matchService.submitVote(
       userId,
