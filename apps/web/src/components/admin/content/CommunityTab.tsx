@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, Button, LoadingSpinner } from "@/components/ui";
 import { Search, Pin, Trash2 } from "lucide-react";
 import { BoardsTab } from "./BoardsTab";
+import { useAdminGameScope } from "../game-scope";
 import { Pagination, type AddToast } from "../shared";
 
 interface AdminPost {
@@ -65,6 +66,7 @@ export function CommunityTab({
 function CommunityPostsTab({ addToast }: { addToast: AddToast }) {
   const [posts, setPosts] = useState<AdminPost[]>([]);
   const [total, setTotal] = useState(0);
+  const { gameParam } = useAdminGameScope();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -80,6 +82,7 @@ function CommunityPostsTab({ addToast }: { addToast: AddToast }) {
         page,
         limit,
         search: search || undefined,
+        gameTitle: gameParam,
       });
       setPosts(data.posts);
       setTotal(data.total);
@@ -88,7 +91,12 @@ function CommunityPostsTab({ addToast }: { addToast: AddToast }) {
     } finally {
       setLoading(false);
     }
-  }, [page, search, addToast]);
+  }, [page, search, gameParam, addToast]);
+
+  // 게임을 바꾸면 이전 게임의 페이지 번호를 끌고 가지 않는다.
+  useEffect(() => {
+    setPage(1);
+  }, [gameParam]);
 
   useEffect(() => {
     fetchPosts();

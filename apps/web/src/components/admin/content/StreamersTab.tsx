@@ -11,6 +11,7 @@ import {
 } from "@/components/ui";
 import { CheckCircle, RefreshCw, Search, XCircle } from "lucide-react";
 import type { AddToast } from "../shared";
+import { useAdminGameScope } from "../game-scope";
 
 const PLATFORM_LABELS: Record<string, string> = {
   CHZZK: "치지직",
@@ -37,6 +38,7 @@ function formatDateTime(value: string | null): string {
 }
 
 export function StreamersTab({ addToast }: { addToast: AddToast }) {
+  const { gameParam } = useAdminGameScope();
   const [streamers, setStreamers] = useState<AdminStreamerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,6 +52,7 @@ export function StreamersTab({ addToast }: { addToast: AddToast }) {
       const data = await streamerApi.listForAdmin({
         verified: filter,
         search: search || undefined,
+        gameTitle: gameParam,
       });
       setStreamers(data);
     } catch {
@@ -57,7 +60,7 @@ export function StreamersTab({ addToast }: { addToast: AddToast }) {
     } finally {
       setLoading(false);
     }
-  }, [filter, search, addToast]);
+  }, [filter, search, gameParam, addToast]);
 
   useEffect(() => {
     fetchStreamers();

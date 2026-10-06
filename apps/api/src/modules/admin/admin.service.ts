@@ -1093,12 +1093,19 @@ export class AdminService {
 
   // ── Community ─────────────────────────────────────────────────────────────
 
-  async getPosts(params: { page: number; limit: number; search?: string }) {
-    const { page, search } = params;
+  async getPosts(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    gameTitle?: GameTitle;
+  }) {
+    const { page, search, gameTitle } = params;
     const limit = clampLimit(params.limit);
     const skip = (page - 1) * limit;
 
     const where: any = { isDeleted: false };
+    // 게임은 게시판이 정한다 — 글에는 게임 컬럼이 없다.
+    if (gameTitle) where.board = { gameTitle };
     if (search) {
       where.OR = [
         { title: { contains: search, mode: "insensitive" as const } },
@@ -1111,6 +1118,7 @@ export class AdminService {
         where,
         include: {
           author: { select: { id: true, username: true } },
+          board: { select: { name: true, gameTitle: true } },
           _count: { select: { comments: true, likes: true } },
         },
         orderBy: { createdAt: "desc" },

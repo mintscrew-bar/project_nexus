@@ -253,6 +253,7 @@ export class AdminController {
       page: query.page,
       limit: query.limit,
       search: query.search,
+      gameTitle: query.gameTitle,
     });
   }
 

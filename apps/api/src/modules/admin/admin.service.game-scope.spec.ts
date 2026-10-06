@@ -23,6 +23,10 @@ function makeService(overrides: Record<string, any> = {}) {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    post: {
+      count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     scrim: {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
@@ -156,6 +160,25 @@ describe("AdminService 게임 구분", () => {
       const result = await service.getScrims({ page: 1, limit: 20 });
 
       expect(result.scrims[0].completedRounds).toBe(2);
+    });
+  });
+
+  it("게시글은 게시판의 게임으로 좁힌다 — 글에는 게임 컬럼이 없다", async () => {
+    const { service, prisma } = makeService();
+    await service.getPosts({ page: 1, limit: 20, gameTitle: "PUBG" as any });
+
+    expect(prisma.post.findMany.mock.calls[0][0].where).toEqual({
+      isDeleted: false,
+      board: { gameTitle: "PUBG" },
+    });
+  });
+
+  it("게임을 안 주면 게시글 전체를 본다", async () => {
+    const { service, prisma } = makeService();
+    await service.getPosts({ page: 1, limit: 20 });
+
+    expect(prisma.post.findMany.mock.calls[0][0].where).toEqual({
+      isDeleted: false,
     });
   });
 });

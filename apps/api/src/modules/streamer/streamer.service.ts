@@ -705,8 +705,10 @@ export class StreamerService {
   async listForAdmin(filters?: {
     verified?: "all" | "verified" | "pending";
     search?: string;
+    gameTitle?: GameTitle;
   }) {
     const where: Prisma.StreamerProfileWhereInput = {};
+    if (filters?.gameTitle) where.games = { has: filters.gameTitle };
 
     if (filters?.verified === "verified") where.verifiedAt = { not: null };
     if (filters?.verified === "pending") where.verifiedAt = null;

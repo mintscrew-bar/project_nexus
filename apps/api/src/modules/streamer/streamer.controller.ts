@@ -13,7 +13,7 @@ import {
 } from "@nestjs/common";
 import type { Response } from "express";
 import { Throttle } from "@nestjs/throttler";
-import { StreamerPlatform, UserRole } from "@nexus/database";
+import { GameTitle, StreamerPlatform, UserRole } from "@nexus/database";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { OptionalJwtGuard } from "../auth/guards/optional-jwt.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -122,8 +122,14 @@ export class StreamerController {
   listForAdmin(
     @Query("verified") verified?: "all" | "verified" | "pending",
     @Query("search") search?: string,
+    @Query("gameTitle") gameTitle?: GameTitle,
   ) {
-    return this.streamerService.listForAdmin({ verified, search });
+    return this.streamerService.listForAdmin({
+      verified,
+      search,
+      gameTitle:
+        gameTitle === "LOL" || gameTitle === "PUBG" ? gameTitle : undefined,
+    });
   }
 
   /** 수동 인증 승인/해제 — 자동 대조가 안 되는 플랫폼용 */

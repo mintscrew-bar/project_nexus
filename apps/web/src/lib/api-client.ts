@@ -2779,6 +2779,7 @@ export const adminApi = {
     page?: number;
     limit?: number;
     search?: string;
+    gameTitle?: GameTitle;
   }) => {
     const response = await apiClient.get("/admin/posts", { params });
     return response.data;
@@ -3034,6 +3035,7 @@ export const streamerApi = {
   listForAdmin: async (params?: {
     verified?: "all" | "verified" | "pending";
     search?: string;
+    gameTitle?: GameTitle;
   }): Promise<AdminStreamerItem[]> => {
     const response = await apiClient.get("/streamers/admin", { params });
     return response.data;
