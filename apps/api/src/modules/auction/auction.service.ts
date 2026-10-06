@@ -23,6 +23,7 @@ import {
   teamCountForRoster,
   teamSizeForRoom,
 } from "@nexus/types";
+import { recordRoomOutcome } from "../common/room-outcome.util";
 
 const BONUS_GOLD = 500;
 const DEFAULT_BID_TIME_SECONDS = 30;
@@ -1844,6 +1845,7 @@ export class AuctionService implements OnModuleInit {
       });
     }
 
+    await recordRoomOutcome(this.prisma, roomId);
     await this.prisma.room.delete({ where: { id: roomId } });
     this.clearAuctionState(roomId);
     // 공지를 "해산"으로 닫는다. 캐시만 남겨 두면 사라진 방의 공지가

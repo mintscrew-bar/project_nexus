@@ -46,6 +46,7 @@ import { parseStoredInvite, roomInviteKey } from "./room-invite.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { StatsService } from "../stats/stats.service";
 import { BALANCE_ROLES } from "../common/balance-score.util";
+import { recordRoomOutcome } from "../common/room-outcome.util";
 
 /**
  * 편성 점수가 없는 참가자에게 임시로 매기는 값.
@@ -404,6 +405,8 @@ export class RoomService {
   }
 
   async deleteRoomData(roomId: string) {
+    // 지우기 전에 결과 한 줄을 남긴다 — 방은 지워지면 흔적이 없다.
+    await recordRoomOutcome(this.prisma, roomId);
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const room = await tx.room.findUnique({
         where: { id: roomId },

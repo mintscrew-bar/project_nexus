@@ -28,6 +28,7 @@ import {
   teamSizeForRoom,
   type LadderDraw,
 } from "@nexus/types";
+import { recordRoomOutcome } from "../common/room-outcome.util";
 
 export interface SnakeDraftState {
   roomId: string;
@@ -807,6 +808,7 @@ export class SnakeDraftService implements OnModuleInit {
       });
     }
 
+    await recordRoomOutcome(this.prisma, roomId);
     await this.prisma.room.delete({ where: { id: roomId } });
     this.clearDraftState(roomId);
     // 공지를 "해산"으로 닫는다. 캐시만 남겨 두면 사라진 방의 공지가
