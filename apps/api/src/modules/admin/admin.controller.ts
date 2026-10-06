@@ -97,6 +97,34 @@ export class AdminController {
     });
   }
 
+  @Get("scrims/:id")
+  @Roles(UserRole.ADMIN, UserRole.MODERATOR)
+  getScrimDetail(@Param("id") scrimId: string) {
+    return this.adminService.getScrimDetail(scrimId);
+  }
+
+  @Post("scrims/:id/rounds/:roundId/reset")
+  @Roles(UserRole.ADMIN)
+  resetScrimRound(
+    @Param("id") scrimId: string,
+    @Param("roundId") roundId: string,
+    @Request() req: any,
+  ) {
+    return this.adminService.resetScrimRound(scrimId, roundId, req.user.sub);
+  }
+
+  @Post("scrims/:id/retry-collection")
+  @Roles(UserRole.ADMIN)
+  retryScrimCollection(@Param("id") scrimId: string, @Request() req: any) {
+    return this.adminService.retryScrimCollection(scrimId, req.user.sub);
+  }
+
+  @Post("scrims/:id/cancel")
+  @Roles(UserRole.ADMIN)
+  cancelScrim(@Param("id") scrimId: string, @Request() req: any) {
+    return this.adminService.cancelScrim(scrimId, req.user.sub);
+  }
+
   // ── Users ────────────────────────────────────────────────────────────────
   // 조회 및 제재(restrict/unrestrict)는 ADMIN + MODERATOR(매니저), 밴/역할변경은 ADMIN 전용
   @Get("users")

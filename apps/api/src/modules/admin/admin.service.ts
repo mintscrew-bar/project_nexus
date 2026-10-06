@@ -1437,6 +1437,149 @@ export class AdminService {
   //   · 내부 내전 매치 — isInternal=true이며 방 삭제 후에도 스냅샷으로 보존되는 경기
   //   · 외부 랭크 인제스트 매치 — queueId로 식별되는 캐시 데이터
 
+  /** 스크림 상세 — 라운드별 팀 결과와 수집 상태까지 */
+  async getScrimDetail(scrimId: string) {
+    const scrim = await this.prisma.scrim.findUnique({
+      where: { id: scrimId },
+      include: {
+        room: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            pubgGameMode: true,
+            maxParticipants: true,
+            host: { select: { id: true, username: true } },
+          },
+        },
+        rounds: {
+          orderBy: { roundNumber: "asc" },
+          include: { results: { orderBy: { placement: "asc" } } },
+        },
+      },
+    });
+    if (!scrim) throw new NotFoundException("스크림을 찾을 수 없습니다.");
+
+    const state = scrim.collectorState as { pending?: unknown[] } | null;
+    const { collectorState: _omit, ...rest } = scrim;
+    return {
+      ...rest,
+      // 수집기 내부 상태는 통째로 내보내지 않고 운영자가 볼 것만 뽑는다.
+      pendingMatches: state?.pending?.length ?? 0,
+    };
+  }
+
+  /**
+   * 한 라운드의 결과를 지우고 처음 상태로 되돌린다.
+   *
+   * 잘못 붙은 매치(남의 판을 주워 온 경우)나 틀린 수동 입력을 바로잡는 도구다.
+   * 수집기가 이미 처리한 매치로 기억하고 있으면 다시 안 가져오므로 `seen` 에서도 뺀다.
+   */
+  async resetScrimRound(scrimId: string, roundId: string, adminId: string) {
+    const round = await this.prisma.scrimRound.findFirst({
+      where: { id: roundId, scrimId },
+      include: { scrim: true, _count: { select: { results: true } } },
+    });
+    if (!round) throw new NotFoundException("라운드를 찾을 수 없습니다.");
+    if (round.scrim.status === "CANCELLED")
+      throw new BadRequestException("취소된 스크림은 고칠 수 없습니다.");
+
+    const state = round.scrim.collectorState as {
+      seen?: string[];
+      pending?: { id: string }[];
+    } | null;
+    const collectorState =
+      state && round.pubgMatchId
+        ? {
+            ...state,
+            seen: (state.seen ?? []).filter((id) => id !== round.pubgMatchId),
+          }
+        : undefined;
+
+    await this.prisma.$transaction([
+      this.prisma.scrimTeamResult.deleteMany({ where: { roundId } }),
+      this.prisma.scrimRound.update({
+        where: { id: roundId },
+        data: {
+          status: "PENDING",
+          pubgMatchId: null,
+          resultSource: null,
+          startedAt: null,
+          endedAt: null,
+        },
+      }),
+      ...(collectorState
+        ? [
+            this.prisma.scrim.update({
+              where: { id: scrimId },
+              data: { collectorState, collectionError: null },
+            }),
+          ]
+        : []),
+    ]);
+
+    await this.logAction(
+      adminId,
+      AdminAction.SCRIM_ROUND_RESET,
+      "scrim",
+      scrimId,
+      {
+        roundNumber: round.roundNumber,
+        pubgMatchId: round.pubgMatchId,
+        removedResults: round._count.results,
+      },
+    );
+    return { ok: true, roundNumber: round.roundNumber };
+  }
+
+  /** 수집 오류를 지우고 다음 수집 주기에 바로 다시 보게 한다. */
+  async retryScrimCollection(scrimId: string, adminId: string) {
+    const scrim = await this.prisma.scrim.findUnique({
+      where: { id: scrimId },
+    });
+    if (!scrim) throw new NotFoundException("스크림을 찾을 수 없습니다.");
+    if (scrim.status !== "IN_PROGRESS")
+      throw new BadRequestException(
+        "진행 중인 스크림만 다시 수집할 수 있습니다.",
+      );
+
+    await this.prisma.scrim.update({
+      where: { id: scrimId },
+      data: { collectionError: null, lastCollectedAt: null },
+    });
+    await this.logAction(
+      adminId,
+      AdminAction.SCRIM_COLLECT_RETRY,
+      "scrim",
+      scrimId,
+      { previousError: scrim.collectionError },
+    );
+    return { ok: true };
+  }
+
+  /** 스크림을 취소한다. 방은 그대로 두고(방 관리에서 닫는다) 기록만 취소 처리한다. */
+  async cancelScrim(scrimId: string, adminId: string) {
+    const scrim = await this.prisma.scrim.findUnique({
+      where: { id: scrimId },
+    });
+    if (!scrim) throw new NotFoundException("스크림을 찾을 수 없습니다.");
+    if (scrim.status === "CANCELLED")
+      throw new BadRequestException("이미 취소된 스크림입니다.");
+    if (scrim.status === "COMPLETED")
+      throw new BadRequestException(
+        "확정된 스크림은 취소할 수 없습니다. 틀린 라운드는 결과 초기화로 고치세요.",
+      );
+
+    await this.prisma.scrim.update({
+      where: { id: scrimId },
+      data: { status: "CANCELLED" },
+    });
+    await this.logAction(adminId, AdminAction.SCRIM_CANCEL, "scrim", scrimId, {
+      previousStatus: scrim.status,
+    });
+    return { ok: true };
+  }
+
   async getInternalMatches(params: {
     page: number;
     limit: number;
