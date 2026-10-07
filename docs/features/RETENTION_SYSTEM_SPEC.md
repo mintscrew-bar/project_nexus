@@ -707,6 +707,27 @@ RetentionBatchJob
 - 특정 미션 교체율이 40%를 넘으면 배정 품질 경고
 - 동일 지급 멱등성 키 충돌이나 보상 재시도 누적 시 시스템 경고
 
+### 콘텐츠 생성 공통 흐름
+
+세 가지 콘텐츠 모두 목록 화면의 `새로 만들기` 버튼에서 생성한다. 운영자가 데이터베이스를 직접 수정하거나 배포 파일을 바꿀 필요가 없어야 한다.
+
+```text
+새로 만들기
+  → 콘텐츠 유형 선택
+  → 조건·보상·노출 설정
+  → 저장(DRAFT)
+  → 검증·시뮬레이션
+  → 미리보기
+  → 즉시 게시 또는 KST 예약 게시
+  → ACTIVE
+```
+
+- 기존 콘텐츠는 `복제해서 새로 만들기`를 지원한다.
+- 초안은 사용자에게 노출되지 않고 운영자끼리만 확인한다.
+- 검증 실패 시 게시 버튼을 비활성화하고 실패 항목을 필드별로 표시한다.
+- 게시된 콘텐츠는 삭제하지 않고 새 버전을 만들어 수정한다.
+- 모든 생성·복제·게시·일시정지·보관은 `AdminAuditLog`에 남긴다.
+
 ### 미션 관리
 
 #### 목록
@@ -718,6 +739,8 @@ RetentionBatchJob
 
 #### 편집
 
+`새 미션 만들기`에서 다음 항목을 입력한다.
+
 - 이름과 설명
 - `DAILY / WEEKLY / MONTHLY` 주기
 - 게임 범위와 지원 데이터 조건
@@ -726,6 +749,8 @@ RetentionBatchJob
 - 사용자 자격 조건과 동적 목표 제한
 - 활성 시작·종료 시각과 KST 기간 미리보기
 - 예상 후보 사용자 수와 최근 데이터 기준 예상 완료율
+
+`저장 후 검증`을 누르면 표본 사용자 배정 결과, 예상 NP 공급량, 충돌 태그, 소급 가능 여부를 계산한다. 기존 미션을 복제하면 코드와 버전은 새로 발급하고 조건·보상·에셋 설명만 복사한다.
 
 활성 템플릿은 조건·목표·보상을 직접 덮어쓰지 않는다. 수정본을 새 버전의 초안으로 만들고 다음 주기부터 적용한다. 긴급한 오류에는 일시정지를 사용하며 이미 완료된 보상은 자동 회수하지 않는다.
 
@@ -738,6 +763,10 @@ RetentionBatchJob
 
 ### 업적 관리
 
+- `새 업적 만들기`에서 코드, 이름, 게임 범위, 카운터 이벤트, I~V 임계치, 보상 프로필, 단계별 칭호·아이콘·전용 상품 조건을 입력한다.
+- 카운터 이벤트가 실제 서버 이벤트와 연결되지 않거나 과거 데이터에 필요한 필드가 없으면 저장은 가능하되 게시할 수 없다.
+- 저장 전에 표본 사용자 100명의 현재 카운트와 각 단계 예상 도달률을 보여준다.
+- 기존 업적 복제 시 카운터와 보상 프로필을 복사하되 코드·버전·칭호 ID는 새로 만든다.
 - 코드, 이름, 게임 범위, 카운터, 보상 프로필, 현재 버전 검색
 - I~V 임계치와 예상 달성률, 실제 달성자 분포 비교
 - 단계별 칭호·아이콘·프레임·이펙트 미리보기
@@ -749,6 +778,11 @@ RetentionBatchJob
 
 ### 상점 관리
 
+- `새 상품 만들기`에서 상품 코드, 이름, 설명, 카테고리, 장착 슬롯, 가격, 희귀도, NP 구매 조건을 입력한다.
+- 프로필·호버·룸·사이트 중 적용 위치를 선택하고 에셋을 업로드한다.
+- 실제 적용 화면에서 정적·애니메이션 미리보기를 확인한 뒤 저장한다.
+- 업적 조건은 `없음` 또는 특정 업적의 최소 단계를 선택한다.
+- 기존 상품 복제 시 에셋과 설정을 복사하되 상품 코드와 판매 상태는 새로 만든다.
 - 상품 코드, 이름, 카테고리, 장착 슬롯, 희귀도, 가격, 상태 관리
 - 정적·애니메이션 에셋 업로드와 프로필·호버·룸·사이트 적용 미리보기
 - 업적 코드와 최소 단계 구매 조건 연결
@@ -808,12 +842,18 @@ OPEN → REVIEWING → RESOLVED 또는 DISMISSED
 
 ```text
 RETENTION_MISSION_CREATE
+RETENTION_MISSION_CLONE
 RETENTION_MISSION_PUBLISH
 RETENTION_MISSION_PAUSE
+RETENTION_ACHIEVEMENT_CREATE
+RETENTION_ACHIEVEMENT_CLONE
 RETENTION_ACHIEVEMENT_PUBLISH
+RETENTION_ACHIEVEMENT_PAUSE
 RETENTION_ACHIEVEMENT_BACKFILL
 RETENTION_SHOP_ITEM_CREATE
+RETENTION_SHOP_ITEM_CLONE
 RETENTION_SHOP_ITEM_PUBLISH
+RETENTION_SHOP_ITEM_PAUSE
 RETENTION_POINT_GRANT
 RETENTION_POINT_REVOKE
 RETENTION_PURCHASE_REFUND
@@ -827,17 +867,22 @@ RETENTION_ABUSE_RESOLVE
 GET    /admin/retention/overview
 GET    /admin/retention/missions
 POST   /admin/retention/missions
+POST   /admin/retention/missions/:id/clone
 PATCH  /admin/retention/missions/:id
 POST   /admin/retention/missions/:id/preview
 POST   /admin/retention/missions/:id/publish
 POST   /admin/retention/missions/:id/pause
 GET    /admin/retention/achievements
+POST   /admin/retention/achievements
+POST   /admin/retention/achievements/:id/clone
 PATCH  /admin/retention/achievements/:id
 POST   /admin/retention/achievements/backfill/preview
 POST   /admin/retention/achievements/backfill
 GET    /admin/retention/shop-items
 POST   /admin/retention/shop-items
+POST   /admin/retention/shop-items/:id/clone
 PATCH  /admin/retention/shop-items/:id
+POST   /admin/retention/shop-items/:id/preview
 POST   /admin/retention/shop-items/:id/publish
 GET    /admin/retention/ledger
 POST   /admin/retention/users/:userId/points/adjust
