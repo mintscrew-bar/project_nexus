@@ -783,6 +783,92 @@ describe("AuctionService", () => {
       expect(beforeFinalFold.timerEnd).toBeLessThanOrEqual(Date.now());
     });
 
+    describe("운영자가 정한 포기 규칙 (2026-10-07)", () => {
+      /**
+       * 포기하면 그 매물의 결과는 남은 팀의 결정으로 정해진다.
+       *  - 남은 한 팀이 입찰하면(금액 무관) 바로 그 팀이 가져간다
+       *  - 남은 한 팀도 포기하면 바로 유찰
+       *  - 4팀 이상: 2팀이 포기하고 2팀이 경쟁하다 한 팀이 포기하면 남은 팀이 가져간다
+       */
+      const fourTeams = {
+        id: roomId,
+        participants: [currentPlayer],
+        teams: [
+          { id: "team-1", captainId: "captain-1", _count: { members: 2 } },
+          { id: "team-2", captainId: "captain-2", _count: { members: 2 } },
+          { id: "team-3", captainId: "captain-3", _count: { members: 2 } },
+          { id: "team-4", captainId: "captain-4", _count: { members: 2 } },
+        ],
+      };
+
+      it("남은 한 팀이 입찰하면 바로 낙찰 — 입찰 전에는 기다린다", async () => {
+        const state = (service as any).auctionStates.get(roomId);
+        await service.foldCurrentItem("captain-2", roomId);
+        await service.foldCurrentItem("captain-3", roomId);
+
+        // 아무도 입찰 안 함 → team-1 의 결정을 기다린다
+        await expect(service.closeIfOthersFolded(roomId)).resolves.toBe(false);
+        expect(state.timerEnd).toBeGreaterThan(Date.now());
+
+        // team-1 이 입찰 (placeBid 가 남기는 상태)
+        state.currentHighestBid = 50;
+        state.currentHighestBidder = "team-1";
+        await expect(service.closeIfOthersFolded(roomId)).resolves.toBe(true);
+      });
+
+      it("남은 한 팀도 포기하면 바로 유찰", async () => {
+        await service.foldCurrentItem("captain-2", roomId);
+        await service.foldCurrentItem("captain-3", roomId);
+        const last = await service.foldCurrentItem("captain-1", roomId);
+
+        expect(last.allCaptainsAgreed).toBe(true);
+        expect(
+          (service as any).auctionStates.get(roomId).currentHighestBidder,
+        ).toBeNull(); // 입찰자 없음 → 유찰로 마감된다
+      });
+
+      it("4팀: 2팀 포기 후 둘이 경쟁하다 한 팀이 포기하면 남은 팀이 가져간다", async () => {
+        prisma.room.findUnique.mockResolvedValue(fourTeams);
+        const state = (service as any).auctionStates.get(roomId);
+
+        const f3 = await service.foldCurrentItem("captain-3", roomId);
+        const f4 = await service.foldCurrentItem("captain-4", roomId);
+        expect(f3.allCaptainsAgreed).toBe(false);
+        expect(f4.allCaptainsAgreed).toBe(false);
+
+        // team-1, team-2 경쟁 → team-2 가 최고가
+        state.currentHighestBid = 300;
+        state.currentHighestBidder = "team-2";
+        await expect(service.closeIfOthersFolded(roomId)).resolves.toBe(false);
+
+        // team-1 포기 → 남은 team-2 가 바로 가져간다
+        const f1 = await service.foldCurrentItem("captain-1", roomId);
+        expect(f1.allCaptainsAgreed).toBe(true);
+        expect(state.currentHighestBidder).toBe("team-2");
+      });
+
+      it("4팀: 아직 경쟁 팀이 둘 남아 있으면 한 팀 입찰만으로는 끝나지 않는다", async () => {
+        prisma.room.findUnique.mockResolvedValue(fourTeams);
+        const state = (service as any).auctionStates.get(roomId);
+        await service.foldCurrentItem("captain-3", roomId);
+        await service.foldCurrentItem("captain-4", roomId);
+
+        state.currentHighestBid = 50;
+        state.currentHighestBidder = "team-1";
+        // team-2 가 아직 포기하지 않았다
+        await expect(service.closeIfOthersFolded(roomId)).resolves.toBe(false);
+      });
+
+      it("최고 입찰자는 포기할 수 없다 — 남은 쪽이 포기해야 끝난다", async () => {
+        const state = (service as any).auctionStates.get(roomId);
+        state.currentHighestBid = 100;
+        state.currentHighestBidder = "team-1";
+        await expect(
+          service.foldCurrentItem("captain-1", roomId),
+        ).rejects.toThrow("현재 최고 입찰자는 포기할 수 없습니다");
+      });
+    });
+
     describe("포기 뒤의 입찰 (2026-10-06 제보: 상대가 먼저 포기하면 다음 매물로 안 넘어감)", () => {
       it("다른 팀이 모두 포기한 뒤 입찰하면 즉시 마감한다 — 포기 때와 같은 규칙", async () => {
         const state = (service as any).auctionStates.get(roomId);
