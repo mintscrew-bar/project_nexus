@@ -878,8 +878,9 @@ export class AuthService {
       const user = await this.prisma.user.findUnique({
         where: { id },
         // /auth/me is consumed by the browser. Keep it deliberately small:
-        // identity-provider metadata, emails, Riot identifiers, and token hashes
-        // must never be serialized into a normal user session response.
+        // emails, Riot identifiers(puuid·summonerId), providerId, provider
+        // metadata, and token hashes must never be serialized into a normal
+        // user session response.
         select: {
           id: true,
           username: true,
@@ -888,12 +889,22 @@ export class AuthService {
           role: true,
           // 온보딩 안내 모달 노출 판단용 — 계정 기준이어야 기기가 바뀌어도 다시 뜨지 않는다.
           settings: { select: { onboardingSeenAt: true } },
-          // 이미 Riot 계정과 주 라인을 등록한 기존 유저는 온보딩을 마친 것으로 본다.
-          // (설정 행이 없어 백필되지 않은 유저를 위한 런타임 판정)
+          // 설정 페이지 "내전 참여 준비" 카드가 디스코드 연동·라이엇 계정·주 라인을
+          // 이 응답에서 판정한다. 예전에 응답을 줄이면서 이 값이 빠져, 연동한
+          // 사람에게도 전부 "안 됨"으로 보였다(2026-10-07 확인). 판정에 필요한
+          // 최소 정보만 둔다 — 연동 종류, 라이엇 표시명·태그(프로필에 공개되는 값),
+          // 주/부 라인. puuid·summonerId·providerId 는 넣지 않는다.
+          authProviders: { select: { provider: true } },
           riotAccounts: {
-            where: { mainRole: { not: null } },
-            take: 1,
-            select: { id: true },
+            select: {
+              gameName: true,
+              tagLine: true,
+              mainRole: true,
+              subRole: true,
+              isPrimary: true,
+            },
+            // 화면은 첫 번째를 대표 계정으로 쓴다
+            orderBy: [{ isPrimary: "desc" }, { verifiedAt: "desc" }],
           },
         },
       });
@@ -902,11 +913,15 @@ export class AuthService {
         throw new UnauthorizedException("User not found");
       }
 
-      const { settings, riotAccounts, ...profile } = user;
+      const { settings, ...profile } = user;
 
       return {
         ...profile,
-        onboardingSeen: !!settings?.onboardingSeenAt || riotAccounts.length > 0,
+        // 이미 Riot 계정과 주 라인을 등록한 기존 유저는 온보딩을 마친 것으로 본다.
+        // (설정 행이 없어 백필되지 않은 유저를 위한 런타임 판정)
+        onboardingSeen:
+          !!settings?.onboardingSeenAt ||
+          user.riotAccounts.some((account) => account.mainRole !== null),
       };
     } catch (e) {
       console.error("Error in getUserById:", e);
