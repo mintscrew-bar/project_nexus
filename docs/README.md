@@ -39,6 +39,7 @@
 
 ### 🧩 [Feature Improvements](./features/)
 개별 기능별 상세 개선안 및 TODO 목록입니다.
+- **Retention**: [Retention System Spec](./features/RETENTION_SYSTEM_SPEC.md) — 미션·성장형 업적·Nexus Point·꾸미기 상점
 - **Broadcast**: [Broadcast Overlay](./features/TODO_broadcast_overlay.md) — OBS 오버레이 / scene / 조작 패널
 - **Match**: [Series Match](./features/TODO_series_match.md) — 다전제(Bo3/Bo5)
 - **Riot**: [Riot Account Identity Revamp](./features/TODO_riot_account_identity_revamp.md) — 퍼스널 키 제약 하 전적 설계
@@ -74,4 +75,4 @@ pnpm dev
 
 ---
 
-**마지막 업데이트**: 2026-09-03
+**마지막 업데이트**: 2026-10-07
