@@ -1,4 +1,4 @@
-# Nexus 리텐션 시스템 기획서 v0.4
+# Nexus 리텐션 시스템 기획서 v0.5
 
 > 상태: 제품·도메인 설계 초안  
 > 범위: 출석, 일일·주간·월간 미션, 성장형 업적, Nexus Point, 꾸미기 상점  
@@ -527,7 +527,7 @@ KDA는 초기 구현에서 사용하되 역할별 형평성 문제가 확인되�
 - 구매 전 실제 적용 위치에서 미리보기를 제공한다.
 - 애니메이션 상품은 `prefers-reduced-motion`과 사용자 효과 끄기 설정을 따른다.
 - 사이트 테마는 텍스트 대비와 주요 운영 UI의 가독성 검사를 통과해야 한다.
-- 품절이나 확률형 구매는 v0.4 범위에 포함하지 않는다.
+- 품절이나 확률형 구매는 v0.5 범위에 포함하지 않는다.
 - 기간 한정 상품도 구매한 뒤에는 영구 소유한다.
 - 구매는 원장 차감과 소유권 생성을 하나의 DB 트랜잭션으로 처리한다.
 
@@ -547,9 +547,9 @@ PointLedger
   userId, amount, balanceAfter, reasonType, sourceId, idempotencyKey, metadata, createdAt
 
 MissionTemplate
-  code, cadence, gameScope, conditionType, targetValue, rewardPoint,
+  code, version, status, cadence, gameScope, conditionType, targetValue, rewardPoint,
   difficulty, slotType, assignmentWeight, eligibilityConfig, tags,
-  enabled, activeFrom, activeUntil
+  activeFrom, activeUntil
 
 UserMission
   userId, templateId, periodKey, progress, targetValue, status,
@@ -560,31 +560,43 @@ MissionReroll
   toMissionId, pointCost, pointLedgerId, createdAt
 
 AchievementDefinition
-  code, gameScope, counterType, thresholds, rewardProfile,
-  tierTitleConfig, tierVisualConfig, enabled
+  code, version, status, gameScope, counterType, thresholds, rewardProfile,
+  tierTitleConfig, tierVisualConfig, activeFrom
 
 UserAchievement
   userId, achievementId, counter, tier, tierReachedAt
 
 ShopItem
-  code, name, category, equipSlot, price, rarity, assetConfig,
-  requiredAchievementCode, requiredAchievementTier, enabled
+  code, status, name, category, equipSlot, price, rarity, assetConfig,
+  requiredAchievementCode, requiredAchievementTier, saleFrom, saleUntil
 
 UserInventory
   userId, shopItemId, acquiredAt, acquisitionType
 
 UserLoadout
   userId, equipSlot, shopItemId, updatedAt
+
+RetentionAbuseCase
+  status, userId, detectorType, severity, evidence, assignedAdminId,
+  resolution, createdAt, resolvedAt
+
+RetentionBatchJob
+  type, status, requestedById, dryRunSummary, totalCount, successCount,
+  failureCount, idempotencyKey, startedAt, completedAt
 ```
 
 필수 유니크 제약:
 
 - `PointLedger.idempotencyKey`
+- `MissionTemplate(code, version)`
 - `UserMission(userId, templateId, periodKey)`
 - `MissionReroll(userId, cadence, periodKey, sequence)`
+- `AchievementDefinition(code, version)`
 - `UserAchievement(userId, achievementId)`
+- `ShopItem.code`
 - `UserInventory(userId, shopItemId)`
 - `UserLoadout(userId, equipSlot)`
+- `RetentionBatchJob.idempotencyKey`
 
 ## 11. 화면 구조
 
@@ -639,7 +651,201 @@ UserLoadout
 - 미션 교체 NP 소비 비중과 반복 교체 사용자 비율
 - 애니메이션 효과 비활성화율과 관련 성능 지표
 
-## 13. 구현 순서
+## 13. 관리자 운영 콘솔
+
+### 관리자 정보 구조
+
+기존 관리자 사이드바의 `콘텐츠` 그룹에 ADMIN 전용 `리텐션 운영` 탭 하나를 추가한다. 상위 탭을 미션·업적·상점별로 늘리지 않고, 탭 내부의 보조 내비게이션으로 나눈다.
+
+```text
+리텐션 운영
+├─ 현황
+├─ 미션
+├─ 업적
+├─ 상점
+├─ 포인트·원장
+└─ 이상 활동
+```
+
+리텐션 시스템은 공통 계정 경제이므로 관리자 상단의 `공통 / LoL / PUBG` 범위 중 `공통`에서 노출한다. 현황과 정의 목록 안에서는 게임 범위를 별도 필터로 제공한다.
+
+### 권한
+
+| 기능                     | ADMIN | MODERATOR          |
+| ------------------------ | ----- | ------------------ |
+| 운영 현황·정의 조회      | 전체  | 읽기 전용          |
+| 미션·업적·상품 초안 작성 | 가능  | 불가               |
+| 예약·활성·일시정지·보관  | 가능  | 불가               |
+| 포인트 수동 지급·회수    | 가능  | 불가               |
+| 업적 재계산·소급 작업    | 가능  | 불가               |
+| 이상 활동 검토           | 가능  | 조회와 메모만 가능 |
+| 보상 무효화·원장 정정    | 가능  | 불가               |
+
+초기 구현에서는 `리텐션 운영` 탭 전체를 ADMIN 전용으로 출시한다. MODERATOR 읽기 권한은 운영 인력이 실제로 필요해질 때 열어도 된다.
+
+### 현황 대시보드
+
+#### 핵심 카드
+
+- 오늘·7일·30일 NP 발행량과 소비량
+- 미사용 NP 총액, 사용자당 P50·P75·P95 잔액
+- 상점 소비와 미션 교체 소비 비율
+- 일일·주간·월간 미션 완료율
+- 무료·유료 교체율과 평균 교체 비용
+- 업적 단계별 승급 수와 소급 지급량
+- 상점 구매율, 첫 구매 전환율, 구매 후 장착률
+- 보상 대상 경기 수와 중복 지급 차단 건수
+
+#### 차트와 경고
+
+- 일별 NP 발행·소비·순증 추이
+- 지급 사유별 공급 비중과 소비처별 소각 비중
+- 미션별 배정·교체·완료 퍼널
+- 업적별 I~V 달성자 분포
+- 상품별 구매·장착·미사용 비율
+- P95 잔액이 초기 고급 상품 가격의 5배를 넘으면 인플레이션 경고
+- 특정 미션 교체율이 40%를 넘으면 배정 품질 경고
+- 동일 지급 멱등성 키 충돌이나 보상 재시도 누적 시 시스템 경고
+
+### 미션 관리
+
+#### 목록
+
+- 주기, 게임 범위, 상태, 슬롯 유형, 난이도, 태그로 필터
+- 배정 수, 완료율, 교체율, 평균 완료 시간, 지급 NP 표시
+- 교체율·포기율이 높은 미션을 상단 경고로 표시
+- 템플릿 복제, 초안 생성, 예약 활성화, 일시정지, 보관 제공
+
+#### 편집
+
+- 이름과 설명
+- `DAILY / WEEKLY / MONTHLY` 주기
+- 게임 범위와 지원 데이터 조건
+- 슬롯 유형, 난이도, 가중치, 충돌 태그
+- 조건 이벤트, 목표 값, NP 보상
+- 사용자 자격 조건과 동적 목표 제한
+- 활성 시작·종료 시각과 KST 기간 미리보기
+- 예상 후보 사용자 수와 최근 데이터 기준 예상 완료율
+
+활성 템플릿은 조건·목표·보상을 직접 덮어쓰지 않는다. 수정본을 새 버전의 초안으로 만들고 다음 주기부터 적용한다. 긴급한 오류에는 일시정지를 사용하며 이미 완료된 보상은 자동 회수하지 않는다.
+
+#### 배정 시뮬레이션
+
+- 지정한 사용자 또는 표본 사용자 100명에게 어떤 미션이 배정되는지 dry-run
+- 같은 태그 충돌, 후보 부족, 지원하지 않는 게임 통계, 달성 불가능한 목표 검출
+- 주기별 예상 총 지급량과 사용자별 P25·P50·P75 표시
+- 변경 전후 배정 분포 비교 후에만 게시 가능
+
+### 업적 관리
+
+- 코드, 이름, 게임 범위, 카운터, 보상 프로필, 현재 버전 검색
+- I~V 임계치와 예상 달성률, 실제 달성자 분포 비교
+- 단계별 칭호·아이콘·프레임·이펙트 미리보기
+- 업적 전용 상점 상품 연결 상태 확인
+- 단일 사용자 재계산, 전체 backfill 미리보기, 배치 실행과 진행 상태 제공
+- 이전 정의와 새 정의의 승급·강등 대상 및 예상 NP 차이를 게시 전에 표시
+
+한 명이라도 진척을 가진 업적 정의는 삭제하지 않는다. `DRAFT / SCHEDULED / ACTIVE / PAUSED / ARCHIVED` 상태와 정의 버전을 사용한다. 임계치가 변경되어도 이미 지급된 단계와 보상을 회수하지 않는 것을 기본값으로 한다.
+
+### 상점 관리
+
+- 상품 코드, 이름, 카테고리, 장착 슬롯, 희귀도, 가격, 상태 관리
+- 정적·애니메이션 에셋 업로드와 프로필·호버·룸·사이트 적용 미리보기
+- 업적 코드와 최소 단계 구매 조건 연결
+- 판매 시작·종료 예약, 표시 순서, 신규·한정 라벨 관리
+- 판매량, 구매자 수, 장착률, 구매 후 미장착률 표시
+- 특정 상품 직접 지급과 오류 구매 환불
+
+상태는 `DRAFT / SCHEDULED / ACTIVE / PAUSED / ARCHIVED`를 사용한다. 이미 판매된 상품을 보관 처리해도 소유자는 계속 장착할 수 있다. 렌더링 오류나 보안 문제가 있는 상품만 `PAUSED`로 전체 장착을 막고 기본 외형으로 대체한다.
+
+### 포인트·사용자 상세
+
+관리자는 사용자 검색 후 다음 내용을 한 화면에서 확인한다.
+
+- 현재 NP 잔액과 총 획득·소비량
+- 시간순 PointLedger와 지급 사유·원본 경기·미션·업적 링크
+- 현재 및 과거 미션, 교체 내역과 비용
+- 업적 카운트와 단계별 달성 시각
+- 구매 상품, 직접 지급 상품, 현재 장착 상태
+- 보상 보류·회수·정정 기록
+
+수동 조정은 잔액을 직접 수정하지 않고 `ADMIN_GRANT` 또는 `ADMIN_REVOKE` 원장을 추가한다. 관리자 ID, 필수 사유, 변경 전후 잔액, 관련 사용자·경기·미션을 기록한다. 잔액보다 큰 회수는 기본적으로 차단하고, 부정 획득 회수로 음수 잔액을 허용해야 한다면 별도 확인 절차를 거친다.
+
+### 이상 활동 관리
+
+#### 탐지 조건
+
+- 짧은 시간에 동일 참가자 조합으로 반복 완료된 경기
+- 동일 사용자 쌍의 반복 평가와 상호 평가 집중
+- 평균 대비 과도한 경기·KDA·평가 포인트 획득
+- 동일 멱등성 키 충돌, 비정상 재시도, 관리자 수동 지급 반복
+- 미션 교체 직후 비정상적으로 높은 즉시 완료율
+- 계정 생성 직후 고가 상품 구매가 가능한 비정상 잔액
+
+#### 처리 흐름
+
+```text
+OPEN → REVIEWING → RESOLVED 또는 DISMISSED
+```
+
+- 자동 탐지는 포인트를 즉시 회수하거나 계정을 자동 제재하지 않는다.
+- 관리자가 경기·평가·원장을 확인한 뒤 지급 보류, 원장 정정, 경기 보상 무효화를 선택한다.
+- 원장 정정은 기존 행을 삭제하지 않고 반대 부호의 정정 행을 추가한다.
+- 일반 계정 제재가 필요하면 기존 유저 관리·신고 관리 화면으로 연결한다.
+
+### 게시와 변경 안전장치
+
+- 모든 변경은 초안에서 시작하고 `미리보기 → 검증 → 예약 또는 즉시 게시` 순서를 따른다.
+- 활성 정의는 삭제하지 않고 일시정지 또는 보관한다.
+- 대량 지급, 회수, backfill은 대상 수와 총 NP를 dry-run으로 보여준 뒤 확인 문구를 입력해야 실행된다.
+- 배치 작업은 진행률, 성공·실패 수, 재시도 상태를 제공하고 중복 실행을 막는다.
+- 미션·업적·상품의 당시 정의 스냅샷을 원장 메타데이터에 남겨 이후 변경에도 과거 내역을 설명할 수 있게 한다.
+- 모든 쓰기 작업은 기존 `AdminAuditLog`에 관리자, 액션, 대상, 변경 전후 값, 사유를 기록한다.
+
+### 관리자 감사 액션
+
+`AdminAction`에는 최소한 다음 액션을 추가한다.
+
+```text
+RETENTION_MISSION_CREATE
+RETENTION_MISSION_PUBLISH
+RETENTION_MISSION_PAUSE
+RETENTION_ACHIEVEMENT_PUBLISH
+RETENTION_ACHIEVEMENT_BACKFILL
+RETENTION_SHOP_ITEM_CREATE
+RETENTION_SHOP_ITEM_PUBLISH
+RETENTION_POINT_GRANT
+RETENTION_POINT_REVOKE
+RETENTION_PURCHASE_REFUND
+RETENTION_REWARD_INVALIDATE
+RETENTION_ABUSE_RESOLVE
+```
+
+### 관리자 API 초안
+
+```text
+GET    /admin/retention/overview
+GET    /admin/retention/missions
+POST   /admin/retention/missions
+PATCH  /admin/retention/missions/:id
+POST   /admin/retention/missions/:id/preview
+POST   /admin/retention/missions/:id/publish
+POST   /admin/retention/missions/:id/pause
+GET    /admin/retention/achievements
+PATCH  /admin/retention/achievements/:id
+POST   /admin/retention/achievements/backfill/preview
+POST   /admin/retention/achievements/backfill
+GET    /admin/retention/shop-items
+POST   /admin/retention/shop-items
+PATCH  /admin/retention/shop-items/:id
+POST   /admin/retention/shop-items/:id/publish
+GET    /admin/retention/ledger
+POST   /admin/retention/users/:userId/points/adjust
+GET    /admin/retention/abuse-cases
+PATCH  /admin/retention/abuse-cases/:id
+```
+
+## 14. 구현 순서
 
 - [ ] Task 1: 보상 대상 경기 판정 규칙과 서버 도메인 이벤트 계약 확정
 - [ ] Task 2: PointLedger, 잔액 조회, 관리자 조정과 멱등 지급 구현
@@ -651,18 +857,25 @@ UserLoadout
 - [ ] Task 8: 장착 슬롯과 프로필·호버·룸 노출 구현
 - [ ] Task 9: 사이트 테마와 모션 접근성 설정 구현
 - [ ] Task 10: 리텐션 퍼널, 경제 지표와 어뷰징 모니터링 구현
+- [ ] Task 11: 관리자 리텐션 현황과 경제 대시보드 구현
+- [ ] Task 12: 관리자 미션 템플릿 편집, 검증, 버전 게시 구현
+- [ ] Task 13: 관리자 업적 버전, 재계산, backfill 도구 구현
+- [ ] Task 14: 관리자 상품 편집, 에셋 미리보기, 판매 상태 관리 구현
+- [ ] Task 15: 관리자 포인트 원장 조회, 수동 조정, 환불 구현
+- [ ] Task 16: 이상 활동 검토와 리텐션 감사 로그 구현
 
-## 14. 구현 전 확정할 제품 결정
+## 15. 구현 전 확정할 제품 결정
 
 1. PUBG 개인 완주·승리·성과를 어떤 레코드로 판정할지
 2. KDA 성과 보너스를 그대로 출시할지, 역할 보정 점수를 먼저 만들지
 3. 일일·주간 미션을 사용자마다 무작위 배정할지 전 사용자 공통으로 운영할지
-4. 일일·주간 미션의 무료 교체 후 추가 교체를 허용할지
-5. 비공개 방의 반복 플레이에 별도 보상 감쇠를 적용할지
-6. 업적 단계 명칭을 I~V로 유지할지 별도 등급명을 사용할지
-7. 초기 카탈로그의 아트 제작 범위와 파일 포맷을 어떻게 제한할지
+4. 비공개 방의 반복 플레이에 별도 보상 감쇠를 적용할지
+5. 업적 단계 명칭을 I~V로 유지할지 별도 등급명을 사용할지
+6. 초기 카탈로그의 아트 제작 범위와 파일 포맷을 어떻게 제한할지
+7. MODERATOR에게 리텐션 현황과 이상 활동 읽기 권한을 언제 열지
+8. 소급 업적 NP를 전액·상한·기간 분할 중 어떤 방식으로 지급할지
 
-## 15. v0.4 범위 밖
+## 16. v0.5 범위 밖
 
 - 현금 결제와 유료 재화
 - 사용자 간 포인트 또는 아이템 거래
