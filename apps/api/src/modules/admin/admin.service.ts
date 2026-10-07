@@ -2807,6 +2807,27 @@ export class AdminService {
       { guildId: link.guildId, action: "approve" },
     );
 
+    // 승인되면 신청자(길드 연동 소유자)에게 알림을 보낸다.
+    // 알림 실패가 승인 자체를 되돌리면 안 되므로 best-effort로 처리한다.
+    if (link.owner?.id) {
+      const guildName = perms.guildName ?? link.guildName;
+      await this.notificationService
+        .create({
+          userId: link.owner.id,
+          type: "SYSTEM",
+          title: "디스코드 봇 승인 완료",
+          message: guildName
+            ? `'${guildName}' 서버의 봇 연동이 승인되었습니다. 이제 방 생성 시 이 서버를 선택할 수 있습니다.`
+            : "디스코드 봇 연동이 승인되었습니다. 이제 방 생성 시 이 서버를 선택할 수 있습니다.",
+          link: "/settings",
+        })
+        .catch((error) => {
+          this.logger.warn(
+            `봇 승인 알림 발송 실패 (linkId=${linkId}, owner=${link.owner?.id}): ${error?.message ?? error}`,
+          );
+        });
+    }
+
     return result;
   }
 
