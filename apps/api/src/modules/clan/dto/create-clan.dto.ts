@@ -13,6 +13,7 @@ import {
 import { GameTitle } from "@nexus/database";
 import { Transform } from "class-transformer";
 import { stripAllHtml } from "@/common/utils/sanitize";
+import { KeepRaw } from "../../../common/keep-raw.decorator";
 
 /** 모집 포지션 허용 값 (mainRole/subRole과 동일 체계) */
 export const CLAN_RECRUIT_ROLES = [
@@ -56,6 +57,7 @@ export class CreateClanDto {
   @MaxLength(500, { message: "클랜 설명은 500자를 초과할 수 없습니다." })
   description?: string;
 
+  @KeepRaw()
   @IsBoolean()
   isRecruiting: boolean;
 

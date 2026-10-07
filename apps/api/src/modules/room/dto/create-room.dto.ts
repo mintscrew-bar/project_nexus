@@ -20,6 +20,7 @@ import {
   PubgPlatform,
 } from "@nexus/database";
 import { stripAllHtml } from "@/common/utils/sanitize";
+import { KeepRaw } from "../../../common/keep-raw.decorator";
 
 /**
  * 내전방 생성 DTO
@@ -79,6 +80,7 @@ export class CreateRoomDto {
   teamMode: TeamMode;
 
   @IsOptional()
+  @KeepRaw()
   @IsBoolean()
   allowSpectators?: boolean;
 
@@ -87,6 +89,7 @@ export class CreateRoomDto {
    * 방장 권한은 Room.hostId가 소유하므로 참가 역할과 독립적이다.
    */
   @IsOptional()
+  @KeepRaw()
   @IsBoolean()
   hostAsSpectator?: boolean;
 

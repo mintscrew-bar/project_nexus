@@ -6,6 +6,7 @@ import {
   MaxLength,
 } from "class-validator";
 import { ClanRole } from "@nexus/database";
+import { KeepRaw } from "../../../common/keep-raw.decorator";
 
 /**
  * 멤버 역할 변경 DTO
@@ -56,6 +57,7 @@ export class InviteUserDto {
  * 초대/가입 요청 수락 또는 거절 DTO
  */
 export class ResolveDto {
+  @KeepRaw()
   @IsBoolean({ message: "수락 여부를 boolean 값으로 입력해주세요." })
   accept: boolean;
 }

@@ -5,6 +5,7 @@ import {
   IsString,
   MaxLength,
 } from "class-validator";
+import { KeepRaw } from "../../../common/keep-raw.decorator";
 
 export const BROADCAST_CONTROL_SCENES = [
   "auto",
@@ -29,6 +30,7 @@ export class UpdateBroadcastControlDto {
   scene?: BroadcastControlScene;
 
   @IsOptional()
+  @KeepRaw()
   @IsBoolean()
   lowerThirdVisible?: boolean;
 

@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsOptional,
 } from "class-validator";
+import { KeepRaw } from "../../../common/keep-raw.decorator";
 
 /**
  * 회원가입 요청 DTO
@@ -25,16 +26,20 @@ export class RegisterDto {
   @MaxLength(20, { message: "닉네임은 20자를 초과할 수 없습니다." })
   username: string;
 
+  @KeepRaw()
   @IsBoolean()
   termsOfService: boolean;
 
+  @KeepRaw()
   @IsBoolean()
   privacyPolicy: boolean;
 
+  @KeepRaw()
   @IsBoolean()
   ageVerification: boolean;
 
   @IsOptional()
+  @KeepRaw()
   @IsBoolean()
   marketingConsent?: boolean;
 }

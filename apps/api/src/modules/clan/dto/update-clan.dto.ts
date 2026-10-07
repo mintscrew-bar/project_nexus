@@ -11,6 +11,7 @@ import {
   Max,
 } from "class-validator";
 import { CLAN_RECRUIT_ROLES, CLAN_ACCENT_COLOR_REGEX } from "./create-clan.dto";
+import { KeepRaw } from "../../../common/keep-raw.decorator";
 
 /**
  * 클랜 정보 수정 DTO
@@ -27,6 +28,7 @@ export class UpdateClanDto {
   description?: string;
 
   @IsOptional()
+  @KeepRaw()
   @IsBoolean()
   isRecruiting?: boolean;
 
@@ -35,18 +37,22 @@ export class UpdateClanDto {
   minTier?: string;
 
   @IsOptional()
+  @KeepRaw()
   @IsBoolean()
   officerCanManageSettings?: boolean;
 
   @IsOptional()
+  @KeepRaw()
   @IsBoolean()
   officerCanManageMembers?: boolean;
 
   @IsOptional()
+  @KeepRaw()
   @IsBoolean()
   officerCanManageAnnouncements?: boolean;
 
   @IsOptional()
+  @KeepRaw()
   @IsBoolean()
   officerCanManageInvitations?: boolean;
 

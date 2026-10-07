@@ -10,6 +10,7 @@ import {
 import { Transform } from "class-transformer";
 import { GameTitle, UserRole } from "@nexus/database";
 import { stripAllHtml } from "@/common/utils/sanitize";
+import { KeepRaw } from "../../../common/keep-raw.decorator";
 
 /**
  * 게시판 수정 DTO (관리자 전용) — 모든 필드 선택적.
@@ -65,10 +66,12 @@ export class UpdateBoardDto {
   writeRole?: UserRole | null;
 
   @IsOptional()
+  @KeepRaw()
   @IsBoolean()
   isActive?: boolean;
 
   @IsOptional()
+  @KeepRaw()
   @IsBoolean()
   isHidden?: boolean;
 }
