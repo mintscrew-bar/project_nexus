@@ -77,10 +77,10 @@ Nexus의 기존 핵심 루프는 `방 발견 → 참가 → 경기 → 기록`�
 | `match.completed`            | 사용자가 보상 대상 경기를 정상 완주   | `userId:matchId`              | 게임, 방, 포지션, 승패, 팀 구성 방식, 인원 | 미션, 업적, 기본 포인트 |
 | `match.won`                  | 정상 완주한 경기에서 승리             | `userId:matchId`              | 게임, 팀                                   | 미션, 업적, 승리 보너스 |
 | `match.performance_recorded` | 공식 경기 통계 수집 완료              | `userId:matchId:statsVersion` | KDA, 역할, 전투·오브젝트 지표              | 성과 미션·업적          |
-| `auction.value_recorded`     | 경매 낙찰가 스냅샷 저장               | `userId:roomId`               | 낙찰가, 팀 예산, 정규화 비율               | 몸값·시즌·업적          |
+| `auction.value_recorded`     | 경매 낙찰이 확정될 때마다 건별 저장   | `auctionBidId`                | 낙찰가, 팀 예산, 정규화 비율               | 몸값·시즌·업적          |
 | `rating.submitted`           | 완료 경기 참가자에게 유효한 평가 제출 | `ratingId`                    | 경기, 대상                                 | 미션, 업적              |
 | `rating.received`            | 다른 참가자에게 유효한 평가 수신      | `ratingId`                    | 경기, 평가자                               | 업적, 소량 포인트       |
-| `room.host_completed`        | 방장이 실제 사용자 경기를 정상 종료   | `hostId:roomId`               | 게임, 인원, 예약 여부, 팀 구성 방식        | 미션, 업적              |
+| `room.host_completed`        | 방장이 실제 사용자 경기를 정상 종료   | `hostId:finalMatchId`         | 게임, 인원, 예약 여부, 팀 구성 방식        | 미션, 업적              |
 | `match.vote_received`        | MVP 또는 ACE 표 획득                  | `voteId`                      | 경기, 투표 종류                            | 업적, 추후 보너스       |
 | `mission.completed`          | 할당된 미션의 목표 달성               | `assignmentId`                | 주기, 미션 코드                            | 포인트 지급             |
 | `achievement.leveled_up`     | 업적 카운트가 새 임계치 도달          | `userId:achievementCode:tier` | 이전·현재 단계                             | 포인트·배지 지급        |
@@ -164,9 +164,10 @@ Nexus의 기존 핵심 루프는 `방 발견 → 참가 → 경기 → 기록`�
 
 ```text
 AuctionValueRecord
-  userId, roomIdSnapshot, gameTitle, seasonKey,
-  soldPrice, teamInitialBudget, normalizedValue,
-  teamMode, recordedAt, sourceVersion
+  auctionBidId(unique), userId, roomIdSnapshot, teamIdSnapshot, gameTitle, seasonKey,
+  soldPrice, teamInitialBudget, normalizedValue, teamMode,
+  sessionKey, status(ACTIVE|VOIDED), voidReason, voidedAt,
+  recordedAt, sourceVersion
 
 NexusSeason
   key, label, startsAt, endsAt, status, finalizedAt
@@ -176,11 +177,14 @@ SeasonAward
   userId, titleCode, awardedAt
 ```
 
-- `AuctionValueRecord`는 경매 낙찰이 확정되는 시점 또는 방 삭제 직전에 생성한다.
-- `RoomOutcome`에는 `hostIdSnapshot`을 추가하거나 동일한 결과 스냅샷에 방장 ID를 남긴다. 현재 `RoomOutcome`의 방 단위 정보만으로는 삭제된 방의 개인 방장을 복원할 수 없다.
+- `AuctionValueRecord`는 경매 낙찰이 확정되는 즉시 **낙찰 건마다** 만들고, 낙찰가·예산·비율을 값으로 복사해 둔다. 방을 다시 열어 같은 사용자가 두 번 낙찰돼도 `auctionBidId`가 달라 충돌하지 않으며, 방 리셋이나 삭제로 팀·낙찰 행이 지워져도 기록은 남는다. "방 삭제 직전 생성" 경로는 두지 않는다.
+- `sessionKey`는 토너먼트가 정상 종료될 때 그 방 세션의 최종 경기 `matchId`로 채운다. 채워지지 않은 기록(중단·삭제된 방)은 시즌 집계와 업적에 포함하지 않는다.
+- 데이터 정정으로 해당 세션의 경기가 무효 처리되거나 관리자가 몸값을 무효화하면 `status`를 `VOIDED`로 바꾸고 사유를 남긴다. 평균·최고·수상·업적은 `ACTIVE`만 집계한다.
+- `RoomOutcome`은 바꾸지 않는다. 방 삭제 후에도 `Match.roomHostId`, `Match.roomTeamMode`, `Match.roomIdSnapshot`이 남으며 경기 생성 시점의 방장이 기록되므로 방장·팀 구성 방식은 여기서 읽는다. 방장 이양이 일어난 방에서 값이 어떻게 남는지는 Task 1에서 확인하고, 어긋날 때만 보정 컬럼을 검토한다.
+- 방장 정상 종료(`room.host_completed`)는 토너먼트를 끝낸 최종 경기 기준으로 세션당 한 번만 센다.
 - `NexusSeason`은 월 경계를 계산하는 대신 종료·재개·수상 확정을 명시적으로 보존한다.
 - `SeasonAward`는 시즌 종료 후에도 프로필 칭호를 복원할 수 있게 한다.
-- 과거에 삭제된 방의 낙찰가·방장 정보는 원본이 남아 있지 않으면 소급하지 않는다. 1단계 출시 이후부터 정확히 기록한다.
+- 과거에 삭제된 방의 낙찰가는 원본이 남아 있지 않으면 소급하지 않는다. 1단계 출시 이후부터 정확히 기록한다.
 
 ### 1단계 화면
 
@@ -627,7 +631,7 @@ KDA는 초기 구현에서 사용하되 역할별 형평성 문제가 확인되�
 | 적용 방식                | 업적                                                                                                         |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | 기존 데이터로 전체 소급  | 완주, 승리, 패배 완주, 평가, 투표, KDA, 포지션, 챔피언, 킬·어시스트·피해량·시야·CS·골드·오브젝트·멀티킬 계열 |
-| 데이터 연결 검증 후 소급 | 방장, 예약 방, 만원 방, 팀 구성 방식, 고유 팀원                                                              |
+| 데이터 연결 검증 후 소급 | 방장·팀 구성 방식(`Match` 스냅샷 값 검증 후), 예약 방, 만원 방, 고유 팀원                                    |
 | 출시일부터 집계          | 출석 및 기존 데이터에서 유일성을 보장할 수 없는 항목                                                         |
 
 소급 승급 시 달성한 모든 단계와 장식은 즉시 개방한다. 다만 대량의 포인트가 한 번에 공급될 수 있으므로 shadow economy에서 소급 총액 분포를 별도로 계산한 뒤, `전액 지급`, `출시 보너스 상한 적용`, `기간 분할 지급` 중 하나를 출시 전에 확정한다.
@@ -700,7 +704,7 @@ AchievementDefinition
   tierTitleConfig, tierVisualConfig, activeFrom
 
 UserAchievement
-  userId, achievementId, counter, tier, tierReachedAt
+  userId, achievementCode, definitionVersion, counter, tier, tierReachedAt
 
 ShopItem
   code, status, name, category, equipSlot, price, rarity, assetConfig,
@@ -728,7 +732,8 @@ RetentionBatchJob
 - `UserMission(userId, templateId, periodKey)`
 - `MissionReroll(userId, cadence, periodKey, sequence)`
 - `AchievementDefinition(code, version)`
-- `UserAchievement(userId, achievementId)`
+- `UserAchievement(userId, achievementCode)`
+- `AuctionValueRecord.auctionBidId`
 - `ShopItem.code`
 - `UserInventory(userId, shopItemId)`
 - `UserLoadout(userId, equipSlot)`
@@ -878,7 +883,8 @@ RetentionBatchJob
 - 기존 콘텐츠는 `복제해서 새로 만들기`를 지원한다.
 - 초안은 사용자에게 노출되지 않고 운영자끼리만 확인한다.
 - 검증 실패 시 게시 버튼을 비활성화하고 실패 항목을 필드별로 표시한다.
-- 게시된 콘텐츠는 삭제하지 않고 새 버전을 만들어 수정한다.
+- 게시된 미션·업적은 삭제하지 않고 새 버전을 만들어 수정한다. 업적 진척은 `achievementCode` 기준으로 이어지므로 버전을 올려도 카운터가 갈라지지 않는다.
+- 게시된 상품은 `version`이 없으므로 수정 대신 판매를 중단하고 새 `code`로 만든다. 구매 내역은 기존 `code`에 그대로 남는다.
 - 모든 생성·복제·게시·일시정지·보관은 `AdminAuditLog`에 남긴다.
 
 ### 미션 관리
@@ -1055,7 +1061,7 @@ PATCH  /admin/retention/abuse-cases/:id
 
 ## 15. 구현 순서
 
-- [ ] Task 1: 경매 낙찰가·방장 스냅샷과 보상 대상 경기 이벤트 계약 확정
+- [ ] Task 1: 경매 낙찰 건별 스냅샷, `Match` 방장 스냅샷 검증과 보상 대상 경기 이벤트 계약 확정
 - [ ] Task 2: NexusSeason, 로컬 랭킹, SeasonAward와 포인트 없는 배지 구현
 - [ ] Task 3: PointLedger, 잔액 조회, 관리자 조정과 멱등 지급 구현
 - [ ] Task 4: shadow economy 및 운영자 지급량 대시보드 구현
