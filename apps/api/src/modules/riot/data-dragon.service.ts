@@ -18,7 +18,7 @@ import axios from "axios";
  * DDragon 버전 조회가 실패하고 기억해 둔 버전도 없을 때 쓰는 값.
  * 웹의 로컬 아이콘 패치(apps/web/src/lib/ddragon-champion-ids.ts)와 맞춰 둔다.
  */
-const FALLBACK_DDRAGON_VERSION = "16.19.1";
+const FALLBACK_DDRAGON_VERSION = "16.20.1";
 /** 폴백 버전을 캐시하는 시간(초). 짧게 둬서 곧 최신 조회를 다시 시도한다 */
 const FALLBACK_CACHE_TTL_SECONDS = 300;
 
