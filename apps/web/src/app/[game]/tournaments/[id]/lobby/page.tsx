@@ -405,11 +405,30 @@ export default function TournamentLobbyPage() {
     }
   }, [room, addToast]);
 
+  // 비공개 방 비밀번호 — 친구 패널 등이 ?password= 로 넘겨준 값을 초기값으로 쓰고,
+  // 없거나 틀리면 아래 입력 화면에서 받는다.
+  const joinPassword = useRef<string | undefined>(
+    typeof window === "undefined"
+      ? undefined
+      : (new URLSearchParams(window.location.search).get("password") ??
+          undefined),
+  );
+  const [passwordInput, setPasswordInput] = useState("");
+  const isPasswordError = !!error && /password/i.test(error);
+
+  const submitPassword = () => {
+    const pw = passwordInput.trim();
+    if (!pw || !roomId) return;
+    joinPassword.current = pw;
+    setPasswordInput("");
+    connect(roomId, pw);
+  };
+
   // connect/disconnect는 zustand 스토어 함수로 참조가 안정적이므로 dependency에서 제외
   useEffect(() => {
     // 인증 복원이 끝나고 로그인 상태일 때만 연결한다.
     // (비로그인 상태에서 connect를 불러도 소켓이 열리지 않아 스피너만 남는다)
-    if (roomId && isAuthenticated) connect(roomId);
+    if (roomId && isAuthenticated) connect(roomId, joinPassword.current);
     return () => {
       clearTransitionRetry();
       if (hasRedirected.current) return;
@@ -493,6 +512,48 @@ export default function TournamentLobbyPage() {
         onGoProfile={() => router.push(`/settings/game-accounts${gamePrefix}`)}
         loginHref={`/auth/login?redirect=${encodeURIComponent(`${gamePrefix}/tournaments/${roomId}/lobby`)}`}
       />
+    );
+  }
+
+  if (isPasswordError) {
+    return (
+      <div className="flex-grow flex items-center justify-center p-8">
+        <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-8 max-w-md w-full">
+          <h2 className="text-xl font-bold text-text-primary mb-2 text-center">
+            비공개 방입니다
+          </h2>
+          <p className="text-text-secondary text-center mb-4">
+            {/invalid/i.test(error ?? "")
+              ? "비밀번호가 올바르지 않습니다. 다시 입력해주세요."
+              : "입장하려면 비밀번호를 입력하세요."}
+          </p>
+          <input
+            autoFocus
+            type="password"
+            className="w-full input text-sm mb-3"
+            placeholder="비밀번호"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitPassword();
+            }}
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              className="px-3 py-1.5 text-sm bg-bg-tertiary hover:bg-bg-elevated rounded-lg"
+              onClick={() => router.push(`${gamePrefix}/tournaments`)}
+            >
+              목록으로
+            </button>
+            <button
+              className="px-3 py-1.5 text-sm bg-accent-primary text-accent-on rounded-lg hover:bg-accent-hover"
+              onClick={submitPassword}
+            >
+              입장
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 

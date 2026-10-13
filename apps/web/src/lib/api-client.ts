@@ -854,6 +854,7 @@ export const roomApi = {
     status?: string;
     teamMode?: string;
     search?: string;
+    includePrivate?: boolean;
     sort?: "newest" | "oldest" | "mostPlayers" | "leastPlayers";
     cursor?: string;
     limit?: number;
@@ -1061,10 +1062,7 @@ export const matchApi = {
     return response.data;
   },
 
-  reportResult: async (
-    matchId: string,
-    data: { winnerId: string },
-  ) => {
+  reportResult: async (matchId: string, data: { winnerId: string }) => {
     const response = await apiClient.post(`/matches/${matchId}/result`, data);
     return response.data;
   },

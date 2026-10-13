@@ -177,6 +177,8 @@ export function RoomList({
         gameTitle === "PUBG" && gameModeFilter !== "ALL"
           ? gameModeFilter
           : undefined,
+      // 비공개 방도 목록에 보여준다(자물쇠 표시). 입장은 로비에서 비밀번호를 받는다.
+      includePrivate: true,
       search: debouncedSearchQuery || undefined,
       sort: sortBy,
       limit: 24,
