@@ -1330,7 +1330,11 @@ export function DashboardContent({
   const { data: rooms = [], isLoading: isRoomsLoading } = useQuery<Room[]>({
     queryKey: ["dashboard", "rooms"],
     queryFn: async () => {
-      const data = await roomApi.getRooms({ status: "WAITING" });
+      const data = await roomApi.getRooms({
+        status: "WAITING",
+        // 비공개 방도 보여주고 카드에 자물쇠를 표시한다. 입장 시 로비에서 비밀번호를 받는다.
+        includePrivate: true,
+      });
       const list = Array.isArray(data) ? data : (data?.items ?? []);
       return list.slice(0, 6);
     },
