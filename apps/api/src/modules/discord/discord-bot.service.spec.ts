@@ -475,6 +475,7 @@ describe("DiscordBotService 모집 공지 — 참가 버튼과 역할 멘션", (
       return {
         customId,
         user: { id: "discord-1" },
+        showModal: jest.fn().mockResolvedValue(undefined),
         deferReply: jest.fn().mockResolvedValue(undefined),
         editReply: jest.fn().mockResolvedValue(undefined),
       };
@@ -502,6 +503,11 @@ describe("DiscordBotService 모집 공지 — 참가 버튼과 역할 멘션", (
         authProvider: {
           findFirst: jest.fn().mockResolvedValue({ userId: "nexus-1" }),
         },
+        room: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ isPrivate: false, participants: [] }),
+        },
       };
       const service = makeService(prisma);
       const joinRoom = jest.fn().mockResolvedValue({});
@@ -519,6 +525,11 @@ describe("DiscordBotService 모집 공지 — 참가 버튼과 역할 멘션", (
       const prisma = {
         authProvider: {
           findFirst: jest.fn().mockResolvedValue({ userId: "nexus-1" }),
+        },
+        room: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ isPrivate: false, participants: [] }),
         },
       };
       const service = makeService(prisma);
@@ -539,6 +550,11 @@ describe("DiscordBotService 모집 공지 — 참가 버튼과 역할 멘션", (
         authProvider: {
           findFirst: jest.fn().mockResolvedValue({ userId: "nexus-1" }),
         },
+        room: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ isPrivate: false, participants: [] }),
+        },
       };
       const service = makeService(prisma);
       const interaction = makeInteraction();
@@ -548,6 +564,74 @@ describe("DiscordBotService 모집 공지 — 참가 버튼과 역할 멘션", (
       expect(interaction.editReply.mock.calls[0][0]).toContain(
         "/lol/tournaments/room-1/lobby",
       );
+    });
+
+    it("비공개 방이면 바로 참가하지 않고 비밀번호 모달을 띄운다", async () => {
+      const prisma = {
+        authProvider: {
+          findFirst: jest.fn().mockResolvedValue({ userId: "nexus-1" }),
+        },
+        room: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ isPrivate: true, participants: [] }),
+        },
+      };
+      const service = makeService(prisma);
+      const joinRoom = jest.fn();
+      service.setRoomJoiner({ joinRoom });
+      const interaction = makeInteraction();
+
+      await (service as any).handleJoinRoomButton(interaction);
+
+      expect(interaction.showModal).toHaveBeenCalledTimes(1);
+      expect(interaction.deferReply).not.toHaveBeenCalled();
+      expect(joinRoom).not.toHaveBeenCalled();
+    });
+
+    it("비공개 방이어도 이미 참가 중이면 모달 없이 처리한다", async () => {
+      const prisma = {
+        authProvider: {
+          findFirst: jest.fn().mockResolvedValue({ userId: "nexus-1" }),
+        },
+        room: {
+          findUnique: jest.fn().mockResolvedValue({
+            isPrivate: true,
+            participants: [{ userId: "nexus-1" }],
+          }),
+        },
+      };
+      const service = makeService(prisma);
+      service.setRoomJoiner({ joinRoom: jest.fn().mockResolvedValue({}) });
+      const interaction = makeInteraction();
+
+      await (service as any).handleJoinRoomButton(interaction);
+
+      expect(interaction.showModal).not.toHaveBeenCalled();
+      expect(interaction.deferReply).toHaveBeenCalled();
+    });
+
+    it("모달로 받은 비밀번호를 넘겨 참가시킨다", async () => {
+      const prisma = {
+        authProvider: {
+          findFirst: jest.fn().mockResolvedValue({ userId: "nexus-1" }),
+        },
+      };
+      const service = makeService(prisma);
+      const joinRoom = jest.fn().mockResolvedValue({});
+      service.setRoomJoiner({ joinRoom });
+      const interaction = {
+        ...makeInteraction("nexus_join_room_pw:room-1"),
+        fields: { getTextInputValue: jest.fn().mockReturnValue(" 1234 ") },
+      };
+
+      await (service as any).handleJoinRoomPasswordSubmit(interaction);
+
+      expect(joinRoom).toHaveBeenCalledWith("nexus-1", {
+        roomId: "room-1",
+        password: "1234",
+      });
+      expect(interaction.editReply.mock.calls[0][0]).toContain("참가했습니다");
     });
   });
 });

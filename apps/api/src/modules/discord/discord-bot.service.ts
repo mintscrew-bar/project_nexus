@@ -123,6 +123,9 @@ const VERIFY_BUTTON_ID = "nexus_verify_start_button";
 const SET_ANNOUNCE_BUTTON_ID = "nexus_set_announce_here_button";
 /** 모집 공지에서 바로 방에 참가하는 버튼. `nexus_join_room:{roomId}` 형태 */
 const JOIN_ROOM_BUTTON_PREFIX = "nexus_join_room:";
+/** 비공개 방 비밀번호 입력 모달. `nexus_join_room_pw:{roomId}` 형태 */
+const JOIN_ROOM_PASSWORD_MODAL_PREFIX = "nexus_join_room_pw:";
+const JOIN_ROOM_PASSWORD_INPUT_ID = "password";
 const VERIFY_RIOT_ID_INPUT_ID = "nexus_verify_riot_id";
 const ROOM_NOTIFICATION_CACHE_PREFIX = "discord:room-notification:";
 const ROOM_NOTIFICATION_TTL_SECONDS = 24 * 60 * 60;
@@ -1251,6 +1254,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       }
       if (interaction.customId === VERIFY_MODAL_ID) {
         await this.handleVerifyModalSubmit(interaction);
+      }
+      if (interaction.customId.startsWith(JOIN_ROOM_PASSWORD_MODAL_PREFIX)) {
+        await this.handleJoinRoomPasswordSubmit(interaction);
       }
       return;
     }
@@ -2820,7 +2826,10 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
    * 기존 setVoiceService와 같은 세터 주입 방식으로 배선한다.
    */
   private roomJoiner?: {
-    joinRoom(userId: string, dto: { roomId: string }): Promise<unknown>;
+    joinRoom(
+      userId: string,
+      dto: { roomId: string; password?: string },
+    ): Promise<unknown>;
     /**
      * 예약 개설용. 반환 타입은 RoomService 쪽 변환 결과(방 상세/요약)라
      * 형태가 고정되지 않아 여기서는 id만 쓴다.
@@ -2854,8 +2863,67 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const roomId = interaction.customId.slice(JOIN_ROOM_BUTTON_PREFIX.length);
     if (!roomId) return;
 
-    await interaction.deferReply({ ephemeral: true });
+    // 비공개 방은 비밀번호가 필요하다. 모달은 interaction의 첫 응답이어야 하므로
+    // deferReply 전에 판별한다. 이미 참가 중인 사람은 비밀번호를 다시 묻지 않는다.
+    const provider = await this.prisma.authProvider.findFirst({
+      where: { provider: "DISCORD", providerId: interaction.user.id },
+      select: { userId: true },
+    });
+    if (provider) {
+      const room = await this.prisma.room.findUnique({
+        where: { id: roomId },
+        select: {
+          isPrivate: true,
+          participants: {
+            where: { userId: provider.userId },
+            select: { userId: true },
+          },
+        },
+      });
+      if (room?.isPrivate && room.participants.length === 0) {
+        const input = new TextInputBuilder()
+          .setCustomId(JOIN_ROOM_PASSWORD_INPUT_ID)
+          .setLabel("방 비밀번호")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(200);
+        await interaction.showModal(
+          new ModalBuilder()
+            .setCustomId(`${JOIN_ROOM_PASSWORD_MODAL_PREFIX}${roomId}`)
+            .setTitle("비공개 방 참가")
+            .addComponents(
+              new ActionRowBuilder<TextInputBuilder>().addComponents(input),
+            ),
+        );
+        return;
+      }
+    }
 
+    await interaction.deferReply({ ephemeral: true });
+    await this.joinRoomFromInteraction(interaction, roomId);
+  }
+
+  /** 비밀번호 모달 제출 — 입력값으로 참가를 시도한다. */
+  private async handleJoinRoomPasswordSubmit(
+    interaction: ModalSubmitInteraction,
+  ) {
+    const roomId = interaction.customId.slice(
+      JOIN_ROOM_PASSWORD_MODAL_PREFIX.length,
+    );
+    if (!roomId) return;
+    const password = interaction.fields
+      .getTextInputValue(JOIN_ROOM_PASSWORD_INPUT_ID)
+      .trim();
+    await interaction.deferReply({ ephemeral: true });
+    await this.joinRoomFromInteraction(interaction, roomId, password);
+  }
+
+  /** 이미 deferReply한 interaction에서 참가를 처리하고 결과를 editReply로 알린다. */
+  private async joinRoomFromInteraction(
+    interaction: ButtonInteraction | ModalSubmitInteraction,
+    roomId: string,
+    password?: string,
+  ) {
     const appUrl =
       this.configService.get("APP_URL") || "https://labs-nexus.com";
     const lobbyUrl = roomLobbyUrl(appUrl, roomId);
@@ -2882,12 +2950,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      await this.roomJoiner.joinRoom(provider.userId, { roomId });
+      await this.roomJoiner.joinRoom(provider.userId, { roomId, password });
       await interaction.editReply(
         [`✅ 참가했습니다.`, `로비: ${lobbyUrl}`].join("\n"),
       );
     } catch (error: any) {
-      // joinRoom은 정원 초과·이미 참가·비밀번호 필요 등을 예외 메시지로 준다.
+      // joinRoom은 정원 초과·이미 참가·비밀번호 오류 등을 예외 메시지로 준다.
       // 사용자가 다음에 뭘 하면 되는지 알 수 있게 그대로 보여주고 로비 링크를 붙인다.
       const reason =
         typeof error?.response?.message === "string"
