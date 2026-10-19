@@ -1,7 +1,7 @@
-// 자동 생성 — scripts/update-ddragon-assets.mjs (Data Dragon 16.19.1). 손으로 고치지 않는다.
+// 자동 생성 — scripts/update-ddragon-assets.mjs (Data Dragon 16.20.1). 손으로 고치지 않는다.
 // 챔피언 숫자 ID(champion.json 의 key) → 챔피언 키(id, 아이콘 파일 이름).
 
-export const DDRAGON_ASSET_VERSION = "16.19.1";
+export const DDRAGON_ASSET_VERSION = "16.20.1";
 
 export const CHAMPION_ID_TO_KEY: Record<number, string> = {
   1: "Annie",
