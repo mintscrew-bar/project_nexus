@@ -20,11 +20,11 @@
     "db:scrub-oauth-tokens": "ts-node prisma/scrub-oauth-tokens.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.0.0"
+    "@prisma/client": "^6.19.3"
   },
   "devDependencies": {
-    "prisma": "^6.0.0",
+    "prisma": "^6.19.3",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.0"
+    "typescript": "^5.9.3"
   }
 }
