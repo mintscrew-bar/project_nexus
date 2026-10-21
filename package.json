@@ -42,7 +42,7 @@
   "pnpm": {
     "overrides": {
       "axios": "^1.20.0",
-      "follow-redirects": "^1.16.0",
+      "follow-redirects": "^1.16.1",
       "postcss": "^8.5.18",
       "qs": "^6.15.2",
       "socket.io-parser": "^4.2.7",

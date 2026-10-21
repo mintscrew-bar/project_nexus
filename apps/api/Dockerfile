@@ -37,8 +37,10 @@ FROM node:24-alpine AS runner
 # Prisma 엔진 실행에 필요한 OpenSSL 설치
 RUN apk add --no-cache openssl
 
-# PM2 글로벌 설치
-RUN npm install -g pm2
+# PM2 글로벌 설치 — entrypoint 의 pm2-runtime 이 이걸 쓴다.
+# 버전을 고정해 두지 않으면 빌드할 때마다 최신이 들어와 재현성이 깨진다.
+# (package.json 의존성에는 두지 않는다 — 런타임에 필요한 건 이 전역 설치뿐이다)
+RUN npm install -g pm2@7.0.4
 
 WORKDIR /app
 
