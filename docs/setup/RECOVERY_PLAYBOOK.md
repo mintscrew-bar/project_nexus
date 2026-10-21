@@ -137,6 +137,31 @@ docker exec nexus-postgres psql -U nexus -d postgres -c "DROP DATABASE restore_c
 
 이 절차는 2026-09-03 에 실제로 한 번 돌려 검증했다(임시 DB 복원 → 행 수 대조 일치).
 
+### 복구 리허설 스크립트
+
+위 확인을 운영 postgres 안이 아니라 **분리된 임시 컨테이너**에서 자동으로 한다
+(`--network none`, 메모리·CPU 상한, 끝나면 컨테이너·볼륨 삭제). 운영 DB 에는 `count(*)` 만 보낸다.
+
+```bash
+scripts/ops/verify-backup-restore.sh             # 로컬 최신 core 덤프
+scripts/ops/verify-backup-restore.sh --from-r2   # R2 최신 core 덤프를 내려받아 검증
+```
+
+gzip 무결성 → 복원 → 테이블별 행 수를 운영과 대조해 합격/불합격을 낸다.
+
+### 호스트가 통째로 죽었을 때 — R2 에서 받기
+
+`nexus-backup.sh` 는 `NEXUS_BACKUP_R2_REMOTE` 가 설정돼 있으면 매일 R2 백업 전용 버킷에도 올린다
+(`copy --immutable` — 로컬이 비어도 R2 사본은 안 지워진다. 만료는 버킷 수명주기 규칙).
+새 호스트에서는 `~/.config/nexus-ops.env` 의 `RCLONE_CONFIG_NEXUSR2_*` 값만 옮기면 된다:
+
+```bash
+rclone --config /dev/null lsf nexusr2:nexus-db-backups/daily/          # 목록
+rclone --config /dev/null copyto nexusr2:nexus-db-backups/daily/db-core-<STAMP>.sql.gz ./restore.sql.gz
+```
+
+받은 파일로 위 1)~4) 를 그대로 진행한다.
+
 ---
 
 ## 3. 메모리가 부족할 때
@@ -278,5 +303,5 @@ docker exec -i nexus-api npx prisma migrate deploy --schema packages/database/pr
   cloudflared 가 `TUNNEL_TOKEN` 원격 관리형이라 이 저장소가 아니라 Cloudflare 대시보드에서 설정해야 한다
 - Task 10 Wake-on-LAN — 호스트가 완전히 행 걸리면 물리 접근 외 방법이 없다
 - Task 11 Discord ops 명령 — 봇만 살아 있을 때 컨테이너를 재시작할 수단
-- **백업 호스트 밖 사본** — `NEXUS_BACKUP_RSYNC_TARGET` 이 비어 있어 지금 백업은 이 호스트에만 있다.
-  볼륨 손상에는 대응하지만 호스트 전손에는 대응하지 못한다
+- **R2 업로드 버킷 보호** — DB 백업은 R2 백업 버킷으로 나가지만(2-1 참고), 사용자 업로드 원본이 있는
+  공개 버킷 자체는 아직 버저닝·사본이 없다
