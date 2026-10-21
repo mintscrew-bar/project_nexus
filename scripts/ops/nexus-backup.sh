@@ -118,8 +118,60 @@ if [ -n "${NEXUS_BACKUP_RSYNC_TARGET:-}" ]; then
   else
     fail "외부 동기화 실패"
   fi
-else
-  log "NEXUS_BACKUP_RSYNC_TARGET 미설정 — 호스트 로컬 사본만 존재 (호스트 전손 시 함께 사라짐)"
+fi
+
+# 6) Cloudflare R2 오프사이트 사본 — NEXUS_BACKUP_R2_REMOTE 가 설정돼 있을 때만.
+#
+#    왜 sync 가 아니라 copy --immutable 인가:
+#      sync 는 로컬과 똑같이 맞추므로, 로컬 백업 폴더가 실수(rm)나 디스크 손상으로
+#      비면 다음 실행 때 R2 사본까지 같이 지운다. 오프사이트 사본은 로컬이 망가졌을
+#      때 쓰려고 두는 것이라, 로컬 상태에 끌려가면 안 된다.
+#      → 올리기만 하고, 이미 올라간 파일은 절대 덮어쓰지 않는다(--immutable).
+#      → 삭제는 R2 버킷의 수명주기 규칙(daily/ 30일, weekly/ 90일)이 맡는다.
+#
+#    자격증명은 rclone 설정 파일 대신 nexus-ops.env 의 RCLONE_CONFIG_<리모트>_* 환경변수로
+#    받는다. 백업 전용 비공개 버킷 + 그 버킷만 쓸 수 있는 토큰을 쓴다 — 업로드용 버킷은
+#    공개 버킷이라 DB 덤프를 넣으면 안 된다.
+#      예) NEXUS_BACKUP_R2_REMOTE=nexusr2:nexus-db-backups
+#          RCLONE_CONFIG_NEXUSR2_TYPE=s3
+#          RCLONE_CONFIG_NEXUSR2_PROVIDER=Cloudflare
+#          RCLONE_CONFIG_NEXUSR2_ENDPOINT=https://<계정ID>.r2.cloudflarestorage.com
+#          RCLONE_CONFIG_NEXUSR2_ACCESS_KEY_ID=...
+#          RCLONE_CONFIG_NEXUSR2_SECRET_ACCESS_KEY=...
+#          RCLONE_CONFIG_NEXUSR2_NO_CHECK_BUCKET=true   # 버킷 한정 토큰은 버킷 생성 권한이 없다
+#
+#    cron 의 PATH 에는 ~/.local/bin 이 없으므로 rclone 은 절대 경로로 부른다.
+RCLONE_BIN="${NEXUS_RCLONE_BIN:-$HOME/.local/bin/rclone}"
+# 설정 파일은 쓰지 않는다(전부 환경변수) — 없다는 NOTICE 가 매일 로그에 찍히지 않게 막아 둔다
+RCLONE_ARGS=(--config /dev/null)
+if [ -n "${NEXUS_BACKUP_R2_REMOTE:-}" ]; then
+  if [ ! -x "$RCLONE_BIN" ]; then
+    fail "R2 업로드 실패(rclone 없음: $RCLONE_BIN)"
+  elif "$RCLONE_BIN" "${RCLONE_ARGS[@]}" copy "$BACKUP_DIR/" "$NEXUS_BACKUP_R2_REMOTE/" \
+         --immutable --retries 3 --low-level-retries 10 --stats-log-level NOTICE 2>&1 \
+         | grep -v 'NOTICE: *$' | sed 's/^/[nexus-backup] rclone: /'; [ "${PIPESTATUS[0]}" -eq 0 ]; then
+    # 업로드가 "성공"했다는 것과 R2 에 온전한 파일이 있다는 것은 다르다.
+    # 이번 회차에 만든 파일만 골라 R2 쪽 체크섬과 대조한다.
+    # (멀티파트 업로드는 ETag 가 MD5 가 아니지만, rclone 이 업로드 때 MD5 를 메타데이터로
+    #  남겨 두므로 check 가 비교할 수 있다)
+    CHECK_LIST=$(mktemp)
+    for f in "$DUMP" "$FULLDUMP" "$UPLOADS"; do
+      [ -n "$f" ] && [ -f "$f" ] && echo "${f#"$BACKUP_DIR"/}" >> "$CHECK_LIST"
+    done
+    if "$RCLONE_BIN" "${RCLONE_ARGS[@]}" check "$BACKUP_DIR/" "$NEXUS_BACKUP_R2_REMOTE/" \
+         --one-way --files-from "$CHECK_LIST" >/dev/null 2>&1; then
+      log "R2 업로드·체크섬 검증 완료 → $NEXUS_BACKUP_R2_REMOTE ($(wc -l < "$CHECK_LIST")개)"
+    else
+      fail "R2 체크섬 불일치"
+    fi
+    rm -f "$CHECK_LIST"
+  else
+    fail "R2 업로드 실패"
+  fi
+fi
+
+if [ -z "${NEXUS_BACKUP_RSYNC_TARGET:-}" ] && [ -z "${NEXUS_BACKUP_R2_REMOTE:-}" ]; then
+  log "오프사이트 사본 미설정 — 호스트 로컬 사본만 존재 (호스트 전손 시 함께 사라짐)"
 fi
 
 ELAPSED=$(($(date +%s) - START))
