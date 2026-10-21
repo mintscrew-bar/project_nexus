@@ -1,6 +1,6 @@
 {
   "name": "@nexus/api",
-  "version": "1.68.3",
+  "version": "1.68.4",
   "private": true,
   "scripts": {
     "build": "nest build",
