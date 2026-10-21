@@ -87,11 +87,18 @@
       "fast-uri@>=3.0.0 <3.1.7": "3.1.7",
       "fast-uri@>=3.1.2 <3.1.7": "3.1.7",
       "fast-uri": "3.1.7"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "bcrypt",
+      "prisma",
+      "unrs-resolver"
+    ]
   },
   "engines": {
     "node": ">=24.0.0",
-    "pnpm": ">=8.0.0"
+    "pnpm": ">=10.0.0"
   },
-  "packageManager": "pnpm@8.15.0"
+  "packageManager": "pnpm@10.34.7"
 }

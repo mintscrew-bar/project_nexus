@@ -19,7 +19,7 @@ jobs:
       - name: 코드 체크아웃
         uses: actions/checkout@v6
 
-      # 버전은 루트 package.json의 packageManager 필드(pnpm@8.15.0)에서 읽는다.
+      # 버전은 루트 package.json의 packageManager 필드(pnpm@10.34.7)에서 읽는다.
       # version 입력을 함께 주면 버전이 어긋날 때 에러가 나므로 단일 출처로 유지한다.
       - name: pnpm 설치
         uses: pnpm/action-setup@v6

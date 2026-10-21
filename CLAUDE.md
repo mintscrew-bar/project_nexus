@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Development Commands
 
 ```bash
-# Package manager: pnpm (v8+), Node >= 20
+# Package manager: pnpm (v10), Node >= 24
 pnpm dev              # 개발 서버 켜기 — 포트 3010 고정, 메모리 상한 적용
 pnpm dev:stop         # 끄기
 pnpm dev:status       # 켜짐/꺼짐, PID, 메모리, 포트 점유 확인
