@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
@@ -32,7 +32,7 @@ RUN pnpm --filter @nexus/database build
 RUN pnpm --filter @nexus/api build
 
 # Production stage
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 
 # Prisma 엔진 실행에 필요한 OpenSSL 설치
 RUN apk add --no-cache openssl

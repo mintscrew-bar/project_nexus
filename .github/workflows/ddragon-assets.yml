@@ -43,10 +43,10 @@ jobs:
       - name: pnpm 설치
         uses: pnpm/action-setup@v6
 
-      - name: Node.js 22 설정
+      - name: Node.js 24 설정
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: 의존성 설치

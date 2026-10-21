@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 
@@ -50,7 +50,7 @@ RUN pnpm --filter @nexus/types build
 RUN pnpm --filter @nexus/web build
 
 # Production stage
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 
 WORKDIR /app
 
