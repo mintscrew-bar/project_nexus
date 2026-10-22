@@ -295,7 +295,7 @@ function BidLog({
   logEndRef,
 }: {
   bidHistory: any[];
-  logEndRef: React.RefObject<HTMLDivElement>;
+  logEndRef: React.RefObject<HTMLDivElement | null>;
 }) {
   return (
     <div className="h-full flex flex-col min-h-0">

@@ -259,7 +259,9 @@ function FriendItem({
   const status = getFriendStatus(friendUser.id);
   const unread = unreadCounts[friendUser.id] ?? 0;
   const [hovered, setHovered] = useState(false);
-  const hoverTimer = useRef<ReturnType<typeof setTimeout>>();
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   const handleMouseEnter = () => {
     hoverTimer.current = setTimeout(() => setHovered(true), 400);
@@ -738,7 +740,9 @@ function AddFriendModal({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
-  const debounceTimer = useRef<ReturnType<typeof setTimeout>>();
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   // 400ms debounce
   useEffect(() => {
