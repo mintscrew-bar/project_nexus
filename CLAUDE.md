@@ -48,7 +48,7 @@ Turborepo monorepo with pnpm workspaces:
 ```
 apps/
   api/          → NestJS backend (REST + WebSocket), port 4000, prefix /api
-  web/          → Next.js 14 App Router frontend, port 3000
+  web/          → Next.js 16 App Router frontend, port 3000
 packages/
   database/     → @nexus/database — Prisma schema + client (schema at prisma/schema.prisma)
   types/        → @nexus/types — Shared TypeScript types (ApiResponse, User, Auction, WS events)
