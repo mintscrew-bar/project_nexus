@@ -31,6 +31,15 @@ RUN pnpm --filter @nexus/database build
 # API 빌드
 RUN pnpm --filter @nexus/api build
 
+# 운영 이미지에 넣을 node_modules 를 따로 뽑는다 — api 의 dependencies 만, devDependencies 는 뺀다.
+# 위의 /app/node_modules 는 lockfile 전체(web 의존성·jest·nest cli·webpack·typescript…)라 1GB 가 넘는다.
+# 의존성이 바뀌는 배포마다 이 레이어를 통째로 새로 받아야 해서, GHCR 이 느린 날 CD 가 pull 단계에서
+# 15분 제한에 걸려 취소됐다(2026-10-23). `pnpm deploy` 는 api 의 운영 의존성만 담은 평평한 node_modules 를 만든다.
+# (prisma CLI 는 entrypoint 의 migrate deploy 가 런타임에 쓰므로 api dependencies 에 둔다)
+RUN pnpm --filter @nexus/api deploy --prod --legacy /out \
+  && cp -r packages/database/prisma /out/prisma \
+  && cd /out && node_modules/.bin/prisma generate --schema=prisma/schema.prisma
+
 # Production stage
 FROM node:24-alpine AS runner
 
@@ -54,8 +63,10 @@ COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/package.json ./
 COPY --from=builder /app/apps/api/ecosystem.config.js ./
 
-# node_modules 복사 (workspace symlink은 다음 단계에서 실제 파일로 덮어씀)
-COPY --from=builder /app/node_modules ./node_modules
+# node_modules 복사 — 운영 의존성만 뽑은 /out 의 것 (생성된 Prisma 클라이언트 포함)
+# api 전용 버전도 여기 평평하게 들어간다. 예전처럼 루트 node_modules 만 복사하면
+# apps/api/node_modules 에 따로 깔린 버전이 조용히 빠지는 문제가 있었다.
+COPY --from=builder /out/node_modules ./node_modules
 
 # workspace 패키지를 node_modules/@nexus/에 직접 배치
 # (Docker COPY는 node_modules 외부를 가리키는 pnpm symlink를 따라가지 못함)
