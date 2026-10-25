@@ -1,7 +1,7 @@
-import { PrismaClient } from "@nexus/database";
+import { PrismaClient, createPrismaAdapter } from "@nexus/database";
 import { createCipheriv, createHmac, randomBytes } from "crypto";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: createPrismaAdapter() });
 
 function readKey(name: string): Buffer {
   const value = process.env[name];

@@ -9,9 +9,9 @@
  *  - 각 유저 UserSettings 생성
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, createPrismaAdapter } from '../src';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: createPrismaAdapter() });
 
 async function main() {
   console.log('🌱 시드 데이터 생성 시작...\n');

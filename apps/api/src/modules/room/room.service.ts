@@ -23,7 +23,7 @@ import {
   PubgGameMode,
   PubgPlatform,
 } from "@nexus/database";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@nexus/database";
 import * as bcrypt from "bcrypt";
 import { randomInt } from "crypto";
 import {

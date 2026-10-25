@@ -287,7 +287,8 @@ journalctl -u nexus.service -n 50 --no-pager
 프로젝트·네트워크·서비스명을 공유해 운영이 내려간다.
 
 ```bash
-docker exec -i nexus-api npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
+# entrypoint 의 migrate 명령을 그대로 쓴다 (Prisma 7: /app/prisma.config.ts 에서 스키마·DATABASE_URL 을 읽는다)
+docker exec -i nexus-api ./docker-entrypoint.sh migrate
 ```
 
 ---

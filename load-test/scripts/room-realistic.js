@@ -23,7 +23,8 @@ loadEnvFiles([
 
 const io = requireFromProject("socket.io-client");
 const jwt = requireFromProject("jsonwebtoken");
-const { PrismaClient } = requireFromProject("@prisma/client");
+// Prisma 7: 클라이언트는 @nexus/database 에서 생성·배포되고 pg 어댑터가 필수다
+const { PrismaClient, createPrismaAdapter } = requireFromProject("@nexus/database");
 
 function requireFromProject(name) {
   return require(require.resolve(name, {
@@ -532,7 +533,7 @@ async function main() {
   const health = await api("/api/health", { expectOk: false }).catch(() => null);
   if (!health?.ok) throw new Error("API health check failed");
 
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({ adapter: createPrismaAdapter() });
   const results = [];
   try {
     for (let i = 1; i <= config.repeat; i++) {

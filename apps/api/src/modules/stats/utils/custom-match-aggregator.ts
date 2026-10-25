@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@nexus/database";
 
 export type CustomMatchPeriod = "30d" | "90d" | "all";
 export type CustomMatchGroupBy =

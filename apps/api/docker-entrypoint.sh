@@ -22,12 +22,13 @@ set -e
 # 기존 점수를 재계산하는 역할도 한다. 산식 버전을 바꾼 배포에서는
 # 위 명령을 한 번 실행해야 한다.
 
-SCHEMA=/app/prisma/schema.prisma
+# Prisma 7: 스키마·마이그레이션 경로와 접속 URL(DATABASE_URL)을 이 설정 파일에서 읽는다
+PRISMA_CONFIG=/app/prisma.config.ts
 
 run_migrations() {
   echo "[entrypoint] 마이그레이션 적용"
   # 운영에서는 스키마 강제 동기화(db push)를 쓰지 않고 검증된 마이그레이션만 적용한다.
-  node_modules/.bin/prisma migrate deploy --schema="$SCHEMA"
+  node_modules/.bin/prisma migrate deploy --config="$PRISMA_CONFIG"
 }
 
 run_backfills() {

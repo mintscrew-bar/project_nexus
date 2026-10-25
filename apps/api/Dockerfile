@@ -36,9 +36,8 @@ RUN pnpm --filter @nexus/api build
 # 의존성이 바뀌는 배포마다 이 레이어를 통째로 새로 받아야 해서, GHCR 이 느린 날 CD 가 pull 단계에서
 # 15분 제한에 걸려 취소됐다(2026-10-23). `pnpm deploy` 는 api 의 운영 의존성만 담은 평평한 node_modules 를 만든다.
 # (prisma CLI 는 entrypoint 의 migrate deploy 가 런타임에 쓰므로 api dependencies 에 둔다)
-RUN pnpm --filter @nexus/api deploy --prod --legacy /out \
-  && cp -r packages/database/prisma /out/prisma \
-  && cd /out && node_modules/.bin/prisma generate --schema=prisma/schema.prisma
+# Prisma 7 부터 클라이언트는 @nexus/database 의 dist 에 컴파일돼 들어가서 여기서 따로 생성하지 않는다.
+RUN pnpm --filter @nexus/api deploy --prod --legacy /out
 
 # Production stage
 FROM node:24-alpine AS runner
@@ -63,7 +62,7 @@ COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/package.json ./
 COPY --from=builder /app/apps/api/ecosystem.config.js ./
 
-# node_modules 복사 — 운영 의존성만 뽑은 /out 의 것 (생성된 Prisma 클라이언트 포함)
+# node_modules 복사 — 운영 의존성만 뽑은 /out 의 것
 # api 전용 버전도 여기 평평하게 들어간다. 예전처럼 루트 node_modules 만 복사하면
 # apps/api/node_modules 에 따로 깔린 버전이 조용히 빠지는 문제가 있었다.
 COPY --from=builder /out/node_modules ./node_modules
@@ -74,8 +73,9 @@ COPY --from=builder /app/packages/database/dist ./node_modules/@nexus/database/d
 COPY --from=builder /app/packages/database/package.json ./node_modules/@nexus/database/package.json
 COPY --from=builder /app/packages/types/dist ./node_modules/@nexus/types/dist
 COPY --from=builder /app/packages/types/package.json ./node_modules/@nexus/types/package.json
-# Prisma 스키마/마이그레이션 파일
+# Prisma 스키마/마이그레이션 파일 + CLI 설정(Prisma 7 은 접속 URL 을 여기서 읽는다)
 COPY --from=builder /app/packages/database/prisma ./prisma
+COPY --from=builder /app/packages/database/prisma.config.ts ./prisma.config.ts
 
 # 시작 스크립트 (마이그레이션 / 백필 / 기동 분리)
 COPY --from=builder /app/apps/api/docker-entrypoint.sh ./docker-entrypoint.sh

@@ -1,10 +1,10 @@
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient, Prisma, createPrismaAdapter } from "../src";
 
 // 기존 auth_providers.metadata에 평문 저장된 OAuth accessToken/refreshToken을 제거하는 일회성 정리 스크립트.
 // 저장된 토큰을 사용하는 코드가 없으므로 삭제해도 기능에 영향 없다.
 // 실행: pnpm --filter @nexus/database db:scrub-oauth-tokens
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: createPrismaAdapter() });
 const SENSITIVE_KEYS = ["accessToken", "refreshToken"];
 
 async function main() {

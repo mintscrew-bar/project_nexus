@@ -13,12 +13,12 @@
  *
  * 실행: cd apps/api && npx ts-node --transpile-only src/scripts/backfill-balance-scores.ts
  */
-import { PrismaClient } from "@nexus/database";
+import { PrismaClient, createPrismaAdapter } from "@nexus/database";
 import { BalanceScoreService } from "../modules/common/balance-score.service";
 import { BALANCE_SCORE_VERSION } from "../modules/common/balance-score.util";
 import type { PrismaService } from "../modules/prisma/prisma.service";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: createPrismaAdapter() });
 // 서비스는 PrismaClient 의 메서드만 쓰므로 그대로 넘긴다.
 const balanceScores = new BalanceScoreService(
   prisma as unknown as PrismaService,

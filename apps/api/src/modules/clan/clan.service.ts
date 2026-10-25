@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import { randomBytes } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@nexus/database";
 import {
   ClanActivityType,
   ClanInvitationStatus,

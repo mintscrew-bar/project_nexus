@@ -11,7 +11,7 @@
 import { PrismaService } from "../prisma/prisma.service";
 import { startBlocked } from "../room/start-blocked";
 import { RedisService } from "../redis/redis.service";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@nexus/database";
 import { RoomStatus, TeamCaptainSelection, TeamMode } from "@nexus/database";
 import {
   calculateCaptainScore,

@@ -33,7 +33,8 @@ const { chromium } = requireOptional("playwright", [
 ]);
 const jwt = requireFromProject("jsonwebtoken");
 const io = requireFromProject("socket.io-client");
-const { PrismaClient } = requireFromProject("@prisma/client");
+// Prisma 7: 클라이언트는 @nexus/database 에서 생성·배포되고 pg 어댑터가 필수다
+const { PrismaClient, createPrismaAdapter } = requireFromProject("@nexus/database");
 
 function requireOptional(name, paths) {
   try {
@@ -469,7 +470,7 @@ async function main() {
   console.log(`web=${config.webUrl} api=${config.baseUrl} count=${config.count} headless=${config.headless}`);
   console.log("=".repeat(64));
 
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({ adapter: createPrismaAdapter() });
   const browser = await chromium.launch({
     headless: config.headless,
     executablePath: config.chromiumExecutable || undefined,

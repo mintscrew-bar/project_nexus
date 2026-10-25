@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
-import { PrismaClient } from "@nexus/database";
+import { PrismaClient, createPrismaAdapter } from "@nexus/database";
 
 @Injectable()
 export class PrismaService
@@ -8,6 +8,9 @@ export class PrismaService
 {
   constructor() {
     super({
+      // Prisma 7 은 드라이버 어댑터가 필수다. 풀 크기·대기 시간은 createPrismaAdapter 가
+      // Prisma 6 기본값에 맞춰 둔다(@nexus/database 참고).
+      adapter: createPrismaAdapter(),
       log:
         process.env.NODE_ENV === "development"
           ? ["query", "info", "warn", "error"]

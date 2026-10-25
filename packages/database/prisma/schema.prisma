@@ -1,11 +1,17 @@
+// Prisma 7: Rust 쿼리 엔진이 없어지고 클라이언트를 TypeScript 소스로 생성한다.
+// 생성물은 src/generated/prisma 에 떨어지고, 이 패키지의 tsc 빌드가 dist 로 함께 컴파일한다.
+// (gitignore 대상 — `pnpm db:generate` 가 생성 + dist 빌드까지 한다. 스키마를 바꾸면 이것만 돌리면 된다)
+// API 가 CommonJS 라서 moduleFormat 을 cjs 로 고정한다.
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
 }
 
+// 접속 URL 은 Prisma 7 부터 스키마가 아니라 prisma.config.ts 에서 준다(CLI 용).
+// 런타임 PrismaClient 는 src/index.ts 의 pg 어댑터가 DATABASE_URL 로 접속한다.
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {

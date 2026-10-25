@@ -1,6 +1,6 @@
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient, Prisma, createPrismaAdapter } from "../src";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: createPrismaAdapter() });
 const BATCH_SIZE = 1000;
 
 /**
