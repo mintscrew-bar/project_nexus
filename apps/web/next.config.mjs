@@ -1,6 +1,8 @@
 /** @ts-check */
 
 import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // package.json을 앱 버전의 단일 출처로 사용하고 클라이언트 번들에 주입한다.
 const require = createRequire(import.meta.url);
@@ -66,6 +68,15 @@ const nextConfig = {
   // 둘이 같은 디렉터리에 써서 vendor 청크가 반쪽만 남는다 —
   // "Cannot find module './vendor-chunks/...'" 가 그 증상이다.
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // 운영 이미지는 standalone 출력으로 돌린다 — Next 가 실제로 쓰는 파일만 추적해
+  // `<distDir>/standalone` 에 server.js 와 최소 node_modules 를 만든다.
+  // 예전엔 lockfile 전체 node_modules(1GB+)와 빌드 캐시까지 이미지에 넣어, 의존성이 바뀌는
+  // 배포마다 큰 레이어를 받다가 CD 가 시간 초과로 취소된 적이 있다(2026-10-23).
+  // 주의: standalone 은 이 설정 파일을 빌드 시점에 평가해 고정한다. rewrites 의 API_URL 도
+  // 빌드 인자 값이 박힌다(운영은 빌드·런타임 모두 http://api:4000 이라 같다).
+  output: "standalone",
+  // 모노레포라 추적 기준을 저장소 루트로 잡아야 @nexus/types 와 루트 node_modules 가 포함된다
+  outputFileTracingRoot: join(dirname(fileURLToPath(import.meta.url)), "../.."),
   reactStrictMode: true,
   poweredByHeader: false,
   env: {

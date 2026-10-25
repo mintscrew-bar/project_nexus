@@ -60,16 +60,15 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# node_modules 복사 (next 바이너리 + 런타임 의존성)
-COPY --from=builder /app/node_modules ./node_modules
-
-# 빌드된 Next.js 결과물 복사
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next ./apps/web/.next
+# standalone 출력만 복사한다 (next.config 의 output: "standalone").
+# Next 가 실제로 쓰는 파일만 추적한 server.js + 최소 node_modules(next·react·sharp 등)다.
+# 예전엔 lockfile 전체 node_modules(1GB+)와 .next/cache(빌드 캐시 115MB)까지 넣어서
+# 배포마다 큰 레이어를 받다가 CD 가 시간 초과로 취소된 적이 있다(2026-10-23).
+# 앱 의존성(@nexus/types 포함)은 서버 번들에 들어가 있어 따로 복사하지 않는다.
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+# standalone 은 정적 파일을 담지 않는다 — 브라우저용 청크(static)와 public 을 직접 옆에 둔다
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
-COPY --from=builder /app/apps/web/package.json ./apps/web/
-COPY --from=builder /app/apps/web/next.config.mjs ./apps/web/
-COPY --from=builder /app/packages/types/dist ./node_modules/@nexus/types/dist
-COPY --from=builder /app/packages/types/package.json ./node_modules/@nexus/types/package.json
 
 USER nextjs
 
@@ -80,4 +79,5 @@ ENV HOSTNAME="0.0.0.0"
 
 WORKDIR /app/apps/web
 
-CMD ["node", "../../node_modules/next/dist/bin/next", "start"]
+# PORT·HOSTNAME 은 위 ENV 를 server.js 가 읽는다
+CMD ["node", "server.js"]
