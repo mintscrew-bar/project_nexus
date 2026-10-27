@@ -8,6 +8,17 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+# 바깥 주소(discord.com 등)를 조회할 DNS 서버를 고정한다.
+# 지정하지 않으면 컨테이너는 "생성 시점" 호스트 /etc/resolv.conf 를 복사해 계속 쓴다.
+# 테일스케일이 로그인돼 있으면 그 파일이 테일스케일 DNS(100.100.100.100)로 바뀌어 있어서,
+# 2026-10-26 테일스케일이 로그아웃되자 그 DNS 가 죽고 컨테이너 안 외부 조회가 전부 실패했다
+# (디스코드 로그인 500, 봇 API, 치지직·숲 조회, cloudflared 재연결 불가 — 약 25시간).
+# 10.255.255.254 는 WSL 이 제공하는 호스트 DNS 창구 — 윈도우 DNS 설정을 따라가므로
+# 호스트 본체와 같은 경로이고, 테일스케일 상태와 무관하다.
+# 컨테이너끼리의 이름(api, postgres 등)은 이 설정과 상관없이 도커가 직접 푼다.
+x-dns: &host-dns
+  - 10.255.255.254
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -60,6 +71,7 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: nexus-api
     logging: *default-logging
+    dns: *host-dns
     restart: unless-stopped
     # 종료 유예. 앱은 SIGTERM 을 받으면 진행 중인 방이 끝나기를 최대 60초 기다리고
     # (app.module.ts DRAIN_TIMEOUT_MS), PM2 는 kill_timeout 75초까지 기다린다
@@ -115,6 +127,7 @@ services:
         API_URL: http://api:4000
     container_name: nexus-web
     logging: *default-logging
+    dns: *host-dns
     restart: unless-stopped
     mem_limit: 2048m
     memswap_limit: 2048m
@@ -166,6 +179,7 @@ services:
     image: cloudflare/cloudflared:2026.7.2
     container_name: nexus-cloudflared
     logging: *default-logging
+    dns: *host-dns
     restart: unless-stopped
     mem_limit: 256m
     memswap_limit: 256m
@@ -182,6 +196,7 @@ services:
     image: louislam/uptime-kuma:2
     container_name: nexus-uptime-kuma
     logging: *default-logging
+    dns: *host-dns
     restart: unless-stopped
     mem_limit: 512m
     memswap_limit: 512m
