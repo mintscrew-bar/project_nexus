@@ -188,7 +188,7 @@
       운영자 1인·컨테이너 7개 규모에 Grafana 를 얹으면 그 자체가 또 하나의 관리 대상이 된다.
       필요해지는 시점은 "왜 느린지"를 사후에 봐야 할 때이고, 그때 다시 연다.
 
-- [ ] Task 18: 컨테이너 DNS 실패 알림 — `scripts/ops/dns-alert.sh` (5분 주기, 설치 대기)
+- [x] Task 18: 컨테이너 DNS 실패 알림 — `scripts/ops/dns-alert.sh` (5분 주기, 2026-10-28 설치 완료)
       2026-10-26 테일스케일 로그아웃으로 컨테이너 안 외부 이름 조회가 약 25시간 실패했는데
       (디스코드 로그인 500), healthcheck·Uptime Kuma 는 전부 통과해서 아무 알림이 없었다.
       api·web·uptime-kuma 안에서 discord.com·cloudflare.com 을 직접 조회하고, cloudflared 는
