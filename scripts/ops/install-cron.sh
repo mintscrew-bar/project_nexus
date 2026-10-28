@@ -49,13 +49,13 @@ if [ ! -f "$ENV_FILE" ]; then
   install -m 0600 /dev/null "$ENV_FILE"
   cat > "$ENV_FILE" <<'ENVEOF'
 # NEXUS 운영 스크립트 공용 설정 (권한 0600 유지)
-# 디스크 정리·디스크 경고·백업 세 스크립트가 이 파일을 공유한다.
+# 디스크 정리·디스크 경고·DNS 경고·백업 스크립트가 이 파일을 공유한다.
 #
 # `: "${VAR:=값}"` 은 "이미 설정돼 있으면 그대로 두고, 아니면 이 값을 쓴다"는 뜻이다.
 # 그냥 VAR="값" 으로 쓰면 파일이 항상 이기기 때문에
 # `DISK_ALERT_THRESHOLD=1 ./disk-alert.sh` 같은 일회성 오버라이드가 먹지 않는다.
 
-# Discord 웹훅 — 정리 결과 보고, 디스크 임계 경고, 백업 실패 알림
+# Discord 웹훅 — 정리 결과 보고, 디스크 임계 경고, DNS 실패 경고, 백업 실패 알림
 : "${NEXUS_OPS_WEBHOOK:=}"
 
 # 백업 보관 위치와 개수 (core=매일, full=주간)
@@ -82,6 +82,8 @@ BLOCK="$MARK_BEGIN
 0 4 * * * $OPS/nexus-cleanup.sh >> $LOG_DIR/cleanup.log 2>&1
 # 30분마다 — 디스크 사용률 경고 (임계 초과 시 하루 1회)
 */30 * * * * $OPS/disk-alert.sh >> $LOG_DIR/disk-alert.log 2>&1
+# 5분마다 — 컨테이너 DNS(외부 이름 조회) 경고 (실패 시 6시간에 1회 + 복구 알림)
+*/5 * * * * $OPS/dns-alert.sh >> $LOG_DIR/dns-alert.log 2>&1
 $MARK_END"
 
 # 기존 블록 제거 후 재삽입 = 멱등. 흡수된 구버전 disk-cleanup.sh 라인도 같이 걷어낸다.
