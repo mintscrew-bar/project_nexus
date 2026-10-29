@@ -125,6 +125,79 @@ jobs:
           EOF
           chmod 600 /home/haru/projects/nexus/.env.production
 
+      # GitHub Secrets → ~/.config/nexus-ops.env 자동 생성.
+      # 호스트 crontab 의 ops 스크립트(백업·정리·디스크/DNS 경고)가 공유하는 설정이다.
+      # 서버를 새로 깔아도 러너만 다시 등록해 CD 를 한 번 돌리면 웹훅·R2 오프사이트 백업 설정이 돌아온다.
+      # 롤아웃보다 앞에 둔다 — 롤아웃이 실패해도 백업 설정은 먼저 깔려 있어야 R2 에서 복원할 수 있다.
+      - name: nexus-ops.env 생성
+        env:
+          OPS_WEBHOOK: ${{ secrets.NEXUS_OPS_WEBHOOK }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          BACKUP_R2_KEY_ID: ${{ secrets.NEXUS_BACKUP_R2_ACCESS_KEY_ID }}
+          BACKUP_R2_SECRET: ${{ secrets.NEXUS_BACKUP_R2_SECRET_ACCESS_KEY }}
+        run: |
+          OPS_ENV=/home/haru/.config/nexus-ops.env
+          # 웹훅 Secret 이 비어 있으면 기존 파일을 건드리지 않는다.
+          # 빈 값으로 덮어쓰면 백업 실패·디스크 경고 알림이 조용히 끊긴다.
+          if [ -z "$OPS_WEBHOOK" ]; then
+            echo "::warning::NEXUS_OPS_WEBHOOK Secret 이 없어 $OPS_ENV 를 그대로 둔다"
+            exit 0
+          fi
+          umask 077
+          install -d -m 0700 /home/haru/.config
+          # 엔드포인트는 업로드 서비스와 같은 규칙: R2_ENDPOINT 가 있으면 그것, 없으면 계정 ID 로 조립
+          ENDPOINT="${R2_ENDPOINT:-https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com}"
+          R2_READY=0
+          if [ -n "$BACKUP_R2_KEY_ID" ] && [ -n "$BACKUP_R2_SECRET" ] && [ -n "${R2_ENDPOINT}${R2_ACCOUNT_ID}" ]; then
+            R2_READY=1
+          fi
+          # 임시 파일에 다 쓴 뒤 mv — 쓰는 도중에 cron 이 반쪽짜리 파일을 읽지 않게 한다
+          TMP=$(mktemp "$OPS_ENV.XXXXXX")
+          {
+            cat << 'EOF'
+          # NEXUS 운영 스크립트 공용 설정 — CD(deploy.yml)가 GitHub Secrets 로 매 배포마다 새로 쓴다.
+          # ⚠️ 여기서 손으로 고친 값은 다음 배포 때 사라진다. 바꿀 값은 Secret 이나 deploy.yml 에서 바꾼다.
+          #
+          # `: "${VAR:=값}"` 은 "이미 설정돼 있으면 그대로 두고, 아니면 이 값을 쓴다"는 뜻이다.
+          # 그래서 `DISK_ALERT_THRESHOLD=1 ./disk-alert.sh` 같은 일회성 오버라이드가 먹는다.
+
+          # 백업 보관 위치와 개수 (core=매일, full=주간)
+          : "${NEXUS_BACKUP_DIR:=$HOME/nexus-backups}"
+          : "${NEXUS_BACKUP_KEEP_DAILY:=14}"
+          : "${NEXUS_BACKUP_KEEP_WEEKLY:=3}"
+
+          # 호스트 밖 rsync 사본 (user@host:/path). 비워두면 쓰지 않는다.
+          : "${NEXUS_BACKUP_RSYNC_TARGET:=}"
+
+          # 디스크 경고 임계치(%)
+          : "${DISK_ALERT_THRESHOLD:=80}"
+          EOF
+            echo
+            echo "# Discord 웹훅 — 정리 결과 보고, 디스크 임계 경고, DNS 실패 경고, 백업 실패 알림"
+            printf ': "${NEXUS_OPS_WEBHOOK:=%s}"\n' "$OPS_WEBHOOK"
+            if [ "$R2_READY" = 1 ]; then
+              echo
+              echo "# Cloudflare R2 오프사이트 백업 (nexus-backup.sh 6단계) — 백업 전용 비공개 버킷 + 버킷 한정 토큰"
+              echo "# 이 파일은 export 없이 source 되므로 rclone 이 읽으려면 export 가 필요하다."
+              echo ': "${NEXUS_BACKUP_R2_REMOTE:=nexusr2:nexus-db-backups}"'
+              echo "export RCLONE_CONFIG_NEXUSR2_TYPE=s3"
+              echo "export RCLONE_CONFIG_NEXUSR2_PROVIDER=Cloudflare"
+              printf 'export RCLONE_CONFIG_NEXUSR2_ENDPOINT=%s\n' "$ENDPOINT"
+              printf 'export RCLONE_CONFIG_NEXUSR2_ACCESS_KEY_ID=%s\n' "$BACKUP_R2_KEY_ID"
+              printf 'export RCLONE_CONFIG_NEXUSR2_SECRET_ACCESS_KEY=%s\n' "$BACKUP_R2_SECRET"
+              echo "# 버킷 한정 토큰은 버킷 생성 권한이 없어서 존재 확인(생성 시도)을 건너뛴다"
+              echo "export RCLONE_CONFIG_NEXUSR2_NO_CHECK_BUCKET=true"
+            fi
+          } > "$TMP"
+          chmod 600 "$TMP"
+          mv -f "$TMP" "$OPS_ENV"
+          if [ "$R2_READY" = 1 ]; then
+            echo "nexus-ops.env 생성 (R2 오프사이트 백업 켜짐)"
+          else
+            echo "::warning::NEXUS_BACKUP_R2_* Secret 이 없어 R2 오프사이트 백업은 꺼진 채로 생성했다"
+          fi
+
       # GHCR private 패키지 pull 권한. public 으로 바꾸면 이 단계는 생략 가능.
       - name: GHCR 로그인
         run: |

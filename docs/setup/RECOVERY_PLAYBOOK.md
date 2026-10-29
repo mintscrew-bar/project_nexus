@@ -153,7 +153,14 @@ gzip 무결성 → 복원 → 테이블별 행 수를 운영과 대조해 합격
 
 `nexus-backup.sh` 는 `NEXUS_BACKUP_R2_REMOTE` 가 설정돼 있으면 매일 R2 백업 전용 버킷에도 올린다
 (`copy --immutable` — 로컬이 비어도 R2 사본은 안 지워진다. 만료는 버킷 수명주기 규칙).
-새 호스트에서는 `~/.config/nexus-ops.env` 의 `RCLONE_CONFIG_NEXUSR2_*` 값만 옮기면 된다:
+자격증명은 GitHub Secret(`NEXUS_OPS_WEBHOOK`, `NEXUS_BACKUP_R2_ACCESS_KEY_ID`, `NEXUS_BACKUP_R2_SECRET_ACCESS_KEY`,
+엔드포인트는 기존 `R2_ENDPOINT`/`R2_ACCOUNT_ID`)에 있고, CD 가 배포마다 `~/.config/nexus-ops.env` 를 새로 쓴다.
+새 호스트에서는 셀프호스티드 러너를 등록하고 최근 CD 실행을 `gh run rerun` 하면 파일이 생긴다
+(롤아웃이 실패해도 이 파일은 그 전 단계에서 써진다). 그다음:
+
+```bash
+set -a; . ~/.config/nexus-ops.env; set +a
+```
 
 ```bash
 rclone --config /dev/null lsf nexusr2:nexus-db-backups/daily/          # 목록
