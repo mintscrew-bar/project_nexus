@@ -66,6 +66,8 @@ export interface Room {
   teams?: { id: string; name: string; color?: string | null }[];
   // Extended settings
   allowSpectators?: boolean;
+  /** 대기실에서 방장이 나가면 방을 해산한다 */
+  closeOnHostLeave?: boolean;
   startingPoints?: number;
   minBidIncrement?: number;
   bidTimeLimit?: number;
@@ -101,6 +103,7 @@ export interface RoomSettingsDto {
   maxParticipants?: number;
   teamMode?: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   allowSpectators?: boolean;
+  closeOnHostLeave?: boolean;
   // Auction settings
   startingPoints?: number;
   minBidIncrement?: number;
@@ -256,6 +259,15 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
             ? false
             : state.gameStarting,
       }));
+    });
+
+    // 방장이 나가 방이 해산됐다. 방은 DB 에서 이미 지워졌으므로 재입장(rejoin)하지
+    // 않게 소켓을 끊고, 로비 화면은 에러 상태로 해산 사실과 목록 링크를 보여준다.
+    socket.on("room-disbanded", () => {
+      get().disconnect({ skipLeave: true });
+      set({
+        error: "ROOM_DISBANDED::방장이 나가서 방이 해산되었습니다.",
+      });
     });
 
     socket.on("participant-kicked", (data: { participantId: string }) => {

@@ -464,6 +464,9 @@ model Room {
   /// 이 방의 모집 공지를 연동된 다른 서버에도 보낼지.
   /// 비공개 방은 이 값과 무관하게 원 서버에만 공지한다.
   crossGuildAnnounce       Boolean @default(true)
+  /// 대기실에서 방장이 나가면 방장을 넘기지 않고 방을 해산할지.
+  /// 경기가 시작된 뒤에는 이 값과 무관하게 방장을 넘긴다(진행 중 기록 보호).
+  closeOnHostLeave         Boolean @default(false)
 
   id                       String                @id @default(cuid())
   /// 이 방이 어떤 게임의 내전인지. 목록·전적·랭킹이 이 값으로 갈린다.

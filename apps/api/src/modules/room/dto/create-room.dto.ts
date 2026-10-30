@@ -84,6 +84,12 @@ export class CreateRoomDto {
   @IsBoolean()
   allowSpectators?: boolean;
 
+  /** 대기실에서 방장이 나가면 방장을 넘기지 않고 방을 해산한다. */
+  @IsOptional()
+  @KeepRaw()
+  @IsBoolean()
+  closeOnHostLeave?: boolean;
+
   /**
    * 방장이 선수 슬롯을 차지하지 않고 운영자(관전자)로 방을 진행할지 여부.
    * 방장 권한은 Room.hostId가 소유하므로 참가 역할과 독립적이다.

@@ -70,6 +70,8 @@ export interface CreateRoomDto {
   maxParticipants: number;
   teamMode: TeamMode;
   allowSpectators?: boolean;
+  /** 대기실에서 방장이 나가면 방장을 넘기지 않고 방을 해산한다. */
+  closeOnHostLeave?: boolean;
   /** 방장은 유지하되 선수 명단에서는 제외하고 운영자로 참가한다. */
   hostAsSpectator?: boolean;
   discordGuildId?: string;
@@ -1169,6 +1171,7 @@ export class RoomService {
             isPrivate: !!dto.password,
             teamMode: dto.teamMode,
             allowSpectators: dto.allowSpectators ?? true,
+            closeOnHostLeave: dto.closeOnHostLeave ?? false,
             discordGuildId: resolvedDiscordGuildId,
             gameTitle,
             pubgPlatform:
@@ -1958,6 +1961,13 @@ export class RoomService {
           continue;
         }
 
+        // 방장 퇴장 시 해산 옵션 — 다른 방으로 옮겨 가는 것도 퇴장이다.
+        // 남은 참가자 알림은 게이트웨이가 "방이 사라졌다"를 보고 보낸다.
+        if (this.shouldDisbandOnLeave(previousRoom, userId)) {
+          roomsToDelete.push(previousRoom.id);
+          continue;
+        }
+
         if (previousRoom.hostId === userId) {
           const nextHost =
             remainingParticipants.find(
@@ -2295,6 +2305,21 @@ export class RoomService {
       };
     }
 
+    // 방장 퇴장 시 해산 옵션이 켜진 대기실이면 방장을 넘기지 않고 방을 없앤다.
+    // disbanded 는 호출부가 남은 참가자에게 "방이 해산됐다"를 알리는 신호다.
+    if (this.shouldDisbandOnLeave(room, userId)) {
+      if (this.discordVoiceService) {
+        await this.discordVoiceService.deleteRoomChannels(roomId);
+      }
+      await this.deleteRoomData(roomId);
+      return {
+        message: "Room disbanded (host left)",
+        username,
+        roomDeleted: true,
+        disbanded: true,
+      };
+    }
+
     // If host leaves but others remain, transfer host to next real (non-bot) participant
     let newHostId: string | null = null;
     if (room.hostId === userId && remainingCount > 0) {
@@ -2314,6 +2339,22 @@ export class RoomService {
     this.refreshDiscordRoomNotification(roomId);
 
     return { message: "Left room successfully", username, newHostId };
+  }
+
+  /**
+   * 이 퇴장으로 방을 해산해야 하는지.
+   * 대기실에서만 적용한다 — 경기가 시작된 뒤(완료 포함)에는 진행·결과 기록을
+   * 지키기 위해 옵션과 무관하게 기존처럼 방장을 넘긴다.
+   */
+  private shouldDisbandOnLeave(
+    room: { hostId: string; status: RoomStatus; closeOnHostLeave?: boolean },
+    leavingUserId: string,
+  ): boolean {
+    return (
+      room.closeOnHostLeave === true &&
+      room.status === RoomStatus.WAITING &&
+      room.hostId === leavingUserId
+    );
   }
 
   /**
@@ -2517,6 +2558,10 @@ export class RoomService {
 
     if (updates.allowSpectators !== undefined) {
       data.allowSpectators = updates.allowSpectators;
+    }
+
+    if (updates.closeOnHostLeave !== undefined) {
+      data.closeOnHostLeave = updates.closeOnHostLeave;
     }
 
     if (updates.password !== undefined) {

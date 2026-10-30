@@ -19,6 +19,7 @@ import {
   GitBranch,
   Scale,
   ArrowLeftRight,
+  DoorOpen,
 } from "lucide-react";
 import { RoomSettingsDto, useLobbyStore } from "@/stores/lobby-store";
 import { SeriesPresetSelector } from "@/components/rooms/SeriesPresetSelector";
@@ -56,6 +57,7 @@ interface RoomSettingsModalProps {
     isPrivate: boolean;
     teamMode: TeamMode;
     allowSpectators?: boolean;
+    closeOnHostLeave?: boolean;
     startingPoints?: number;
     minBidIncrement?: number;
     bidTimeLimit?: number;
@@ -165,6 +167,9 @@ export function RoomSettingsModal({
   const [allowSpectators, setAllowSpectators] = useState(
     room.allowSpectators ?? true,
   );
+  const [closeOnHostLeave, setCloseOnHostLeave] = useState(
+    room.closeOnHostLeave ?? false,
+  );
 
   // Auction settings
   const [startingPoints, setStartingPoints] = useState(
@@ -245,6 +250,7 @@ export function RoomSettingsModal({
     isPrivate !== room.isPrivate ||
     teamMode !== room.teamMode ||
     allowSpectators !== (room.allowSpectators ?? true) ||
+    closeOnHostLeave !== (room.closeOnHostLeave ?? false) ||
     startingPoints !== (room.startingPoints ?? 1000) ||
     minBidIncrement !== (room.minBidIncrement ?? 50) ||
     bidTimeLimit !== (room.bidTimeLimit ?? 30) ||
@@ -279,6 +285,7 @@ export function RoomSettingsModal({
       setPassword("");
       setTeamMode(room.teamMode);
       setAllowSpectators(room.allowSpectators ?? true);
+      setCloseOnHostLeave(room.closeOnHostLeave ?? false);
       setStartingPoints(room.startingPoints ?? 1000);
       setMinBidIncrement(room.minBidIncrement ?? 50);
       setBidTimeLimit(room.bidTimeLimit ?? 30);
@@ -328,6 +335,7 @@ export function RoomSettingsModal({
         maxParticipants,
         teamMode,
         allowSpectators,
+        closeOnHostLeave,
         startingPoints,
         killMatchDurationMinutes: Number(killMatchDurationMinutes),
         battleRoyaleRounds: Number(battleRoyaleRounds),
@@ -726,6 +734,33 @@ export function RoomSettingsModal({
                 />
               </div>
             </div>
+
+            {/* 방장 퇴장 시 해산 설정 */}
+            <div className="p-3 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+              <div className="flex items-center justify-between h-full">
+                <div className="flex items-center gap-2">
+                  <DoorOpen
+                    className={`w-4 h-4 ${
+                      closeOnHostLeave
+                        ? "text-accent-warning"
+                        : "text-text-secondary"
+                    }`}
+                  />
+                  <div>
+                    <div className="text-text-primary font-medium text-sm">
+                      방장 퇴장 시 해산
+                    </div>
+                    <div className="text-text-secondary text-xs">
+                      대기실에서 나가면 방 삭제
+                    </div>
+                  </div>
+                </div>
+                <Switch
+                  checked={closeOnHostLeave}
+                  onCheckedChange={setCloseOnHostLeave}
+                />
+              </div>
+            </div>
           </div>
           <p className="text-xs text-text-tertiary">
             Discord 음성 서버는 방 생성 시 선택한 서버를 유지합니다. 음성 채널 변경은 Discord에서 직접 진행해주세요.
@@ -763,6 +798,12 @@ export function RoomSettingsModal({
             </span>
             {" • "}
             <span>{allowSpectators ? "관전 허용" : "관전 비허용"}</span>
+            {closeOnHostLeave && (
+              <>
+                {" • "}
+                <span>방장 퇴장 시 해산</span>
+              </>
+            )}
           </div>
         </div>
 

@@ -201,7 +201,9 @@ export class RoomGateway
         await this.roomService.getRoomStatus(previousRoomId);
         this.broadcastRoomDelta("update", previousRoomId);
       } catch {
-        this.broadcastRoomDelta("remove", previousRoomId);
+        // 방이 사라졌다. 사람이 남아 있었다면 방장 퇴장 해산뿐이고,
+        // 빈 방·봇만 남은 방이었다면 받을 소켓이 없어 알림은 그냥 흘려진다.
+        this.notifyRoomDisbanded(previousRoomId);
       }
     }
   }
@@ -235,8 +237,12 @@ export class RoomGateway
       try {
         const prevStatus = await this.roomService.getRoomStatus(previousRoomId);
         if (prevStatus === RoomStatus.WAITING) {
+          let leaveResult: any = null;
           if (!atomicallyRemovedRoomIds.includes(previousRoomId)) {
-            await this.roomService.leaveRoom(client.userId, previousRoomId);
+            leaveResult = await this.roomService.leaveRoom(
+              client.userId,
+              previousRoomId,
+            );
           }
           const isCurrentSocketInPreviousRoom =
             this.socketRooms.get(client.id) === previousRoomId;
@@ -245,6 +251,10 @@ export class RoomGateway
               ? client.id
               : undefined,
           });
+          if (leaveResult?.disbanded) {
+            this.notifyRoomDisbanded(previousRoomId);
+            continue;
+          }
           this.server.to(previousRoomId).emit("user-left", {
             userId: client.userId,
             username: client.username,
@@ -282,6 +292,10 @@ export class RoomGateway
         if (status !== RoomStatus.WAITING) return;
 
         const result: any = await this.roomService.leaveRoom(userId, roomId);
+        if (result?.disbanded) {
+          this.notifyRoomDisbanded(roomId);
+          return;
+        }
         this.server.to(roomId).emit("user-left", { userId, username });
         this.broadcastRoomDelta(
           result?.roomDeleted ? "remove" : "update",
@@ -574,6 +588,17 @@ export class RoomGateway
       client.leave(data.roomId);
       this.socketRooms.delete(client.id);
       this.detachUserFromRoom(data.roomId, client.userId);
+
+      // 방이 없어졌으면 user-left·update 대신 해산 알림·목록 제거로 끝낸다.
+      if (leaveResult?.roomDeleted) {
+        if (leaveResult.disbanded) {
+          this.notifyRoomDisbanded(data.roomId);
+        } else {
+          this.broadcastRoomDelta("remove", data.roomId);
+        }
+        this.stopTyping(data.roomId, client.userId);
+        return { success: true, roomDeleted: true };
+      }
 
       // 참가자 슬롯이 보존된 경우(게임 진행 중)에는 다른 클라이언트에 user-left 알리지 않음.
       // user-left 를 받으면 클라 화면에서 해당 참가자가 사라져 실제 DB 상태(보존됨)와 어긋남.
@@ -1312,6 +1337,18 @@ export class RoomGateway
 
   notifyRoomUpdate(roomId: string, event: string, data: any) {
     this.server.to(roomId).emit(event, data);
+  }
+
+  /**
+   * 방장 퇴장으로 해산된 방을 알린다.
+   * DB 에서는 이미 지워졌지만 Socket.IO 룸은 메모리에 남아 있어 남은 참가자에게 닿는다.
+   * 클라는 이 이벤트를 받으면 연결을 끊고 내전 목록으로 돌아간다.
+   */
+  notifyRoomDisbanded(roomId: string) {
+    this.server
+      .to(roomId)
+      .emit("room-disbanded", { roomId, reason: "HOST_LEFT" });
+    this.broadcastRoomDelta("remove", roomId);
   }
 
   async getRoomParticipantCount(roomId: string): Promise<number> {

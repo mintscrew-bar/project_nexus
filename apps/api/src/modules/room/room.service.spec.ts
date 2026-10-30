@@ -227,6 +227,34 @@ describe("RoomService", () => {
       expect(result.switchedFromRoomIds).toEqual(["old-room"]);
     });
 
+    it("방장 퇴장 해산 방이면 방장을 넘기지 않고 기존 방을 지운다", async () => {
+      prisma.roomParticipant.findMany.mockResolvedValue([
+        {
+          roomId: "old-room",
+          room: {
+            id: "old-room",
+            name: "기존 방",
+            hostId: "user-1",
+            status: RoomStatus.WAITING,
+            closeOnHostLeave: true,
+            participants: [
+              { userId: "user-1", user: { username: "나" } },
+              { userId: "user-2", user: { username: "남은 사람" } },
+            ],
+          },
+        },
+      ]);
+      jest.spyOn(service, "getRoomById").mockResolvedValue(targetRoom as any);
+      const deleteRoomData = jest
+        .spyOn(service, "deleteRoomData")
+        .mockResolvedValue(undefined as any);
+
+      await service.joinRoom("user-1", { roomId: "target-room" });
+
+      expect(prisma.room.update).not.toHaveBeenCalled();
+      expect(deleteRoomData).toHaveBeenCalledWith("old-room");
+    });
+
     it("관전 허용 방이 만석이면 게임 계정 없이 관전자로 자동 입장한다", async () => {
       const fullRoom = {
         ...targetRoom,
@@ -268,6 +296,73 @@ describe("RoomService", () => {
         service.joinRoom("viewer-1", { roomId: "target-room" }),
       ).rejects.toThrow("참가 인원이 가득 찼습니다.");
       expect(prisma.roomParticipant.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("leaveRoom — 방장 퇴장 시 해산", () => {
+    const makeRoom = (overrides: Record<string, unknown> = {}) => ({
+      id: "room-1",
+      hostId: "host",
+      status: RoomStatus.WAITING,
+      closeOnHostLeave: true,
+      participants: [
+        { id: "p-host", userId: "host", user: { username: "방장" } },
+        { id: "p-2", userId: "user-2", user: { username: "참가자" } },
+      ],
+      ...overrides,
+    });
+    let deleteRoomData: jest.SpyInstance;
+
+    beforeEach(() => {
+      prisma.roomParticipant.delete = jest.fn().mockResolvedValue({});
+      deleteRoomData = jest
+        .spyOn(service, "deleteRoomData")
+        .mockResolvedValue(undefined as any);
+      // 디스코드 공지 갱신은 이 테스트의 관심사가 아니다.
+      jest
+        .spyOn(service as any, "refreshDiscordRoomNotification")
+        .mockImplementation(() => undefined);
+    });
+
+    it("옵션이 켜진 대기실에서 방장이 나가면 방을 해산한다", async () => {
+      prisma.room.findUnique.mockResolvedValue(makeRoom());
+
+      const result: any = await service.leaveRoom("host", "room-1");
+
+      expect(result).toMatchObject({ roomDeleted: true, disbanded: true });
+      expect(deleteRoomData).toHaveBeenCalledWith("room-1");
+      expect(prisma.room.update).not.toHaveBeenCalled();
+    });
+
+    it("옵션이 꺼져 있으면 다음 참가자에게 방장을 넘긴다", async () => {
+      prisma.room.findUnique.mockResolvedValue(
+        makeRoom({ closeOnHostLeave: false }),
+      );
+
+      const result: any = await service.leaveRoom("host", "room-1");
+
+      expect(result.newHostId).toBe("user-2");
+      expect(deleteRoomData).not.toHaveBeenCalled();
+    });
+
+    it("방장이 아닌 참가자가 나가면 해산하지 않는다", async () => {
+      prisma.room.findUnique.mockResolvedValue(makeRoom());
+
+      const result: any = await service.leaveRoom("user-2", "room-1");
+
+      expect(result.disbanded).toBeUndefined();
+      expect(deleteRoomData).not.toHaveBeenCalled();
+    });
+
+    it("경기가 시작된 뒤에는 옵션이 켜져 있어도 방장을 넘긴다", async () => {
+      prisma.room.findUnique.mockResolvedValue(
+        makeRoom({ status: RoomStatus.IN_PROGRESS }),
+      );
+
+      const result: any = await service.leaveRoom("host", "room-1");
+
+      expect(result).toMatchObject({ preserved: true, newHostId: "user-2" });
+      expect(deleteRoomData).not.toHaveBeenCalled();
     });
   });
 

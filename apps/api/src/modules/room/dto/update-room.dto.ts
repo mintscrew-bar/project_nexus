@@ -59,6 +59,12 @@ export class UpdateRoomDto {
   @IsBoolean()
   allowSpectators?: boolean;
 
+  /** 대기실에서 방장이 나가면 방장을 넘기지 않고 방을 해산한다. */
+  @KeepRaw()
+  @IsOptional()
+  @IsBoolean()
+  closeOnHostLeave?: boolean;
+
   @KeepRaw()
   @IsOptional()
   @IsInt()

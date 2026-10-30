@@ -27,7 +27,10 @@ export function LobbyErrorState({
   // 실패(빨강)가 아니라 안내(노랑) 톤으로 보여준다.
   const isAuthRequired = errorType === "NOT_AUTHENTICATED";
   const isTimeout = errorType === "CONNECT_TIMEOUT";
-  const isRecoverable = isDiscordError || isRiotError || isAuthRequired || isTimeout;
+  // 방장 퇴장 해산은 실패가 아니라 방이 정상적으로 닫힌 것이다.
+  const isDisbanded = errorType === "ROOM_DISBANDED";
+  const isRecoverable =
+    isDiscordError || isRiotError || isAuthRequired || isTimeout || isDisbanded;
 
   return (
     <div className="flex-grow flex items-center justify-center p-8">
@@ -45,6 +48,7 @@ export function LobbyErrorState({
             {isRiotError && "Riot 계정 연동 필요"}
             {isAuthRequired && "로그인이 필요합니다"}
             {isTimeout && "로비에 연결하지 못했습니다"}
+            {isDisbanded && "방이 해산되었습니다"}
             {!isRecoverable && "로비 입장 실패"}
           </h2>
           <p className="text-text-secondary">{errorMessage}</p>

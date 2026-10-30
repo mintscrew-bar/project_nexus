@@ -231,7 +231,12 @@ export class RoomController {
     const result: any = await this.roomService.leaveRoom(userId, roomId);
 
     if (result?.roomDeleted) {
-      this.roomGateway.broadcastRoomDelta("remove", roomId);
+      if (result.disbanded) {
+        // 방장 퇴장 해산 — 남은 참가자에게 알리고 목록에서도 지운다.
+        this.roomGateway.notifyRoomDisbanded(roomId);
+      } else {
+        this.roomGateway.broadcastRoomDelta("remove", roomId);
+      }
       return result;
     }
 

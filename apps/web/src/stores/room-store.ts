@@ -61,6 +61,7 @@ interface RoomCreationData {
   teamMode: "AUCTION" | "SNAKE_DRAFT" | "AUTO_BALANCE" | "MANUAL_TEAM";
   password?: string;
   allowSpectators?: boolean;
+  closeOnHostLeave?: boolean;
   hostAsSpectator?: boolean;
   discordGuildId?: string;
   // Auction settings

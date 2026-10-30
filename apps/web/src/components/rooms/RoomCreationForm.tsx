@@ -142,6 +142,8 @@ export function RoomCreationForm({
   const [isPrivate, setIsPrivate] = useState(false);
   const [password, setPassword] = useState("");
   const [allowSpectators, setAllowSpectators] = useState(true);
+  // 기본은 꺼짐 — 방장이 나가면 지금처럼 다음 참가자에게 방장을 넘긴다.
+  const [closeOnHostLeave, setCloseOnHostLeave] = useState(false);
   const [hostAsSpectator, setHostAsSpectator] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedDiscordGuildId, setSelectedDiscordGuildId] = useState("");
@@ -276,6 +278,7 @@ export function RoomCreationForm({
       teamMode: teamMode,
       password: isPrivate ? password : undefined,
       allowSpectators: allowSpectators,
+      closeOnHostLeave,
       hostAsSpectator,
       discordGuildId: selectedDiscordGuildId || undefined,
       // Auction settings
@@ -963,6 +966,27 @@ export function RoomCreationForm({
                 />
               </div>
             </div>
+            {/* 방장 퇴장 시 해산 설정 */}
+            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+              <div className="flex h-full items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    id="close-on-host-leave-label"
+                    className="text-text-primary font-medium"
+                  >
+                    방장 퇴장 시 해산
+                  </div>
+                  <div className="text-text-secondary text-xs">
+                    대기실에서 방장이 나가면 방이 사라집니다
+                  </div>
+                </div>
+                <Switch
+                  checked={closeOnHostLeave}
+                  onCheckedChange={setCloseOnHostLeave}
+                  aria-labelledby="close-on-host-leave-label"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1000,6 +1024,7 @@ export function RoomCreationForm({
             {isPrivate ? "비공개" : "공개"}
           </span>
           • <span>{allowSpectators ? "관전 허용" : "관전 비허용"}</span> •{" "}
+          {closeOnHostLeave && <span>방장 퇴장 시 해산 • </span>}
           <span>{hostAsSpectator ? "운영자 방장" : "선수 방장"}</span> •{" "}
           <span className="font-semibold text-text-primary">
             {selectedDiscordServerLabel}
