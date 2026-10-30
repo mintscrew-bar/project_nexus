@@ -45,7 +45,17 @@ const PLAYER_SCHEMA = {
     cs: { type: "integer" },
     gold: { type: "integer" },
   },
-  required: ["riotId", "champion", "kills", "deaths", "assists", "cs", "gold"],
+  // level 을 빼 두면 모델들이 레벨을 통째로 생략했다(2026-10-30 실측) — 전부 필수로 둔다
+  required: [
+    "riotId",
+    "champion",
+    "level",
+    "kills",
+    "deaths",
+    "assists",
+    "cs",
+    "gold",
+  ],
 } as const;
 
 const RESULT_SCHEMA = {
@@ -287,6 +297,8 @@ export class AdminCaptureOcrService {
         ],
         format: RESULT_SCHEMA,
         stream: false,
+        // qwen3-vl 은 기본으로 생각(thinking) 토큰을 수천 개 만들어 4~6배 느려진다
+        think: false,
         // 같은 캡처는 같은 결과가 나와야 모델끼리 비교가 된다
         options: { temperature: 0, num_ctx: 8192 },
       }),
