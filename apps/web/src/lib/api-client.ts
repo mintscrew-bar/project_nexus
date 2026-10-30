@@ -2592,6 +2592,56 @@ export interface AdminAuditLogItem {
   admin: { id: string; username: string };
 }
 
+/** 결과창 캡처 인식 실험 — Ollama 연결 상태 */
+export interface CaptureOcrStatus {
+  enabled: boolean;
+  reachable: boolean;
+  version: string | null;
+  defaultModel: string;
+  models: { name: string; sizeMb: number }[];
+  error?: string;
+}
+
+/** 비전 모델이 읽어 낸 점수판 (모델이 스키마를 어길 수 있어 전부 optional) */
+export interface CaptureOcrScoreboard {
+  durationText?: string;
+  teams?: {
+    result?: "WIN" | "LOSS" | "UNKNOWN";
+    players?: {
+      riotId?: string;
+      champion?: string;
+      level?: number;
+      kills?: number;
+      deaths?: number;
+      assists?: number;
+      cs?: number;
+      gold?: number;
+    }[];
+  }[];
+}
+
+export interface CaptureOcrJob {
+  id: string;
+  status: "running" | "done" | "error";
+  model: string;
+  startedAt: number;
+  finishedAt?: number;
+  elapsedMs: number;
+  error?: string;
+  result?: {
+    model: string;
+    tookMs: number;
+    promptTokens: number | null;
+    promptMs: number | null;
+    evalTokens: number | null;
+    evalMs: number | null;
+    imageWidth: number;
+    imageHeight: number;
+    parsed: CaptureOcrScoreboard | null;
+    raw: string;
+  };
+}
+
 /** 일별 운영 지표 한 줄. null 은 "그날은 기록이 없었다" 이지 0 이 아니다 */
 export interface AdminDailyStat {
   date: string;
@@ -2760,6 +2810,27 @@ export const adminApi = {
   sendDiscordTestAlert: async () => {
     const response = await apiClient.post("/admin/discord/test-alert");
     return response.data as { ok: boolean };
+  },
+
+  // 결과창 캡처 인식 실험 (ADMIN 전용)
+  getCaptureOcrStatus: async () => {
+    const response = await apiClient.get("/admin/capture-ocr/status");
+    return response.data as CaptureOcrStatus;
+  },
+  startCaptureOcr: async (file: File, model?: string) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    if (model) formData.append("model", model);
+    const response = await apiClient.post(
+      "/admin/capture-ocr/analyze",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" }, timeout: 60000 },
+    );
+    return response.data as { jobId: string };
+  },
+  getCaptureOcrJob: async (jobId: string) => {
+    const response = await apiClient.get(`/admin/capture-ocr/jobs/${jobId}`);
+    return response.data as CaptureOcrJob;
   },
   approveDiscordGuildLink: async (id: string) => {
     const response = await apiClient.patch(

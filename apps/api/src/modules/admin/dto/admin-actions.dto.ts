@@ -138,3 +138,12 @@ export class AddBotsDto {
   @Max(100)
   count?: number;
 }
+
+/** 결과창 캡처 인식 실험 — multipart 의 텍스트 필드. 이미지는 FileInterceptor 가 따로 받는다. */
+export class AnalyzeCaptureDto {
+  // 비우면 서버 기본 모델(CAPTURE_OCR_MODEL). Ollama 모델 이름은 `qwen2.5vl:7b` 꼴이다.
+  @IsOptional()
+  @IsString({ message: "model은 문자열이어야 합니다." })
+  @MaxLength(100, { message: "model은 100자 이하여야 합니다." })
+  model?: string;
+}

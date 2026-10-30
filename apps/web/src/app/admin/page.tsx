@@ -27,6 +27,7 @@ import { BotCleanupTab } from "@/components/admin/system/BotCleanupTab";
 import { AuditLogsTab } from "@/components/admin/system/AuditLogsTab";
 import { ErrorLogsTab } from "@/components/admin/system/ErrorLogsTab";
 import { RehearsalTab } from "@/components/admin/system/RehearsalTab";
+import { CaptureOcrTab } from "@/components/admin/system/CaptureOcrTab";
 import {
   Shield,
   Users,
@@ -45,6 +46,7 @@ import {
   Bug,
   ClipboardList,
   Trash2,
+  ScanText,
 } from "lucide-react";
 
 type Tab =
@@ -64,7 +66,8 @@ type Tab =
   | "errors"
   | "audit"
   | "botcleanup"
-  | "rehearsal";
+  | "rehearsal"
+  | "captureocr";
 
 interface TabItem {
   id: Tab;
@@ -215,6 +218,13 @@ const TAB_GROUPS: TabGroup[] = [
         scope: "LOL",
         label: "경매 리허설",
         icon: <FlaskConical className="h-4 w-4" />,
+      },
+      {
+        // 결과창 캡처 → 로컬 비전 모델 인식 실험 (롤 내전 기록용)
+        id: "captureocr",
+        scope: "LOL",
+        label: "캡처 인식 실험",
+        icon: <ScanText className="h-4 w-4" />,
       },
     ],
   },
@@ -388,6 +398,7 @@ function AdminPageInner() {
             <DiscordGuildLinksTab addToast={addToast} />
           )}
           {activeTab === "rehearsal" && <RehearsalTab addToast={addToast} />}
+          {activeTab === "captureocr" && <CaptureOcrTab addToast={addToast} />}
         </main>
       </div>
     </div>

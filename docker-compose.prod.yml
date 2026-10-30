@@ -72,6 +72,10 @@ services:
     container_name: nexus-api
     logging: *default-logging
     dns: *host-dns
+    # 캡처 인식 실험: 호스트에 띄운 Ollama(GPU)를 컨테이너에서 부르기 위한 이름.
+    # OLLAMA_BASE_URL=http://host.docker.internal:11434 로 쓴다. (docs/setup/CAPTURE_OCR.md)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     # 종료 유예. 앱은 SIGTERM 을 받으면 진행 중인 방이 끝나기를 최대 60초 기다리고
     # (app.module.ts DRAIN_TIMEOUT_MS), PM2 는 kill_timeout 75초까지 기다린다

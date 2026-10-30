@@ -14,9 +14,13 @@ import {
   Res,
   Inject,
   forwardRef,
+  UseInterceptors,
+  UploadedFile,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { Throttle } from "@nestjs/throttler";
 import { AdminStatsSnapshotService } from "./admin-stats-snapshot.service";
+import { AdminCaptureOcrService } from "./admin-capture-ocr.service";
 import { AdminService } from "./admin.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -42,6 +46,7 @@ import {
 } from "./dto/admin-query.dto";
 import {
   AddBotsDto,
+  AnalyzeCaptureDto,
   BanUserDto,
   BotCleanupDto,
   PinPostDto,
@@ -63,6 +68,7 @@ export class AdminController {
     @Inject(forwardRef(() => RoomService))
     private readonly roomService: RoomService,
     private readonly statsSnapshot: AdminStatsSnapshotService,
+    private readonly captureOcr: AdminCaptureOcrService,
   ) {}
 
   // ── Stats ──────────────────────────────────────────────────────────────────
@@ -525,6 +531,35 @@ export class AdminController {
   @Roles(UserRole.ADMIN)
   getDiscordGuildLinks() {
     return this.adminService.getDiscordGuildLinks();
+  }
+
+  // ── 결과창 캡처 인식 실험 (ADMIN 전용, 저장 안 함) ──────────────────────────
+  @Get("capture-ocr/status")
+  @Roles(UserRole.ADMIN)
+  getCaptureOcrStatus() {
+    return this.captureOcr.getStatus();
+  }
+
+  @Post("capture-ocr/analyze")
+  @Roles(UserRole.ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  // 메모리에만 두고 디스크·R2 에 저장하지 않는다.
+  // nginx client_max_body_size 가 10m 라 multipart 여유를 두고 8MB.
+  @UseInterceptors(
+    FileInterceptor("image", { limits: { fileSize: 8 * 1024 * 1024 } }),
+  )
+  analyzeCapture(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: AnalyzeCaptureDto,
+  ) {
+    // 분석은 수십 초 걸려 작업 ID 만 바로 돌려준다 — 결과는 jobs/:id 로 폴링
+    return this.captureOcr.startAnalysis(file, body?.model);
+  }
+
+  @Get("capture-ocr/jobs/:id")
+  @Roles(UserRole.ADMIN)
+  getCaptureOcrJob(@Param("id") id: string) {
+    return this.captureOcr.getJob(id);
   }
 
   @Post("discord/test-alert")

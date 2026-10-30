@@ -122,6 +122,8 @@ jobs:
           CHZZK_CLIENT_SECRET=${{ secrets.CHZZK_CLIENT_SECRET }}
           CHZZK_CALLBACK_URL=${{ secrets.CHZZK_CALLBACK_URL }}
           ENABLE_LOAD_REHEARSAL=${{ secrets.ENABLE_LOAD_REHEARSAL }}
+          OLLAMA_BASE_URL=${{ secrets.OLLAMA_BASE_URL }}
+          CAPTURE_OCR_MODEL=${{ secrets.CAPTURE_OCR_MODEL }}
           EOF
           chmod 600 /home/haru/projects/nexus/.env.production
 
