@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { ROOM_DISBANDED_MESSAGE } from "@/lib/room-disband-notice";
 import type { Socket } from "socket.io-client";
 import { roomApi } from "@/lib/api-client";
 import { createAuthenticatedSocket } from "@/lib/socket-client";
@@ -262,12 +263,10 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
     });
 
     // 방장이 나가 방이 해산됐다. 방은 DB 에서 이미 지워졌으므로 재입장(rejoin)하지
-    // 않게 소켓을 끊고, 로비 화면은 에러 상태로 해산 사실과 목록 링크를 보여준다.
+    // 않게 소켓을 끊는다. 로비 화면은 이 에러 코드를 보고 토스트를 띄우고 목록으로 보낸다.
     socket.on("room-disbanded", () => {
       get().disconnect({ skipLeave: true });
-      set({
-        error: "ROOM_DISBANDED::방장이 나가서 방이 해산되었습니다.",
-      });
+      set({ error: `ROOM_DISBANDED::${ROOM_DISBANDED_MESSAGE}` });
     });
 
     socket.on("participant-kicked", (data: { participantId: string }) => {

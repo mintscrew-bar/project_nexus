@@ -12,6 +12,7 @@ import { StreamerService } from "../streamer/streamer.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { StatsService } from "../stats/stats.service";
 import { RedisService } from "../redis/redis.service";
+import { NotificationService } from "../notification/notification.service";
 
 describe("RoomService", () => {
   let service: RoomService;
@@ -19,6 +20,7 @@ describe("RoomService", () => {
   let shutdownService: any;
   let balanceScores: any;
   let redis: any;
+  let notificationService: any;
 
   const baseDto = {
     name: "테스트 방",
@@ -98,6 +100,7 @@ describe("RoomService", () => {
     shutdownService = {
       isShuttingDown: jest.fn().mockReturnValue(false),
     };
+    notificationService = { create: jest.fn().mockResolvedValue({}) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -120,6 +123,7 @@ describe("RoomService", () => {
           useValue: { enqueueChampionScanForPuuids: jest.fn() },
         },
         { provide: RedisService, useValue: redis },
+        { provide: NotificationService, useValue: notificationService },
       ],
     }).compile();
 
@@ -253,6 +257,12 @@ describe("RoomService", () => {
 
       expect(prisma.room.update).not.toHaveBeenCalled();
       expect(deleteRoomData).toHaveBeenCalledWith("old-room");
+      expect(notificationService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-2",
+          data: { kind: "ROOM_DISBANDED", roomId: "old-room" },
+        }),
+      );
     });
 
     it("관전 허용 방이 만석이면 게임 계정 없이 관전자로 자동 입장한다", async () => {
@@ -332,6 +342,38 @@ describe("RoomService", () => {
       expect(result).toMatchObject({ roomDeleted: true, disbanded: true });
       expect(deleteRoomData).toHaveBeenCalledWith("room-1");
       expect(prisma.room.update).not.toHaveBeenCalled();
+    });
+
+    it("해산하면 방장·봇을 뺀 남은 참가자에게만 알림을 남긴다", async () => {
+      const room = makeRoom();
+      room.participants.push({
+        id: "p-bot",
+        userId: "bot",
+        user: { username: "testbot_1" },
+      });
+      prisma.room.findUnique.mockResolvedValue(room);
+
+      await service.leaveRoom("host", "room-1");
+
+      expect(notificationService.create).toHaveBeenCalledTimes(1);
+      expect(notificationService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-2",
+          type: "SYSTEM",
+          link: "/lol/tournaments",
+          data: { kind: "ROOM_DISBANDED", roomId: "room-1" },
+        }),
+      );
+    });
+
+    it("옵션이 꺼져 있으면 알림을 남기지 않는다", async () => {
+      prisma.room.findUnique.mockResolvedValue(
+        makeRoom({ closeOnHostLeave: false }),
+      );
+
+      await service.leaveRoom("host", "room-1");
+
+      expect(notificationService.create).not.toHaveBeenCalled();
     });
 
     it("옵션이 꺼져 있으면 다음 참가자에게 방장을 넘긴다", async () => {

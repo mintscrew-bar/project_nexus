@@ -45,6 +45,7 @@ import { RedisService } from "../redis/redis.service";
 import { parseStoredInvite, roomInviteKey } from "./room-invite.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { StatsService } from "../stats/stats.service";
+import { NotificationService } from "../notification/notification.service";
 import { BALANCE_ROLES } from "../common/balance-score.util";
 import { recordRoomOutcome } from "../common/room-outcome.util";
 import type { UpdateRoomDto } from "./dto/update-room.dto";
@@ -181,6 +182,9 @@ export class RoomService {
     private readonly redis: RedisService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
+    // 방장 퇴장 해산 알림(종)용. 알림이 없어도 방 동작은 그대로라 선택 주입이다.
+    @Optional()
+    private readonly notificationService?: NotificationService,
   ) {
     this.discordBotService = discordBot;
     this.discordVoiceService = discordVoice;
@@ -1941,6 +1945,8 @@ export class RoomService {
       });
 
       const roomsToDelete: string[] = [];
+      // 해산한 방 — 삭제 뒤에는 방 이름·참가자를 다시 읽을 수 없어 여기서 남겨 둔다.
+      const disbandedRooms: any[] = [];
       for (const participation of previousWaitingParticipations as any[]) {
         const previousRoom = participation.room;
         const remainingParticipants = previousRoom.participants.filter(
@@ -1962,9 +1968,11 @@ export class RoomService {
         }
 
         // 방장 퇴장 시 해산 옵션 — 다른 방으로 옮겨 가는 것도 퇴장이다.
-        // 남은 참가자 알림은 게이트웨이가 "방이 사라졌다"를 보고 보낸다.
+        // 로비에 있는 참가자에게는 게이트웨이가 "방이 사라졌다"를 보고 알리고,
+        // 알림(종)은 삭제 뒤 notifyRoomDisbanded 가 남긴다.
         if (this.shouldDisbandOnLeave(previousRoom, userId)) {
           roomsToDelete.push(previousRoom.id);
+          disbandedRooms.push(previousRoom);
           continue;
         }
 
@@ -1988,6 +1996,7 @@ export class RoomService {
           (participation: any) => participation.roomId,
         ),
         roomsToDelete,
+        disbandedRooms,
       };
     });
 
@@ -2002,6 +2011,9 @@ export class RoomService {
           `[Room] Failed to clean empty previous room ${previousRoomId} after room switch: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
+    }
+    for (const disbandedRoom of switchResult.disbandedRooms) {
+      this.notifyRoomDisbanded(disbandedRoom, userId);
     }
 
     // 들어왔으니 이 방 초대는 다 썼다. 대기 탭에서 사라지게 지운다.
@@ -2312,6 +2324,7 @@ export class RoomService {
         await this.discordVoiceService.deleteRoomChannels(roomId);
       }
       await this.deleteRoomData(roomId);
+      this.notifyRoomDisbanded(room, userId);
       return {
         message: "Room disbanded (host left)",
         username,
@@ -2355,6 +2368,47 @@ export class RoomService {
       room.status === RoomStatus.WAITING &&
       room.hostId === leavingUserId
     );
+  }
+
+  /**
+   * 해산된 방의 남은 참가자에게 알림(종)을 남긴다.
+   * 로비를 보고 있지 않던 사람(다른 페이지로 이동했거나 오프라인)도 나중에 알 수 있게
+   * 기록으로 남기고, 접속 중이면 알림 소켓을 타고 바로 토스트로 뜬다.
+   * 방 퇴장은 이미 끝난 뒤라 알림 실패는 로그만 남기고 삼킨다.
+   */
+  private notifyRoomDisbanded(
+    room: {
+      id: string;
+      name: string;
+      gameTitle?: GameTitle | null;
+      participants: Array<{ userId: string; user?: { username?: string } }>;
+    },
+    hostUserId: string,
+  ): void {
+    if (!this.notificationService) return;
+    const recipients = room.participants.filter(
+      (p) =>
+        p.userId !== hostUserId &&
+        !/^testbot_\d+$/.test(p.user?.username ?? ""),
+    );
+    const slug = getGame(room.gameTitle ?? GameTitle.LOL).slug;
+    for (const recipient of recipients) {
+      void this.notificationService
+        .create({
+          userId: recipient.userId,
+          type: "SYSTEM",
+          title: "방 해산",
+          message: `방장이 나가서 '${room.name}' 방이 해산되었습니다.`,
+          link: `/${slug}/tournaments`,
+          // 웹은 이 kind 를 보고 알림을 토스트로도 띄운다.
+          data: { kind: "ROOM_DISBANDED", roomId: room.id },
+        })
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `[Room] 해산 알림 실패 (room ${room.id}, user ${recipient.userId}): ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
+    }
   }
 
   /**

@@ -1343,10 +1343,20 @@ export class RoomGateway
    * 방장 퇴장으로 해산된 방을 알린다.
    * DB 에서는 이미 지워졌지만 Socket.IO 룸은 메모리에 남아 있어 남은 참가자에게 닿는다.
    * 클라는 이 이벤트를 받으면 연결을 끊고 내전 목록으로 돌아간다.
+   * departingUserId: 나간 방장. REST 퇴장은 방장 소켓이 아직 룸에 붙어 있을 때
+   * 호출되므로, 방장에게 "방장이 나가서 해산" 안내가 가지 않게 그 소켓은 뺀다.
    */
-  notifyRoomDisbanded(roomId: string) {
+  notifyRoomDisbanded(roomId: string, departingUserId?: string) {
+    const departingSocketIds = departingUserId
+      ? [
+          ...(this.roomUserSockets.get(
+            this.getRoomUserSocketKey(roomId, departingUserId),
+          ) ?? []),
+        ]
+      : [];
     this.server
       .to(roomId)
+      .except(departingSocketIds)
       .emit("room-disbanded", { roomId, reason: "HOST_LEFT" });
     this.broadcastRoomDelta("remove", roomId);
   }

@@ -14,6 +14,7 @@ import {
 } from "@nexus/types";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLobbyStore } from "@/stores/lobby-store";
+import { announceRoomDisbanded } from "@/lib/room-disband-notice";
 import { useAuthStore } from "@/stores/auth-store";
 import { useFriendStore } from "@/stores/friend-store";
 import { ChatBox } from "@/components/domain/ChatBox";
@@ -203,6 +204,14 @@ export default function TournamentLobbyPage() {
     // 수 있다. 모달은 체크리스트의 최신 계산으로 돌아간다.
     setServerStartBlock(null);
   }, [room?.participants, room?.status, room?.teamMode]);
+
+  // 방장 퇴장으로 방이 해산됐다 — 안내 토스트를 띄우고 내전 목록으로 보낸다.
+  useEffect(() => {
+    if (!error?.startsWith("ROOM_DISBANDED::") || hasRedirected.current) return;
+    hasRedirected.current = true;
+    announceRoomDisbanded(roomId);
+    router.replace(`${gamePrefix}/tournaments`);
+  }, [error, roomId, router, gamePrefix]);
 
   useEffect(() => {
     if (!error?.startsWith("ACTIVE_ROOM_EXISTS::")) return;

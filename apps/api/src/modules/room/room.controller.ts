@@ -233,7 +233,7 @@ export class RoomController {
     if (result?.roomDeleted) {
       if (result.disbanded) {
         // 방장 퇴장 해산 — 남은 참가자에게 알리고 목록에서도 지운다.
-        this.roomGateway.notifyRoomDisbanded(roomId);
+        this.roomGateway.notifyRoomDisbanded(roomId, userId);
       } else {
         this.roomGateway.broadcastRoomDelta("remove", roomId);
       }

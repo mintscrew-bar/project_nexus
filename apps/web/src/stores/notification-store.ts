@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { toast } from "@/stores/toast-store";
+import { announceRoomDisbanded } from "@/lib/room-disband-notice";
 import { notificationApi } from "@/lib/api-client";
 import { useFriendStore, type RoomInviteItem } from "@/stores/friend-store";
 import {
@@ -56,6 +57,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         notifications: [notification, ...state.notifications],
         unreadCount: state.unreadCount + 1,
       }));
+      // 방 해산은 종 숫자만으로는 놓치기 쉽다. 어느 페이지에 있든 토스트로도 알린다.
+      if (notification.data?.kind === "ROOM_DISBANDED") {
+        announceRoomDisbanded(notification.data.roomId, notification.message);
+      }
     });
 
     // 친구가 보낸 내전 초대 — 종이 아니라 친구창(대기 탭)과 팝업이 받는다.
