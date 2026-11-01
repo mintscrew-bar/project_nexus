@@ -11,7 +11,9 @@ import {
  *
  * 팀 채널이 `userLimit: 5`(롤 고정), 대기실이 `50` 고정이던 시절이 있었다.
  * 100명 배틀로얄은 절반이 대기실에 못 들어갔다.
- * 여기서 검증하는 건 방 형태 → 정원 계산이다.
+ * 여기서 검증하는 건 방 형태 → 팀 채널 정원 계산이다.
+ * 대기실은 제한 없음(0)이라 여기서 다루지 않는다
+ * (discord-voice.service.spec 의 createRoomChannels 테스트 참고).
  *
  * 배그는 인게임 스쿼드가 4인이고, **그 스쿼드가 곧 한 팀이다.**
  * 편을 몇 개로 나눌지(16명이면 2대2일 수도, 1대1대1대1일 수도)는 방에서
@@ -22,8 +24,6 @@ describe("음성채널 정원", () => {
   /** 서비스가 쓰는 것과 같은 계산 */
   const teamChannelLimit = (teamSize: number) =>
     Math.min(99, Math.max(1, teamSize));
-  const lobbyLimit = (maxParticipants: number) =>
-    maxParticipants > 99 ? 0 : maxParticipants;
 
   it("배그는 모드와 무관하게 4인 스쿼드가 한 팀", () => {
     for (const mode of ["KILL_MATCH", "BATTLE_ROYALE"] as const) {
@@ -54,13 +54,6 @@ describe("음성채널 정원", () => {
         teamSizeForRoom({ gameTitle: "LOL", maxParticipants: 40 }),
       ),
     ).toBe(5);
-  });
-
-  it("대기실은 방 전원이 들어간다", () => {
-    expect(lobbyLimit(10)).toBe(10);
-    expect(lobbyLimit(32)).toBe(32);
-    // 디스코드 상한이 99라 그 이상은 제한 없음(0)으로 둔다.
-    expect(lobbyLimit(100)).toBe(0);
   });
 
   it("정원이 0이어도 채널 정원은 1 이상", () => {

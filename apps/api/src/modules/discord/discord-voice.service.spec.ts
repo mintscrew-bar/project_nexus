@@ -516,4 +516,55 @@ describe("DiscordVoiceService.getRoomAnnounceTargets", () => {
       expect(deleted).toEqual([]);
     });
   });
+
+  describe("createRoomChannels 대기실 정원", () => {
+    /** 채널 생성 옵션만 모아 보는 최소 하네스 */
+    const makeService = () => {
+      const created: any[] = [];
+      const guild = {
+        id: "guild-1",
+        channels: {
+          create: jest.fn(async (options: any) => {
+            created.push(options);
+            return { id: `new-${created.length}` };
+          }),
+        },
+      };
+      const prisma: any = {
+        roomDiscordChannel: { create: jest.fn().mockResolvedValue({}) },
+      };
+      const service = new DiscordVoiceService(
+        { get: jest.fn() } as any,
+        prisma as any,
+      );
+      service.setClient({
+        guilds: { fetch: jest.fn().mockResolvedValue(guild) },
+      } as any);
+      jest
+        .spyOn(service as any, "resolveRoomGuildId")
+        .mockResolvedValue("guild-1");
+      jest.spyOn(service as any, "delay").mockResolvedValue(undefined);
+      return { service, created };
+    };
+
+    it.each([10, 20, 100])(
+      "정원 %i명 방이어도 대기실은 제한 없음(0)",
+      async (maxParticipants) => {
+        // 운영자 방장·관전자는 선수 정원에 들어가지 않는다.
+        // 대기실을 정원만큼 막으면 20명 방에서 운영자 방장이 못 들어온다.
+        const { service, created } = makeService();
+
+        await service.createRoomChannels("room-1", "테스트 방", 2, {
+          teamSize: 5,
+          maxParticipants,
+        });
+
+        const lobby = created.find((o) => o.name === "── 대기실 ──");
+        expect(lobby.userLimit).toBe(0);
+        // 팀 채널 정원은 그대로 유지한다.
+        const teams = created.filter((o) => o.name.startsWith("┊"));
+        expect(teams.every((o) => o.userLimit === 5)).toBe(true);
+      },
+    );
+  });
 });

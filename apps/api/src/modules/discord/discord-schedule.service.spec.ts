@@ -126,7 +126,7 @@ describe("DiscordScheduleService.processScheduledRooms", () => {
 
     await service.processScheduledRooms();
 
-    // 채널 정원은 게임·모드를 따라간다. 롤은 팀 5인이고 대기실은 방 정원만큼.
+    // 팀 채널 정원은 게임·모드를 따라간다. 롤은 팀 5인 (대기실은 제한 없음).
     expect(voiceService.createRoomChannels).toHaveBeenCalledWith(
       "room-1",
       "9월 1일 내전",

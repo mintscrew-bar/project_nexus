@@ -388,14 +388,16 @@ export class DiscordVoiceService {
       }
 
       // Create lobby channel first (생성 순서로 맨 위 고정)
-      // 대기실은 방 전원이 들어갈 수 있어야 한다. 50 고정이면 100명 방의
-      // 절반이 못 들어간다. 디스코드 상한이 99라 그 이상은 제한 없음(0)으로 둔다.
-      const roomCapacity = shape?.maxParticipants ?? 50;
+      // 대기실은 인원 제한을 두지 않는다(userLimit 0 = 제한 없음).
+      // 예전에는 선수 정원(maxParticipants)만큼 막았는데, 정원은 선수만 센다.
+      // 방장이 운영자(관전) 형태로 참가하면 20명 방에 21명이 모여야 하는데
+      // 대기실이 20명에서 막혀 한 명이 못 들어왔다. 관전자도 같은 문제다.
+      // 팀 채널은 그대로 스쿼드 크기로 제한한다.
       const lobbyChannel = await guild.channels.create({
         name: "── 대기실 ──",
         type: ChannelType.GuildVoice,
         parent: category.id,
-        userLimit: roomCapacity > 99 ? 0 : roomCapacity,
+        userLimit: 0,
       });
 
       await this.prisma.roomDiscordChannel.create({
