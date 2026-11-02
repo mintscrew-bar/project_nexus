@@ -24,6 +24,12 @@ export interface ServerStartBlock {
 
 type NudgeReason = "READY" | "VOICE";
 
+/** 방장 본인이 막고 있을 때 직접 해야 할 일 */
+const HOST_SELF_ACTION: Record<NudgeReason, string> = {
+  READY: "준비 완료를 눌러주세요",
+  VOICE: "Discord 대기실 음성 채널에 들어와 주세요",
+};
+
 /** 서버 사유 코드 → 체크리스트 칸 id */
 const REASON_TO_REQUIREMENT: Record<ServerStartBlock["reason"], string> = {
   READY: "ready",
@@ -184,20 +190,28 @@ export function StartBlockedModal({
     setNudge((prev) => ({ ...prev, [reason]: { sending: true } }));
     try {
       const result = await roomApi.nudge(roomId, reason);
+      // 방장은 DM 대상이 아니다. 방장 본인이 막고 있으면 그걸 먼저 알려준다.
+      const hostNote = result.hostBlocking
+        ? `방장님도 ${HOST_SELF_ACTION[reason]}.`
+        : "";
       setNudge((prev) => ({
         ...prev,
         [reason]: {
           sending: false,
           message:
             result.targets === 0
-              ? "부를 사람이 없습니다. 방금 해결된 것 같아요."
-              : result.dmDelivered === 0
-                ? `${result.targets}명 모두 디스코드 DM을 받을 수 없습니다(연동 안 함·DM 차단).`
-                : `디스코드 DM ${result.dmDelivered}명에게 보냈습니다${
-                    result.dmDelivered < result.targets
-                      ? ` (${result.targets - result.dmDelivered}명은 DM을 받을 수 없음)`
-                      : ""
-                  }.`,
+              ? result.hostBlocking
+                ? `남은 사람은 방장님 본인입니다. ${HOST_SELF_ACTION[reason]}.`
+                : "부를 사람이 없습니다. 방금 해결된 것 같아요."
+              : `${
+                  result.dmDelivered === 0
+                    ? `${result.targets}명 모두 디스코드 DM을 받을 수 없습니다(연동 안 함·DM 차단).`
+                    : `디스코드 DM ${result.dmDelivered}명에게 보냈습니다${
+                        result.dmDelivered < result.targets
+                          ? ` (${result.targets - result.dmDelivered}명은 DM을 받을 수 없음)`
+                          : ""
+                      }.`
+                } ${hostNote}`.trim(),
           until:
             result.cooldownSeconds > 0
               ? Date.now() + result.cooldownSeconds * 1000

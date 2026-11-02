@@ -949,6 +949,8 @@ export const roomApi = {
     targets: number;
     dmDelivered: number;
     cooldownSeconds: number;
+    /** 방장 본인도 이 조건을 막고 있다(방장은 DM 대상이 아니다) */
+    hostBlocking?: boolean;
   }> => {
     const response = await apiClient.post(`/rooms/${roomId}/nudge`, {
       reason,

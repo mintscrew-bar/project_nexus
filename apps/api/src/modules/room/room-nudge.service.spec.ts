@@ -171,6 +171,8 @@ describe("RoomNudgeService", () => {
         targets: 1,
         dmDelivered: 1,
         cooldownSeconds: 60,
+        // 기본 방은 방장도 준비 전이다. DM 은 방장에게 보내지 않는다.
+        hostBlocking: true,
       });
       expect(discordBot.sendDirectMessages).toHaveBeenCalledWith(
         ["d-u1"],
@@ -202,6 +204,23 @@ describe("RoomNudgeService", () => {
       const result = await service.nudge("host", "room-1", "READY");
 
       expect(result.targets).toBe(0);
+      expect(redis.incr).not.toHaveBeenCalled();
+      expect(discordBot.sendDirectMessages).not.toHaveBeenCalled();
+    });
+
+    it("남은 사람이 방장 본인뿐이면 DM 없이 hostBlocking 으로 알려준다", async () => {
+      // 2026-11-02 제보: 봇 9명 + 방장 방에서 방장만 대기실 밖이었는데
+      // "부를 사람이 없습니다. 방금 해결된 것 같아요."가 떴다.
+      const { service, redis, discordBot } = setup({ missingVoice: ["방장"] });
+
+      const result = await service.nudge("host", "room-1", "VOICE");
+
+      expect(result).toEqual({
+        targets: 0,
+        dmDelivered: 0,
+        cooldownSeconds: 0,
+        hostBlocking: true,
+      });
       expect(redis.incr).not.toHaveBeenCalled();
       expect(discordBot.sendDirectMessages).not.toHaveBeenCalled();
     });

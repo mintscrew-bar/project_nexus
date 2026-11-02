@@ -56,6 +56,11 @@ export interface RoomNudgeResult {
   dmDelivered: number;
   /** 다음 호출까지 남은 시간(초) */
   cooldownSeconds: number;
+  /**
+   * 방장 본인도 이 조건을 막고 있다. 방장은 호출 대상이 아니라서 남은 사람이
+   * 방장뿐이면 targets 가 0 이 된다 — 화면이 "방장님이 직접 하셔야 한다"고 알려준다.
+   */
+  hostBlocking: boolean;
 }
 
 type LoadedRoom = NonNullable<
@@ -149,13 +154,19 @@ export class RoomNudgeService {
   ): Promise<RoomNudgeResult> {
     const room = await this.loadHostRoom(hostId, roomId);
     const candidates = this.candidates(room, hostId);
-    const targets =
+    // 방장도 같이 판정한다. 시작 검증은 방장도 준비·대기실 입장을 요구하는데,
+    // 방장만 남았을 때 "부를 사람이 없다"고만 하면 무엇이 막혔는지 모른다.
+    const host = room.participants.find((p) => p.userId === hostId);
+    const judged = host ? [...candidates, host] : candidates;
+    const blockers =
       reason === "READY"
-        ? candidates.filter((p) => !p.isReady)
-        : await this.voiceMissing(roomId, candidates);
+        ? judged.filter((p) => !p.isReady)
+        : await this.voiceMissing(roomId, judged);
+    const hostBlocking = blockers.some((p) => p.userId === hostId);
+    const targets = blockers.filter((p) => p.userId !== hostId);
     if (targets.length === 0) {
-      // 부를 사람이 없으면 쿨다운도 걸지 않는다. 막 해결된 경우다.
-      return { targets: 0, dmDelivered: 0, cooldownSeconds: 0 };
+      // 부를 사람이 없으면 쿨다운도 걸지 않는다. 막 해결됐거나 방장 본인만 남았다.
+      return { targets: 0, dmDelivered: 0, cooldownSeconds: 0, hostBlocking };
     }
 
     const key = `room-nudge:${roomId}:${reason}`;
@@ -205,6 +216,7 @@ export class RoomNudgeService {
       targets: targets.length,
       dmDelivered,
       cooldownSeconds: ROOM_NUDGE_COOLDOWN_SECONDS,
+      hostBlocking,
     };
   }
 
@@ -268,10 +280,9 @@ export class RoomNudgeService {
    * 대기실에 없는 선수. 시작 검증(validateVoicePresence)과 같은 판정이되,
    * 준비 안 한 사람도 포함한다 — 준비를 누르는 순간 또 막히지 않게 미리 부른다.
    */
-  private async voiceMissing<T extends { user: { username: string } }>(
-    roomId: string,
-    candidates: T[],
-  ): Promise<T[]> {
+  private async voiceMissing<
+    T extends { userId: string; user: { username: string } },
+  >(roomId: string, candidates: T[]): Promise<T[]> {
     if (!this.discordVoice?.validateVoicePresence) return [];
     const { missingUsernames } = await this.discordVoice.validateVoicePresence(
       roomId,
