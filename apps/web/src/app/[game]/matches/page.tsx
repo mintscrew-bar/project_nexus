@@ -239,15 +239,20 @@ function LolMatchesPage() {
     <div className="min-h-screen">
       <MatchesTour />
       {/* Hero Section */}
-      <div className="relative isolate overflow-hidden border-b border-white/[0.07] bg-[#0b0c11]">
+      {/*
+        히어로 자체에는 overflow-hidden 을 걸지 않는다. 걸면 검색 자동완성
+        드롭다운이 히어로 아래 경계에서 잘린다. 넘치는 건 배경 장식(빛 번짐)뿐이라
+        장식만 별도 래퍼에서 잘라 낸다.
+        z-10 은 드롭다운이 아래 광고·섹션 위로 그려지게 하려는 것이다.
+      */}
+      <div className="relative isolate z-10 border-b border-white/[0.07] bg-[#0b0c11]">
         <div
           aria-hidden="true"
-          className="absolute inset-0 -z-20 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:48px_48px]"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute left-1/2 top-0 -z-10 h-[420px] w-[820px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/20 blur-[140px]"
-        />
+          className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+        >
+          <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:48px_48px]" />
+          <div className="absolute left-1/2 top-0 h-[420px] w-[820px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/20 blur-[140px]" />
+        </div>
         <div className="container mx-auto max-w-[1480px] px-4 py-12 text-center md:px-6 md:py-20">
           <div className="mx-auto mb-5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-violet-200/75">
             <Sparkles className="h-3.5 w-3.5" />
