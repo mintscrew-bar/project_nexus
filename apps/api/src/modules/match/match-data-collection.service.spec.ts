@@ -1,4 +1,5 @@
 import {
+  hasRosterMajority,
   isRiotCustomGame,
   MatchDataCollectionService,
 } from "./match-data-collection.service";
@@ -579,7 +580,8 @@ describe("MatchDataCollectionService", () => {
       );
     };
 
-    it("기대 참가자가 일부만 있는 후보를 거부한다", () => {
+    // 전원 일치 → 과반수 일치로 바꿨다(2026-11-01 4판 누락). 부계정·대타 한두 명은 허용한다.
+    it("기대 참가자가 과반수 있으면 받고, 절반 이하면 거부한다", () => {
       const expected = [
         { puuid: "a1", userId: "ua1", teamId: "a" },
         { puuid: "a2", userId: "ua2", teamId: "a" },
@@ -587,10 +589,19 @@ describe("MatchDataCollectionService", () => {
         { puuid: "b2", userId: "ub2", teamId: "b" },
       ];
 
+      // 3/4 — b2 가 부계정으로 들어온 경우
       expect(
         score(expected, [
           { puuid: "a1", teamId: 100 },
           { puuid: "a2", teamId: 100 },
+          { puuid: "b1", teamId: 200 },
+        ]).valid,
+      ).toBe(true);
+
+      // 2/4 — 절반은 과반수가 아니다
+      expect(
+        score(expected, [
+          { puuid: "a1", teamId: 100 },
           { puuid: "b1", teamId: 200 },
         ]).valid,
       ).toBe(false);
@@ -783,6 +794,118 @@ describe("MatchDataCollectionService", () => {
       await expect(call).rejects.toThrow(/참가자 매핑 불완전/);
       expect(tx.matchParticipant.create).not.toHaveBeenCalled();
       expect(matchUpdate).not.toHaveBeenCalled();
+    });
+
+    // 2026-11-01: Riot 게임을 정확히 찾고도 9/10·8/10 이라 4판이 통째로 버려졌다.
+    // 과반수가 같은 팀 배치로 있으면 그 사람들 기록만 저장한다.
+    describe("과반수 일치 (10명 로스터)", () => {
+      const runTenSave = async (presentCount: number) => {
+        // 0~4 → a팀(블루), 5~9 → b팀(레드)
+        const roster = Array.from({ length: 10 }, (_, i) => ({
+          userId: `user-${i}`,
+          puuid: `puuid-${i}`,
+          teamIdSnapshot: i < 5 ? "a" : "b",
+        }));
+        const storedMatch = {
+          id: "match-10",
+          teamAId: null,
+          teamBId: null,
+          teamAIdSnapshot: "a",
+          teamBIdSnapshot: "b",
+          teamA: null,
+          teamB: null,
+          rosterSnapshots: roster,
+        };
+        // 앞에서부터 presentCount 명만 게임에 있고, 나머지 자리는 부계정·대타
+        const participants = roster.map((r, i) => ({
+          puuid: i < presentCount ? r.puuid : `stranger-${i}`,
+          teamId: i < 5 ? 100 : 200,
+        }));
+
+        const matchUpdate = jest.fn().mockResolvedValue(undefined);
+        const tx = {
+          matchParticipant: {
+            deleteMany: jest.fn().mockResolvedValue(undefined),
+            create: jest.fn().mockResolvedValue(undefined),
+          },
+          matchTeamStats: {
+            deleteMany: jest.fn().mockResolvedValue(undefined),
+            create: jest.fn().mockResolvedValue(undefined),
+          },
+          match: { update: matchUpdate },
+        };
+        const service = new MatchDataCollectionService(
+          {
+            match: {},
+            $transaction: jest.fn(async (cb: (t: unknown) => unknown) =>
+              cb(tx),
+            ),
+            statsRecomputeQueue: {
+              upsert: jest.fn().mockResolvedValue(undefined),
+            },
+          } as never,
+          {} as never,
+          { updateRanking: jest.fn().mockResolvedValue(undefined) } as never,
+        );
+        const call = (
+          service as never as {
+            saveMatchData: (
+              id: string,
+              m: unknown,
+              d: unknown,
+              riotId?: string,
+            ) => Promise<void>;
+          }
+        ).saveMatchData(
+          "match-10",
+          storedMatch,
+          { info: { participants, teams: [] } },
+          "KR_10",
+        );
+        return { call, tx, matchUpdate };
+      };
+
+      it("8/10 이면 게임에 있던 8명 기록만 저장하고 확정한다", async () => {
+        const { call, tx, matchUpdate } = await runTenSave(8);
+
+        await expect(call).resolves.toBeUndefined();
+        expect(tx.matchParticipant.create).toHaveBeenCalledTimes(8);
+        // 로스터에 없는 사람(부계정·대타)은 저장하지 않는다
+        expect(tx.matchParticipant.create).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ puuid: "stranger-8" }),
+          }),
+        );
+        expect(matchUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              dataCollected: true,
+              riotMatchId: "KR_10",
+            }),
+          }),
+        );
+      });
+
+      it("6/10 도 과반수라 저장한다", async () => {
+        const { call, tx } = await runTenSave(6);
+        await expect(call).resolves.toBeUndefined();
+        expect(tx.matchParticipant.create).toHaveBeenCalledTimes(6);
+      });
+
+      it("5/10 은 과반수가 아니라 저장하지 않는다", async () => {
+        const { call, tx, matchUpdate } = await runTenSave(5);
+        await expect(call).rejects.toThrow(/과반수 미만/);
+        expect(tx.matchParticipant.create).not.toHaveBeenCalled();
+        expect(matchUpdate).not.toHaveBeenCalled();
+      });
+    });
+
+    it("hasRosterMajority: 절반 초과일 때만 참", () => {
+      expect(hasRosterMajority(6, 10)).toBe(true);
+      expect(hasRosterMajority(5, 10)).toBe(false);
+      expect(hasRosterMajority(2, 3)).toBe(true);
+      expect(hasRosterMajority(1, 2)).toBe(false);
+      expect(hasRosterMajority(0, 0)).toBe(false);
     });
 
     it("라이엇 계정 연동 멤버가 없으면 빈 전적을 완료 처리하지 않는다", async () => {

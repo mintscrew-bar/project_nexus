@@ -42,6 +42,21 @@ const COLLECT_BASE_BACKOFF_MS = 15 * 60 * 1000; // 15분
 /** 백오프 상한 */
 const COLLECT_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000; // 24시간
 
+/**
+ * Riot 게임에 로스터의 "과반수"가 있으면 같은 경기로 본다.
+ *
+ * 예전에는 연동 참가자 **전원**이 있어야 했다. 그런데 2026-11-01 내전 4판이 Riot 게임을
+ * 정확히 찾고도(커스텀·팀 배치 일치·종료 1~4분 차) 9/10·8/10 이라 전부 버려졌다.
+ * 한두 명이 부계정으로 들어오거나 대타가 뛰면 전원 일치는 깨진다.
+ *
+ * 부계정까지 쫓아가 매칭하지는 않는다 — 빠진 사람은 개인 기록(KDA 등)만 비고,
+ * 승패·라인 전적은 Nexus 자체 데이터라 그대로 집계된다.
+ * 오매칭은 커스텀 여부 + 매칭된 사람 전원의 팀 배치 일치 + 시간창이 막는다.
+ */
+export function hasRosterMajority(matched: number, expected: number): boolean {
+  return expected > 0 && matched * 2 > expected;
+}
+
 export function isRiotCustomGame(matchData: MatchDto): boolean {
   return (
     matchData.info.queueId === 0 ||
@@ -186,7 +201,7 @@ export class MatchDataCollectionService {
     }
 
     const expectedPuuidCount = expectedMembers.length;
-    const requiredMatchedCount = expectedPuuidCount;
+    const majorityOk = hasRosterMajority(matchedPuuidCount, expectedPuuidCount);
     const teamAlignedCount = Math.max(blueToA + redToB, blueToB + redToA);
     const teamAlignmentRatio =
       matchedPuuidCount > 0 ? teamAlignedCount / matchedPuuidCount : 0;
@@ -206,7 +221,7 @@ export class MatchDataCollectionService {
         `notCustomGame(queueId=${queueId},gameType=${matchData.info.gameType})`,
       );
     }
-    if (matchedPuuidCount < requiredMatchedCount) {
+    if (!majorityOk) {
       reasons.push(`matched=${matchedPuuidCount}/${expectedPuuidCount}`);
     }
     if (!teamOk) {
@@ -233,11 +248,7 @@ export class MatchDataCollectionService {
       matchId,
       matchData,
       score,
-      valid:
-        customGameOk &&
-        matchedPuuidCount >= requiredMatchedCount &&
-        teamOk &&
-        timeOk,
+      valid: customGameOk && majorityOk && teamOk && timeOk,
       sampleHits,
       matchedPuuidCount,
       expectedPuuidCount,
@@ -425,9 +436,9 @@ export class MatchDataCollectionService {
       const getLiveTeamId = (teamId: string) =>
         teamId === match.teamAId || teamId === match.teamBId ? teamId : null;
 
-      // Riot 응답에 우리가 기대한 참가자가 전원 들어있는지 먼저 확인한다.
-      // 일부만 매핑된 채로 저장하면 7명짜리 불완전 전적이 dataCollected=true로
-      // 확정되어 재수집 대상에서 영구히 빠진다. 그럴 바엔 저장하지 않고 재시도한다.
+      // Riot 응답에 우리가 기대한 참가자가 과반수 들어있는지 먼저 확인한다.
+      // 과반수면 부분 저장을 허용한다 — 빠진 사람(부계정·대타)은 개인 기록만 없고
+      // dataCollected=true 로 확정돼 재수집 대상에서 빠진다. (hasRosterMajority 참고)
       // (Riot 참가자 중 Nexus 계정이 없는 사람은 애초에 기대 대상이 아니므로 무시)
       const expectedPuuids = new Set(puuidToUser.keys());
       const matchedPuuids = new Set(
@@ -445,13 +456,19 @@ export class MatchDataCollectionService {
         );
       }
 
-      if (matchedPuuids.size < expectedPuuids.size) {
-        const missing = [...expectedPuuids].filter(
-          (puuid) => !matchedPuuids.has(puuid),
-        );
+      const missing = [...expectedPuuids].filter(
+        (puuid) => !matchedPuuids.has(puuid),
+      );
+      if (!hasRosterMajority(matchedPuuids.size, expectedPuuids.size)) {
         throw new Error(
           `참가자 매핑 불완전: ${matchedPuuids.size}/${expectedPuuids.size} ` +
-            `(누락 PUUID: ${missing.join(", ")}) — 부분 저장을 막기 위해 중단`,
+            `(누락 PUUID: ${missing.join(", ")}) — 과반수 미만이라 중단`,
+        );
+      }
+      if (missing.length > 0) {
+        this.logger.warn(
+          `[saveMatchData] 과반수 일치로 부분 저장 ${matchedPuuids.size}/${expectedPuuids.size} ` +
+            `matchId=${matchId} (누락 PUUID: ${missing.join(", ")})`,
         );
       }
 
@@ -472,10 +489,11 @@ export class MatchDataCollectionService {
           if (expected.teamId === teamBId) redToB++;
         }
       }
+      // 게임에 실제로 있던 사람끼리만 본다 — 빠진 사람은 진영을 알 수 없다
       const alignedCount = Math.max(blueToA + redToB, blueToB + redToA);
-      if (alignedCount !== expectedPuuids.size) {
+      if (alignedCount !== matchedPuuids.size) {
         throw new Error(
-          `팀 배치 불일치: ${alignedCount}/${expectedPuuids.size} ` +
+          `팀 배치 불일치: ${alignedCount}/${matchedPuuids.size} ` +
             `- 다른 사설방 경기일 수 있어 저장하지 않는다`,
         );
       }
