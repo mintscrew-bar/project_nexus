@@ -15,8 +15,8 @@ import { useMemo, useState } from "react";
 // 수집된 경기(riotMatchId 있음)만 그릴 수 있다.
 //
 // 아이콘: 롤 클라이언트 전적 화면 에셋(CommunityDragon rcp-fe-lol-match-history).
-// 공허 유충·아타칸은 회색 한 벌(right_icons_grub.png 스프라이트)뿐이라
-// 다른 아이콘과 같은 팀색으로 다시 칠해 horde-/atakhan-{100,200}.png 로 뒀다.
+// 공허 유충은 회색 한 벌(right_icons_grub.png 스프라이트)뿐이라
+// 다른 아이콘과 같은 팀색으로 다시 칠해 horde-{100,200}.png 로 뒀다.
 
 export interface GoldChartTeam {
   name: string;
@@ -28,7 +28,7 @@ export interface GoldChartTeam {
 }
 
 type ObjectiveType =
-  "dragon" | "horde" | "herald" | "atakhan" | "baron" | "tower" | "inhibitor";
+  "dragon" | "horde" | "herald" | "baron" | "tower" | "inhibitor";
 
 interface ObjectiveEvent {
   minute: number;
@@ -41,7 +41,6 @@ const OBJECTIVE_LABEL: Record<ObjectiveType, string> = {
   dragon: "드래곤",
   horde: "공허 유충",
   herald: "협곡의 전령",
-  atakhan: "아타칸",
   baron: "내셔 남작",
   tower: "포탑",
   inhibitor: "억제기",
@@ -108,8 +107,6 @@ function buildSeries(timeline: any, teams: [GoldChartTeam, GoldChartTeam]) {
               ? "horde"
               : e.monsterType === "RIFTHERALD"
                 ? "herald"
-                : e.monsterType === "ATAKHAN"
-                  ? "atakhan"
                   : e.monsterType === "BARON_NASHOR"
                     ? "baron"
                     : null;
