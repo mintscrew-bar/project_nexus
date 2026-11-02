@@ -1477,10 +1477,14 @@ export class AdminService {
       throw new BadRequestException("끝난 경기만 다시 수집할 수 있습니다.");
     if (match.dataCollected)
       throw new BadRequestException("이미 전적이 수집된 경기입니다.");
-    if (!match.tournamentCode && !match.riotMatchId)
-      throw new BadRequestException(
-        "토너먼트 코드 없이 만든 방이라 Riot 에서 전적을 가져올 수 없습니다.",
-      );
+
+    // 코드·Riot ID 가 없는 경기는 15분 주기 수집 큐가 아예 보지 않는다(헛돌기 방지).
+    // 그런데 외부(딥롤 등)에서 발급한 토너먼트 코드로 한 판은 Nexus 에 코드가 없어도
+    // Riot 에 기록이 있다 — 2026-11-01 4판이 그랬다. 이런 경기는 큐에 넣는 대신
+    // 컨트롤러가 PUUID 크로스레퍼런스를 바로 한 번 돌린다. 정말 수동 사설방이면
+    // 후보가 없어 몇 번 재시도하고 끝난다.
+    const mode: "queue" | "crossref" =
+      match.tournamentCode || match.riotMatchId ? "queue" : "crossref";
 
     await this.prisma.match.update({
       where: { id: matchId },
@@ -1491,9 +1495,9 @@ export class AdminService {
       AdminAction.MATCH_COLLECT_RETRY,
       "match",
       matchId,
-      { previousAttempts: match.collectAttempts },
+      { previousAttempts: match.collectAttempts, mode },
     );
-    return { ok: true };
+    return { ok: true, mode };
   }
 
   /**

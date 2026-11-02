@@ -3032,7 +3032,8 @@ export const adminApi = {
     const response = await apiClient.post(
       `/admin/matches/${matchId}/retry-collection`,
     );
-    return response.data;
+    // queue: 15분 수집 주기에 다시 들어감 / crossref: 지금 바로 Riot 에서 찾기 시작
+    return response.data as { ok: boolean; mode: "queue" | "crossref" };
   },
   closeRoom: async (roomId: string) => {
     const response = await apiClient.post(`/admin/rooms/${roomId}/close`);

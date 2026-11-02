@@ -106,11 +106,10 @@ export function MatchesTab({
       const data = await adminApi.getInternalMatches({
         page,
         limit: PAGE_SIZE,
-        status: (status || undefined) as AdminInternalMatch["status"] | undefined,
+        status: (status || undefined) as
+          AdminInternalMatch["status"] | undefined,
         collected: (collected || undefined) as
-          | "collected"
-          | "pending"
-          | undefined,
+          "collected" | "pending" | undefined,
         search: search || undefined,
       });
       setMatches(data.matches);
@@ -201,14 +200,18 @@ export function MatchesTab({
               <table className="w-full min-w-[900px] text-sm">
                 <thead>
                   <tr className="border-b border-bg-tertiary text-text-muted">
-                    <th className="px-4 py-3 text-left font-medium">방 / 호스트</th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      방 / 호스트
+                    </th>
                     <th className="px-4 py-3 text-left font-medium">대진</th>
                     <th className="px-4 py-3 text-left font-medium">승자</th>
                     <th className="px-4 py-3 text-left font-medium">인원</th>
                     <th className="px-4 py-3 text-left font-medium">시간</th>
                     <th className="px-4 py-3 text-left font-medium">상태</th>
                     <th className="px-4 py-3 text-left font-medium">전적</th>
-                    <th className="px-4 py-3 text-left font-medium">진행 시각</th>
+                    <th className="px-4 py-3 text-left font-medium">
+                      진행 시각
+                    </th>
                     <th className="px-4 py-3 text-left font-medium">액션</th>
                   </tr>
                 </thead>
@@ -444,48 +447,76 @@ function MatchDetailModal({
             </div>
 
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3">
-              <SummaryItem label="호스트" value={detail.room?.host?.username ?? "-"} />
+              <SummaryItem
+                label="호스트"
+                value={detail.room?.host?.username ?? "-"}
+              />
               <SummaryItem
                 label="팀 구성"
                 value={
                   detail.room?.teamMode
-                    ? TEAM_MODE_LABELS[detail.room.teamMode] ?? detail.room.teamMode
+                    ? (TEAM_MODE_LABELS[detail.room.teamMode] ??
+                      detail.room.teamMode)
                     : "-"
                 }
               />
-              <SummaryItem label="게임 시간" value={formatDuration(detail.gameDuration)} />
-              <SummaryItem label="시작" value={formatDateTime(detail.startedAt)} />
-              <SummaryItem label="종료" value={formatDateTime(detail.completedAt)} />
+              <SummaryItem
+                label="게임 시간"
+                value={formatDuration(detail.gameDuration)}
+              />
+              <SummaryItem
+                label="시작"
+                value={formatDateTime(detail.startedAt)}
+              />
+              <SummaryItem
+                label="종료"
+                value={formatDateTime(detail.completedAt)}
+              />
               <SummaryItem label="패치" value={detail.patchVersion ?? "-"} />
-              <SummaryItem label="Riot 매치 ID" value={detail.riotMatchId ?? "-"} />
+              <SummaryItem
+                label="Riot 매치 ID"
+                value={detail.riotMatchId ?? "-"}
+              />
               <SummaryItem
                 label="MVP"
                 value={detail.mvpUser?.username ?? "-"}
               />
-              <SummaryItem label="ACE" value={detail.aceUser?.username ?? "-"} />
+              <SummaryItem
+                label="ACE"
+                value={detail.aceUser?.username ?? "-"}
+              />
             </dl>
 
             {!detail.dataCollected && (
               <p className="mt-3 text-xs text-text-muted">
-                아직 Riot 전적이 수집되지 않았습니다. 수집 시도 {detail.collectAttempts}회
+                아직 Riot 전적이 수집되지 않았습니다. 수집 시도{" "}
+                {detail.collectAttempts}회
                 {detail.lastCollectAttemptAt &&
                   ` · 마지막 시도 ${formatDateTime(detail.lastCollectAttemptAt)}`}
               </p>
             )}
             {/* 시도 상한을 넘기면 수집기가 이 경기를 더 안 본다. Riot 쪽 문제가
-                풀린 뒤 횟수를 0 으로 돌려 다시 대상에 넣는다. */}
+                풀린 뒤 횟수를 0 으로 돌려 다시 대상에 넣는다.
+                코드 없는 경기도 외부 토너먼트 코드로 했을 수 있어 버튼을 연다 —
+                그런 경기는 서버가 바로 크로스레퍼런스를 돌린다. */}
             {isAdmin &&
               !detail.dataCollected &&
-              detail.status === "COMPLETED" &&
-              (detail.tournamentCode || detail.riotMatchId) && (
+              detail.status === "COMPLETED" && (
                 <button
                   type="button"
                   disabled={retrying}
                   onClick={async () => {
                     setRetrying(true);
                     try {
-                      await adminApi.retryMatchCollection(detail.id);
-                      addToast("다음 수집 주기에 다시 가져옵니다.", "success");
+                      const { mode } = await adminApi.retryMatchCollection(
+                        detail.id,
+                      );
+                      addToast(
+                        mode === "crossref"
+                          ? "Riot 에서 찾기 시작했습니다. 1~10분 뒤 새로고침해 보세요."
+                          : "다음 수집 주기에 다시 가져옵니다.",
+                        "success",
+                      );
                       setDetail({
                         ...detail,
                         collectAttempts: 0,
@@ -649,7 +680,9 @@ function TeamScoreboard({
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-text-muted">{p.position || "-"}</td>
+                  <td className="px-3 py-2 text-text-muted">
+                    {p.position || "-"}
+                  </td>
                   <td className="px-3 py-2 text-right text-text-secondary">
                     {p.kills} / {p.deaths} / {p.assists}
                   </td>

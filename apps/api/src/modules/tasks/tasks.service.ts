@@ -86,6 +86,21 @@ export class TasksService {
    *
    * 대상이 없으면 Riot 호출 0이라 유휴 비용이 없다.
    */
+  /**
+   * 관리자 "수집 재시도" — 수집 큐가 보지 않는 경기(코드·Riot ID 없음)를 PUUID
+   * 크로스레퍼런스로 지금 한 번 찾는다. 실패하면 서비스가 2분 간격으로 몇 번 더 본다.
+   * 응답을 기다리지 않도록 호출부는 결과를 await 하지 않는다.
+   */
+  async recollectByCrossref(matchId: string): Promise<void> {
+    try {
+      await this.matchDataCollectionService.collectMatchDataByPuuidCrossref(
+        matchId,
+      );
+    } catch (error) {
+      this.logger.error(`관리자 재수집 실패 matchId=${matchId}`, error);
+    }
+  }
+
   /** Re-process completed internal matches whose Riot data was not persisted. */
   @Cron("*/15 * * * *")
   async handlePendingCustomMatchCollection(): Promise<void> {

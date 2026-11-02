@@ -196,16 +196,26 @@ describe("AdminService 스크림 조치", () => {
       });
       expect(prisma.adminAuditLog.create.mock.calls[0][0].data).toMatchObject({
         action: "MATCH_COLLECT_RETRY",
-        details: { previousAttempts: 10 },
+        details: { previousAttempts: 10, mode: "queue" },
       });
     });
 
+    // 2026-11-01: 외부 토너먼트 코드로 한 판은 Nexus 에 코드가 없어도 Riot 에 있다
+    it("코드·매치 ID 가 없으면 거부하지 않고 크로스레퍼런스 모드를 돌려준다", async () => {
+      const { service, prisma } = makeService();
+      prisma.match.findUnique.mockResolvedValue({
+        ...base,
+        tournamentCode: null,
+      });
+
+      await expect(service.retryMatchCollection("m1", "a")).resolves.toEqual({
+        ok: true,
+        mode: "crossref",
+      });
+      expect(prisma.match.update).toHaveBeenCalled();
+    });
+
     it.each([
-      [
-        "수집 불가(코드·매치 ID 없음)",
-        { tournamentCode: null },
-        "가져올 수 없습니다",
-      ],
       ["이미 수집됨", { dataCollected: true }, "이미 전적이"],
       ["아직 안 끝남", { status: "IN_PROGRESS" }, "끝난 경기만"],
     ])("%s 는 거부한다", async (_n, over, message) => {

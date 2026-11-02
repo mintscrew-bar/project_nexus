@@ -187,8 +187,19 @@ export class AdminController {
 
   @Post("matches/:id/retry-collection")
   @Roles(UserRole.ADMIN)
-  retryMatchCollection(@Param("id") matchId: string, @Request() req: any) {
-    return this.adminService.retryMatchCollection(matchId, req.user.sub);
+  async retryMatchCollection(
+    @Param("id") matchId: string,
+    @Request() req: any,
+  ) {
+    const result = await this.adminService.retryMatchCollection(
+      matchId,
+      req.user.sub,
+    );
+    // 큐가 안 보는 경기는 지금 바로 찾는다 — Riot 호출이 수십 초 걸려 기다리지 않는다
+    if (result.mode === "crossref") {
+      void this.tasksService.recollectByCrossref(matchId);
+    }
+    return result;
   }
 
   // ── 스크림 기록 (배그) ─────────────────────────────────────────────────────
