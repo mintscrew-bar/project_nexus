@@ -35,7 +35,8 @@ const TEAM_B_COLOR = "#e84057";
 
 interface MatchParticipant {
   id: string;
-  userId: string;
+  // 로스터와 매칭되지 않은 참가자(부계정·대타)는 null — riotIdSnapshot 으로만 표시
+  userId: string | null;
   teamId: string;
   championId: number;
   championName: string;
@@ -83,11 +84,33 @@ interface MatchParticipant {
   longestTimeSpentLiving: number;
   totalTimeSpentDead: number;
   win: boolean;
+  riotIdSnapshot?: string | null;
   user: {
     id: string;
     username: string;
     avatar?: string;
-  };
+  } | null;
+}
+
+/**
+ * 표시 이름. Nexus 계정이 없으면 경기 당시 Riot 게임이름을 쓴다.
+ * 이런 참가자는 나중에 그 Riot 계정이 등록되면 계정에 연결된다.
+ */
+function participantName(p: MatchParticipant): string {
+  return p.user?.username ?? p.riotIdSnapshot?.split("#")[0] ?? "알 수 없음";
+}
+
+/** Nexus 계정과 아직 연결되지 않은 참가자 표시 */
+function UnlinkedBadge({ participant }: { participant: MatchParticipant }) {
+  if (participant.user) return null;
+  return (
+    <span
+      className="px-1 py-0.5 rounded bg-bg-tertiary text-text-tertiary text-[9px] font-medium flex-shrink-0"
+      title={`${participant.riotIdSnapshot ?? "Riot 계정"} — Nexus 계정에 아직 연결되지 않음. 이 Riot 계정을 등록하면 전적에 잡힙니다.`}
+    >
+      미연동
+    </span>
+  );
 }
 
 interface TeamStats {
@@ -193,8 +216,10 @@ function getMvpAndAce(
     (a, b) => getCarryScore(b) - getCarryScore(a),
   )[0];
   return {
-    mvpId: mvp?.userId ?? null,
-    aceId: ace?.userId ?? null,
+    // 참가자 행 id 로 판별한다. userId 는 미연동 참가자면 null 이라
+    // null === null 로 여러 명이 동시에 MVP 로 찍힌다.
+    mvpId: mvp?.id ?? null,
+    aceId: ace?.id ?? null,
   };
 }
 
@@ -473,8 +498,9 @@ function PlayerRow({
       <div className="min-w-[100px] w-[110px] flex-shrink-0">
         <div className="flex items-center gap-1">
           <span className="font-semibold text-sm text-text-primary truncate">
-            {participant.user.username}
+            {participantName(participant)}
           </span>
+          <UnlinkedBadge participant={participant} />
           {isMvp && (
             <span className="px-1 py-0.5 bg-amber-500/90 text-amber-950 text-[9px] font-bold rounded flex-shrink-0">
               MVP
@@ -644,8 +670,9 @@ function CompactPlayerRow({
       <div className="min-w-[80px] w-[80px] flex-shrink-0">
         <div className="flex items-center gap-1">
           <span className="font-medium text-xs text-text-primary truncate">
-            {participant.user.username}
+            {participantName(participant)}
           </span>
+          <UnlinkedBadge participant={participant} />
           {isMvp && (
             <span className="px-0.5 bg-amber-500/90 text-amber-950 text-[8px] font-bold rounded">
               MVP
@@ -834,8 +861,8 @@ function TeamSection({
                   key={p.id}
                   participant={p}
                   isWinner={isWinner}
-                  isMvp={p.userId === mvpId}
-                  isAce={p.userId === aceId}
+                  isMvp={p.id === mvpId}
+                  isAce={p.id === aceId}
                   teamColor={teamColor}
                 />
               ) : (
@@ -843,8 +870,8 @@ function TeamSection({
                   key={p.id}
                   participant={p}
                   isWinner={isWinner}
-                  isMvp={p.userId === mvpId}
-                  isAce={!isWinner && p.userId === aceId}
+                  isMvp={p.id === mvpId}
+                  isAce={!isWinner && p.id === aceId}
                   maxDamage={maxDamage}
                   gameDuration={gameDuration}
                   teamColor={teamColor}
@@ -1064,7 +1091,7 @@ function DetailStatsTable({
                           className="w-5 h-5 rounded flex-shrink-0"
                         />
                         <span className="max-w-[110px] truncate text-text-secondary">
-                          {p.user.username}
+                          {participantName(p)}
                         </span>
                       </div>
                     </td>

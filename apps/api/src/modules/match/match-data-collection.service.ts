@@ -498,6 +498,39 @@ export class MatchDataCollectionService {
         );
       }
 
+      // 참가자 PUUID로 Riot 팀 ID(100/200) → Nexus 팀 ID 매핑을 역산한다.
+      // 토너먼트 코드로 만든 방이어도 블루/레드 사이드는 랜덤이므로
+      // teamA === 100 이라고 가정하면 안 된다.
+      // 과반수 + 팀 배치 검사를 통과했으므로 양 진영에 매칭된 사람이 최소 한 명씩 있다.
+      const riotTeamToNexusTeam = new Map<number, string>();
+      for (const participant of matchData.info.participants) {
+        const userMapping = puuidToUser.get(participant.puuid);
+        if (userMapping && !riotTeamToNexusTeam.has(participant.teamId)) {
+          riotTeamToNexusTeam.set(participant.teamId, userMapping.teamId);
+        }
+      }
+      const nexusTeamOf = (riotTeamId: number) =>
+        riotTeamToNexusTeam.get(riotTeamId) ??
+        (riotTeamId === 100 ? teamAId : teamBId); // 폴백
+
+      // 로스터와 매칭되지 않은 참가자(부계정·대타)도 버리지 않고 저장한다.
+      // 그 puuid 가 이미 다른 Nexus 계정에 등록돼 있으면 그 유저로 잇고,
+      // 아니면 userId 없이 Riot ID 스냅샷으로만 남긴다 — 나중에 누가 그 Riot 계정을
+      // 등록하면 riot.service 가 userId 를 채운다 (linkUnclaimedMatchParticipants).
+      const unmatchedPuuids = matchData.info.participants
+        .map((p) => p.puuid)
+        .filter((puuid) => !puuidToUser.has(puuid));
+      const registeredByPuuid = new Map<string, string>(
+        unmatchedPuuids.length > 0
+          ? (
+              await this.prisma.riotAccount.findMany({
+                where: { puuid: { in: unmatchedPuuids } },
+                select: { puuid: true, userId: true },
+              })
+            ).map((account) => [account.puuid, account.userId])
+          : [],
+      );
+
       // 멱등성 보장:
       // 기존 전적을 트랜잭션 내에서 교체(replace)해 중복/부분 저장을 방지한다.
       await this.prisma.$transaction(async (tx) => {
@@ -506,20 +539,25 @@ export class MatchDataCollectionService {
 
         for (const participant of matchData.info.participants) {
           const userMapping = puuidToUser.get(participant.puuid);
-
-          // Nexus 계정이 연결되지 않은 외부 참가자 — 저장 대상이 아니다.
-          if (!userMapping) {
-            continue;
-          }
+          const nexusTeamId =
+            userMapping?.teamId ?? nexusTeamOf(participant.teamId);
+          const userId =
+            userMapping?.userId ??
+            registeredByPuuid.get(participant.puuid) ??
+            null;
+          const riotIdSnapshot = participant.riotIdGameName
+            ? `${participant.riotIdGameName}#${participant.riotIdTagline ?? ""}`
+            : null;
 
           await tx.matchParticipant.create({
             data: {
               matchId,
-              userId: userMapping.userId,
-              teamId: getLiveTeamId(userMapping.teamId),
-              teamIdSnapshot: userMapping.teamId,
-              teamName: getTeamName(userMapping.teamId),
+              userId,
+              teamId: getLiveTeamId(nexusTeamId),
+              teamIdSnapshot: nexusTeamId,
+              teamName: getTeamName(nexusTeamId),
               puuid: participant.puuid,
+              riotIdSnapshot,
               riotTeamId: participant.teamId,
               championId: participant.championId,
               championName: participant.championName,
@@ -574,21 +612,8 @@ export class MatchDataCollectionService {
           });
         }
 
-        // 참가자 PUUID로 Riot 팀 ID(100/200) → Nexus 팀 ID 매핑을 역산한다.
-        // 토너먼트 코드로 만든 방이어도 블루/레드 사이드는 랜덤이므로
-        // teamA === 100 이라고 가정하면 안 된다.
-        const riotTeamToNexusTeam = new Map<number, string>();
-        for (const participant of matchData.info.participants) {
-          const userMapping = puuidToUser.get(participant.puuid);
-          if (userMapping && !riotTeamToNexusTeam.has(participant.teamId)) {
-            riotTeamToNexusTeam.set(participant.teamId, userMapping.teamId);
-          }
-        }
-
         for (const team of matchData.info.teams) {
-          const teamId =
-            riotTeamToNexusTeam.get(team.teamId) ??
-            (team.teamId === 100 ? teamAId : teamBId); // 폴백
+          const teamId = nexusTeamOf(team.teamId);
           await tx.matchTeamStats.create({
             data: {
               matchId,
@@ -625,7 +650,10 @@ export class MatchDataCollectionService {
       });
 
       const affectedUserIds = Array.from(
-        new Set(Array.from(puuidToUser.values()).map(({ userId }) => userId)),
+        new Set([
+          ...Array.from(puuidToUser.values()).map(({ userId }) => userId),
+          ...registeredByPuuid.values(),
+        ]),
       );
       await Promise.all(
         affectedUserIds.map((userId) =>

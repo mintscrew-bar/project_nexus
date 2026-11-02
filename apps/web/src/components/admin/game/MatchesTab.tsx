@@ -499,8 +499,10 @@ function MatchDetailModal({
                 풀린 뒤 횟수를 0 으로 돌려 다시 대상에 넣는다.
                 코드 없는 경기도 외부 토너먼트 코드로 했을 수 있어 버튼을 연다 —
                 그런 경기는 서버가 바로 크로스레퍼런스를 돌린다. */}
+            {/* 이미 수집된 경기도 Riot 매치 ID 가 있으면 "다시 수집"으로 연다.
+                11-02 이전 저장분은 부계정·대타를 빼고 저장했다 — 다시 받으면 채워진다. */}
             {isAdmin &&
-              !detail.dataCollected &&
+              (!detail.dataCollected || !!detail.riotMatchId) &&
               detail.status === "COMPLETED" && (
                 <button
                   type="button"
@@ -514,7 +516,7 @@ function MatchDetailModal({
                       addToast(
                         mode === "crossref"
                           ? "Riot 에서 찾기 시작했습니다. 1~10분 뒤 새로고침해 보세요."
-                          : "다음 수집 주기에 다시 가져옵니다.",
+                          : "다음 수집 주기(15분 이내)에 다시 가져옵니다.",
                         "success",
                       );
                       setDetail({
@@ -533,7 +535,9 @@ function MatchDetailModal({
                   }}
                   className="mt-2 rounded-lg bg-bg-tertiary px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary disabled:opacity-50"
                 >
-                  수집 재시도 (시도 횟수 초기화)
+                  {detail.dataCollected
+                    ? "다시 수집 (빠진 참가자 채우기)"
+                    : "수집 재시도 (시도 횟수 초기화)"}
                 </button>
               )}
           </div>
@@ -672,7 +676,10 @@ function TeamScoreboard({
                       />
                       <div className="min-w-0">
                         <div className="truncate font-medium text-text-primary">
-                          {p.user?.username ?? "탈퇴한 유저"}
+                          {p.user?.username ??
+                            (p.riotIdSnapshot
+                              ? `${p.riotIdSnapshot} (미연동)`
+                              : "탈퇴한 유저")}
                         </div>
                         <div className="truncate text-[10px] text-text-muted">
                           {p.championName}

@@ -168,6 +168,31 @@ export class RiotService {
     });
   }
 
+  /**
+   * 주인 없는 내전 참가 기록을 이 유저에게 잇는다.
+   *
+   * 내전 전적은 로스터 과반수만 맞으면 저장되고, 나머지(부계정·대타로 뛴 사람)는
+   * userId 없이 puuid·Riot ID 스냅샷으로 남는다. 그 Riot 계정이 나중에 등록되면
+   * 여기서 userId 를 채워 본인 전적에 잡히게 한다.
+   * 외부 랭크 인제스트 행(isInternal=false)은 건드리지 않는다.
+   */
+  async linkUnclaimedMatchParticipants(
+    userId: string,
+    puuid: string,
+  ): Promise<number> {
+    const { count } = await this.prisma.matchParticipant.updateMany({
+      where: { puuid, userId: null, match: { isInternal: true } },
+      data: { userId },
+    });
+    if (count > 0) {
+      this.logger.log(
+        `주인 없는 내전 기록 ${count}건을 연결 userId=${userId} puuid=${puuid}`,
+      );
+      await this.enqueueStatsRecompute(userId, "custom-match-claimed");
+    }
+    return count;
+  }
+
   private normalizeManualPeakTier(
     peakTier?: string,
     peakRank?: string,

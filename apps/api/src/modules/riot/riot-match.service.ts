@@ -34,6 +34,9 @@ export interface MatchDto {
 
 export interface ParticipantDto {
   puuid: string;
+  // Riot ID (게임이름 / 태그). 오래된 매치에는 없을 수 있다.
+  riotIdGameName?: string;
+  riotIdTagline?: string;
   participantId: number;
   teamId: number;
   championId: number;

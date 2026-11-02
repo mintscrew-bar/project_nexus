@@ -869,6 +869,10 @@ model MatchParticipant {
   puuid                       String?
   // Riot 팀 번호 (100=블루, 200=레드). 외부 매치 head-to-head 비교 시 같은 팀/적팀 판단에 사용.
   riotTeamId                  Int?
+  // 경기 당시 Riot ID(게임이름#태그) 스냅샷. 내전에서 Nexus 계정과 매칭되지 않은
+  // 참가자(부계정·대타)는 userId 가 NULL 이라 이 이름으로만 표시된다. 나중에 누가
+  // 이 puuid 의 Riot 계정을 등록하면 userId 가 채워진다 (riot.service 참고).
+  riotIdSnapshot              String?
   championId                  Int
   championName                String
   position                    String

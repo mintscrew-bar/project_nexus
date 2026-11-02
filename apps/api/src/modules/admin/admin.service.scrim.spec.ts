@@ -196,7 +196,7 @@ describe("AdminService 스크림 조치", () => {
       });
       expect(prisma.adminAuditLog.create.mock.calls[0][0].data).toMatchObject({
         action: "MATCH_COLLECT_RETRY",
-        details: { previousAttempts: 10, mode: "queue" },
+        details: { previousAttempts: 10, mode: "queue", recollect: false },
       });
     });
 
@@ -215,8 +215,35 @@ describe("AdminService 스크림 조치", () => {
       expect(prisma.match.update).toHaveBeenCalled();
     });
 
+    // 11-02 이전 저장분은 부계정·대타를 빼고 저장했다 — 다시 받으면 채워진다
+    it("이미 수집된 경기도 Riot 매치 ID 가 있으면 미수집으로 돌려 다시 받는다", async () => {
+      const { service, prisma } = makeService();
+      prisma.match.findUnique.mockResolvedValue({
+        ...base,
+        dataCollected: true,
+        riotMatchId: "KR_1",
+      });
+
+      await expect(service.retryMatchCollection("m1", "a")).resolves.toEqual({
+        ok: true,
+        mode: "queue",
+      });
+      expect(prisma.match.update).toHaveBeenCalledWith({
+        where: { id: "m1" },
+        data: {
+          collectAttempts: 0,
+          lastCollectAttemptAt: null,
+          dataCollected: false,
+        },
+      });
+    });
+
     it.each([
-      ["이미 수집됨", { dataCollected: true }, "이미 전적이"],
+      [
+        "수집됐는데 매치 ID 없음",
+        { dataCollected: true, riotMatchId: null },
+        "Riot 매치 ID 가 없어",
+      ],
       ["아직 안 끝남", { status: "IN_PROGRESS" }, "끝난 경기만"],
     ])("%s 는 거부한다", async (_n, over, message) => {
       const { service, prisma } = makeService();

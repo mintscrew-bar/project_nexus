@@ -2676,6 +2676,8 @@ export interface AdminInternalMatchDetail extends Omit<
     goldEarned: number;
     totalDamageDealtToChampions: number;
     visionScore: number;
+    /** 경기 당시 Riot ID — 미연동 참가자(user=null)의 표시 이름 */
+    riotIdSnapshot: string | null;
     user: { id: string; username: string; avatar: string | null } | null;
   }[];
 }

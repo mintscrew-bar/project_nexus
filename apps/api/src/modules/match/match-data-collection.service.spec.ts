@@ -799,7 +799,11 @@ describe("MatchDataCollectionService", () => {
     // 2026-11-01: Riot 게임을 정확히 찾고도 9/10·8/10 이라 4판이 통째로 버려졌다.
     // 과반수가 같은 팀 배치로 있으면 그 사람들 기록만 저장한다.
     describe("과반수 일치 (10명 로스터)", () => {
-      const runTenSave = async (presentCount: number) => {
+      const runTenSave = async (
+        presentCount: number,
+        // 이미 다른 Nexus 계정에 등록된 낯선 puuid → userId
+        registered: Record<string, string> = {},
+      ) => {
         // 0~4 → a팀(블루), 5~9 → b팀(레드)
         const roster = Array.from({ length: 10 }, (_, i) => ({
           userId: `user-${i}`,
@@ -819,8 +823,16 @@ describe("MatchDataCollectionService", () => {
         // 앞에서부터 presentCount 명만 게임에 있고, 나머지 자리는 부계정·대타
         const participants = roster.map((r, i) => ({
           puuid: i < presentCount ? r.puuid : `stranger-${i}`,
+          riotIdGameName: i < presentCount ? `player${i}` : `부계정${i}`,
+          riotIdTagline: "KR1",
           teamId: i < 5 ? 100 : 200,
         }));
+        const riotAccountFindMany = jest.fn(
+          async ({ where }: { where: { puuid: { in: string[] } } }) =>
+            where.puuid.in
+              .filter((puuid) => registered[puuid])
+              .map((puuid) => ({ puuid, userId: registered[puuid] })),
+        );
 
         const matchUpdate = jest.fn().mockResolvedValue(undefined);
         const tx = {
@@ -843,6 +855,7 @@ describe("MatchDataCollectionService", () => {
             statsRecomputeQueue: {
               upsert: jest.fn().mockResolvedValue(undefined),
             },
+            riotAccount: { findMany: riotAccountFindMany },
           } as never,
           {} as never,
           { updateRanking: jest.fn().mockResolvedValue(undefined) } as never,
@@ -865,15 +878,30 @@ describe("MatchDataCollectionService", () => {
         return { call, tx, matchUpdate };
       };
 
-      it("8/10 이면 게임에 있던 8명 기록만 저장하고 확정한다", async () => {
+      it("8/10 이면 확정하고, 매칭 안 된 2명도 계정 없이 Riot ID 로 저장한다", async () => {
         const { call, tx, matchUpdate } = await runTenSave(8);
 
         await expect(call).resolves.toBeUndefined();
-        expect(tx.matchParticipant.create).toHaveBeenCalledTimes(8);
-        // 로스터에 없는 사람(부계정·대타)은 저장하지 않는다
-        expect(tx.matchParticipant.create).not.toHaveBeenCalledWith(
+        // 10명 전원 저장 — 부계정·대타도 나중에 계정 등록하면 잡히도록 남긴다
+        expect(tx.matchParticipant.create).toHaveBeenCalledTimes(10);
+        expect(tx.matchParticipant.create).toHaveBeenCalledWith(
           expect.objectContaining({
-            data: expect.objectContaining({ puuid: "stranger-8" }),
+            data: expect.objectContaining({
+              puuid: "stranger-8",
+              userId: null,
+              // 레드(200) 진영 = 같은 진영 매칭자들의 b팀
+              teamIdSnapshot: "b",
+              riotIdSnapshot: "부계정8#KR1",
+            }),
+          }),
+        );
+        expect(tx.matchParticipant.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              puuid: "puuid-0",
+              userId: "user-0",
+              riotIdSnapshot: "player0#KR1",
+            }),
           }),
         );
         expect(matchUpdate).toHaveBeenCalledWith(
@@ -889,7 +917,21 @@ describe("MatchDataCollectionService", () => {
       it("6/10 도 과반수라 저장한다", async () => {
         const { call, tx } = await runTenSave(6);
         await expect(call).resolves.toBeUndefined();
-        expect(tx.matchParticipant.create).toHaveBeenCalledTimes(6);
+        expect(tx.matchParticipant.create).toHaveBeenCalledTimes(10);
+      });
+
+      it("낯선 puuid 가 이미 등록된 계정이면 그 유저로 잇는다", async () => {
+        // 로스터에 없던 사람이 자기 등록 계정으로 대타를 뛴 경우
+        const { call, tx } = await runTenSave(8, { "stranger-9": "user-sub" });
+        await expect(call).resolves.toBeUndefined();
+        expect(tx.matchParticipant.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              puuid: "stranger-9",
+              userId: "user-sub",
+            }),
+          }),
+        );
       });
 
       it("5/10 은 과반수가 아니라 저장하지 않는다", async () => {

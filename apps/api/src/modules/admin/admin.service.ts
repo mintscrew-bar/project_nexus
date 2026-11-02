@@ -1475,8 +1475,14 @@ export class AdminService {
       throw new NotFoundException("내전 기록을 찾을 수 없습니다.");
     if (match.status !== "COMPLETED")
       throw new BadRequestException("끝난 경기만 다시 수집할 수 있습니다.");
-    if (match.dataCollected)
-      throw new BadRequestException("이미 전적이 수집된 경기입니다.");
+    // 이미 수집된 경기도 Riot 매치 ID 가 있으면 다시 받는다. 2026-11-02 이전 저장분은
+    // 로스터와 매칭 안 된 참가자(부계정·대타)를 버렸다 — 다시 받으면 그 사람까지
+    // 채워진다. 저장은 기존 행을 지우고 새로 쓰는 교체라 여러 번 해도 안전하다.
+    const recollect = match.dataCollected;
+    if (recollect && !match.riotMatchId)
+      throw new BadRequestException(
+        "Riot 매치 ID 가 없어 다시 수집할 수 없습니다.",
+      );
 
     // 코드·Riot ID 가 없는 경기는 15분 주기 수집 큐가 아예 보지 않는다(헛돌기 방지).
     // 그런데 외부(딥롤 등)에서 발급한 토너먼트 코드로 한 판은 Nexus 에 코드가 없어도
@@ -1488,14 +1494,20 @@ export class AdminService {
 
     await this.prisma.match.update({
       where: { id: matchId },
-      data: { collectAttempts: 0, lastCollectAttemptAt: null },
+      data: {
+        collectAttempts: 0,
+        lastCollectAttemptAt: null,
+        // 수집 큐는 dataCollected=false 만 본다. 기존 참가자 행은 남아 있어
+        // 다시 받기 전까지 상세 화면은 그대로 보인다.
+        ...(recollect ? { dataCollected: false } : {}),
+      },
     });
     await this.logAction(
       adminId,
       AdminAction.MATCH_COLLECT_RETRY,
       "match",
       matchId,
-      { previousAttempts: match.collectAttempts, mode },
+      { previousAttempts: match.collectAttempts, mode, recollect },
     );
     return { ok: true, mode };
   }
@@ -2163,6 +2175,8 @@ export class AdminService {
             goldEarned: true,
             totalDamageDealtToChampions: true,
             visionScore: true,
+            // 로스터와 매칭되지 않은 참가자(부계정·대타)는 user 가 없고 이 이름만 있다
+            riotIdSnapshot: true,
             user: { select: { id: true, username: true, avatar: true } },
           },
         },
