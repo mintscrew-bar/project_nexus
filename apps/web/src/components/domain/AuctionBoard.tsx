@@ -683,7 +683,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               화면이 낮으면(배율 125% FHD 등) 이 블록을 접는다. 입찰가는 아래
               입찰 버튼에 "150G 입찰"로 그대로 나오므로 정보는 잃지 않는다.
             */}
-            <div className="border-y border-bg-tertiary py-2.5 mb-3 text-center [@media(max-height:820px)]:hidden">
+            {/*
+              입찰가 큰 숫자. 입찰 버튼에도 "○○G 입찰"로 같은 금액이 나오므로 화면이
+              낮으면(900px 미만) 접는다. 매물 카드 위에 카운트다운 줄이 생기면서
+              820~900px 에서 카드 아래 입찰 현황 줄이 가려졌다(2026-11-02).
+            */}
+            <div className="border-y border-bg-tertiary py-2.5 mb-3 text-center [@media(max-height:899px)]:hidden">
               <p className="text-xs text-text-tertiary mb-1">입찰가</p>
               <p
                 className={cn(

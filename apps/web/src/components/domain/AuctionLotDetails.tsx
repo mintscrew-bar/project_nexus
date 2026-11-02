@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Star } from "lucide-react";
+import { AlertTriangle, Star, Timer } from "lucide-react";
 import { Avatar, Badge } from "@/components/ui";
 import { TierBadge } from "./TierBadge";
 import { cn, getTierColor } from "@/lib/utils";
@@ -56,15 +56,15 @@ function StatCell({
   value: React.ReactNode;
   sub?: React.ReactNode;
   valueClassName?: string;
-  /** 화면이 충분히 높을 때(900px 이상) 값을 키운다. 왼쪽 빈 공간을 채우는 용도 */
+  /** 화면이 충분히 높을 때(1000px 이상) 값을 키운다. 왼쪽 빈 공간을 채우는 용도 */
   large?: boolean;
 }) {
   return (
     <div
       className={cn(
         "min-w-0 rounded-md bg-bg-tertiary/60 px-2.5 py-1.5",
-        // FHD(900~999px)는 왼쪽 열에 네 칸씩 두 줄로 들어가 높이가 빠듯하다
-        "[@media(min-height:900px)_and_(max-height:999px)]:py-1",
+        // 820~999px(FHD 포함)는 왼쪽 열에 네 칸씩 두 줄로 들어가 높이가 빠듯하다
+        "[@media(min-height:821px)_and_(max-height:999px)]:py-1",
         large && "[@media(min-height:1000px)]:py-2.5",
       )}
     >
@@ -138,6 +138,15 @@ export function AuctionLotDetails({
 }) {
   const currentGame = useCurrentGame();
   const isLol = currentGame === "LOL";
+  // 카운트다운 막대의 기준 길이. 서버가 전체 제한 시간을 따로 주지 않아, 매물마다
+  // 본 가장 큰 남은 시간을 기준으로 삼는다(입찰로 시간이 늘면 그 값으로 다시 잡힌다).
+  const [timerSpan, setTimerSpan] = React.useState({ id: player.id, max: 0 });
+  if (timerSpan.id !== player.id || timeLeft > timerSpan.max) {
+    setTimerSpan({ id: player.id, max: timeLeft });
+  }
+  const timerRatio =
+    timerSpan.max > 0 ? Math.min(1, timeLeft / timerSpan.max) : 0;
+  const isUrgent = timeLeft <= 5;
   // 라인 줄이 늘어난 만큼 챔피언 아이콘도 키운다. 줄 높이에 비해 아이콘이 작으면
   // 줄마다 빈 띠가 생긴다(고해상도에서 매물 카드가 비어 보이던 원인).
   const iconSize = useViewportHeightStep(
@@ -238,7 +247,7 @@ export function AuctionLotDetails({
     />
   );
 
-  // 내전 평균 지표 여섯 칸. 보통은 카드 아래 전체 폭 줄에 두지만, 키 큰 화면(900px+)
+  // 내전 평균 지표 여섯 칸. 보통은 카드 아래 전체 폭 줄에 두지만, 화면이 820px 보다 높으면
   // 에서는 왼쪽 열로 올려 승률·평판과 함께 쌓는다 — 카드가 늘어난 높이를 빈 칸이 아니라
   // 내용으로 채운다(2026-10-06 운영자 제보: 고해상도에서 매물 카드가 비어 보임).
   // 칸 이름에 "평균"을 붙인다 — "피해량 21,450"이 누적처럼 읽혔다(2026-11-02 운영자 요청).
@@ -303,7 +312,59 @@ export function AuctionLotDetails({
   return (
     // 카드가 세로로 늘어나면 위 행(선수 정보·라인 줄)이 그 높이를 가져가고, 아래 지표 줄은
     // 제 높이를 유지한다. 라인 줄은 flex-1 이라 늘어난 높이를 다섯 줄이 나눠 갖는다.
-    <div className="grid flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_auto] grid-rows-[minmax(0,1fr)_auto] gap-x-5 gap-y-3 px-5 py-4">
+    <div className="grid flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] grid-rows-[auto_minmax(0,1fr)_auto] gap-x-5 gap-y-3 px-5 pb-4 pt-3 [@media(min-height:821px)]:grid-rows-[auto_minmax(0,1fr)] [@media(min-height:821px)_and_(max-height:999px)]:gap-y-2 [@media(min-height:821px)_and_(max-height:999px)]:pt-2.5">
+      {/*
+        ── 맨 위: 카운트다운 ──
+        예전엔 카드 오른쪽에 76px 열을 혼자 차지했다(2026-11-02 운영자 요청으로 위로).
+        카드 전체 폭 한 줄 — 큰 숫자 + 줄어드는 막대로 멀리서도 남은 시간이 보인다.
+      */}
+      <div className="col-span-2 flex items-center gap-3">
+        <Badge
+          variant="primary"
+          className="flex-shrink-0 px-1.5 py-0.5 text-[10px]"
+        >
+          현재 매물
+        </Badge>
+        <Timer
+          className={cn(
+            "h-5 w-5 flex-shrink-0",
+            isUrgent ? "text-accent-danger" : "text-text-secondary",
+          )}
+        />
+        <div
+          className={cn(
+            "w-[64px] flex-shrink-0 text-[32px] font-black leading-none tabular-nums transition-[text-shadow] duration-200",
+            isUrgent
+              ? "animate-pulse text-accent-danger [text-shadow:0_0_22px_rgba(239,68,68,0.8),0_0_8px_rgba(239,68,68,0.6)]"
+              : "text-text-primary",
+          )}
+        >
+          {timeLeft}
+          <span className="ml-0.5 text-sm font-semibold text-text-tertiary">
+            초
+          </span>
+        </div>
+        <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-bg-tertiary">
+          <div
+            className={cn(
+              "h-full rounded-full transition-[width] duration-1000 ease-linear",
+              isUrgent
+                ? "bg-accent-danger"
+                : timeLeft <= 10
+                  ? "bg-accent-warning"
+                  : "bg-accent-primary",
+            )}
+            style={{ width: `${timerRatio * 100}%` }}
+          />
+        </div>
+        {yuchalCount > 0 && (
+          <div className="flex flex-shrink-0 items-center gap-1 text-xs font-medium text-accent-warning">
+            <AlertTriangle className="h-3 w-3" />
+            유찰 {yuchalCount}회
+          </div>
+        )}
+      </div>
+
       {/*
         ── 왼쪽: 누구인가 ──
         좌우 두 단은 그리드 행 높이(둘 중 큰 쪽)에 맞춰 늘어난다. 왼쪽은 위아래로
@@ -320,11 +381,9 @@ export function AuctionLotDetails({
             className="flex-shrink-0 ring-2 ring-accent-primary/60"
           />
           <div className="min-w-0">
-            <div className="mb-0.5 flex items-center gap-1.5">
-              <Badge variant="primary" className="px-1.5 py-0.5 text-[10px]">
-                현재 매물
-              </Badge>
-              {profile?.clan && (
+            {/* "현재 매물" 배지는 타이머 줄로 옮겼다 — 이 줄은 클랜이 있을 때만 */}
+            {profile?.clan && (
+              <div className="mb-0.5 flex items-center gap-1.5">
                 <span
                   className="truncate rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-semibold text-text-secondary"
                   title={`클랜 ${profile.clan.name}`}
@@ -332,8 +391,8 @@ export function AuctionLotDetails({
                   {profile.clan.tag ? `[${profile.clan.tag}] ` : ""}
                   {profile.clan.name}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
             <h2 className="truncate text-2xl font-bold leading-tight text-text-primary [@media(min-height:900px)]:text-[28px] [@media(min-height:1000px)]:text-[34px]">
               {player.username}
             </h2>
@@ -406,25 +465,26 @@ export function AuctionLotDetails({
 
         {/*
           내전 승률 + 평판은 왼쪽 열 바닥에 붙인다. 낮은 화면(820px 이하)에선 아래 지표
-          줄로 옮기고, 키 큰 화면(900px 이상)에선 반대로 아래 지표 여섯 칸을 여기로 올린다.
+          줄로 옮기고, 그보다 높으면(821px 이상) 반대로 아래 지표 여섯 칸을 여기로 올린다.
           기준이 1000px 이면 FHD 브라우저(뷰포트 약 940px)가 아래 줄 배치로 떨어져
-          라인 다섯 줄이 눌렸다(2026-11-02 운영자 제보).
+          라인 다섯 줄이 눌렸다(2026-11-02 운영자 제보). 카운트다운이 카드 위 줄로
+          올라온 뒤로는 820~900px 도 아래 줄 배치로는 입찰 현황 줄이 가려져 821px 까지 내렸다.
         */}
         <div className="mt-auto [@media(max-height:820px)]:hidden">
-          <p className="mb-1 hidden text-[10px] font-medium text-text-tertiary [@media(min-height:900px)]:block [@media(min-height:900px)_and_(max-height:999px)]:mb-0.5">
+          <p className="mb-1 hidden text-[10px] font-medium text-text-tertiary [@media(min-height:821px)]:block [@media(min-height:821px)_and_(max-height:999px)]:mb-0.5">
             {recordCaption}
           </p>
           {/*
-            900px 이상에서는 여덟 칸(승률·평판·KDA·킬관여·피해량·CS·시야·골드)을 네 칸씩
+            821px 이상에서는 여덟 칸(승률·평판·KDA·킬관여·피해량·CS·시야·골드)을 네 칸씩
             두 줄로 놓는다. 두 칸씩이면 네 줄이 되어 카드가 넘치고 입찰 패널이 밀려난다
             (1010px 에서도 118px 넘쳤다).
             auto-rows-fr: 승률·평판만 보조 줄이 있어 줄마다 칸 높이가 달랐다 —
             모든 줄을 가장 높은 줄에 맞춘다(2026-11-02 운영자 제보).
           */}
-          <div className="grid auto-rows-fr grid-cols-2 gap-2 [@media(min-height:900px)_and_(max-height:999px)]:gap-1.5 [@media(min-height:900px)]:grid-cols-4">
+          <div className="grid auto-rows-fr grid-cols-2 gap-2 [@media(min-height:821px)_and_(max-height:999px)]:gap-1.5 [@media(min-height:821px)]:grid-cols-4">
             {winRateCell}
             {reputationCell}
-            <div className="hidden [@media(min-height:900px)]:contents">
+            <div className="hidden [@media(min-height:821px)]:contents">
               {metricCells}
             </div>
           </div>
@@ -452,7 +512,7 @@ export function AuctionLotDetails({
                   row.kind === "other" && "[@media(max-height:820px)]:hidden",
                 )}
               >
-                <span className="flex w-[64px] flex-shrink-0 items-center gap-1 text-xs font-semibold text-text-secondary [@media(min-height:900px)]:w-[76px] [@media(min-height:900px)]:text-sm">
+                <span className="flex w-[64px] flex-shrink-0 items-center gap-1 text-xs font-semibold text-text-secondary [@media(min-height:821px)]:w-[76px] [@media(min-height:821px)]:text-sm">
                   <PositionIcon
                     position={row.role}
                     className="!h-3.5 !w-3.5"
@@ -462,7 +522,7 @@ export function AuctionLotDetails({
                 </span>
                 <span
                   className={cn(
-                    "w-[92px] flex-shrink-0 truncate text-[11px] font-bold [@media(min-height:900px)]:text-[13px]",
+                    "w-[92px] flex-shrink-0 truncate text-[11px] font-bold [@media(min-height:821px)]:text-[13px]",
                     row.roleTier
                       ? getTierColor(row.roleTier.tier)
                       : "text-text-muted",
@@ -483,7 +543,7 @@ export function AuctionLotDetails({
                 */}
                 <span
                   className={cn(
-                    "w-[42px] flex-shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-bold tabular-nums [@media(min-height:900px)]:text-[11px]",
+                    "w-[42px] flex-shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-bold tabular-nums [@media(min-height:821px)]:text-[11px]",
                     row.balanceScore == null
                       ? "text-text-muted"
                       : row.kind === "main"
@@ -497,14 +557,10 @@ export function AuctionLotDetails({
                 <div className="flex min-w-0 items-center gap-1 overflow-hidden">
                   {row.champions.length > 0 ? (
                     row.champions.map((championId, index) => (
-                      // 반쯤 잘린 아이콘을 안 남긴다. 좁은 화면(FHD 배율 125% 등)에선 앞 3개,
-                      // 밸런스 점수 칸이 들어간 뒤로는 FHD(1920)도 다섯 개가 안 들어가 4개까지.
+                      // 좁은 화면(FHD 배율 125% 등)에선 앞 3개만 — 반쯤 잘린 아이콘을 안 남긴다.
                       <span
                         key={championId}
-                        className={cn(
-                          index >= 3 && "max-[1700px]:hidden",
-                          index >= 4 && "max-[2100px]:hidden",
-                        )}
+                        className={cn(index >= 3 && "max-[1700px]:hidden")}
                       >
                         <ChampionIcon championId={championId} size={iconSize} />
                       </span>
@@ -521,33 +577,12 @@ export function AuctionLotDetails({
         )}
       </div>
 
-      {/* ── 타이머 ── */}
-      <div className="flex w-[76px] flex-col items-center pt-1">
-        <div
-          className={cn(
-            "text-4xl font-bold tabular-nums leading-none transition-[text-shadow] duration-200",
-            timeLeft <= 5
-              ? "animate-pulse text-accent-danger [text-shadow:0_0_22px_rgba(239,68,68,0.8),0_0_8px_rgba(239,68,68,0.6)]"
-              : "text-text-primary",
-          )}
-        >
-          {timeLeft}
-        </div>
-        <p className="mt-1.5 text-[11px] text-text-tertiary">남은 시간(초)</p>
-        {yuchalCount > 0 && (
-          <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-accent-warning">
-            <AlertTriangle className="h-3 w-3" />
-            유찰 {yuchalCount}회
-          </div>
-        )}
-      </div>
-
       {/*
         ── 아래: 내전 평균 지표 (좌우 컬럼 전체 폭) ──
         오른쪽 라인 목록 밑에 두면 좌우 높이가 어긋나고 칸이 좁았다.
         카드 전체 폭에 한 줄로 깔아 좌우 두 단을 받친다(2026-10-01 운영자 요청).
       */}
-      <div className="col-span-3 [@media(min-height:900px)]:hidden">
+      <div className="col-span-2 [@media(min-height:821px)]:hidden">
         <p className="mb-1 text-[10px] font-medium text-text-tertiary">
           {recordCaption}
         </p>
