@@ -16,16 +16,15 @@ import { useEffect } from "react";
  * body 가 안 잘렸다 — 로비 참가자·채팅 영역이 안 보이던 원인이다. 새로고침하면
  * 인라인 스타일이 사라져 나았기 때문에 로비 문제로 보였다.
  *
- * 스크롤이 필요한 화면이 직접 켜고, 떠날 때 원래 값으로 되돌린다.
+ * 스크롤이 필요한 화면이 직접 켜고, 떠날 때 끈다.
  * 마크업을 그리지 않으므로 랜딩의 SSR 본문에는 영향이 없다.
  */
 export function LandingBodyScroll() {
+  // 인라인 style 대신 클래스로 켠다 — 구글 비넷 광고가 body style 을 저장했다
+  // 되돌리면서 "auto" 를 다른 화면까지 끌고 가지 않게 (body-scroll-lock.ts 참고).
   useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "auto";
-    return () => {
-      document.body.style.overflow = previous;
-    };
+    document.body.classList.add("landing-scroll");
+    return () => document.body.classList.remove("landing-scroll");
   }, []);
 
   return null;

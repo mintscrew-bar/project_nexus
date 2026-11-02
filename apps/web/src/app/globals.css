@@ -963,3 +963,14 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-text-tertiary;
 }
+
+/* ── body 스크롤 제어 (클래스로만) ──────────────────────────────
+   인라인 style 로 걸면 구글 비넷 광고가 body style 을 저장·복원하면서 잠금을
+   되살려 페이지 스크롤이 죽는다. lib/body-scroll-lock.ts 참고.
+   레이어 밖(unlayered)이라 Tailwind 유틸리티보다 우선한다. */
+body.landing-scroll {
+  overflow: auto;
+}
+body.scroll-locked {
+  overflow: hidden !important;
+}
