@@ -494,7 +494,8 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
               */}
               <div
                 className={cn(
-                  "flex items-center justify-center gap-6 px-5 py-3.5 bg-bg-secondary/60 border-t border-bg-tertiary transition-colors",
+                  // 화면이 1000px 미만이면 위아래 여백을 줄인다 — 매물 카드 위 카운트다운 띠에 높이를 내준다
+                  "flex items-center justify-center gap-6 px-5 py-3.5 [@media(max-height:999px)]:py-2.5 bg-bg-secondary/60 border-t border-bg-tertiary transition-colors",
                   bidFlash && "animate-bid-flash",
                 )}
               >
