@@ -1083,6 +1083,16 @@ export const matchApi = {
     return response.data;
   },
 
+  // Riot 전적 목록의 내전 판 → 넥서스 경기 ID (펼치면 내전 상세를 보여 주려고)
+  getUserInternalRiotMatches: async (
+    userId: string,
+  ): Promise<{ riotMatchId: string; matchId: string }[]> => {
+    const response = await apiClient.get(
+      `/matches/user/${userId}/internal-riot-matches`,
+    );
+    return response.data;
+  },
+
   // Riot 전적 목록에서 Nexus 내전을 식별하기 위한 riotMatchId 전체 목록
   getUserRiotMatchIds: async (userId: string): Promise<string[]> => {
     const response = await apiClient.get(

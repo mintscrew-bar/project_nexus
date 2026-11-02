@@ -229,4 +229,10 @@ export class MatchController {
   async getUserRiotMatchIds(@Param("userId") userId: string) {
     return this.matchService.getUserRiotMatchIds(userId);
   }
+
+  /** Riot 전적 목록의 내전 판을 펼칠 때 쓰는 riotMatchId ↔ 넥서스 경기 ID 쌍 */
+  @Get("user/:userId/internal-riot-matches")
+  async getUserInternalRiotMatches(@Param("userId") userId: string) {
+    return this.matchService.getUserInternalRiotMatches(userId);
+  }
 }

@@ -18,6 +18,7 @@ import { getChampionKoreanName } from "@nexus/types";
 import type { RiotAccount, NexusMatchHistory } from "@/components/matches/match-utils";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
 import RiotMatchList from "@/components/matches/RiotMatchList";
+import { InternalMatchHistoryRow } from "@/components/matches/internal-match/InternalMatchHistoryRow";
 
 interface UserData {
   id: string;
@@ -408,52 +409,12 @@ export default function UserStatsPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {matchHistory.map((match) => (
-                    <Link
-                      key={match.matchId}
-                      href={`${gamePrefix}/matches/match/${match.matchId}`}
-                      className={`flex items-center justify-between p-4 rounded-lg transition-colors ${
-                        match.participant.win
-                          ? "bg-accent-success/10 border border-accent-success/30 hover:bg-accent-success/20"
-                          : "bg-accent-danger/10 border border-accent-danger/30 hover:bg-accent-danger/20"
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <Image
-                          src={getChampionIcon(match.participant.championName)}
-                          alt={match.participant.championName}
-                          width={48}
-                          height={48}
-                          className="w-12 h-12 rounded-lg"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        />
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant={match.participant.win ? "success" : "danger"}>
-                              {match.participant.win ? "승리" : "패배"}
-                            </Badge>
-                            <span className="text-sm text-text-secondary">
-                              {match.participant.position}
-                            </span>
-                          </div>
-                          <p className="text-sm font-semibold text-text-primary">
-                            {getChampionKoreanName(match.participant.championName)}
-                          </p>
-                          <p className="text-xs text-text-tertiary">
-                            {match.team?.name ?? "팀 미배정"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-text-primary">
-                          {match.participant.kills} / {match.participant.deaths} / {match.participant.assists}
-                        </p>
-                        <p className="text-sm text-text-secondary">
-                          {match.participant.kda.toFixed(2)} KDA
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
+                  {/* 일반 전적과 같은 행 — 누르면 그 자리에서 내전 상세가 펼쳐진다 */}
+                  <div className="overflow-hidden rounded-lg divide-y divide-bg-tertiary/40">
+                    {matchHistory.map((match) => (
+                      <InternalMatchHistoryRow key={match.matchId} match={match} />
+                    ))}
+                  </div>
 
                   {/* 더 보기 버튼 */}
                   {hasMore && (

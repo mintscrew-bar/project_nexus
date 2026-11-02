@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { getChampionKoreanName } from "@nexus/types";
+import { InternalMatchExpand } from "@/components/matches/internal-match/InternalMatchExpand";
 
 
 // ─── Main Component ──────────────────────────────────
@@ -56,16 +57,28 @@ export default function RiotMatchList({
   // 화면용 매치 히스토리는 페이지네이션되지만 Riot 전적은 무한 스크롤되므로,
   // 그 목록을 재사용하면 오래된 내전이 "사용자 지정"으로 잘못 표시된다.
   // ID만 담은 전용 엔드포인트로 전체를 받아 대조한다.
-  const { data: nexusRiotMatchIdList } = useQuery<string[]>({
-    queryKey: ["nexusRiotMatchIds", nexusUserId],
-    queryFn: () => matchApi.getUserRiotMatchIds(nexusUserId!),
+  // 넥서스 경기 ID 도 같이 받는다 — 내전 판을 펼치면 Riot 화면 대신
+  // 넥서스 내전 상세(InternalMatchExpand)를 보여 주기 위해서다.
+  const { data: nexusInternalMatches } = useQuery<
+    { riotMatchId: string; matchId: string }[]
+  >({
+    queryKey: ["nexusInternalRiotMatches", nexusUserId],
+    queryFn: () => matchApi.getUserInternalRiotMatches(nexusUserId!),
     staleTime: 5 * 60 * 1000,
     enabled: !!nexusUserId,
   });
 
+  /** Riot 매치 ID → 넥서스 경기 ID */
+  const nexusMatchIdByRiotId = useMemo(
+    () =>
+      new Map(
+        (nexusInternalMatches ?? []).map((m) => [m.riotMatchId, m.matchId]),
+      ),
+    [nexusInternalMatches],
+  );
   const nexusRiotMatchIds = useMemo(
-    () => new Set(nexusRiotMatchIdList ?? []),
-    [nexusRiotMatchIdList],
+    () => new Set(nexusMatchIdByRiotId.keys()),
+    [nexusMatchIdByRiotId],
   );
   const [selectedQueueId, setSelectedQueueId] = useState<number | undefined>(undefined);
   const [expandedMatches, setExpandedMatches] = useState<Set<string>>(new Set());
@@ -205,6 +218,7 @@ export default function RiotMatchList({
 
             const matchId = match.metadata.matchId;
             const isExpanded = expandedMatches.has(matchId);
+            const nexusMatchId = nexusMatchIdByRiotId.get(matchId);
 
             const kda = participant.deaths === 0
               ? "Perfect"
@@ -519,8 +533,19 @@ export default function RiotMatchList({
                   )}
                 </div>
 
+                {/* 내전 판: 넥서스 내전 상세를 펼친다 (어느 목록에서 열든 같은 모양) */}
+                {mountedMatchesRef.current.has(matchId) && nexusMatchId && (
+                  <div style={{ display: 'grid', gridTemplateRows: isExpanded ? '1fr' : '0fr', transition: 'grid-template-rows 0.2s ease' }}>
+                    <div className="overflow-hidden">
+                      <div className="border-t border-bg-tertiary/40 p-3 sm:p-4">
+                        <InternalMatchExpand matchId={nexusMatchId} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Expanded Content */}
-                {mountedMatchesRef.current.has(matchId) && (
+                {mountedMatchesRef.current.has(matchId) && !nexusMatchId && (
                   <div style={{ display: 'grid', gridTemplateRows: isExpanded ? '1fr' : '0fr', transition: 'grid-template-rows 0.2s ease' }}>
                   <div className="overflow-hidden"><div className="border-t border-bg-tertiary/40">
                     <div className="flex border-b border-bg-tertiary bg-bg-tertiary/30">

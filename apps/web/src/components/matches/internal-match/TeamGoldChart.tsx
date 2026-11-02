@@ -107,9 +107,9 @@ function buildSeries(timeline: any, teams: [GoldChartTeam, GoldChartTeam]) {
               ? "horde"
               : e.monsterType === "RIFTHERALD"
                 ? "herald"
-                  : e.monsterType === "BARON_NASHOR"
-                    ? "baron"
-                    : null;
+                : e.monsterType === "BARON_NASHOR"
+                  ? "baron"
+                  : null;
         if (type)
           events.push({ minute, type, team: riotSideTeam(e.killerTeamId) });
       } else if (e.type === "BUILDING_KILL" && e.teamId) {

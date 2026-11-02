@@ -1651,6 +1651,33 @@ export class MatchService {
    * 그 목록을 재사용하면 오래된 내전이 "사용자 지정"으로 잘못 표시된다.
    * ID만 담은 경량 응답이라 전체를 내려도 부담이 없다.
    */
+  /**
+   * 유저가 뛴 내전의 Riot 매치 ID ↔ 넥서스 경기 ID 쌍.
+   * 일반(Riot) 전적 목록에 섞인 내전 판을 펼칠 때 넥서스 내전 상세를 불러오려면
+   * 넥서스 경기 ID 가 필요하다. 대상 조건은 getUserRiotMatchIds 와 같다.
+   */
+  async getUserInternalRiotMatches(
+    userId: string,
+  ): Promise<{ riotMatchId: string; matchId: string }[]> {
+    const matches = await this.prisma.match.findMany({
+      where: {
+        isInternal: true,
+        riotMatchId: { not: null },
+        OR: [
+          { teamA: { members: { some: { userId } } } },
+          { teamB: { members: { some: { userId } } } },
+          { rosterSnapshots: { some: { userId } } },
+        ],
+      },
+      select: { id: true, riotMatchId: true },
+    });
+    return matches.flatMap((match) =>
+      match.riotMatchId
+        ? [{ riotMatchId: match.riotMatchId, matchId: match.id }]
+        : [],
+    );
+  }
+
   async getUserRiotMatchIds(userId: string): Promise<string[]> {
     const matches = await this.prisma.match.findMany({
       where: {
