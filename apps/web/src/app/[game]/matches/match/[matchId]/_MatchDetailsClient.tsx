@@ -3,7 +3,8 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { matchApi } from "@/lib/api-client";
+import { matchApi, statsApi } from "@/lib/api-client";
+import { TeamGoldChart } from "./_TeamGoldChart";
 import { Button, Badge, Skeleton } from "@/components/ui";
 import {
   ArrowLeft,
@@ -85,6 +86,9 @@ interface MatchParticipant {
   totalTimeSpentDead: number;
   win: boolean;
   riotIdSnapshot?: string | null;
+  // 골드 차이 그래프에서 Riot 타임라인 참가자를 팀으로 나눌 때 쓴다
+  puuid?: string | null;
+  riotTeamId?: number | null;
   user: {
     id: string;
     username: string;
@@ -1394,6 +1398,26 @@ export default function MatchDetailsClient({
     fetchMatchDetails();
   }, [initialMatch, matchId]);
 
+  // 골드 차이 그래프용 Riot 타임라인. Riot 매치 ID 가 있는(토너먼트 코드로 수집된)
+  // 경기만 가능하다. 실패하면 그래프만 빠지고 나머지 화면은 그대로다.
+  const riotMatchId = match?.riotMatchId ?? null;
+  const [timeline, setTimeline] = useState<any>(null);
+  useEffect(() => {
+    if (!riotMatchId) return;
+    let cancelled = false;
+    statsApi
+      .getMatchTimeline(riotMatchId)
+      .then((data) => {
+        if (!cancelled) setTimeline(data);
+      })
+      .catch(() => {
+        // 타임라인이 없으면(오래된 경기·Riot 오류) 그래프를 그리지 않는다
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [riotMatchId]);
+
   if (isLoading) return <MatchSkeleton />;
 
   if (error || !match) {
@@ -1634,6 +1658,31 @@ export default function MatchDetailsClient({
             </div>
           </div>
         </div>
+
+        {/* ──────────── 골드 차이 그래프 (대회 중계 방식) ──────────── */}
+        {timeline && (
+          <TeamGoldChart
+            timeline={timeline}
+            teams={[
+              {
+                name: match.teamA.name,
+                color: TEAM_A_COLOR,
+                puuids: teamAParticipants.flatMap((p) =>
+                  p.puuid ? [p.puuid] : [],
+                ),
+                riotTeamId: teamAParticipants[0]?.riotTeamId ?? null,
+              },
+              {
+                name: match.teamB.name,
+                color: TEAM_B_COLOR,
+                puuids: teamBParticipants.flatMap((p) =>
+                  p.puuid ? [p.puuid] : [],
+                ),
+                riotTeamId: teamBParticipants[0]?.riotTeamId ?? null,
+              },
+            ]}
+          />
+        )}
 
         {/* ──────────── Section 2: Team Comparison Bars ──────────── */}
         <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-5 space-y-3">
