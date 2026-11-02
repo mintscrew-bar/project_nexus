@@ -1988,7 +1988,10 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         maxParticipants: true,
         hostId: true,
         host: { select: { username: true } },
-        _count: { select: { participants: true } },
+        // 인원 표시는 선수만 센다. 관전자·운영자 방장까지 세면 정원을 넘겨 보인다.
+        _count: {
+          select: { participants: { where: { role: "PLAYER" } } },
+        },
       },
       orderBy: { createdAt: "desc" },
       take: 10,
