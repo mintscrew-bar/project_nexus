@@ -1664,11 +1664,17 @@ export function FriendsPanel() {
     setFriendCategory(friendId, categoryId);
   };
 
-  // Can invite: in a room with space and status WAITING
+  // 초대 가능 여부 — 서버(room-invite.service)와 같은 기준으로 본다.
+  // 정원은 선수만 센다. 관전자·운영자 방장까지 세면 20명 방에 운영자 방장이
+  // 있을 때 선수 19명에서 초대 버튼이 사라져 마지막 한 명을 못 불렀다.
+  // 관전 허용 방은 선수 자리가 차도 관전자로 들어올 수 있으니 초대를 막지 않는다.
+  const invitePlayerCount =
+    room?.participants.filter((p) => p.role !== "SPECTATOR").length ?? 0;
   const canInvite =
     !!room &&
     room.status === "WAITING" &&
-    room.participants.length < room.maxParticipants;
+    (invitePlayerCount < room.maxParticipants ||
+      room.allowSpectators !== false);
 
   // 친구/대화 클릭 시 플로팅 DM 창 열기
   const handleOpenDm = useCallback(

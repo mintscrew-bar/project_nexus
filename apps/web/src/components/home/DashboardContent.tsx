@@ -926,7 +926,11 @@ function ActiveRoomsCard({ rooms }: { rooms: Room[] }) {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {rooms.map((room) => {
-                const filled = room.participants?.length ?? 0;
+                // 정원은 선수만 센다. 관전자·운영자 방장을 넣으면 21/20 처럼
+                // 정원을 넘겨 보이거나 자리가 남았는데 만석(빨강)으로 보인다.
+                const filled = (room.participants ?? []).filter(
+                  (participant: any) => participant.role !== "SPECTATOR",
+                ).length;
                 const fillRatio =
                   room.maxParticipants > 0 ? filled / room.maxParticipants : 0;
                 const isFull = filled >= room.maxParticipants;
