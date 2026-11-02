@@ -331,6 +331,8 @@ export class UserService {
           neutralMinionsKilled: true,
           visionScore: true,
           goldEarned: true,
+          // 라이엇 challenges 의 킬관여(0~1). 오래된 기록은 NULL 이고 평균에서 빠진다.
+          killParticipation: true,
         },
         _count: { id: true },
       }),
@@ -366,6 +368,11 @@ export class UserService {
             ),
             vision: Math.round((kdaAgg._avg.visionScore ?? 0) * 10) / 10,
             gold: Math.round(kdaAgg._avg.goldEarned ?? 0),
+            // 퍼센트(정수). 값이 있는 판이 하나도 없으면 null — 0% 와 구분한다.
+            killParticipation:
+              kdaAgg._avg.killParticipation != null
+                ? Math.round(kdaAgg._avg.killParticipation * 100)
+                : null,
           }
         : null;
 

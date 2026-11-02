@@ -664,6 +664,8 @@ export const userApi = {
       vision?: number;
       /** 내전 판당 평균 획득 골드 */
       gold?: number;
+      /** 내전 평균 킬관여율(%). 수집된 값이 없으면 null */
+      killParticipation?: number | null;
     } | null;
     reputation: { overallAverage: number; totalRatings: number };
   }> => {

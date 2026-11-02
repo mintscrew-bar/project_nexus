@@ -90,7 +90,13 @@ function useSeedHoverProfile() {
           { role: "JUNGLE", tier: "EMERALD", rank: "II", lp: 0 },
           { role: "MID", tier: "DIAMOND", rank: "I", lp: 0 },
         ],
-        balanceScores: null,
+        balanceScores: {
+          TOP: 17.2,
+          JUNGLE: 15.8,
+          MID: 19.4,
+          ADC: 21.6,
+          SUPPORT: 18.1,
+        },
         championPreferences: ROLES.flatMap((role) =>
           CHAMPIONS[role].map((championId, order) => ({
             role,
@@ -103,9 +109,19 @@ function useSeedHoverProfile() {
       clan: null,
       streamerProfiles: [],
       streamerLinks: [],
-      stats: { wins: 0, losses: 0, winRate: 0 },
-      kda: null,
-      reputation: { overallAverage: 0, totalRatings: 0 },
+      stats: { wins: 14, losses: 9, winRate: 60.9 },
+      kda: {
+        kills: 6.4,
+        deaths: 4.1,
+        assists: 8.7,
+        games: 21,
+        damage: 21450,
+        cs: 187,
+        vision: 24.6,
+        gold: 12380,
+        killParticipation: 58,
+      },
+      reputation: { overallAverage: 4.3, totalRatings: 12 },
     });
     setSeeded(true);
   }
