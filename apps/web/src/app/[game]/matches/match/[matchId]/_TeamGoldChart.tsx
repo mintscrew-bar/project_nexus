@@ -13,6 +13,10 @@ import { useMemo, useState } from "react";
 //
 // 분당 골드는 Riot 타임라인(match-v5 /timeline)에만 있다. 토너먼트 코드로
 // 수집된 경기(riotMatchId 있음)만 그릴 수 있다.
+//
+// 아이콘: 롤 클라이언트 전적 화면 에셋(CommunityDragon rcp-fe-lol-match-history).
+// 공허 유충·아타칸은 회색 한 벌(right_icons_grub.png 스프라이트)뿐이라
+// 다른 아이콘과 같은 팀색으로 다시 칠해 horde-/atakhan-{100,200}.png 로 뒀다.
 
 export interface GoldChartTeam {
   name: string;
@@ -23,7 +27,8 @@ export interface GoldChartTeam {
   riotTeamId: number | null;
 }
 
-type ObjectiveType = "dragon" | "herald" | "baron" | "tower" | "inhibitor";
+type ObjectiveType =
+  "dragon" | "horde" | "herald" | "atakhan" | "baron" | "tower" | "inhibitor";
 
 interface ObjectiveEvent {
   minute: number;
@@ -34,7 +39,9 @@ interface ObjectiveEvent {
 
 const OBJECTIVE_LABEL: Record<ObjectiveType, string> = {
   dragon: "드래곤",
+  horde: "공허 유충",
   herald: "협곡의 전령",
+  atakhan: "아타칸",
   baron: "내셔 남작",
   tower: "포탑",
   inhibitor: "억제기",
@@ -97,11 +104,15 @@ function buildSeries(timeline: any, teams: [GoldChartTeam, GoldChartTeam]) {
         const type: ObjectiveType | null =
           e.monsterType === "DRAGON"
             ? "dragon"
-            : e.monsterType === "RIFTHERALD"
-              ? "herald"
-              : e.monsterType === "BARON_NASHOR"
-                ? "baron"
-                : null; // 공허 유충·아타칸은 공식 아이콘이 없어 생략
+            : e.monsterType === "HORDE"
+              ? "horde"
+              : e.monsterType === "RIFTHERALD"
+                ? "herald"
+                : e.monsterType === "ATAKHAN"
+                  ? "atakhan"
+                  : e.monsterType === "BARON_NASHOR"
+                    ? "baron"
+                    : null;
         if (type)
           events.push({ minute, type, team: riotSideTeam(e.killerTeamId) });
       } else if (e.type === "BUILDING_KILL" && e.teamId) {
@@ -371,8 +382,8 @@ function ObjectiveRow({
   return (
     <div className="relative h-6">
       {events.map((e, i) => {
-        // 포탑은 자주 나와서 작게
-        const size = e.type === "tower" ? 14 : 20;
+        // 포탑·유충은 자주 나와서 작게
+        const size = e.type === "tower" || e.type === "horde" ? 14 : 20;
         return (
           // eslint-disable-next-line @next/next/no-img-element
           <img
