@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { matchApi } from "@/lib/api-client";
 import { Button, Badge, Skeleton } from "@/components/ui";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui";
 import {
   ArrowLeft,
   Trophy,
@@ -274,8 +273,9 @@ function ComparisonBar({
   valueB: number;
   format: (v: number) => string;
 }) {
-  const total = valueA + valueB || 1;
-  const pctA = (valueA / total) * 100;
+  // 양쪽 다 0이면 비율이 없다. 예전엔 B팀 100% 로 그려져 전부 빨강이었다.
+  const empty = valueA + valueB === 0;
+  const pctA = empty ? 50 : (valueA / (valueA + valueB)) * 100;
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
@@ -289,55 +289,69 @@ function ComparisonBar({
       <div className="flex h-2 rounded-full overflow-hidden bg-bg-tertiary">
         <div
           className="h-full transition-all duration-500 rounded-l-full"
-          style={{ width: `${pctA}%`, backgroundColor: TEAM_A_COLOR }}
+          style={{
+            width: `${pctA}%`,
+            backgroundColor: empty ? "transparent" : TEAM_A_COLOR,
+          }}
         />
         <div
           className="h-full transition-all duration-500 rounded-r-full"
-          style={{ width: `${100 - pctA}%`, backgroundColor: TEAM_B_COLOR }}
+          style={{
+            width: `${100 - pctA}%`,
+            backgroundColor: empty ? "transparent" : TEAM_B_COLOR,
+          }}
         />
       </div>
     </div>
   );
 }
 
-function ObjectiveIcon({ type, count }: { type: string; count: number }) {
-  const icons: Record<string, string> = {
-    baron: "🟣",
-    dragon: "🐉",
-    tower: "🏰",
-    herald: "🦀",
-    inhibitor: "💎",
-  };
+// 롤 클라이언트 전적 화면의 공식 오브젝트 아이콘 (CommunityDragon 에서 받아
+// public/icons/objectives 에 둠). 팀색 두 벌이 있다: -100 블루, -200 레드.
+// 라벨도 한국 클라이언트 표기를 따른다.
+const OBJECTIVES = {
+  tower: "포탑",
+  inhibitor: "억제기",
+  dragon: "드래곤",
+  herald: "협곡의 전령",
+  baron: "내셔 남작",
+} as const;
+
+function ObjectiveIcon({
+  type,
+  count,
+  side,
+}: {
+  type: keyof typeof OBJECTIVES;
+  count: number;
+  /** 아이콘 색 — 팀 A(블루색) 100, 팀 B(레드색) 200 */
+  side: 100 | 200;
+}) {
+  const label = OBJECTIVES[type];
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <span className="text-lg">{icons[type] || "❓"}</span>
-      <span className="text-sm font-bold text-text-primary">{count}</span>
-      <span className="text-[10px] text-text-tertiary capitalize">
-        {type === "herald"
-          ? "전령"
-          : type === "baron"
-            ? "바론"
-            : type === "dragon"
-              ? "드래곤"
-              : type === "tower"
-                ? "타워"
-                : type === "inhibitor"
-                  ? "억제기"
-                  : type}
+    <div
+      className={`flex items-center gap-1.5 ${count === 0 ? "opacity-40" : ""}`}
+      title={`${label} ${count}`}
+    >
+      <Image
+        src={`/icons/objectives/${type}-${side}.png`}
+        alt={label}
+        width={20}
+        height={20}
+        className="w-5 h-5"
+        unoptimized
+      />
+      <span className="text-sm font-bold text-text-primary tabular-nums">
+        {count}
       </span>
     </div>
   );
 }
 
 function FirstBadge({ label, active }: { label: string; active: boolean }) {
+  if (!active) return null;
   return (
-    <span
-      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-        active
-          ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-          : "bg-bg-tertiary text-text-tertiary/40"
-      }`}
-    >
+    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
       {label}
     </span>
   );
@@ -844,246 +858,256 @@ function TeamSection({
   );
 }
 
-// ─── Detail Stats Tabs ───────────────────────────────
+// ─── 상세 스탯 표 ─────────────────────────────────────
+//
+// 예전에는 항목마다(딜량·받은 피해·회복·시야…·CS/분, 11개) 10명짜리 순위 막대를
+// 따로 그려서 세로로 110줄이 넘었고, 숫자도 31.2k 처럼 줄여 보여 줬다.
+// 이제는 표 하나에 10명 = 10줄, 항목은 가로 칸이다. 숫자는 축약 없이 전부 쓰고,
+// 숫자 밑 얇은 막대(팀색)로 10명 중 상대 크기를 보여 준다.
+// 칸 제목을 누르면 팀 안에서 그 항목 순으로 정렬한다 (팀 구분은 유지).
 
-function DetailStatsTabs({
+interface StatColumn {
+  key: string;
+  label: string;
+  group: "전투" | "시야" | "경제";
+  getValue: (p: MatchParticipant, minutes: number) => number;
+  /** 소수 자리. 없으면 정수로 천 단위 쉼표 */
+  digits?: number;
+}
+
+const STAT_COLUMNS: StatColumn[] = [
+  {
+    key: "damage",
+    label: "챔피언 딜량",
+    group: "전투",
+    getValue: (p) => p.totalDamageDealtToChampions,
+  },
+  {
+    key: "taken",
+    label: "받은 피해",
+    group: "전투",
+    getValue: (p) => p.totalDamageTaken,
+  },
+  { key: "heal", label: "회복량", group: "전투", getValue: (p) => p.totalHeal },
+  {
+    key: "vision",
+    label: "시야 점수",
+    group: "시야",
+    getValue: (p) => p.visionScore,
+  },
+  {
+    key: "wardsPlaced",
+    label: "와드 설치",
+    group: "시야",
+    getValue: (p) => p.wardsPlaced,
+  },
+  {
+    key: "wardsKilled",
+    label: "와드 제거",
+    group: "시야",
+    getValue: (p) => p.wardsKilled,
+  },
+  {
+    key: "controlWards",
+    label: "제어 와드",
+    group: "시야",
+    getValue: (p) => p.detectorWardsPlaced,
+  },
+  {
+    key: "goldEarned",
+    label: "골드 획득",
+    group: "경제",
+    getValue: (p) => p.goldEarned,
+  },
+  {
+    key: "goldSpent",
+    label: "골드 사용",
+    group: "경제",
+    getValue: (p) => p.goldSpent,
+  },
+  {
+    key: "cs",
+    label: "CS",
+    group: "경제",
+    getValue: (p) => p.totalMinionsKilled + p.neutralMinionsKilled,
+  },
+  {
+    key: "csPerMin",
+    label: "분당 CS",
+    group: "경제",
+    getValue: (p, minutes) =>
+      (p.totalMinionsKilled + p.neutralMinionsKilled) / minutes,
+    digits: 1,
+  },
+];
+
+/** 칸 묶음 머리글 — 연속된 같은 group 을 colSpan 으로 합친다 */
+const STAT_GROUPS = STAT_COLUMNS.reduce<{ name: string; span: number }[]>(
+  (groups, column) => {
+    const last = groups[groups.length - 1];
+    if (last && last.name === column.group) last.span += 1;
+    else groups.push({ name: column.group, span: 1 });
+    return groups;
+  },
+  [],
+);
+
+function formatStat(value: number, digits?: number) {
+  return value.toLocaleString("ko-KR", {
+    minimumFractionDigits: digits ?? 0,
+    maximumFractionDigits: digits ?? 0,
+  });
+}
+
+function DetailStatsTable({
+  teams,
   allParticipants,
   gameDuration,
 }: {
+  /** 위에서부터 그릴 팀 순서 (승리 팀 먼저) */
+  teams: { name: string; color: string; participants: MatchParticipant[] }[];
   allParticipants: MatchParticipant[];
   gameDuration: number;
 }) {
-  const sorted = [...allParticipants];
+  // 기본은 딜량 내림차순
+  const [sortKey, setSortKey] = useState("damage");
+  const minutes = Math.max(gameDuration / 60, 1);
+  const sortColumn =
+    STAT_COLUMNS.find((column) => column.key === sortKey) ?? STAT_COLUMNS[0];
 
-  return (
-    <Tabs
-      defaultValue="damage"
-      className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4"
-    >
-      <TabsList className="mb-4">
-        <TabsTrigger value="damage">딜량 상세</TabsTrigger>
-        <TabsTrigger value="vision">시야 상세</TabsTrigger>
-        <TabsTrigger value="economy">경제</TabsTrigger>
-      </TabsList>
-
-      {/* Damage Tab */}
-      <TabsContent value="damage">
-        <div className="space-y-2">
-          <StatBarSection
-            title="챔피언 딜량"
-            participants={sorted.sort(
-              (a, b) =>
-                b.totalDamageDealtToChampions - a.totalDamageDealtToChampions,
-            )}
-            getValue={(p) => p.totalDamageDealtToChampions}
-            gradient="bg-gradient-to-r from-red-600 to-orange-500"
-          />
-          <div className="border-t border-bg-tertiary my-4" />
-          <StatBarSection
-            title="받은 피해량"
-            participants={[...allParticipants].sort(
-              (a, b) => b.totalDamageTaken - a.totalDamageTaken,
-            )}
-            getValue={(p) => p.totalDamageTaken}
-            gradient="bg-gradient-to-r from-blue-600 to-cyan-500"
-          />
-          <div className="border-t border-bg-tertiary my-4" />
-          <StatBarSection
-            title="회복량"
-            participants={[...allParticipants].sort(
-              (a, b) => b.totalHeal - a.totalHeal,
-            )}
-            getValue={(p) => p.totalHeal}
-            gradient="bg-gradient-to-r from-green-600 to-emerald-500"
-          />
-        </div>
-      </TabsContent>
-
-      {/* Vision Tab */}
-      <TabsContent value="vision">
-        <div className="space-y-2">
-          <StatBarSection
-            title="시야 점수"
-            participants={[...allParticipants].sort(
-              (a, b) => b.visionScore - a.visionScore,
-            )}
-            getValue={(p) => p.visionScore}
-            gradient="bg-gradient-to-r from-yellow-600 to-amber-500"
-            raw
-          />
-          <div className="border-t border-bg-tertiary my-4" />
-          <StatBarSection
-            title="와드 설치"
-            participants={[...allParticipants].sort(
-              (a, b) => b.wardsPlaced - a.wardsPlaced,
-            )}
-            getValue={(p) => p.wardsPlaced}
-            gradient="bg-gradient-to-r from-emerald-600 to-green-500"
-            raw
-          />
-          <div className="border-t border-bg-tertiary my-4" />
-          <StatBarSection
-            title="와드 제거"
-            participants={[...allParticipants].sort(
-              (a, b) => b.wardsKilled - a.wardsKilled,
-            )}
-            getValue={(p) => p.wardsKilled}
-            gradient="bg-gradient-to-r from-rose-600 to-pink-500"
-            raw
-          />
-          <div className="border-t border-bg-tertiary my-4" />
-          <StatBarSection
-            title="제어 와드"
-            participants={[...allParticipants].sort(
-              (a, b) => b.detectorWardsPlaced - a.detectorWardsPlaced,
-            )}
-            getValue={(p) => p.detectorWardsPlaced}
-            gradient="bg-gradient-to-r from-purple-600 to-violet-500"
-            raw
-          />
-        </div>
-      </TabsContent>
-
-      {/* Economy Tab */}
-      <TabsContent value="economy">
-        <div className="space-y-2">
-          <StatBarSection
-            title="골드 획득"
-            participants={[...allParticipants].sort(
-              (a, b) => b.goldEarned - a.goldEarned,
-            )}
-            getValue={(p) => p.goldEarned}
-            gradient="bg-gradient-to-r from-yellow-600 to-amber-500"
-          />
-          <div className="border-t border-bg-tertiary my-4" />
-          <StatBarSection
-            title="골드 사용"
-            participants={[...allParticipants].sort(
-              (a, b) => b.goldSpent - a.goldSpent,
-            )}
-            getValue={(p) => p.goldSpent}
-            gradient="bg-gradient-to-r from-orange-600 to-yellow-500"
-          />
-          <div className="border-t border-bg-tertiary my-4" />
-          <StatBarSection
-            title="CS (총)"
-            participants={[...allParticipants].sort(
-              (a, b) =>
-                b.totalMinionsKilled +
-                b.neutralMinionsKilled -
-                (a.totalMinionsKilled + a.neutralMinionsKilled),
-            )}
-            getValue={(p) => p.totalMinionsKilled + p.neutralMinionsKilled}
-            gradient="bg-gradient-to-r from-teal-600 to-cyan-500"
-            raw
-          />
-          <div className="border-t border-bg-tertiary my-4" />
-          <StatBarSection
-            title="CS/분"
-            participants={[...allParticipants].sort((a, b) => {
-              const csA =
-                (a.totalMinionsKilled + a.neutralMinionsKilled) /
-                Math.max(gameDuration / 60, 1);
-              const csB =
-                (b.totalMinionsKilled + b.neutralMinionsKilled) /
-                Math.max(gameDuration / 60, 1);
-              return csB - csA;
-            })}
-            getValue={(p) => {
-              const mins = Math.max(gameDuration / 60, 1);
-              return (p.totalMinionsKilled + p.neutralMinionsKilled) / mins;
-            }}
-            gradient="bg-gradient-to-r from-sky-600 to-blue-500"
-            formatValue={(v) => v.toFixed(1)}
-          />
-        </div>
-      </TabsContent>
-    </Tabs>
+  // 막대 길이와 "최고" 강조는 팀 구분 없이 전체 10명 기준이다
+  const maxByKey = new Map(
+    STAT_COLUMNS.map((column) => [
+      column.key,
+      Math.max(...allParticipants.map((p) => column.getValue(p, minutes)), 0),
+    ]),
   );
-}
-
-function StatBarSection({
-  title,
-  participants,
-  getValue,
-  gradient,
-  raw,
-  formatValue,
-  defaultShowCount = 5,
-}: {
-  title: string;
-  participants: MatchParticipant[];
-  getValue: (p: MatchParticipant) => number;
-  gradient: string;
-  raw?: boolean;
-  formatValue?: (v: number) => string;
-  defaultShowCount?: number;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const maxVal = Math.max(...participants.map(getValue), 1);
-  const needsExpand = participants.length > defaultShowCount;
-  const visible =
-    expanded || !needsExpand
-      ? participants
-      : participants.slice(0, defaultShowCount);
-
-  const fmt = (v: number) => {
-    if (formatValue) return formatValue(v);
-    if (raw) return v.toString();
-    return (v / 1000).toFixed(1) + "k";
-  };
 
   return (
-    <div>
-      <h4 className="text-sm font-semibold text-text-secondary mb-2">
-        {title}
-      </h4>
-      <div className="space-y-1">
-        {visible.map((p) => {
-          const val = getValue(p);
-          const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
-          return (
-            <div key={p.id} className="flex items-center gap-2">
-              <Image
-                src={getChampionIcon(p.championName)}
-                alt={p.championName}
-                width={20}
-                height={20}
-                className="w-5 h-5 rounded flex-shrink-0"
-              />
-              <span className="text-xs text-text-secondary w-16 truncate flex-shrink-0">
-                {p.user.username}
-              </span>
-              <div className="flex-1 h-4 bg-bg-tertiary rounded overflow-hidden">
-                <div
-                  className={`h-full rounded ${gradient} transition-all duration-300`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <span className="text-xs font-bold text-text-primary w-12 text-right flex-shrink-0">
-                {fmt(val)}
-              </span>
-            </div>
-          );
-        })}
+    <div className="bg-bg-secondary border border-bg-tertiary rounded-xl overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1100px] border-collapse text-xs tabular-nums">
+          <thead>
+            {/* 묶음 머리글 */}
+            <tr className="text-[10px] text-text-tertiary">
+              <th className="sticky left-0 z-10 bg-bg-secondary" />
+              {STAT_GROUPS.map((group) => (
+                <th
+                  key={group.name}
+                  colSpan={group.span}
+                  className="px-3 pt-3 pb-1 text-center font-medium border-l border-bg-tertiary"
+                >
+                  {group.name}
+                </th>
+              ))}
+            </tr>
+            <tr className="border-b border-bg-tertiary">
+              <th className="sticky left-0 z-10 bg-bg-secondary px-4 py-2 text-left font-medium text-text-tertiary">
+                플레이어
+              </th>
+              {STAT_COLUMNS.map((column, index) => {
+                const active = column.key === sortKey;
+                // 묶음이 바뀌는 칸에 세로 구분선
+                const groupStart =
+                  index === 0 || STAT_COLUMNS[index - 1].group !== column.group;
+                return (
+                  <th
+                    key={column.key}
+                    className={`px-3 py-2 text-right font-medium ${groupStart ? "border-l border-bg-tertiary" : ""}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSortKey(column.key)}
+                      className={`inline-flex items-center gap-0.5 whitespace-nowrap transition-colors ${
+                        active
+                          ? "text-text-primary"
+                          : "text-text-tertiary hover:text-text-secondary"
+                      }`}
+                    >
+                      {column.label}
+                      {active && <ChevronDown className="h-3 w-3" />}
+                    </button>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          {teams.map((team) => {
+            const rows = [...team.participants].sort(
+              (a, b) =>
+                sortColumn.getValue(b, minutes) -
+                sortColumn.getValue(a, minutes),
+            );
+            return (
+              <tbody key={team.name}>
+                <tr>
+                  <td
+                    colSpan={STAT_COLUMNS.length + 1}
+                    className="px-4 pt-3 pb-1 text-[11px] font-semibold"
+                    style={{ color: team.color }}
+                  >
+                    ● {team.name}
+                  </td>
+                </tr>
+                {rows.map((p) => (
+                  <tr
+                    key={p.id}
+                    className="border-b border-bg-tertiary/50 last:border-b-0 hover:bg-bg-tertiary/30"
+                  >
+                    <td className="sticky left-0 z-10 bg-bg-secondary px-4 py-2">
+                      <div className="flex items-center gap-2">
+                        <Image
+                          src={getChampionIcon(p.championName)}
+                          alt={p.championName}
+                          width={20}
+                          height={20}
+                          className="w-5 h-5 rounded flex-shrink-0"
+                        />
+                        <span className="max-w-[110px] truncate text-text-secondary">
+                          {p.user.username}
+                        </span>
+                      </div>
+                    </td>
+                    {STAT_COLUMNS.map((column, index) => {
+                      const value = column.getValue(p, minutes);
+                      const max = maxByKey.get(column.key) ?? 0;
+                      const isTop = max > 0 && value === max;
+                      const groupStart =
+                        index === 0 ||
+                        STAT_COLUMNS[index - 1].group !== column.group;
+                      return (
+                        <td
+                          key={column.key}
+                          className={`px-3 py-2 text-right align-middle ${groupStart ? "border-l border-bg-tertiary" : ""}`}
+                        >
+                          <div
+                            className={
+                              isTop
+                                ? "font-bold text-text-primary"
+                                : "text-text-secondary"
+                            }
+                          >
+                            {formatStat(value, column.digits)}
+                          </div>
+                          <div className="mt-1 ml-auto h-[3px] w-full max-w-[72px] rounded-full bg-bg-tertiary overflow-hidden">
+                            <div
+                              className="ml-auto h-full rounded-full"
+                              style={{
+                                width: `${max > 0 ? (value / max) * 100 : 0}%`,
+                                backgroundColor: team.color,
+                              }}
+                            />
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            );
+          })}
+        </table>
       </div>
-      {needsExpand && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="mt-2 text-xs text-accent-primary hover:text-accent-hover flex items-center gap-1 mx-auto"
-        >
-          {expanded ? (
-            <>
-              접기 <ChevronUp className="h-3 w-3" />
-            </>
-          ) : (
-            <>
-              나머지 {participants.length - defaultShowCount}명 더 보기{" "}
-              <ChevronDown className="h-3 w-3" />
-            </>
-          )}
-        </button>
-      )}
     </div>
   );
 }
@@ -1617,111 +1641,83 @@ export default function MatchDetailsClient({
         </div>
 
         {/* ──────────── Section 3: Objectives & Firsts ──────────── */}
+        {/* 팀당 한 줄: 팀 이름 · 공식 오브젝트 아이콘 · 달성한 "첫 ~" 배지만 */}
         {(teamAStats || teamBStats) && (
-          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-5">
-            <div className="grid grid-cols-2 gap-6">
-              {/* Team A Objectives */}
-              <div>
-                <h3 className="text-sm font-semibold text-text-secondary mb-3 flex items-center gap-2">
+          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl divide-y divide-bg-tertiary">
+            {(
+              [
+                {
+                  name: match.teamA.name,
+                  color: TEAM_A_COLOR,
+                  stats: teamAStats,
+                  side: 100,
+                },
+                {
+                  name: match.teamB.name,
+                  color: TEAM_B_COLOR,
+                  stats: teamBStats,
+                  side: 200,
+                },
+              ] as const
+            ).map((team) => (
+              <div
+                key={team.side}
+                className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3"
+              >
+                <div className="flex w-36 items-center gap-2 text-sm font-semibold text-text-secondary">
                   <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: TEAM_A_COLOR }}
+                    className="h-3 w-3 flex-shrink-0 rounded-full"
+                    style={{ backgroundColor: team.color }}
                   />
-                  {match.teamA.name}
-                </h3>
-                <div className="flex items-center gap-4 mb-3">
-                  <ObjectiveIcon
-                    type="baron"
-                    count={teamAStats?.baronKills ?? 0}
-                  />
-                  <ObjectiveIcon
-                    type="dragon"
-                    count={teamAStats?.dragonKills ?? 0}
-                  />
+                  <span className="truncate">{team.name}</span>
+                </div>
+                <div className="flex items-center gap-5">
                   <ObjectiveIcon
                     type="tower"
-                    count={teamAStats?.towerKills ?? 0}
-                  />
-                  <ObjectiveIcon
-                    type="herald"
-                    count={teamAStats?.riftHeraldKills ?? 0}
+                    count={team.stats?.towerKills ?? 0}
+                    side={team.side}
                   />
                   <ObjectiveIcon
                     type="inhibitor"
-                    count={teamAStats?.inhibitorKills ?? 0}
+                    count={team.stats?.inhibitorKills ?? 0}
+                    side={team.side}
+                  />
+                  <ObjectiveIcon
+                    type="dragon"
+                    count={team.stats?.dragonKills ?? 0}
+                    side={team.side}
+                  />
+                  <ObjectiveIcon
+                    type="herald"
+                    count={team.stats?.riftHeraldKills ?? 0}
+                    side={team.side}
+                  />
+                  <ObjectiveIcon
+                    type="baron"
+                    count={team.stats?.baronKills ?? 0}
+                    side={team.side}
                   />
                 </div>
                 <div className="flex flex-wrap gap-1">
                   <FirstBadge
-                    label="First Blood"
-                    active={teamAStats?.firstBlood ?? false}
+                    label="선취점"
+                    active={team.stats?.firstBlood ?? false}
                   />
                   <FirstBadge
-                    label="First Tower"
-                    active={teamAStats?.firstTower ?? false}
+                    label="첫 포탑"
+                    active={team.stats?.firstTower ?? false}
                   />
                   <FirstBadge
-                    label="First Dragon"
-                    active={teamAStats?.firstDragon ?? false}
+                    label="첫 드래곤"
+                    active={team.stats?.firstDragon ?? false}
                   />
                   <FirstBadge
-                    label="First Baron"
-                    active={teamAStats?.firstBaron ?? false}
+                    label="첫 내셔 남작"
+                    active={team.stats?.firstBaron ?? false}
                   />
                 </div>
               </div>
-
-              {/* Team B Objectives */}
-              <div>
-                <h3 className="text-sm font-semibold text-text-secondary mb-3 flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: TEAM_B_COLOR }}
-                  />
-                  {match.teamB.name}
-                </h3>
-                <div className="flex items-center gap-4 mb-3">
-                  <ObjectiveIcon
-                    type="baron"
-                    count={teamBStats?.baronKills ?? 0}
-                  />
-                  <ObjectiveIcon
-                    type="dragon"
-                    count={teamBStats?.dragonKills ?? 0}
-                  />
-                  <ObjectiveIcon
-                    type="tower"
-                    count={teamBStats?.towerKills ?? 0}
-                  />
-                  <ObjectiveIcon
-                    type="herald"
-                    count={teamBStats?.riftHeraldKills ?? 0}
-                  />
-                  <ObjectiveIcon
-                    type="inhibitor"
-                    count={teamBStats?.inhibitorKills ?? 0}
-                  />
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <FirstBadge
-                    label="First Blood"
-                    active={teamBStats?.firstBlood ?? false}
-                  />
-                  <FirstBadge
-                    label="First Tower"
-                    active={teamBStats?.firstTower ?? false}
-                  />
-                  <FirstBadge
-                    label="First Dragon"
-                    active={teamBStats?.firstDragon ?? false}
-                  />
-                  <FirstBadge
-                    label="First Baron"
-                    active={teamBStats?.firstBaron ?? false}
-                  />
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         )}
 
@@ -1828,8 +1824,20 @@ export default function MatchDetailsClient({
           </div>
         </div>
 
-        {/* ──────────── Section 6: Detailed Stats Tabs ──────────── */}
-        <DetailStatsTabs
+        {/* ──────────── Section 6: Detailed Stats Table ──────────── */}
+        <DetailStatsTable
+          teams={[
+            {
+              name: winTeamName,
+              color: winTeamColor,
+              participants: winTeam,
+            },
+            {
+              name: loseTeamName,
+              color: loseTeamColor,
+              participants: loseTeam,
+            },
+          ]}
           allParticipants={allParticipants}
           gameDuration={gameDuration}
         />
