@@ -63,14 +63,14 @@ function StatCell({
     <div
       className={cn(
         "min-w-0 rounded-md bg-bg-tertiary/60 px-2.5 py-1.5",
-        large && "[@media(min-height:900px)]:py-2.5",
+        large && "[@media(min-height:1000px)]:py-2.5",
       )}
     >
       <p className="text-[10px] font-medium text-text-tertiary">{label}</p>
       <p
         className={cn(
           "truncate text-sm font-bold tabular-nums text-text-primary",
-          large && "[@media(min-height:900px)]:text-xl",
+          large && "[@media(min-height:1000px)]:text-xl",
           valueClassName,
         )}
       >
@@ -393,16 +393,22 @@ export function AuctionLotDetails({
 
         {/*
           내전 승률 + 평판은 왼쪽 열 바닥에 붙인다. 낮은 화면(820px 이하)에선 아래 지표
-          줄로 옮기고, 키 큰 화면(1000px 이상)에선 반대로 아래 지표 다섯 칸을 여기로 올린다.
+          줄로 옮기고, 키 큰 화면(900px 이상)에선 반대로 아래 지표 다섯 칸을 여기로 올린다.
+          기준이 1000px 이면 FHD 브라우저(뷰포트 약 940px)가 아래 줄 배치로 떨어져
+          라인 다섯 줄이 눌렸다(2026-11-02 운영자 제보).
         */}
         <div className="mt-auto [@media(max-height:820px)]:hidden">
-          <p className="mb-1 hidden text-[10px] font-medium text-text-tertiary [@media(min-height:1000px)]:block">
+          <p className="mb-1 hidden text-[10px] font-medium text-text-tertiary [@media(min-height:900px)]:block">
             {recordCaption}
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          {/*
+            FHD(900~1000px)에서는 일곱 칸을 네 칸씩 두 줄로 놓는다. 두 칸씩이면 네 줄이 되어
+            카드가 넘치고 입찰 패널이 밀려난다. 1000px 이상은 예전처럼 두 칸씩.
+          */}
+          <div className="grid grid-cols-2 gap-2 [@media(min-height:900px)]:grid-cols-4 [@media(min-height:1000px)]:grid-cols-2">
             {winRateCell}
             {reputationCell}
-            <div className="hidden [@media(min-height:1000px)]:contents">
+            <div className="hidden [@media(min-height:900px)]:contents">
               {metricCells}
             </div>
           </div>
@@ -430,7 +436,7 @@ export function AuctionLotDetails({
                   row.kind === "other" && "[@media(max-height:820px)]:hidden",
                 )}
               >
-                <span className="flex w-[64px] flex-shrink-0 items-center gap-1 text-xs font-semibold text-text-secondary [@media(min-height:1000px)]:w-[76px] [@media(min-height:1000px)]:text-sm">
+                <span className="flex w-[64px] flex-shrink-0 items-center gap-1 text-xs font-semibold text-text-secondary [@media(min-height:900px)]:w-[76px] [@media(min-height:900px)]:text-sm">
                   <PositionIcon
                     position={row.role}
                     className="!h-3.5 !w-3.5"
@@ -440,7 +446,7 @@ export function AuctionLotDetails({
                 </span>
                 <span
                   className={cn(
-                    "w-[92px] flex-shrink-0 truncate text-[11px] font-bold [@media(min-height:1000px)]:text-[13px]",
+                    "w-[92px] flex-shrink-0 truncate text-[11px] font-bold [@media(min-height:900px)]:text-[13px]",
                     row.roleTier
                       ? getTierColor(row.roleTier.tier)
                       : "text-text-muted",
@@ -504,7 +510,7 @@ export function AuctionLotDetails({
         오른쪽 라인 목록 밑에 두면 좌우 높이가 어긋나고 칸이 좁았다.
         카드 전체 폭에 한 줄로 깔아 좌우 두 단을 받친다(2026-10-01 운영자 요청).
       */}
-      <div className="col-span-3 [@media(min-height:1000px)]:hidden">
+      <div className="col-span-3 [@media(min-height:900px)]:hidden">
         <p className="mb-1 text-[10px] font-medium text-text-tertiary">
           {recordCaption}
         </p>
