@@ -5,6 +5,10 @@ import {
   teamCountForRoom,
   teamSizeForRoom,
 } from "@nexus/types";
+import {
+  TEAM_VOICE_EXTRA_SLOTS,
+  teamVoiceChannelLimit,
+} from "./voice-channel-limit";
 
 /**
  * 디스코드 음성채널 정원.
@@ -21,9 +25,9 @@ import {
  * 떨어지는가 뿐이다.
  */
 describe("음성채널 정원", () => {
-  /** 서비스가 쓰는 것과 같은 계산 */
+  /** 팀 채널 정원은 선수 수 + 관전자·운영자 인터뷰용 여유 자리 */
   const teamChannelLimit = (teamSize: number) =>
-    Math.min(99, Math.max(1, teamSize));
+    teamVoiceChannelLimit(teamSize);
 
   it("배그는 모드와 무관하게 4인 스쿼드가 한 팀", () => {
     for (const mode of ["KILL_MATCH", "BATTLE_ROYALE"] as const) {
@@ -34,7 +38,9 @@ describe("음성채널 정원", () => {
           maxParticipants: size,
         };
         expect(teamSizeForRoom(shape)).toBe(4);
-        expect(teamChannelLimit(teamSizeForRoom(shape))).toBe(4);
+        expect(teamChannelLimit(teamSizeForRoom(shape))).toBe(
+          4 + TEAM_VOICE_EXTRA_SLOTS,
+        );
       }
     }
   });
@@ -48,17 +54,31 @@ describe("음성채널 정원", () => {
     expect(teamCountForRoom(shape)).toBe(16);
   });
 
-  it("롤은 5인", () => {
+  it("롤은 5인 + 여유 자리", () => {
     expect(
       teamChannelLimit(
         teamSizeForRoom({ gameTitle: "LOL", maxParticipants: 40 }),
       ),
-    ).toBe(5);
+    ).toBe(5 + TEAM_VOICE_EXTRA_SLOTS);
   });
 
-  it("정원이 0이어도 채널 정원은 1 이상", () => {
+  it("관전자·운영자가 인터뷰할 수 있게 팀 채널에 2자리 여유를 둔다", () => {
+    expect(TEAM_VOICE_EXTRA_SLOTS).toBe(2);
+    expect(teamChannelLimit(5)).toBe(7);
+  });
+
+  it("스쿼드가 갈리면 큰 쪽 스쿼드 + 여유 자리", () => {
+    // 7대7 → 4+3 스쿼드 → 4 + 2
+    expect(teamVoiceChannelLimit(7, 2)).toBe(6);
+  });
+
+  it("정원이 0이어도 채널 정원은 0(제한 없음)이 아니다", () => {
     // userLimit 0 은 "제한 없음"이라 팀 채널에 쓰면 아무나 들어온다.
-    expect(teamChannelLimit(0)).toBe(1);
+    expect(teamChannelLimit(0)).toBe(1 + TEAM_VOICE_EXTRA_SLOTS);
+  });
+
+  it("디스코드 상한 99를 넘지 않는다", () => {
+    expect(teamChannelLimit(200)).toBe(99);
   });
 });
 

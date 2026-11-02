@@ -447,8 +447,8 @@ describe("DiscordVoiceService.getRoomAnnounceTargets", () => {
         "┊ 3팀 A",
         "┊ 3팀 B",
       ]);
-      // 8대8은 4인 스쿼드 둘이라 채널 정원은 8이 아니라 4다.
-      expect(created.every((options) => options.userLimit === 4)).toBe(true);
+      // 8대8은 4인 스쿼드 둘이라 채널 정원은 8이 아니라 4(+인터뷰 여유 2)다.
+      expect(created.every((options) => options.userLimit === 6)).toBe(true);
     });
 
     it("팀당 채널 수가 바뀌면 팀 채널을 다시 만든다", async () => {
@@ -478,7 +478,7 @@ describe("DiscordVoiceService.getRoomAnnounceTargets", () => {
         "┊ 2팀 A",
         "┊ 2팀 B",
       ]);
-      expect(created.every((options) => options.userLimit === 4)).toBe(true);
+      expect(created.every((options) => options.userLimit === 6)).toBe(true);
     });
 
     it("반대로 갈라진 채널을 하나로 합칠 때도 다시 만든다", async () => {
@@ -512,7 +512,7 @@ describe("DiscordVoiceService.getRoomAnnounceTargets", () => {
       await service.updateRoomChannels("room-1", 3, { teamSize: 5 });
 
       expect(created.map((options) => options.name)).toEqual(["┊ 3팀"]);
-      expect(created[0].userLimit).toBe(5);
+      expect(created[0].userLimit).toBe(7);
       expect(deleted).toEqual([]);
     });
   });
@@ -561,9 +561,9 @@ describe("DiscordVoiceService.getRoomAnnounceTargets", () => {
 
         const lobby = created.find((o) => o.name === "── 대기실 ──");
         expect(lobby.userLimit).toBe(0);
-        // 팀 채널 정원은 그대로 유지한다.
+        // 팀 채널은 팀 크기 5 + 인터뷰용 여유 2 로 제한한다.
         const teams = created.filter((o) => o.name.startsWith("┊"));
-        expect(teams.every((o) => o.userLimit === 5)).toBe(true);
+        expect(teams.every((o) => o.userLimit === 7)).toBe(true);
       },
     );
   });

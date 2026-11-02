@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron } from "@nestjs/schedule";
 import { PrismaService } from "../prisma/prisma.service";
+import { teamVoiceChannelLimit } from "./voice-channel-limit";
 import {
   Client,
   ChannelType,
@@ -416,8 +417,8 @@ export class DiscordVoiceService {
       // 한 팀이 인게임 스쿼드 여러 개로 갈라지면 채널도 그만큼 필요하다.
       const squadsPerTeam = Math.max(1, shape?.squadsPerTeam ?? 1);
       const teamSize = Math.max(1, shape?.teamSize ?? 5);
-      // 채널 정원은 스쿼드 하나 크기다. 7대7이면 4+3으로 갈리므로 큰 쪽에 맞춘다.
-      const squadLimit = Math.min(99, Math.ceil(teamSize / squadsPerTeam));
+      // 채널 정원은 스쿼드 하나 크기 + 인터뷰용 여유 자리 (voice-channel-limit.ts).
+      const squadLimit = teamVoiceChannelLimit(teamSize, squadsPerTeam);
 
       // 채널이 너무 많으면 팀 채널을 만들지 않는다. 대기실은 그대로 둔다.
       const totalTeamChannels = numTeams * squadsPerTeam;
@@ -829,8 +830,8 @@ export class DiscordVoiceService {
     // 깐부킬내기(팀당 2채널)에서 2팀짜리 방을 4팀으로 착각한다.
     const squadsPerTeam = Math.max(1, shape?.squadsPerTeam ?? 1);
     const teamSize = Math.max(1, shape?.teamSize ?? 5);
-    // 채널 정원은 스쿼드 하나 크기다. 생성 때와 같은 기준을 쓴다.
-    const squadLimit = Math.min(99, Math.ceil(teamSize / squadsPerTeam));
+    // 채널 정원은 생성 때와 같은 기준을 쓴다 (스쿼드 크기 + 인터뷰용 여유 자리).
+    const squadLimit = teamVoiceChannelLimit(teamSize, squadsPerTeam);
 
     /**
      * 지금 있는 채널이 팀당 몇 개로 만들어졌는가.
