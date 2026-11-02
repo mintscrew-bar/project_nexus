@@ -1449,6 +1449,11 @@ export class MatchService {
       ...match,
       teamA: resolvedTeamA,
       teamB: resolvedTeamB,
+      // 팀 FK 도 방 정리 후 null 이 된다. 참가자 teamId 는 아래에서 스냅샷으로
+      // 복원하는데 이쪽을 안 하면 화면이 참가자를 어느 팀에도 못 넣는다
+      // (전적은 수집됐는데 양 팀 0명·0-0, 승패도 항상 B팀 승으로 보이던 버그).
+      teamAId: match.teamAId ?? match.teamAIdSnapshot,
+      teamBId: match.teamBId ?? match.teamBIdSnapshot,
       // 방 정리 후에는 FK인 winnerId가 null이 되고 스냅샷만 남는다.
       // 투표 화면이 승패 팀을 계속 올바르게 나누도록 복원한다.
       winnerId: match.winnerId ?? match.winnerIdSnapshot,

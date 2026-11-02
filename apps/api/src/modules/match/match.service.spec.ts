@@ -160,6 +160,34 @@ describe("MatchService", () => {
       ).rejects.toThrow("MVP는 이긴 팀 멤버만 선택할 수 있습니다.");
     });
 
+    it("상세: 팀 ID·승자·참가자 팀을 스냅샷으로 복원해 같은 기준으로 맞춘다", async () => {
+      // 11/1 내전: 전적은 수집됐는데 match.teamAId 만 null 로 내려가서
+      // 화면이 참가자를 어느 팀에도 넣지 못했다 (양 팀 0명, 0-0).
+      prisma.match.findUnique.mockResolvedValue({
+        ...archived,
+        teamAName: "A팀",
+        teamBName: "B팀",
+        participants: [
+          { id: "p1", teamId: null, teamIdSnapshot: "team-a" },
+          { id: "p2", teamId: null, teamIdSnapshot: "team-b" },
+        ],
+        teamStats: [],
+        draftSnapshots: [],
+      });
+
+      const details: any = await service.getMatchDetails("match-1");
+
+      expect(details.teamAId).toBe("team-a");
+      expect(details.teamBId).toBe("team-b");
+      expect(details.winnerId).toBe("team-a");
+      expect(
+        details.participants.filter((p: any) => p.teamId === details.teamAId),
+      ).toHaveLength(1);
+      expect(
+        details.participants.filter((p: any) => p.teamId === details.teamBId),
+      ).toHaveLength(1);
+    });
+
     it("ACE 대상이 이긴 팀이면 막는다", async () => {
       await expect(
         service.submitVote("winner-2", "match-1", "winner-1", "ACE" as never),
