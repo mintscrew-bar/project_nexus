@@ -241,11 +241,13 @@ export function AuctionLotDetails({
   // 내전 평균 지표 여섯 칸. 보통은 카드 아래 전체 폭 줄에 두지만, 키 큰 화면(900px+)
   // 에서는 왼쪽 열로 올려 승률·평판과 함께 쌓는다 — 카드가 늘어난 높이를 빈 칸이 아니라
   // 내용으로 채운다(2026-10-06 운영자 제보: 고해상도에서 매물 카드가 비어 보임).
+  // 칸 이름에 "평균"을 붙인다 — "피해량 21,450"이 누적처럼 읽혔다(2026-11-02 운영자 요청).
+  // 내전 승률·평판은 평균이 아니라 그대로 둔다.
   const metricCells = (
     <>
       <StatCell
         large
-        label="KDA"
+        label="평균 KDA"
         value={kdaRatio ?? "—"}
         sub={kda ? `${kda.kills}/${kda.deaths}/${kda.assists}` : undefined}
         valueClassName={
@@ -256,25 +258,25 @@ export function AuctionLotDetails({
       />
       <StatCell
         large
-        label="킬관여"
+        label="평균 킬관여"
         value={
           kda?.killParticipation != null ? `${kda.killParticipation}%` : "—"
         }
       />
       <StatCell
         large
-        label="피해량"
+        label="평균 피해량"
         value={kda?.damage != null ? kda.damage.toLocaleString() : "—"}
       />
-      <StatCell large label="CS" value={kda?.cs != null ? kda.cs : "—"} />
+      <StatCell large label="평균 CS" value={kda?.cs != null ? kda.cs : "—"} />
       <StatCell
         large
-        label="시야"
+        label="평균 시야"
         value={kda?.vision != null ? kda.vision : "—"}
       />
       <StatCell
         large
-        label="골드"
+        label="평균 골드"
         value={kda?.gold != null ? kda.gold.toLocaleString() : "—"}
       />
     </>
