@@ -72,10 +72,12 @@ function LolRankingPage() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center gap-3 mb-4">
             <Trophy className="h-8 w-8 text-accent-gold" />
-            <h1 className="text-2xl md:text-3xl font-bold text-text-primary">랭킹</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-text-primary">
+              랭킹
+            </h1>
           </div>
           <p className="text-text-secondary">
-            Nexus 내전 기록 기반 랭킹 (최소 10판 이상)
+            Nexus 내전 기록 기반 랭킹 (1판만 해도 등록)
           </p>
 
           {/* Tabs */}
@@ -112,7 +114,10 @@ function LolRankingPage() {
         </div>
       </div>
 
-      <div data-tour="ranking-results" className="container mx-auto px-4 py-8 max-w-4xl">
+      <div
+        data-tour="ranking-results"
+        className="container mx-auto px-4 py-8 max-w-4xl"
+      >
         {tab === "global" && (
           <>
             {isLoading ? (
@@ -136,7 +141,7 @@ function LolRankingPage() {
               <EmptyState
                 icon={Trophy}
                 title="아직 랭킹에 오른 플레이어가 없습니다"
-                description="내전 기록이 10경기 쌓이면 승률과 전적을 기준으로 랭킹에 등록됩니다. 첫 기록을 만들어보세요."
+                description="내전을 한 판만 해도 승률과 전적을 기준으로 랭킹에 등록됩니다. 첫 기록을 만들어보세요."
                 action={{
                   label: "내전 방 둘러보기",
                   onClick: () => router.push(`${gamePrefix}/tournaments`),
@@ -210,8 +215,8 @@ function LolRankingPage() {
                               parseFloat(winRate) >= 60
                                 ? "text-accent-success"
                                 : parseFloat(winRate) >= 50
-                                ? "text-accent-primary"
-                                : "text-accent-danger"
+                                  ? "text-accent-primary"
+                                  : "text-accent-danger"
                             }`}
                           >
                             {winRate}%

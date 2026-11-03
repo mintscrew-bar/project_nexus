@@ -8,7 +8,8 @@ import { TEST_BOT_USER_WHERE } from "../common/test-bot.util";
 @Injectable()
 export class RankingService {
   private readonly logger = new Logger(RankingService.name);
-  private static readonly MIN_GAMES_FOR_RANK = 10;
+  // 랭킹 등재 최소 판수. 2026-11-03 10판 → 1판: 내전 성사 자체가 드물어 10판 조건이면 목록이 비어 있었다.
+  private static readonly MIN_GAMES_FOR_RANK = 1;
   private static readonly RECENT_GAMES_COUNT = 20;
 
   constructor(

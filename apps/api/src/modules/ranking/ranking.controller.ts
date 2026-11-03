@@ -20,7 +20,7 @@ export class RankingController {
   constructor(private readonly rankingService: RankingService) {}
 
   /**
-   * 글로벌 랭킹 (페이지네이션, 최소 10판 이상)
+   * 글로벌 랭킹 (페이지네이션, 내전 1판 이상)
    */
   @Get("global")
   async getGlobalRanking(@Query() query: RankingQueryDto) {

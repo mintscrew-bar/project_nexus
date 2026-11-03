@@ -7,7 +7,12 @@ import {
   type GameTitle,
 } from "@nexus/types";
 import { GameSectionPending } from "@/components/games/GameSectionPending";
-import { absoluteUrl, DEFAULT_OG_IMAGES, gameCanonical, SITE_NAME } from "@/lib/seo";
+import {
+  absoluteUrl,
+  DEFAULT_OG_IMAGES,
+  gameCanonical,
+  SITE_NAME,
+} from "@/lib/seo";
 
 /**
  * 랭킹은 게임마다 줄 세우는 기준 자체가 다르다.
@@ -19,7 +24,7 @@ const COPY = {
     description:
       "Nexus 내전 전적 기반 글로벌 랭킹입니다. 승률, 판수, KDA 기준으로 최상위 플레이어를 확인하세요.",
     ogDescription:
-      "롤 내전 전적 기반 글로벌 랭킹. 최소 10판 이상 플레이어 대상 승률·KDA 순위를 제공합니다.",
+      "롤 내전 전적 기반 글로벌 랭킹. 내전에 참여한 플레이어의 승률·KDA 순위를 제공합니다.",
     jsonLdDescription: "롤 내전 전적 기반 글로벌 랭킹 페이지",
   },
   PUBG: {
@@ -72,7 +77,12 @@ function buildJsonLd(title: GameTitle) {
     breadcrumb: {
       "@type": "BreadcrumbList",
       itemListElement: [
-        { "@type": "ListItem", position: 1, name: "홈", item: absoluteUrl("/") },
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "홈",
+          item: absoluteUrl("/"),
+        },
         { "@type": "ListItem", position: 2, name: copy.title, item: url },
       ],
     },
