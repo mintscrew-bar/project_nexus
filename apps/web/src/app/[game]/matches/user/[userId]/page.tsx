@@ -9,14 +9,16 @@ import Image from "next/image";
 import { userApi, matchApi, statsApi, rankingApi } from "@/lib/api-client";
 import { LoadingSpinner, Button, Badge, Skeleton } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { ArrowLeft, User, Trophy, Target, TrendingUp, Calendar, ExternalLink } from "lucide-react";
+import { ArrowLeft, User, Trophy, Target, Calendar, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
-import { getChampionIcon } from "@/components/matches/match-utils";
-import { getChampionKoreanName } from "@nexus/types";
 import type { RiotAccount, NexusMatchHistory } from "@/components/matches/match-utils";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
 import { CustomGameStatsCard } from "@/components/matches/CustomGameStatsCard";
+import {
+  ChampionStatsCard,
+  type ChampionStat,
+} from "@/components/matches/ChampionStatsCard";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 import { InternalMatchHistoryRow } from "@/components/matches/internal-match/InternalMatchHistoryRow";
 
@@ -126,7 +128,7 @@ export default function UserStatsPage() {
 
 
   // 백엔드에서 챔피언 통계 조회 (전체 MatchParticipant 집계)
-  const { data: championStats = [] } = useQuery<any[]>({
+  const { data: championStats = [] } = useQuery<ChampionStat[]>({
     queryKey: ["championStats", userId],
     queryFn: () => statsApi.getUserChampionStats(userId),
     staleTime: 5 * 60 * 1000,
@@ -389,74 +391,9 @@ export default function UserStatsPage() {
             </div>
           </div>
 
-          {/* Champion Statistics */}
+          {/* 내전 챔피언 — 2026-11-03 디자인 개편(승패 막대·판당 지표) */}
           <div className="space-y-6">
-            <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
-              <h2 className="text-xl font-bold text-text-primary mb-4 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-accent-primary" />
-                챔피언 통계
-              </h2>
-
-              {championStats.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-text-secondary text-sm">
-                    챔피언 통계가 없습니다
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {championStats.slice(0, 5).map((stat) => {
-                    const champWinRate = Math.round((stat.wins / stat.games) * 100);
-                    const avgKDA =
-                      stat.deaths === 0
-                        ? stat.kills + stat.assists
-                        : ((stat.kills + stat.assists) / stat.deaths).toFixed(2);
-
-                    return (
-                      <div
-                        key={stat.championId}
-                        className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Image
-                            src={getChampionIcon(stat.championName)}
-                            alt={stat.championName}
-                            width={40}
-                            height={40}
-                            className="w-10 h-10 rounded-lg"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          />
-                          <div>
-                            <p className="font-semibold text-text-primary text-sm">
-                              {getChampionKoreanName(stat.championName)}
-                            </p>
-                            <p className="text-xs text-text-tertiary">
-                              {stat.wins}승 {stat.losses}패
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p
-                            className={`font-bold text-sm ${
-                              champWinRate >= 60
-                                ? "text-accent-success"
-                                : champWinRate >= 50
-                                ? "text-accent-primary"
-                                : "text-accent-danger"
-                            }`}
-                          >
-                            {champWinRate}%
-                          </p>
-                          <p className="text-xs text-text-tertiary">
-                            {avgKDA} KDA
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <ChampionStatsCard stats={championStats} />
           </div>
         </div>
       </div>

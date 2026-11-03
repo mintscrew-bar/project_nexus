@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CustomGameStatsCard } from "@/components/matches/CustomGameStatsCard";
+import { ChampionStatsCard } from "@/components/matches/ChampionStatsCard";
 
 const RANKING = {
   totalGames: 23,
@@ -21,6 +22,31 @@ const RANKING = {
     { role: "ADC", totalGames: 12, wins: 10, losses: 2, winRate: 83.3 },
   ],
 };
+
+const CHAMPIONS = [
+  ["Jinx", 222, 6, 5, 1],
+  ["Kaisa", 145, 4, 2, 2],
+  ["Ezreal", 81, 3, 1, 2],
+  ["LeeSin", 64, 3, 2, 1],
+  ["Ahri", 103, 2, 0, 2],
+  ["Thresh", 412, 2, 1, 1],
+  ["Garen", 86, 1, 1, 0],
+].map(([name, id, games, wins, losses]) => {
+  const g = games as number;
+  return {
+    championId: id as number,
+    championName: name as string,
+    games: g,
+    wins: wins as number,
+    losses: losses as number,
+    kills: 7 * g,
+    deaths: name === "Garen" ? 0 : 4 * g,
+    assists: 8 * g,
+    totalMinionsKilled: 180 * g,
+    neutralMinionsKilled: 8 * g,
+    totalDamageDealtToChampions: 21000 * g,
+  };
+});
 
 export default function CustomGameStatsPreviewPage() {
   const queryClient = useQueryClient();
@@ -52,8 +78,14 @@ export default function CustomGameStatsPreviewPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-[900px] px-4 py-8">
-      <CustomGameStatsCard userId="preview-user" ranking={RANKING} />
+    <div className="container mx-auto px-4 py-8">
+      {/* 실제 화면과 같은 2:1 배치 */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <CustomGameStatsCard userId="preview-user" ranking={RANKING} />
+        </div>
+        <ChampionStatsCard stats={CHAMPIONS} />
+      </div>
     </div>
   );
 }
