@@ -342,4 +342,26 @@ describe("RankingService", () => {
       ).toBeLessThan(prisma.nexusRanking.findMany.mock.invocationCallOrder[0]);
     });
   });
+
+  describe("getGlobalRanking 검색", () => {
+    it("닉네임·소환사명으로 거르고, 순위는 전체 랭킹 기준으로 센다", async () => {
+      prisma.nexusRanking.findMany.mockResolvedValue([
+        { id: "r1", totalGames: 3, winRate: 66.7 },
+      ]);
+      prisma.nexusRanking.count = jest
+        .fn()
+        .mockResolvedValueOnce(1) // 검색 결과 총수
+        .mockResolvedValueOnce(4); // 이 사람보다 위에 있는 인원
+
+      const result = await service.getGlobalRanking(1, 50, " 철수 ");
+
+      const where = prisma.nexusRanking.findMany.mock.calls[0][0].where;
+      expect(where.user.OR[0].username).toEqual({
+        contains: "철수",
+        mode: "insensitive",
+      });
+      expect(where.user.OR[1].riotAccounts.some.gameName.contains).toBe("철수");
+      expect(result.rankings[0].globalRank).toBe(5);
+    });
+  });
 });

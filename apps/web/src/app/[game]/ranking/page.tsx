@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
@@ -9,7 +9,16 @@ import { useCurrentGame, useGamePrefix } from "@/hooks/useCurrentGame";
 import { PubgRankingPage } from "./_PubgRankingPage";
 import { rankingApi } from "@/lib/api-client";
 import { Skeleton, Button, EmptyState } from "@/components/ui";
-import { Trophy, Crown, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import {
+  Trophy,
+  Crown,
+  ChevronLeft,
+  ChevronRight,
+  Users,
+  Search,
+  X,
+} from "lucide-react";
+import { useDebounce } from "@/hooks/useDebounce";
 import { getTierImage } from "@/components/matches/match-utils";
 import { RankingTour } from "@/components/onboarding/PrimaryPageTours";
 import { AdSlotCard } from "@/components/ads/AdSlot";
@@ -30,11 +39,23 @@ function LolRankingPage() {
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<"global" | "clan">("global");
   const limit = 50;
+  // 닉네임·소환사명 검색. 프로필의 "랭킹 #N" 링크가 ?q= 로 이름을 넘겨준다.
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search.trim(), 300);
+  useEffect(() => {
+    // 서버 렌더와 어긋나지 않게 마운트 뒤에 주소의 검색어를 읽는다
+    const q = new URLSearchParams(window.location.search).get("q");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (q) setSearch(q);
+  }, []);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["globalRanking", page],
-    queryFn: () => rankingApi.getGlobalRanking(page, limit),
+    queryKey: ["globalRanking", page, debouncedSearch],
+    queryFn: () =>
+      rankingApi.getGlobalRanking(page, limit, debouncedSearch || undefined),
     staleTime: 2 * 60 * 1000,
+    // 검색어를 칠 때마다 목록이 스켈레톤으로 깜빡이지 않게 이전 결과를 잠시 보여준다
+    placeholderData: (previous) => previous,
     enabled: tab === "global",
   });
 
@@ -120,6 +141,35 @@ function LolRankingPage() {
       >
         {tab === "global" && (
           <>
+            {/* 검색 — 순위 번호는 검색해도 전체 랭킹 기준 그대로 */}
+            <div className="relative mb-4">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                maxLength={30}
+                placeholder="닉네임 또는 소환사명으로 찾기"
+                aria-label="랭킹 검색"
+                className="w-full rounded-lg border border-bg-tertiary bg-bg-secondary py-2.5 pl-9 pr-9 text-sm text-text-primary placeholder:text-text-tertiary focus:border-accent-primary focus:outline-none"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setPage(1);
+                  }}
+                  aria-label="검색어 지우기"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-text-tertiary hover:text-text-primary"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             {isLoading ? (
               <div className="space-y-3">
                 {[...Array(10)].map((_, i) => (
@@ -137,6 +187,12 @@ function LolRankingPage() {
                   </div>
                 ))}
               </div>
+            ) : debouncedSearch && (!data || data.rankings.length === 0) ? (
+              <EmptyState
+                icon={Search}
+                title={`"${debouncedSearch}" 검색 결과가 없습니다`}
+                description="내전을 한 판 이상 한 플레이어만 랭킹에 있습니다. 닉네임이나 소환사명을 다시 확인해 주세요."
+              />
             ) : !data || data.rankings.length === 0 ? (
               <EmptyState
                 icon={Trophy}

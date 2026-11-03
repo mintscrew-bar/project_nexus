@@ -20,11 +20,15 @@ export class RankingController {
   constructor(private readonly rankingService: RankingService) {}
 
   /**
-   * 글로벌 랭킹 (페이지네이션, 내전 1판 이상)
+   * 글로벌 랭킹 (페이지네이션, 내전 1판 이상). q 를 주면 닉네임·소환사명으로 거른다.
    */
   @Get("global")
   async getGlobalRanking(@Query() query: RankingQueryDto) {
-    return this.rankingService.getGlobalRanking(query.page, query.limit);
+    return this.rankingService.getGlobalRanking(
+      query.page,
+      query.limit,
+      query.q,
+    );
   }
 
   /**

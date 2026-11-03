@@ -2508,9 +2508,13 @@ export const rankingApi = {
     return response.data;
   },
 
-  getGlobalRanking: async (page: number = 1, limit: number = 50) => {
+  getGlobalRanking: async (
+    page: number = 1,
+    limit: number = 50,
+    q?: string,
+  ) => {
     const response = await apiClient.get("/ranking/global", {
-      params: { page, limit },
+      params: { page, limit, ...(q ? { q } : {}) },
     });
     return response.data;
   },

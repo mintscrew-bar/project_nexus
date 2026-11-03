@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { useDdragonStore } from "@/stores/ddragon-store";
@@ -12,6 +14,7 @@ import {
   statsApi,
   presenceApi,
   reputationApi,
+  rankingApi,
 } from "@/lib/api-client";
 import { ChampionImage } from "@/components/ChampionImage";
 import {
@@ -207,6 +210,14 @@ export default function UserProfilePage() {
   const { user: currentUser, isAuthenticated } = useAuthStore();
   const { championMap, fetchChampions } = useDdragonStore();
   const { addToast } = useToast();
+
+  // 롤 내전 랭킹 순위 — 이름 옆 배지로 띄우고 누르면 랭킹에서 이 사람을 찾아 준다
+  const { data: nexusRanking } = useQuery({
+    queryKey: ["userRanking", userId],
+    queryFn: () => rankingApi.getUserRanking(userId),
+    enabled: Boolean(userId),
+    staleTime: 2 * 60 * 1000,
+  });
 
   const [profile, setProfile] = useState<ProfileUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -672,6 +683,16 @@ export default function UserProfilePage() {
                         {clan.tag}
                       </Badge>
                     )}
+                    {nexusRanking?.globalRank ? (
+                      <Link
+                        href={`/lol/ranking?q=${encodeURIComponent(profile.username)}`}
+                        title={`내전 ${nexusRanking.totalGames}전 ${nexusRanking.wins}승 ${nexusRanking.losses}패 · 랭킹에서 보기`}
+                        className="inline-flex items-center gap-1 rounded-md bg-accent-gold/15 px-2 py-1 text-xs font-black text-accent-gold transition-colors hover:bg-accent-gold/25"
+                      >
+                        <Trophy className="h-3.5 w-3.5" />
+                        랭킹 #{nexusRanking.globalRank}
+                      </Link>
+                    ) : null}
                     {(profile.streamerProfiles ?? []).map((streamer) => (
                       <a
                         key={streamer.platform}

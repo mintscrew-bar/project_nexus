@@ -249,14 +249,42 @@ export class RankingService {
   /**
    * Get global ranking (paginated, minimum games required)
    */
-  async getGlobalRanking(page: number = 1, limit: number = 50) {
+  async getGlobalRanking(page: number = 1, limit: number = 50, q?: string) {
     const skip = (page - 1) * limit;
+    const search = q?.trim();
+    // 검색어가 있으면 사이트 닉네임 또는 Riot 게임 이름으로 거른다.
+    // 순위 번호는 검색 결과 안의 순서가 아니라 전체 랭킹 기준 순위여야 한다.
+    const where = {
+      totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
+      ...(search
+        ? {
+            user: {
+              OR: [
+                {
+                  username: {
+                    contains: search,
+                    mode: "insensitive" as const,
+                  },
+                },
+                {
+                  riotAccounts: {
+                    some: {
+                      gameName: {
+                        contains: search,
+                        mode: "insensitive" as const,
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          }
+        : {}),
+    };
 
     const [rankings, total] = await Promise.all([
       this.prisma.nexusRanking.findMany({
-        where: {
-          totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
-        },
+        where,
         include: {
           user: {
             select: {
@@ -281,19 +309,23 @@ export class RankingService {
         take: limit,
       }),
       this.prisma.nexusRanking.count({
-        where: {
-          totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
-        },
+        where,
       }),
     ]);
 
-    // Attach rank numbers
-    const rankedData = rankings.map(
-      (r: (typeof rankings)[number], i: number) => ({
-        ...r,
-        globalRank: skip + i + 1,
-      }),
-    );
+    // 순위 번호 — 검색 중이면 각자 전체 순위를 따로 센다(결과가 한 페이지라 비용이 작다)
+    const rankedData = search
+      ? await Promise.all(
+          rankings.map(async (r: (typeof rankings)[number]) => ({
+            ...r,
+            globalRank:
+              (await this.countRankedAbove(r.totalGames, r.winRate)) + 1,
+          })),
+        )
+      : rankings.map((r: (typeof rankings)[number], i: number) => ({
+          ...r,
+          globalRank: skip + i + 1,
+        }));
 
     return {
       rankings: rankedData,
@@ -302,6 +334,19 @@ export class RankingService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  /** 정렬 기준(판수 → 승률)과 같은 순서로 "나보다 위" 인원을 센다 */
+  private countRankedAbove(totalGames: number, winRate: number) {
+    return this.prisma.nexusRanking.count({
+      where: {
+        totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
+        OR: [
+          { totalGames: { gt: totalGames } },
+          { totalGames, winRate: { gt: winRate } },
+        ],
+      },
+    });
   }
 
   /**
@@ -387,20 +432,8 @@ export class RankingService {
     // Calculate global rank position
     let globalRank: number | null = null;
     if (ranking.totalGames >= RankingService.MIN_GAMES_FOR_RANK) {
-      const higherCount = await this.prisma.nexusRanking.count({
-        where: {
-          totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
-          // 정렬 기준(판수 → 승률)과 같은 순서로 "나보다 위" 인원을 센다
-          OR: [
-            { totalGames: { gt: ranking.totalGames } },
-            {
-              totalGames: ranking.totalGames,
-              winRate: { gt: ranking.winRate },
-            },
-          ],
-        },
-      });
-      globalRank = higherCount + 1;
+      globalRank =
+        (await this.countRankedAbove(ranking.totalGames, ranking.winRate)) + 1;
     }
 
     return {

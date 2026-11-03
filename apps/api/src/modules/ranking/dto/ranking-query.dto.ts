@@ -1,4 +1,11 @@
-import { IsOptional, IsInt, Min, Max } from "class-validator";
+import {
+  IsOptional,
+  IsInt,
+  IsString,
+  Min,
+  Max,
+  MaxLength,
+} from "class-validator";
 
 export class RankingQueryDto {
   @IsOptional()
@@ -11,4 +18,10 @@ export class RankingQueryDto {
   @Min(1, { message: "limit는 1 이상이어야 합니다." })
   @Max(100, { message: "limit는 100 이하여야 합니다." })
   limit?: number = 50;
+
+  /** 닉네임·소환사명 검색어 (글로벌 랭킹 전용) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(30, { message: "검색어는 30자 이하여야 합니다." })
+  q?: string;
 }
