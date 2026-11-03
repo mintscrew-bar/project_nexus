@@ -6,6 +6,7 @@ import { DiscordController } from "./discord.controller";
 import { DiscordAdminAlertService } from "./discord-admin-alert.service";
 import { DiscordEmojiService } from "./discord-emoji.service";
 import { DiscordScheduleService } from "./discord-schedule.service";
+import { DiscordAvatarRefreshService } from "./discord-avatar-refresh.service";
 import { AuthModule } from "../auth/auth.module";
 
 @Module({
@@ -18,6 +19,7 @@ import { AuthModule } from "../auth/auth.module";
     DiscordAdminAlertService,
     DiscordEmojiService,
     DiscordScheduleService,
+    DiscordAvatarRefreshService,
   ],
   exports: [
     DiscordService,
