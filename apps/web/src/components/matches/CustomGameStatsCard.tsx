@@ -5,7 +5,7 @@ import { BarChart3, Star } from "lucide-react";
 import { userApi } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui";
 import {
-  RoleRecordList,
+  RoleWinRateChart,
   type RoleRecord,
 } from "@/components/domain/RoleRecordList";
 import { cn } from "@/lib/utils";
@@ -183,10 +183,15 @@ export function CustomGameStatsCard({
           {/* 라인별 승패 — 역할 선택을 거친 판만 집계된다(RoleRecordList 주석 참고) */}
           {ranking?.byRole?.some((record) => record.totalGames > 0) && (
             <div className="mt-5">
-              <h3 className="mb-2 text-sm font-semibold text-text-secondary">
-                라인별 전적
-              </h3>
-              <RoleRecordList records={ranking.byRole} />
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <h3 className="text-sm font-semibold text-text-secondary">
+                  라인별 승률
+                </h3>
+                <span className="text-[11px] text-text-tertiary">
+                  점선 = 50% · 테두리 = 가장 많이 한 라인
+                </span>
+              </div>
+              <RoleWinRateChart records={ranking.byRole} />
             </div>
           )}
         </>
