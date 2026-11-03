@@ -41,8 +41,8 @@ function kdaTone(ratio: number | null): string {
  * - 승/패를 한 줄 막대로 나눠 그려 승률을 길이로 읽게 한다
  * - KDA 는 비율을 크게, 판당 평균 K/D/A 를 작게
  * - 판당 CS·피해량을 함께 적어 경매 매물 카드의 지표와 같은 눈높이로 본다
- * - 세 칸 상자(너무 큼)와 두 줄 압축(너무 빽빽함) 사이: 이름·승률·막대·판당 지표를
- *   가운데에, KDA 를 오른쪽 칸으로 떼어 크게 둔다
+ * - 세 칸 상자(너무 큼)와 두 줄 압축(너무 빽빽함) 사이: 이름·승률·막대·판당 지표(KDA 포함)를
+ *   가운데에, 승패를 오른쪽 칸으로 떼어 크게 둔다
  */
 export function ChampionStatsCard({
   stats,
@@ -131,9 +131,6 @@ export function ChampionStatsCard({
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="truncate text-sm font-bold text-text-primary">
                         {getChampionKoreanName(stat.championName)}
-                        <span className="ml-1.5 text-[11px] font-medium text-text-tertiary">
-                          {stat.games}판
-                        </span>
                       </p>
                       <span
                         className={cn(
@@ -163,26 +160,28 @@ export function ChampionStatsCard({
                       )}
                     </div>
                     <p className="mt-1.5 truncate text-[11px] tabular-nums text-text-tertiary">
-                      <span className="text-text-secondary">
-                        {stat.wins}승 {stat.losses}패
+                      <span
+                        className={cn("font-bold", kdaTone(ratio))}
+                        title={`판당 ${per(stat.kills)}/${per(stat.deaths)}/${per(stat.assists)}`}
+                      >
+                        {ratio != null ? ratio.toFixed(2) : "Perfect"} KDA
                       </span>
+                      {/* 판당 K/D/A 는 좁은 줄에 안 들어가 KDA 에 마우스를 올리면 보인다 */}
                       {" · "}CS {cs}
-                      {" · "}피해 {damage.toLocaleString()}
+                      {" · "}피해 {(damage / 1000).toFixed(1)}k
                     </p>
                   </div>
 
-                  {/* KDA — 오른쪽 칸으로 떼어 크게 */}
+                  {/* 승패 — 오른쪽 칸으로 떼어 크게. 판수는 그 아래 */}
                   <div className="flex w-[68px] shrink-0 flex-col items-center justify-center border-l border-bg-elevated/60 pl-3">
-                    <span
-                      className={cn(
-                        "text-base font-black leading-tight tabular-nums",
-                        kdaTone(ratio),
-                      )}
-                    >
-                      {ratio != null ? ratio.toFixed(2) : "Perfect"}
+                    <span className="text-sm font-black leading-tight tabular-nums">
+                      <span className="text-accent-primary">{stat.wins}승</span>{" "}
+                      <span className="text-accent-danger">
+                        {stat.losses}패
+                      </span>
                     </span>
                     <span className="text-[10px] tabular-nums text-text-tertiary">
-                      {per(stat.kills)}/{per(stat.deaths)}/{per(stat.assists)}
+                      {stat.games}판
                     </span>
                   </div>
                 </li>
