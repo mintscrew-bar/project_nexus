@@ -9,10 +9,20 @@ import Image from "next/image";
 import { userApi, matchApi, statsApi, rankingApi } from "@/lib/api-client";
 import { LoadingSpinner, Button, Badge, Skeleton } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { ArrowLeft, User, Trophy, Target, Calendar, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft,
+  User,
+  Trophy,
+  Target,
+  Calendar,
+  ExternalLink,
+} from "lucide-react";
 import Link from "next/link";
 
-import type { RiotAccount, NexusMatchHistory } from "@/components/matches/match-utils";
+import type {
+  RiotAccount,
+  NexusMatchHistory,
+} from "@/components/matches/match-utils";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
 import { CustomGameStatsCard } from "@/components/matches/CustomGameStatsCard";
 import {
@@ -47,7 +57,8 @@ export default function UserStatsPage() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const primaryAccount = riotAccounts.find(a => a.isPrimary) || riotAccounts[0];
+  const primaryAccount =
+    riotAccounts.find((a) => a.isPrimary) || riotAccounts[0];
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -56,15 +67,18 @@ export default function UserStatsPage() {
 
       // user, matches, riotAccounts 병렬 조회 — 순차 대기 제거
       // matches는 21개 조회해 hasMore 판단 (20개 반환 시 마지막 페이지 오인 방지)
-      const [userResult, matchesResult, accountsResult] = await Promise.allSettled([
-        userApi.getProfile(userId),
-        matchApi.getUserMatchHistory(userId, 21, 0),
-        statsApi.getUserRiotAccounts(userId),
-      ]);
+      const [userResult, matchesResult, accountsResult] =
+        await Promise.allSettled([
+          userApi.getProfile(userId),
+          matchApi.getUserMatchHistory(userId, 21, 0),
+          statsApi.getUserRiotAccounts(userId),
+        ]);
 
       if (userResult.status === "rejected") {
         const err: any = userResult.reason;
-        setError(err.response?.data?.message || "유저 정보를 불러오는데 실패했습니다.");
+        setError(
+          err.response?.data?.message || "유저 정보를 불러오는데 실패했습니다.",
+        );
         setIsLoading(false);
         return;
       }
@@ -93,7 +107,11 @@ export default function UserStatsPage() {
     setIsLoadingMore(true);
     try {
       // 21개 조회 후 20개만 추가 — hasMore 정확한 판단
-      const moreMatches = await matchApi.getUserMatchHistory(userId, 21, matchHistory.length);
+      const moreMatches = await matchApi.getUserMatchHistory(
+        userId,
+        21,
+        matchHistory.length,
+      );
       setMatchHistory((prev) => [...prev, ...moreMatches.slice(0, 20)]);
       setHasMore(moreMatches.length > 20);
     } catch (err) {
@@ -109,7 +127,9 @@ export default function UserStatsPage() {
     const losses = totalGames - wins;
     const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
 
-    let totalKills = 0, totalDeaths = 0, totalAssists = 0;
+    let totalKills = 0,
+      totalDeaths = 0,
+      totalAssists = 0;
     matchHistory.forEach((m) => {
       totalKills += m.participant.kills;
       totalDeaths += m.participant.deaths;
@@ -120,12 +140,11 @@ export default function UserStatsPage() {
       totalGames > 0 && totalDeaths > 0
         ? ((totalKills + totalAssists) / totalDeaths).toFixed(2)
         : totalGames > 0
-        ? (totalKills + totalAssists).toFixed(2)
-        : "0.00";
+          ? (totalKills + totalAssists).toFixed(2)
+          : "0.00";
 
     return { totalGames, wins, losses, winRate, avgKDA };
   };
-
 
   // 백엔드에서 챔피언 통계 조회 (전체 MatchParticipant 집계)
   const { data: championStats = [] } = useQuery<ChampionStat[]>({
@@ -202,7 +221,9 @@ export default function UserStatsPage() {
     return (
       <div className="flex-grow flex items-center justify-center">
         <div className="text-center max-w-md">
-          <p className="text-accent-danger mb-4">{error || "유저를 찾을 수 없습니다."}</p>
+          <p className="text-accent-danger mb-4">
+            {error || "유저를 찾을 수 없습니다."}
+          </p>
           <Button onClick={() => router.push(`${gamePrefix}/matches`)}>
             전적 검색으로 돌아가기
           </Button>
@@ -350,56 +371,58 @@ export default function UserStatsPage() {
         </div>
 
         <div className="space-y-6">
-
-            {/* 최근 내전 요약 — 2026-11-03 Riot 랭크·일반 전적은 유저 검색 화면에서 뺐다.
+          {/* 최근 내전 요약 — 2026-11-03 Riot 랭크·일반 전적은 유저 검색 화면에서 뺐다.
                 Riot 계정을 안 넘기면 요약 컴포넌트가 내전 탭 하나만 그린다. */}
-            <RecentStatsSummary nexusMatches={matchHistory} />
+          <RecentStatsSummary nexusMatches={matchHistory} />
 
-            {/* 광고 — 요약과 내전 기록 사이, 문서 흐름 안에만 둔다 */}
-            <AdSlotCard slotKey="profile" minHeight={90} />
+          {/* 광고 — 요약과 내전 기록 사이, 문서 흐름 안에만 둔다 */}
+          <AdSlotCard slotKey="profile" minHeight={90} />
 
-            {/* Nexus Match Detail List */}
-            <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
-              <h2 className="text-xl font-bold text-text-primary mb-4 flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-accent-primary" />
-                넥서스 내전 기록
-              </h2>
+          {/* Nexus Match Detail List */}
+          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
+            <h2 className="text-xl font-bold text-text-primary mb-4 flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-accent-primary" />
+              넥서스 내전 기록
+            </h2>
 
-              {matchHistory.length === 0 ? (
-                <div className="text-center py-16">
-                  <Target className="h-16 w-16 text-text-tertiary mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-semibold text-text-primary mb-2">
-                    매치 기록이 없습니다
-                  </h3>
-                  <p className="text-text-secondary">
-                    토너먼트에 참가하면 여기에 전적이 표시됩니다.
-                  </p>
+            {matchHistory.length === 0 ? (
+              <div className="text-center py-16">
+                <Target className="h-16 w-16 text-text-tertiary mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold text-text-primary mb-2">
+                  매치 기록이 없습니다
+                </h3>
+                <p className="text-text-secondary">
+                  토너먼트에 참가하면 여기에 전적이 표시됩니다.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* 일반 전적과 같은 행 — 누르면 그 자리에서 내전 상세가 펼쳐진다 */}
+                <div className="overflow-hidden rounded-lg divide-y divide-bg-tertiary/40">
+                  {matchHistory.map((match) => (
+                    <InternalMatchHistoryRow
+                      key={match.matchId}
+                      match={match}
+                    />
+                  ))}
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* 일반 전적과 같은 행 — 누르면 그 자리에서 내전 상세가 펼쳐진다 */}
-                  <div className="overflow-hidden rounded-lg divide-y divide-bg-tertiary/40">
-                    {matchHistory.map((match) => (
-                      <InternalMatchHistoryRow key={match.matchId} match={match} />
-                    ))}
+
+                {/* 더 보기 버튼 */}
+                {hasMore && (
+                  <div className="text-center pt-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={loadMoreMatches}
+                      disabled={isLoadingMore}
+                    >
+                      {isLoadingMore ? "로딩 중..." : "더 보기"}
+                    </Button>
                   </div>
-
-                  {/* 더 보기 버튼 */}
-                  {hasMore && (
-                    <div className="text-center pt-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={loadMoreMatches}
-                        disabled={isLoadingMore}
-                      >
-                        {isLoadingMore ? "로딩 중..." : "더 보기"}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
