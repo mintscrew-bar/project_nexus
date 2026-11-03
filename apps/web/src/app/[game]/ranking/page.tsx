@@ -141,7 +141,7 @@ function LolRankingPage() {
               <EmptyState
                 icon={Trophy}
                 title="아직 랭킹에 오른 플레이어가 없습니다"
-                description="내전을 한 판만 해도 승률과 전적을 기준으로 랭킹에 등록됩니다. 첫 기록을 만들어보세요."
+                description="내전을 한 판만 해도 랭킹에 등록됩니다. 판수가 많은 순, 같으면 승률 순으로 줄을 세웁니다. 첫 기록을 만들어보세요."
                 action={{
                   label: "내전 방 둘러보기",
                   onClick: () => router.push(`${gamePrefix}/tournaments`),

@@ -8,6 +8,7 @@ import { TEST_BOT_USER_WHERE } from "../common/test-bot.util";
 @Injectable()
 export class RankingService {
   private readonly logger = new Logger(RankingService.name);
+  // 정렬은 판수 → 승률 순. 1판짜리 100% 가 위로 튀지 않게 많이 뛴 사람이 먼저다.
   // 랭킹 등재 최소 판수. 2026-11-03 10판 → 1판: 내전 성사 자체가 드물어 10판 조건이면 목록이 비어 있었다.
   private static readonly MIN_GAMES_FOR_RANK = 1;
   private static readonly RECENT_GAMES_COUNT = 20;
@@ -275,7 +276,7 @@ export class RankingService {
             },
           },
         },
-        orderBy: [{ winRate: "desc" }, { totalGames: "desc" }],
+        orderBy: [{ totalGames: "desc" }, { winRate: "desc" }],
         skip,
         take: limit,
       }),
@@ -329,7 +330,7 @@ export class RankingService {
             },
           },
         },
-        orderBy: [{ winRate: "desc" }, { totalGames: "desc" }],
+        orderBy: [{ totalGames: "desc" }, { winRate: "desc" }],
         skip,
         take: limit,
       }),
@@ -389,11 +390,12 @@ export class RankingService {
       const higherCount = await this.prisma.nexusRanking.count({
         where: {
           totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
+          // 정렬 기준(판수 → 승률)과 같은 순서로 "나보다 위" 인원을 센다
           OR: [
-            { winRate: { gt: ranking.winRate } },
+            { totalGames: { gt: ranking.totalGames } },
             {
-              winRate: ranking.winRate,
-              totalGames: { gt: ranking.totalGames },
+              totalGames: ranking.totalGames,
+              winRate: { gt: ranking.winRate },
             },
           ],
         },
@@ -495,7 +497,7 @@ export class RankingService {
       where: {
         totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
       },
-      orderBy: [{ winRate: "desc" }, { totalGames: "desc" }],
+      orderBy: [{ totalGames: "desc" }, { winRate: "desc" }],
       select: { id: true },
     });
 
