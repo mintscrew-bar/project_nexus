@@ -78,7 +78,7 @@ export default function CustomGameStatsPreviewPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto max-w-6xl px-4 py-8">
       {/* 실제 화면과 같은 2:1 배치 */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">

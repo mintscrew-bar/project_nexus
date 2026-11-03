@@ -147,11 +147,11 @@ export default function UserStatsPage() {
     return (
       <div className="min-h-screen">
         <div className="border-b border-bg-tertiary">
-          <div className="container mx-auto px-4 py-4">
+          <div className="container mx-auto max-w-6xl px-4 py-4">
             <Skeleton className="h-5 w-36" />
           </div>
         </div>
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto max-w-6xl px-4 py-8">
           {/* 유저 헤더 스켈레톤 */}
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6 mb-6">
             <div className="flex items-start gap-6">
@@ -217,7 +217,7 @@ export default function UserStatsPage() {
     <div className="min-h-screen">
       {/* Back Button */}
       <div className="border-b border-bg-tertiary">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto max-w-6xl px-4 py-4">
           <Link
             href={`${gamePrefix}/matches`}
             className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
@@ -228,7 +228,7 @@ export default function UserStatsPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto max-w-6xl px-4 py-8">
         {/* User Header */}
         <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6 mb-6">
           <div className="flex items-start gap-6">
