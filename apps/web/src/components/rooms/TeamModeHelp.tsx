@@ -173,7 +173,7 @@ export function RoleSelectionHelp({ compact = false }: { compact?: boolean }) {
             팀에서 플레이할 라인을 선택하는 마지막 팀 편성 단계입니다.
           </span>
           <span className="mt-3 block rounded-md bg-accent-primary/10 px-2.5 py-2 font-semibold text-accent-primary">
-            역할 선택 → 모든 팀장 준비 → 대진표
+            역할 선택 → 모든 팀 「팀 역할 선택 완료」 → 대진표
           </span>
           <span className="mt-2 block">
             시간이 끝나면 설정한 주/부 라인을 기준으로 미선택 역할이 자동

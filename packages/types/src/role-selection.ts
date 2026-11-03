@@ -7,7 +7,7 @@
 // 바뀌면 타이머 표시와 실제 만료 시각이 어긋났다. 두 곳 모두 여기서 가져간다.
 
 /** 역할 선택 기본 제한 시간 (초) */
-export const ROLE_SELECTION_TIME_SECONDS = 90;
+export const ROLE_SELECTION_TIME_SECONDS = 300;
 
 /** 연장 1회당 추가되는 시간 (초) */
 export const ROLE_SELECTION_EXTENSION_SECONDS = 15;
