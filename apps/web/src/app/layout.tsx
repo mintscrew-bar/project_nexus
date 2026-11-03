@@ -76,9 +76,9 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     images: [
       {
-        url: absoluteUrl("/images/og-banner.png"),
-        width: 1731,
-        height: 909,
+        url: absoluteUrl("/images/og-banner.jpg"),
+        width: 1200,
+        height: 630,
         alt: "Nexus - 내전 운영의 모든 것",
       },
     ],
@@ -87,7 +87,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    images: [absoluteUrl("/images/og-banner.png")],
+    images: [absoluteUrl("/images/og-banner.jpg")],
   },
   icons: {
     icon: "/icon.png",

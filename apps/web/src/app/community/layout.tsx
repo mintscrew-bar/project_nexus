@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { absoluteUrl, SITE_NAME } from "@/lib/seo";
+import { absoluteUrl, DEFAULT_OG_IMAGES, SITE_NAME } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "커뮤니티",
@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     canonical: absoluteUrl("/community"),
   },
   openGraph: {
+    images: DEFAULT_OG_IMAGES,
     title: "커뮤니티 | Nexus",
     description:
       "롤·배그 내전 후기, 게임 팁과 질문을 게임별 Nexus 커뮤니티에서 나눠보세요.",

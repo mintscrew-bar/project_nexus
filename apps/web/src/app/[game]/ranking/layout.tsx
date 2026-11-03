@@ -7,7 +7,7 @@ import {
   type GameTitle,
 } from "@nexus/types";
 import { GameSectionPending } from "@/components/games/GameSectionPending";
-import { gameCanonical, absoluteUrl, SITE_NAME } from "@/lib/seo";
+import { absoluteUrl, DEFAULT_OG_IMAGES, gameCanonical, SITE_NAME } from "@/lib/seo";
 
 /**
  * 랭킹은 게임마다 줄 세우는 기준 자체가 다르다.
@@ -52,6 +52,7 @@ export async function generateMetadata({
     description: copy.description,
     alternates: { canonical: url },
     openGraph: {
+      images: DEFAULT_OG_IMAGES,
       title: `${copy.title} | Nexus`,
       description: copy.ogDescription,
       url,

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { GAMES, gameFromSlug, DEFAULT_GAME } from "@nexus/types";
-import { gameCanonical } from "@/lib/seo";
+import { DEFAULT_OG_IMAGES, gameCanonical } from "@/lib/seo";
 
 const COPY = {
   LOL: {
@@ -34,6 +34,7 @@ export async function generateMetadata({
     description: copy.description,
     alternates: { canonical: url },
     openGraph: {
+      images: DEFAULT_OG_IMAGES,
       title: `${copy.title} | Nexus`,
       description: copy.ogDescription,
       url,

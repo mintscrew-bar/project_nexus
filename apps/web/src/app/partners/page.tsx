@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Bot, BookOpen, Radio, Shield, Users } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { absoluteUrl, DEFAULT_OG_IMAGES } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "NEXUS 파트너 안내",
@@ -15,6 +15,7 @@ export const metadata: Metadata = {
     follow: false,
   },
   openGraph: {
+    images: DEFAULT_OG_IMAGES,
     title: "NEXUS 파트너 모집",
     description:
       "방송 파티와 클랜 내전을 더 쉽고 재밌게 운영할 스트리머, 클랜 파트너를 찾고 있어요.",

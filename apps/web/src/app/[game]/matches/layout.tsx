@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { GAMES, gameFromSlug, DEFAULT_GAME, isSectionReady } from "@nexus/types";
 import { GameSectionPending } from "@/components/games/GameSectionPending";
-import { gameCanonical } from "@/lib/seo";
+import { DEFAULT_OG_IMAGES, gameCanonical } from "@/lib/seo";
 
 /** 게임마다 전적에 담기는 내용이 달라 문구도 따로 둔다. */
 const COPY = {
@@ -44,6 +44,7 @@ export async function generateMetadata({
     description: copy.description,
     alternates: { canonical: url },
     openGraph: {
+      images: DEFAULT_OG_IMAGES,
       title: `${copy.title} | Nexus`,
       description: copy.ogDescription,
       url,

@@ -16,6 +16,7 @@ import type { GameTitle } from "@nexus/types";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { RESOURCE_ARTICLES } from "@/app/resources/articles";
 import { GuideCarousel } from "./_components/GuideCarousel";
+import { DEFAULT_OG_IMAGES } from "@/lib/seo";
 
 /**
  * 가이드 홈은 게임마다 다른 글 묶음을 가리킨다.
@@ -36,6 +37,7 @@ export async function generateMetadata({
         : "Nexus의 방 생성, 팀 구성, 역할 선택, 대진표, Discord 연동 사용법과 실제 내전 운영 자료를 주제별로 확인하세요.",
     alternates: { canonical: guideUrl("/guide", game) },
     openGraph: {
+      images: DEFAULT_OG_IMAGES,
       title: `${label} 내전 가이드와 운영 자료 — Nexus`,
       description: "기능 사용법과 실제 운영 자료를 주제별 페이지에서 확인하세요.",
       url: guideUrl("/guide", game),

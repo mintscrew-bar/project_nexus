@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { absoluteUrl, SITE_NAME } from "@/lib/seo";
+import { absoluteUrl, DEFAULT_OG_IMAGES, SITE_NAME } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "클랜",
@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     canonical: absoluteUrl("/clans"),
   },
   openGraph: {
+    images: DEFAULT_OG_IMAGES,
     title: "클랜 브라우저 | Nexus",
     description:
       "롤 내전 클랜을 찾고 합류하세요. 클랜 랭킹과 모집 현황을 실시간으로 확인할 수 있습니다.",

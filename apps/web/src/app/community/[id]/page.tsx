@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { absoluteUrl, SITE_NAME } from "@/lib/seo";
+import { absoluteUrl, DEFAULT_OG_IMAGES, SITE_NAME } from "@/lib/seo";
 import PostDetailClient from "./_PostDetailClient";
 
 interface Props {
@@ -32,6 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         description,
         alternates: { canonical: absoluteUrl(`/community/${id}`) },
         openGraph: {
+          images: DEFAULT_OG_IMAGES,
           title: `${title} | ${SITE_NAME} 커뮤니티`,
           description,
           url: absoluteUrl(`/community/${id}`),

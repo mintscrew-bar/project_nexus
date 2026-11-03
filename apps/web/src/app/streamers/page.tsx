@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { absoluteUrl } from "@/lib/seo";
+import { absoluteUrl, DEFAULT_OG_IMAGES } from "@/lib/seo";
 import { StreamersClient } from "./_StreamersClient";
 
 export const metadata: Metadata = {
@@ -10,6 +10,7 @@ export const metadata: Metadata = {
     canonical: absoluteUrl("/streamers"),
   },
   openGraph: {
+    images: DEFAULT_OG_IMAGES,
     title: "NEXUS 스트리머",
     description:
       "방송 중인 스트리머와 진행 중인 시참 내전을 한곳에서 확인하세요.",

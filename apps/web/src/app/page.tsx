@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { absoluteUrl, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/seo";
+import { absoluteUrl, DEFAULT_OG_IMAGES, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/seo";
 import HomeClient from "./_components/HomeClient";
 import LandingContent from "./_components/LandingContent";
 
@@ -12,6 +12,7 @@ export const metadata: Metadata = {
     canonical: absoluteUrl("/"),
   },
   openGraph: {
+    images: DEFAULT_OG_IMAGES,
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     url: absoluteUrl("/"),

@@ -5,6 +5,7 @@ import { ArrowLeft, CalendarDays, Clock3 } from "lucide-react";
 import { guideBase, guideGame, guideUrl } from "@/lib/guide-links";
 import { getResourceArticle, RESOURCE_ARTICLES } from "@/app/resources/articles";
 import { AdSlotCard } from "@/components/ads/AdSlot";
+import { DEFAULT_OG_IMAGES } from "@/lib/seo";
 
 export function generateStaticParams() {
   return RESOURCE_ARTICLES.map(({ slug }) => ({ slug }));
@@ -26,6 +27,7 @@ export async function generateMetadata({
     // 같은 글이 `/lol` `/pubg` 두 URL 로 중복 색인되지 않게 한다.
     alternates: { canonical: guideUrl(`/guide/${article.slug}`) },
     openGraph: {
+      images: DEFAULT_OG_IMAGES,
       title: article.title,
       description: article.description,
       url: guideUrl(`/guide/${article.slug}`),

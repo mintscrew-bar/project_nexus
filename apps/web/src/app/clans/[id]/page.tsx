@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { absoluteUrl, SITE_NAME } from "@/lib/seo";
+import { absoluteUrl, DEFAULT_OG_IMAGES, SITE_NAME } from "@/lib/seo";
 import ClanDetailClient from "./_ClanDetailClient";
 
 interface Props {
@@ -32,6 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         description,
         alternates: { canonical: absoluteUrl(`/clans/${id}`) },
         openGraph: {
+          images: DEFAULT_OG_IMAGES,
           title: `${title} | ${SITE_NAME}`,
           description,
           url: absoluteUrl(`/clans/${id}`),

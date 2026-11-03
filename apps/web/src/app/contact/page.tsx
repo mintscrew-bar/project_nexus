@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, Mail, MessageSquare, ShieldCheck } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { absoluteUrl, DEFAULT_OG_IMAGES } from "@/lib/seo";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 
 export const metadata: Metadata = {
@@ -12,6 +12,7 @@ export const metadata: Metadata = {
     canonical: absoluteUrl("/contact"),
   },
   openGraph: {
+    images: DEFAULT_OG_IMAGES,
     title: "Nexus 문의하기",
     description:
       "서비스 이용, 계정, 개인정보, 커뮤니티 신고, 디스코드 연동 문의 방법을 확인하세요.",

@@ -11,7 +11,7 @@ import {
   Swords,
   Users,
 } from "lucide-react";
-import { absoluteUrl } from "@/lib/seo";
+import { absoluteUrl, DEFAULT_OG_IMAGES } from "@/lib/seo";
 import { DEFAULT_GAME_PREFIX } from "@/lib/game-links";
 
 export const metadata: Metadata = {
@@ -22,6 +22,7 @@ export const metadata: Metadata = {
     canonical: absoluteUrl("/about"),
   },
   openGraph: {
+    images: DEFAULT_OG_IMAGES,
     title: "Nexus 소개 — 롤 내전 운영과 전적 기록",
     description:
       "롤 내전 운영자가 반복하던 모집, 팀 구성, 결과 기록을 Nexus가 어떻게 정리하는지 확인하세요.",

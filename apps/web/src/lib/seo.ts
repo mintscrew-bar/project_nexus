@@ -18,6 +18,23 @@ export function absoluteUrl(path = "/"): string {
 }
 
 /**
+ * 링크 미리보기(카톡·디스코드 등) 기본 이미지.
+ *
+ * Next 는 페이지가 `openGraph` 를 따로 정의하면 루트 레이아웃의 openGraph 를
+ * 통째로 갈아끼운다(깊은 병합이 아니다). 그래서 페이지마다 images 를 직접
+ * 넣지 않으면 og:image 가 아예 빠진다 — 메인 포함 15개 페이지가 그랬다.
+ * 원본 1.6MB PNG 는 카톡 미리보기 용량 제한에 걸릴 수 있어 1200x630 JPEG(약 120KB)로 둔다.
+ */
+export const DEFAULT_OG_IMAGES = [
+  {
+    url: absoluteUrl("/images/og-banner.jpg"),
+    width: 1200,
+    height: 630,
+    alt: "Nexus - 내전 운영의 모든 것",
+  },
+];
+
+/**
  * 게임별 화면의 정규 URL.
  *
  * 라우트가 `/lol/*` `/pubg/*` 로 갈린 뒤에도 canonical 이 옛 경로(`/matches`)를
