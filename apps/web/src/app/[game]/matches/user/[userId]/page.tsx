@@ -18,6 +18,7 @@ import { getChampionKoreanName } from "@nexus/types";
 import type { RiotAccount, NexusMatchHistory } from "@/components/matches/match-utils";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
 import RiotMatchList from "@/components/matches/RiotMatchList";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 import { InternalMatchHistoryRow } from "@/components/matches/internal-match/InternalMatchHistoryRow";
 
 interface UserData {
@@ -389,6 +390,9 @@ export default function UserStatsPage() {
                 </div>
               </div>
             )}
+
+            {/* 광고 — 일반 전적과 내전 기록 사이, 문서 흐름 안에만 둔다 */}
+            <AdSlotCard slotKey="profile" minHeight={90} />
 
             {/* Nexus Match Detail List */}
             <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">

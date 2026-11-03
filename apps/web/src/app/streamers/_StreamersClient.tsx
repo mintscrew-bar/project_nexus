@@ -17,6 +17,7 @@ import { StreamersTour } from "@/components/onboarding/PrimaryPageTours";
 import { useNavigationGame } from "@/hooks/useCurrentGame";
 import { GameSectionTabs } from "@/components/GameSectionTabs";
 import { scopedSectionPath } from "@/lib/scoped-section-routes";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 
 export function StreamersClient() {
   const game = useNavigationGame();
@@ -146,6 +147,9 @@ export function StreamersClient() {
             </div>
           </section>
         )}
+
+        {/* 광고 — 스트리머 목록을 다 본 뒤 */}
+        <AdSlotCard slotKey="feed" minHeight={90} className="mt-10" />
       </div>
     </div>
   );

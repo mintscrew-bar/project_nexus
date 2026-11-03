@@ -12,6 +12,7 @@ import { Skeleton, Button, EmptyState } from "@/components/ui";
 import { Trophy, Crown, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { getTierImage } from "@/components/matches/match-utils";
 import { RankingTour } from "@/components/onboarding/PrimaryPageTours";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 
 /**
  * 롤과 배그는 줄 세우는 기준 자체가 다르다 — 롤은 승률, 배그는 누적 포인트.
@@ -264,6 +265,9 @@ function LolRankingPage() {
             }}
           />
         )}
+
+        {/* 광고 — 순위표를 다 본 뒤 */}
+        <AdSlotCard slotKey="feed" minHeight={90} className="mt-8" />
       </div>
     </div>
   );

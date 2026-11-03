@@ -39,6 +39,7 @@ import { getChampionKoreanName } from "@nexus/types";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
 import { RoleRecordList } from "@/components/domain/RoleRecordList";
 import RiotMatchList from "@/components/matches/RiotMatchList";
+import { AdSlotCard } from "@/components/ads/AdSlot";
 
 type QueueGroup = "ranked" | "normal" | "aram" | "custom" | "all";
 
@@ -907,6 +908,9 @@ export default function SummonerStatsPage() {
               navigateToSummoner={navigateToSummoner}
               nexusUserId={nexusUserId}
             />
+
+            {/* 광고 — 전적 목록을 다 본 뒤 문서 흐름 안에만 둔다 */}
+            <AdSlotCard slotKey="profile" minHeight={90} />
           </div>
 
           {/* Sidebar */}
