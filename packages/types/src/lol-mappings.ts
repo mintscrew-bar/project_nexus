@@ -1,7 +1,7 @@
 /**
  * League of Legends 영문->한글 매핑 데이터
  * 챔피언, 아이템, 룬의 공식 한글 이름 데이터
- * 출처: Riot Games Dragon API (16.19.1 패치 기준)
+ * 출처: Riot Games Dragon API (16.21.1 패치 기준)
  */
 
 // ============================================
@@ -357,12 +357,6 @@ export const ITEM_MAPPINGS: Record<string, string> = {
   "Hamstringer": "불귀신",
   "Haunting Guise": "기괴한 가면",
   "Health Potion": "체력 물약",
-  "Healthbar Cleanup: Reset Color": "체력 바 청소: 색상 초기화",
-  "Healthbar Splash: Blue": "체력 바 색칠: 파랑",
-  "Healthbar Splash: Green": "체력 바 색칠: 초록",
-  "Healthbar Splash: Orange": "체력 바 색칠: 주황",
-  "Healthbar Splash: Pink": "체력 바 색칠: 분홍",
-  "Healthbar Splash: Rainbow": "체력 바 색칠: 무지개",
   "Heart of Gold": "황금의 심장",
   "Hearthbound Axe": "온기가 필요한 자의 도끼",
   "Heartsteel": "강철심장",
@@ -466,7 +460,6 @@ export const ITEM_MAPPINGS: Record<string, string> = {
   "Oracle's Elixir": "예언자의 영약",
   "Overlord's Bloodmail": "지배자의 피갑옷",
   "OwO Blaster": "왕 귀여운 발사기",
-  "Party Favor": "파티 선물",
   "Paw Print Poisoner": "발자국 중독 장치",
   "Perfect Hex Core": "완성형 마공학 핵",
   "Perplexity": "당혹",
