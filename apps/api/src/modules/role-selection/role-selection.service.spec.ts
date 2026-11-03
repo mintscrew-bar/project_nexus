@@ -99,7 +99,7 @@ describe("RoleSelectionService captain readiness", () => {
     prisma.team.findFirst.mockResolvedValue(null);
 
     await expect(service.markCaptainReady("player-1", roomId)).rejects.toThrow(
-      "팀장만 팀을 확정할 수 있습니다.",
+      "팀장만 팀 역할을 확정할 수 있습니다.",
     );
   });
 });

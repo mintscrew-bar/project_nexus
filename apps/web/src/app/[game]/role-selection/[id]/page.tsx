@@ -286,7 +286,7 @@ export default function RoleSelectionPage() {
     try {
       await markCaptainReady(roomId);
     } catch (err: any) {
-      addToast(err.message || "팀 확정에 실패했습니다.", "error");
+      addToast(err.message || "팀 역할 확정에 실패했습니다.", "error");
     } finally {
       setIsMarkingReady(false);
     }
@@ -387,7 +387,7 @@ export default function RoleSelectionPage() {
               {isConnected ? "● 연결됨" : "● 연결 끊김"}
             </Badge>
             <Badge variant={allCaptainsReady ? "success" : "primary"}>
-              팀 확정 {readyCaptainIds.length}/{readyCaptainsRequired}
+              팀 역할 확정 {readyCaptainIds.length}/{readyCaptainsRequired}
             </Badge>
             {isMyTeamCaptain && (
               <Button
@@ -396,10 +396,10 @@ export default function RoleSelectionPage() {
                 isLoading={isMarkingReady}
                 disabled={!isConnected || hasMarkedReady || isMarkingReady}
                 onClick={handleMarkCaptainReady}
-                title="모든 팀이 확정하면 아직 안 고른 역할을 자동 배정하고 대진표로 넘어갑니다."
+                title="모든 팀이 역할을 확정하면 아직 안 고른 역할을 자동 배정하고 대진표로 넘어갑니다."
               >
                 <CheckCircle2 className="h-4 w-4" />
-                <span>{hasMarkedReady ? "확정됨" : "팀 확정"}</span>
+                <span>{hasMarkedReady ? "확정됨" : "팀 역할 확정"}</span>
               </Button>
             )}
             <button
