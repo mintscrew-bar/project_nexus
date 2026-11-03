@@ -23,15 +23,19 @@ const RANKING = {
   ],
 };
 
+// [영문명, id, 판수, 승, 패, 판당 K, D, A, 판당 CS, 판당 분]
 const CHAMPIONS = [
-  ["Jinx", 222, 6, 5, 1],
-  ["Kaisa", 145, 4, 2, 2],
-  ["Ezreal", 81, 3, 1, 2],
-  ["LeeSin", 64, 3, 2, 1],
-  ["Ahri", 103, 2, 0, 2],
-  ["Thresh", 412, 2, 1, 1],
-  ["Garen", 86, 1, 1, 0],
-].map(([name, id, games, wins, losses]) => {
+  ["Jinx", 222, 6, 5, 1, 8.2, 3.1, 7.5, 214, 28],
+  ["Kaisa", 145, 4, 2, 2, 6.5, 4.8, 6.0, 198, 30],
+  ["Ezreal", 81, 3, 1, 2, 4.0, 5.3, 6.7, 176, 27],
+  ["LeeSin", 64, 3, 2, 1, 5.7, 3.3, 9.3, 142, 29],
+  ["Ahri", 103, 2, 0, 2, 3.5, 6.0, 4.5, 165, 26],
+  ["Thresh", 412, 2, 1, 1, 1.0, 4.5, 14.0, 32, 31],
+  ["Garen", 86, 1, 1, 0, 9.0, 0, 3.0, 201, 25],
+  ["Lulu", 117, 1, 0, 1, 1.0, 5.0, 11.0, 28, 33],
+  ["Viego", 234, 1, 1, 0, 7.0, 2.0, 6.0, 168, 27],
+  ["Caitlyn", 51, 1, 0, 1, 4.0, 7.0, 3.0, 221, 32],
+].map(([name, id, games, wins, losses, k, d, a, cs, min]) => {
   const g = games as number;
   return {
     championId: id as number,
@@ -39,12 +43,11 @@ const CHAMPIONS = [
     games: g,
     wins: wins as number,
     losses: losses as number,
-    kills: 7 * g,
-    deaths: name === "Garen" ? 0 : 4 * g,
-    assists: 8 * g,
-    totalMinionsKilled: 180 * g,
-    neutralMinionsKilled: 8 * g,
-    totalDamageDealtToChampions: 21000 * g,
+    kills: (k as number) * g,
+    deaths: (d as number) * g,
+    assists: (a as number) * g,
+    timedCs: (cs as number) * g,
+    timedSeconds: (min as number) * 60 * g,
   };
 });
 

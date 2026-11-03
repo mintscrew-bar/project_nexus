@@ -34,6 +34,12 @@ export interface ChampionStats {
   neutralMinionsKilled: number;
   goldEarned: number;
   totalDamageDealtToChampions: number;
+  /**
+   * 분당 CS 계산용. 경기 시간이 기록된 판만 더한다(시간 없는 판의 CS 까지 나누면
+   * 분당 CS 가 부풀거나 줄어든다). 분당 CS = timedCs / (timedSeconds / 60).
+   */
+  timedCs: number;
+  timedSeconds: number;
 }
 
 export interface RankedChampStat {
@@ -1182,6 +1188,7 @@ export class StatsService {
         goldEarned: true,
         totalDamageDealtToChampions: true,
         win: true,
+        match: { select: { gameDuration: true } },
       },
     });
 
@@ -1190,7 +1197,13 @@ export class StatsService {
 
     participants.forEach((p: (typeof participants)[number]) => {
       const existing = statsMap.get(p.championId);
+      // 경기 시간(초)이 있는 판만 분당 CS 에 넣는다
+      const seconds = p.match?.gameDuration ?? 0;
+      const timedCs =
+        seconds > 0 ? p.totalMinionsKilled + p.neutralMinionsKilled : 0;
       if (existing) {
+        existing.timedCs += timedCs;
+        existing.timedSeconds += seconds > 0 ? seconds : 0;
         existing.games++;
         if (p.win) existing.wins++;
         else existing.losses++;
@@ -1217,6 +1230,8 @@ export class StatsService {
           neutralMinionsKilled: p.neutralMinionsKilled,
           goldEarned: p.goldEarned,
           totalDamageDealtToChampions: p.totalDamageDealtToChampions,
+          timedCs,
+          timedSeconds: seconds > 0 ? seconds : 0,
         });
       }
     });

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
-import { Swords, ChevronDown } from "lucide-react";
+import { Swords } from "lucide-react";
 import { getChampionKoreanName } from "@nexus/types";
 import { getChampionIcon } from "@/components/matches/match-utils";
 import { cn } from "@/lib/utils";
@@ -17,13 +16,10 @@ export interface ChampionStat {
   kills: number;
   deaths: number;
   assists: number;
-  totalMinionsKilled: number;
-  neutralMinionsKilled: number;
-  totalDamageDealtToChampions: number;
+  /** 경기 시간이 기록된 판의 CS 합 / 경기 시간 합(초) — 분당 CS 계산용 */
+  timedCs?: number;
+  timedSeconds?: number;
 }
-
-/** 처음에 보여줄 챔피언 수. 나머지는 "더 보기"로 편다 */
-const INITIAL_COUNT = 5;
 
 /** KDA 색 — 경매 매물 카드와 같이 3 이상을 금색으로 */
 function kdaTone(ratio: number | null): string {
@@ -33,16 +29,96 @@ function kdaTone(ratio: number | null): string {
   return "text-text-primary";
 }
 
+/** 승률 글자색 — 3판 미만은 표본이 작아 약하게 */
+function winRateTone(winRate: number, games: number): string {
+  if (games < 3) return "text-text-secondary";
+  if (winRate >= 60) return "text-accent-primary";
+  if (winRate < 40) return "text-accent-danger";
+  return "text-text-primary";
+}
+
+/** 표시용 값을 한 번에 계산해 둔다 */
+function summarize(stat: ChampionStat) {
+  const winRate = Math.round((stat.wins / stat.games) * 100);
+  const ratio =
+    stat.deaths > 0 ? (stat.kills + stat.assists) / stat.deaths : null;
+  const per = (value: number) => (value / stat.games).toFixed(1);
+  const minutes = (stat.timedSeconds ?? 0) / 60;
+  return {
+    winRate,
+    ratio,
+    kdaText: ratio != null ? ratio.toFixed(2) : "Perfect",
+    kdaDetail: `${per(stat.kills)}/${per(stat.deaths)}/${per(stat.assists)}`,
+    // 경기 시간이 기록된 판이 없으면 계산하지 않는다
+    csPerMin: minutes > 0 ? ((stat.timedCs ?? 0) / minutes).toFixed(1) : "—",
+  };
+}
+
+/**
+ * 챔피언 아이콘 둘레에 승률 링 — 파랑 = 승, 빨강 = 패.
+ * 아이콘 자체가 승률 그래프라 숫자를 덜 읽어도 잘하는 챔피언이 보인다.
+ */
+function WinRateRing({
+  championName,
+  winRate,
+  size,
+}: {
+  championName: string;
+  winRate: number;
+  size: number;
+}) {
+  const stroke = size >= 56 ? 4 : 3;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const inset = stroke + 2;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90" aria-hidden>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={stroke}
+          className="stroke-accent-danger/60"
+        />
+        {winRate > 0 && (
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            strokeWidth={stroke}
+            strokeDasharray={`${(circumference * winRate) / 100} ${circumference}`}
+            strokeLinecap={winRate < 100 ? "round" : "butt"}
+            className="stroke-accent-primary"
+          />
+        )}
+      </svg>
+      <Image
+        src={getChampionIcon(championName)}
+        alt={championName}
+        width={size - inset * 2}
+        height={size - inset * 2}
+        className="absolute rounded-full"
+        style={{ inset }}
+      />
+    </div>
+  );
+}
+
+/** 목록 머리줄·행이 같이 쓰는 열: 챔피언 | 승패(판수) | KDA | 분당 CS */
+const COLUMNS = "grid-cols-[minmax(0,1fr)_76px_48px_44px]";
+
 /**
  * 넥서스 유저 전적 화면의 "내전 챔피언" 카드.
  *
- * 예전 모양은 아이콘 · 승패 · 승률 · KDA 가 한 줄에 같은 크기로 늘어서서 어떤 챔피언을
- * 잘하는지가 눈에 안 들어왔다(2026-11-03 운영자 요청으로 다시 그림).
- * - 승/패를 한 줄 막대로 나눠 그려 승률을 길이로 읽게 한다
- * - KDA 는 비율을 크게, 판당 평균 K/D/A 를 작게
- * - 판당 CS·피해량을 함께 적어 경매 매물 카드의 지표와 같은 눈높이로 본다
- * - 세 칸 상자(너무 큼)와 두 줄 압축(너무 빽빽함) 사이: 이름·승률·막대·판당 지표(KDA 포함)를
- *   가운데에, 승패를 오른쪽 칸으로 떼어 크게 둔다
+ * 2026-11-03 운영자와 시안 셋(표형 / 승률 링 / 대표 챔피언 + 목록)을 비교하고
+ * 승률 링과 대표 챔피언을 섞기로 했다.
+ * - 가장 많이 한 챔피언을 맨 위에 크게 — "이 사람 주력이 뭐지"에 바로 답한다
+ * - 지표는 승패(판수) · KDA · 분당 CS 세 가지로 통일 (평균 딜량은 운영자 요청으로 뺐다)
+ * - 아이콘 둘레 링이 승률
+ * - 나머지 챔피언은 카드 안에서 스크롤로 더 본다(접기/펼치기 버튼 없음)
  */
 export function ChampionStatsCard({
   stats,
@@ -52,12 +128,13 @@ export function ChampionStatsCard({
   /**
    * 부모 높이를 꽉 채우고 목록은 그 안에서 스크롤한다(넓은 화면 전용).
    * 유저 전적 화면에서 옆 "내전 지표" 카드와 높이를 맞출 때 쓴다.
-   * 좁은 화면(한 줄씩 쌓일 때)은 지금처럼 5개 + "더 보기".
+   * 좁은 화면에서는 목록 높이를 정해 두고 스크롤한다.
    */
   fill?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const totalGames = stats.reduce((sum, stat) => sum + stat.games, 0);
+  const [top, ...rest] = stats;
+  const topSummary = top ? summarize(top) : null;
 
   return (
     <div
@@ -66,7 +143,7 @@ export function ChampionStatsCard({
         fill && "lg:flex lg:h-full lg:flex-col",
       )}
     >
-      <div className="mb-4 flex items-center justify-between gap-2">
+      <div className="mb-4 flex shrink-0 items-center justify-between gap-2">
         <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
           <Swords className="h-5 w-5 text-accent-primary" />
           내전 챔피언
@@ -78,137 +155,150 @@ export function ChampionStatsCard({
         )}
       </div>
 
-      {stats.length === 0 ? (
+      {!top || !topSummary ? (
         <p className="py-8 text-center text-sm text-text-secondary">
           상세 기록이 수집된 내전이 아직 없습니다
         </p>
       ) : (
         <>
-          <ul
-            className={cn(
-              "space-y-1.5",
-              // 넓은 화면에서는 남은 높이 안에서 스크롤 — 스크롤바가 붙지 않게 오른쪽 여백
-              fill &&
-                "lg:-mr-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2",
-            )}
-          >
-            {stats.map((stat, index) => {
-              // 접힌 상태에서 6번째부터는 숨긴다. fill 이면 넓은 화면에선 전부 보인다(스크롤).
-              const collapsed = !expanded && index >= INITIAL_COUNT;
-              const winRate = Math.round((stat.wins / stat.games) * 100);
-              const ratio =
-                stat.deaths > 0
-                  ? (stat.kills + stat.assists) / stat.deaths
-                  : null;
-              const per = (value: number) => (value / stat.games).toFixed(1);
-              const cs = Math.round(
-                (stat.totalMinionsKilled + stat.neutralMinionsKilled) /
-                  stat.games,
-              );
-              const damage = Math.round(
-                stat.totalDamageDealtToChampions / stat.games,
-              );
-
-              return (
-                <li
-                  key={stat.championId}
+          {/* 주력 챔피언 */}
+          <div className="mb-3 flex shrink-0 items-center gap-4 rounded-lg bg-gradient-to-r from-accent-primary/15 to-transparent p-3 ring-1 ring-accent-primary/30">
+            <WinRateRing
+              championName={top.championName}
+              winRate={topSummary.winRate}
+              size={68}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold text-accent-primary">
+                주력 챔피언
+              </p>
+              <div className="flex items-baseline gap-2">
+                <p className="truncate text-lg font-black text-text-primary">
+                  {getChampionKoreanName(top.championName)}
+                </p>
+                <span
                   className={cn(
-                    "flex items-stretch gap-3 rounded-lg bg-bg-tertiary/50 px-3 py-2.5",
-                    collapsed && (fill ? "hidden lg:flex" : "hidden"),
+                    "shrink-0 text-sm font-black tabular-nums",
+                    winRateTone(topSummary.winRate, top.games),
                   )}
                 >
-                  {/* 아이콘 */}
-                  <Image
-                    src={getChampionIcon(stat.championName)}
-                    alt={stat.championName}
-                    width={44}
-                    height={44}
-                    className="h-11 w-11 shrink-0 self-center rounded-lg"
-                  />
+                  {topSummary.winRate}%
+                </span>
+              </div>
+              <div className="mt-1.5 grid grid-cols-3 gap-2">
+                <div>
+                  <p className="text-sm font-black tabular-nums">
+                    <span className="text-accent-primary">{top.wins}승</span>{" "}
+                    <span className="text-accent-danger">{top.losses}패</span>
+                  </p>
+                  <p className="text-[10px] tabular-nums text-text-tertiary">
+                    {top.games}판
+                  </p>
+                </div>
+                <div>
+                  <p
+                    className={cn(
+                      "text-sm font-black tabular-nums",
+                      kdaTone(topSummary.ratio),
+                    )}
+                  >
+                    {topSummary.kdaText}
+                  </p>
+                  <p className="text-[10px] tabular-nums text-text-tertiary">
+                    {topSummary.kdaDetail}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-black tabular-nums text-text-primary">
+                    {topSummary.csPerMin}
+                  </p>
+                  <p className="text-[10px] text-text-tertiary">분당 CS</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-                  {/* 이름 · 승률 · 승패 막대 · 판당 CS/피해 */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className="truncate text-sm font-bold text-text-primary">
-                        {getChampionKoreanName(stat.championName)}
-                      </p>
+          {rest.length > 0 && (
+            <>
+              {/* 머리줄 */}
+              <div
+                className={cn(
+                  "grid shrink-0 items-center gap-x-2 px-2 pb-1.5 text-[10px] font-medium text-text-tertiary",
+                  COLUMNS,
+                )}
+              >
+                <span>챔피언</span>
+                <span className="text-right">승패(판수)</span>
+                <span className="text-right">KDA</span>
+                <span className="text-right">분당 CS</span>
+              </div>
+
+              {/* 나머지 — 카드 안에서 스크롤 (오른쪽 여백은 스크롤바 자리) */}
+              <ul
+                className={cn(
+                  "-mr-2 max-h-[320px] space-y-0.5 overflow-y-auto pr-2",
+                  fill && "lg:max-h-none lg:min-h-0 lg:flex-1",
+                )}
+              >
+                {rest.map((stat) => {
+                  const s = summarize(stat);
+                  return (
+                    <li
+                      key={stat.championId}
+                      className={cn(
+                        "grid items-center gap-x-2 rounded-md px-2 py-1.5 transition-colors hover:bg-bg-tertiary/50",
+                        COLUMNS,
+                      )}
+                    >
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <WinRateRing
+                          championName={stat.championName}
+                          winRate={s.winRate}
+                          size={36}
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-text-primary">
+                            {getChampionKoreanName(stat.championName)}
+                          </p>
+                          <p
+                            className={cn(
+                              "text-[11px] font-bold tabular-nums",
+                              winRateTone(s.winRate, stat.games),
+                            )}
+                          >
+                            {s.winRate}%
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-right text-xs tabular-nums">
+                        <span className="text-accent-primary">
+                          {stat.wins}승
+                        </span>{" "}
+                        <span className="text-accent-danger">
+                          {stat.losses}패
+                        </span>
+                        <span className="text-text-tertiary">
+                          {" "}
+                          ({stat.games})
+                        </span>
+                      </span>
                       <span
                         className={cn(
-                          "shrink-0 text-base font-black leading-none tabular-nums",
-                          stat.games < 3
-                            ? "text-text-secondary"
-                            : winRate >= 60
-                              ? "text-accent-primary"
-                              : winRate < 40
-                                ? "text-accent-danger"
-                                : "text-text-primary",
+                          "text-right text-xs font-bold tabular-nums",
+                          kdaTone(s.ratio),
                         )}
+                        title={`판당 ${s.kdaDetail}`}
                       >
-                        {winRate}%
+                        {s.kdaText}
                       </span>
-                    </div>
-                    {/* 승(파랑) | 패(빨강) 비율 막대 */}
-                    <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-bg-primary">
-                      {stat.wins > 0 && (
-                        <div
-                          className="bg-accent-primary"
-                          style={{ width: `${winRate}%` }}
-                        />
-                      )}
-                      {stat.losses > 0 && (
-                        <div className="flex-1 bg-accent-danger/70" />
-                      )}
-                    </div>
-                    <p className="mt-1.5 truncate text-[11px] tabular-nums text-text-tertiary">
-                      <span
-                        className={cn("font-bold", kdaTone(ratio))}
-                        title={`판당 ${per(stat.kills)}/${per(stat.deaths)}/${per(stat.assists)}`}
-                      >
-                        {ratio != null ? ratio.toFixed(2) : "Perfect"} KDA
+                      <span className="text-right text-xs tabular-nums text-text-secondary">
+                        {s.csPerMin}
                       </span>
-                      {/* 판당 K/D/A 는 좁은 줄에 안 들어가 KDA 에 마우스를 올리면 보인다 */}
-                      {" · "}CS {cs}
-                      {" · "}피해 {(damage / 1000).toFixed(1)}k
-                    </p>
-                  </div>
-
-                  {/* 승패 — 오른쪽 칸으로 떼어 크게. 판수는 그 아래 */}
-                  <div className="flex w-[68px] shrink-0 flex-col items-center justify-center border-l border-bg-elevated/60 pl-3">
-                    <span className="text-sm font-black leading-tight tabular-nums">
-                      <span className="text-accent-primary">{stat.wins}승</span>{" "}
-                      <span className="text-accent-danger">
-                        {stat.losses}패
-                      </span>
-                    </span>
-                    <span className="text-[10px] tabular-nums text-text-tertiary">
-                      {stat.games}판
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-
-          {stats.length > INITIAL_COUNT && (
-            <button
-              // fill 이면 넓은 화면에선 스크롤로 다 보이므로 버튼을 숨긴다(lg:hidden)
-              type="button"
-              onClick={() => setExpanded((value) => !value)}
-              className={cn(
-                "mt-3 flex w-full items-center justify-center gap-1 rounded-lg py-2 text-xs font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary",
-                fill && "lg:hidden",
-              )}
-            >
-              {expanded
-                ? "접기"
-                : `${stats.length - INITIAL_COUNT}챔피언 더 보기`}
-              <ChevronDown
-                className={cn(
-                  "h-3.5 w-3.5 transition-transform",
-                  expanded && "rotate-180",
-                )}
-              />
-            </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </>
       )}

@@ -140,6 +140,41 @@ describe("StatsService", () => {
       expect(result[0]).toHaveProperty("championNameKorean");
     });
 
+    it("분당 CS 는 경기 시간이 있는 판만 더한다", async () => {
+      prisma.user.findUnique.mockResolvedValue(mockUser);
+      const base = {
+        championId: 103,
+        championName: "Ahri",
+        kills: 5,
+        deaths: 2,
+        assists: 8,
+        goldEarned: 12000,
+        totalDamageDealtToChampions: 25000,
+        win: true,
+      };
+      prisma.matchParticipant.findMany.mockResolvedValue([
+        // 30분 · CS 240
+        {
+          ...base,
+          totalMinionsKilled: 220,
+          neutralMinionsKilled: 20,
+          match: { gameDuration: 1800 },
+        },
+        // 시간 기록 없음 — 분당 CS 계산에서 빠져야 한다
+        {
+          ...base,
+          totalMinionsKilled: 300,
+          neutralMinionsKilled: 0,
+          match: { gameDuration: null },
+        },
+      ]);
+
+      const [ahri] = await service.getUserChampionStats(userId);
+
+      expect(ahri.timedCs).toBe(240);
+      expect(ahri.timedSeconds).toBe(1800);
+    });
+
     it("외부 Riot 인제스트 매치를 제외하고 Nexus 내전만 조회한다", async () => {
       prisma.user.findUnique.mockResolvedValue(mockUser);
       prisma.matchParticipant.findMany.mockResolvedValue([]);
