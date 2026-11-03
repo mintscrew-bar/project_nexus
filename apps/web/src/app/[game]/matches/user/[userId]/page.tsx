@@ -17,6 +17,7 @@ import { getChampionIcon } from "@/components/matches/match-utils";
 import { getChampionKoreanName } from "@nexus/types";
 import type { RiotAccount, NexusMatchHistory } from "@/components/matches/match-utils";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
+import { CustomGameStatsCard } from "@/components/matches/CustomGameStatsCard";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 import { InternalMatchHistoryRow } from "@/components/matches/internal-match/InternalMatchHistoryRow";
 
@@ -353,6 +354,9 @@ export default function UserStatsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Column */}
           <div className="lg:col-span-2 space-y-6">
+            {/* 내전 지표 — 경매 매물 카드와 같은 여덟 칸. Riot 게임 전적이 있던 자리 */}
+            <CustomGameStatsCard userId={userId} />
+
             {/* 최근 내전 요약 — 2026-11-03 Riot 랭크·일반 전적은 유저 검색 화면에서 뺐다.
                 Riot 계정을 안 넘기면 요약 컴포넌트가 내전 탭 하나만 그린다. */}
             <RecentStatsSummary nexusMatches={matchHistory} />
