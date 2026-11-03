@@ -17,7 +17,6 @@ import { getChampionIcon } from "@/components/matches/match-utils";
 import { getChampionKoreanName } from "@nexus/types";
 import type { RiotAccount, NexusMatchHistory } from "@/components/matches/match-utils";
 import RecentStatsSummary from "@/components/matches/RecentStatsSummary";
-import RiotMatchList from "@/components/matches/RiotMatchList";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 import { InternalMatchHistoryRow } from "@/components/matches/internal-match/InternalMatchHistoryRow";
 
@@ -86,12 +85,6 @@ export default function UserStatsPage() {
 
     fetchUserData();
   }, [userId]);
-
-  const navigateToSummoner = (gameName: string, tagLine: string) => {
-    if (gameName && tagLine) {
-      router.push(`${gamePrefix}/matches/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`);
-    }
-  };
 
   const loadMoreMatches = async () => {
     if (isLoadingMore || !hasMore) return;
@@ -360,38 +353,11 @@ export default function UserStatsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Column */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Recent Stats Summary (Ranked / Nexus tabs) */}
-            <RecentStatsSummary
-              gameName={primaryAccount?.gameName}
-              tagLine={primaryAccount?.tagLine}
-              puuid={primaryAccount?.puuid}
-              nexusMatches={matchHistory}
-            />
+            {/* 최근 내전 요약 — 2026-11-03 Riot 랭크·일반 전적은 유저 검색 화면에서 뺐다.
+                Riot 계정을 안 넘기면 요약 컴포넌트가 내전 탭 하나만 그린다. */}
+            <RecentStatsSummary nexusMatches={matchHistory} />
 
-            {/* Riot Match List */}
-            {primaryAccount ? (
-              <RiotMatchList
-                gameName={primaryAccount.gameName}
-                tagLine={primaryAccount.tagLine}
-                puuid={primaryAccount.puuid}
-                navigateToSummoner={navigateToSummoner}
-                nexusUserId={userId}
-              />
-            ) : (
-              <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
-                <div className="text-center py-12">
-                  <Target className="h-12 w-12 text-text-tertiary mx-auto mb-3 opacity-50" />
-                  <h3 className="text-lg font-semibold text-text-primary mb-2">
-                    Riot 계정이 연동되지 않았습니다
-                  </h3>
-                  <p className="text-text-secondary text-sm">
-                    Riot 계정을 연동하면 솔로 랭크, 자유 랭크 등의 전적을 확인할 수 있습니다.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* 광고 — 일반 전적과 내전 기록 사이, 문서 흐름 안에만 둔다 */}
+            {/* 광고 — 요약과 내전 기록 사이, 문서 흐름 안에만 둔다 */}
             <AdSlotCard slotKey="profile" minHeight={90} />
 
             {/* Nexus Match Detail List */}
