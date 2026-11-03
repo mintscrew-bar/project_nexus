@@ -4,12 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart3, Star } from "lucide-react";
 import { userApi } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui";
+import {
+  RoleRecordList,
+  type RoleRecord,
+} from "@/components/domain/RoleRecordList";
 import { cn } from "@/lib/utils";
 
 /**
  * 넥서스 유저 전적 화면의 "내전 지표" 카드.
  *
  * 경매 매물 카드(AuctionLotDetails)가 보여주는 여덟 칸과 같은 값·같은 이름이다.
+ * 그 아래에 라인별 승패를 붙인다 — 따로 있던 "내전 라인별 전적" 칸을 합쳤다(2026-11-03).
  * 2026-11-03 유저 전적 화면에서 Riot 게임 전적을 빼고 그 자리에 넣었다.
  * 데이터도 같은 호버 프로필 조회를 쓰므로(같은 queryKey) 경매·호버 카드와 캐시를 나눠 쓴다.
  * 경매 카드는 화면 높이별 배치가 촘촘하게 맞춰져 있어 손대지 않고, 여기서는 칸만 따로 그린다.
@@ -43,7 +48,22 @@ function StatCell({
   );
 }
 
-export function CustomGameStatsCard({ userId }: { userId: string }) {
+/** 랭킹 API(/ranking/user/:id) 가 주는 내전 전체 승패·순위·라인별 전적 */
+interface CustomGameRanking {
+  totalGames: number;
+  wins: number;
+  losses: number;
+  globalRank: number | null;
+  byRole?: RoleRecord[] | null;
+}
+
+export function CustomGameStatsCard({
+  userId,
+  ranking,
+}: {
+  userId: string;
+  ranking?: CustomGameRanking | null;
+}) {
   const { data: profile, isLoading } = useQuery({
     queryKey: ["hoverProfile", userId, "LOL"],
     queryFn: () => userApi.getHoverProfile(userId, "LOL"),
@@ -64,10 +84,18 @@ export function CustomGameStatsCard({ userId }: { userId: string }) {
 
   return (
     <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6">
-      <h2 className="text-xl font-bold text-text-primary mb-4 flex items-center gap-2">
-        <BarChart3 className="h-5 w-5 text-accent-primary" />
-        내전 지표
-      </h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-accent-primary" />
+          내전 지표
+        </h2>
+        {ranking && ranking.totalGames > 0 && (
+          <p className="text-sm text-text-tertiary">
+            {ranking.totalGames}전 {ranking.wins}승 {ranking.losses}패
+            {ranking.globalRank ? ` · 랭킹 #${ranking.globalRank}` : ""}
+          </p>
+        )}
+      </div>
 
       {isLoading ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -150,6 +178,16 @@ export function CustomGameStatsCard({ userId }: { userId: string }) {
             <p className="mt-3 text-xs text-text-tertiary">
               평균 지표는 상세 기록이 수집된 내전 {kda.games}판 기준입니다.
             </p>
+          )}
+
+          {/* 라인별 승패 — 역할 선택을 거친 판만 집계된다(RoleRecordList 주석 참고) */}
+          {ranking?.byRole?.some((record) => record.totalGames > 0) && (
+            <div className="mt-5">
+              <h3 className="mb-2 text-sm font-semibold text-text-secondary">
+                라인별 전적
+              </h3>
+              <RoleRecordList records={ranking.byRole} />
+            </div>
           )}
         </>
       )}

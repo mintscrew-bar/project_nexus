@@ -9,8 +9,7 @@ import Image from "next/image";
 import { userApi, matchApi, statsApi, rankingApi } from "@/lib/api-client";
 import { LoadingSpinner, Button, Badge, Skeleton } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { ArrowLeft, User, Trophy, Target, TrendingUp, Calendar, ExternalLink, Swords } from "lucide-react";
-import { RoleRecordList } from "@/components/domain/RoleRecordList";
+import { ArrowLeft, User, Trophy, Target, TrendingUp, Calendar, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { getChampionIcon } from "@/components/matches/match-utils";
@@ -297,24 +296,6 @@ export default function UserStatsPage() {
           </div>
         </div>
 
-        {/* 내전 라인별 전적 — 승패는 Nexus가 확정하므로 Riot 수집과 무관하게 쌓인다 */}
-        {nexusRanking && (
-          <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6 mb-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 text-xl font-bold text-text-primary">
-                <Swords className="h-5 w-5 text-accent-primary" />
-                내전 라인별 전적
-              </h2>
-              <p className="text-sm text-text-tertiary">
-                {nexusRanking.totalGames}전 {nexusRanking.wins}승{" "}
-                {nexusRanking.losses}패
-                {nexusRanking.globalRank ? ` · #${nexusRanking.globalRank}` : ""}
-              </p>
-            </div>
-            <RoleRecordList records={nexusRanking.byRole} />
-          </div>
-        )}
-
         {/* Riot Accounts */}
         {riotAccounts.length > 0 && (
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6 mb-6">
@@ -354,8 +335,8 @@ export default function UserStatsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Column */}
           <div className="lg:col-span-2 space-y-6">
-            {/* 내전 지표 — 경매 매물 카드와 같은 여덟 칸. Riot 게임 전적이 있던 자리 */}
-            <CustomGameStatsCard userId={userId} />
+            {/* 내전 지표 — 경매 매물 카드와 같은 여덟 칸 + 라인별 전적. Riot 게임 전적이 있던 자리 */}
+            <CustomGameStatsCard userId={userId} ranking={nexusRanking} />
 
             {/* 최근 내전 요약 — 2026-11-03 Riot 랭크·일반 전적은 유저 검색 화면에서 뺐다.
                 Riot 계정을 안 넘기면 요약 컴포넌트가 내전 탭 하나만 그린다. */}
