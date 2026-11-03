@@ -147,11 +147,11 @@ export default function UserStatsPage() {
     return (
       <div className="min-h-screen">
         <div className="border-b border-bg-tertiary">
-          <div className="container mx-auto max-w-6xl px-4 py-4">
+          <div className="container mx-auto px-4 py-4">
             <Skeleton className="h-5 w-36" />
           </div>
         </div>
-        <div className="container mx-auto max-w-6xl px-4 py-8">
+        <div className="container mx-auto px-4 py-8">
           {/* 유저 헤더 스켈레톤 */}
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6 mb-6">
             <div className="flex items-start gap-6">
@@ -217,7 +217,7 @@ export default function UserStatsPage() {
     <div className="min-h-screen">
       {/* Back Button */}
       <div className="border-b border-bg-tertiary">
-        <div className="container mx-auto max-w-6xl px-4 py-4">
+        <div className="container mx-auto px-4 py-4">
           <Link
             href={`${gamePrefix}/matches`}
             className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
@@ -228,7 +228,7 @@ export default function UserStatsPage() {
         </div>
       </div>
 
-      <div className="container mx-auto max-w-6xl px-4 py-8">
+      <div className="container mx-auto px-4 py-8">
         {/* User Header */}
         <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-6 mb-6">
           <div className="flex items-start gap-6">
@@ -336,8 +336,9 @@ export default function UserStatsPage() {
 
         {/* 내전 지표 + 내전 챔피언 — 한 줄에 같은 높이로.
             챔피언 카드는 높이를 정하지 않고(absolute) 내전 지표 높이에 맞춰 안에서 스크롤한다. */}
-        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
+          {/* 챔피언 카드는 고정 폭 — 1/3 비율이면 와이드 화면에서 줄이 좌우로 너무 길어졌다 */}
+          <div className="min-w-0">
             {/* 경매 매물 카드와 같은 여덟 칸 + 라인별 승률. Riot 게임 전적이 있던 자리 */}
             <CustomGameStatsCard userId={userId} ranking={nexusRanking} />
           </div>
