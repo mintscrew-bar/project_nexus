@@ -41,8 +41,8 @@ function kdaTone(ratio: number | null): string {
  * - 승/패를 한 줄 막대로 나눠 그려 승률을 길이로 읽게 한다
  * - KDA 는 비율을 크게, 판당 평균 K/D/A 를 작게
  * - 판당 CS·피해량을 함께 적어 경매 매물 카드의 지표와 같은 눈높이로 본다
- * - 한 챔피언을 두 줄 높이로 줄였다 — 세 칸 상자는 옆 열보다 카드가 훨씬 길어졌다
- *   (판당 K/D/A 는 KDA 에 마우스를 올리면 보인다)
+ * - 세 칸 상자(너무 큼)와 두 줄 압축(너무 빽빽함) 사이: 이름·승률·막대·판당 지표를
+ *   가운데에, KDA 를 오른쪽 칸으로 떼어 크게 둔다
  */
 export function ChampionStatsCard({
   stats,
@@ -113,33 +113,31 @@ export function ChampionStatsCard({
                 <li
                   key={stat.championId}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-lg bg-bg-tertiary/50 px-2.5 py-2",
+                    "flex items-stretch gap-3 rounded-lg bg-bg-tertiary/50 px-3 py-2.5",
                     collapsed && (fill ? "hidden lg:flex" : "hidden"),
                   )}
                 >
-                  {/* 아이콘 + 판수 */}
-                  <div className="relative shrink-0">
-                    <Image
-                      src={getChampionIcon(stat.championName)}
-                      alt={stat.championName}
-                      width={36}
-                      height={36}
-                      className="h-9 w-9 rounded-md"
-                    />
-                    <span className="absolute -bottom-1 -right-1 rounded bg-bg-primary px-0.5 text-[9px] font-bold tabular-nums text-text-secondary ring-1 ring-bg-tertiary">
-                      {stat.games}판
-                    </span>
-                  </div>
+                  {/* 아이콘 */}
+                  <Image
+                    src={getChampionIcon(stat.championName)}
+                    alt={stat.championName}
+                    width={44}
+                    height={44}
+                    className="h-11 w-11 shrink-0 self-center rounded-lg"
+                  />
 
+                  {/* 이름 · 승률 · 승패 막대 · 판당 CS/피해 */}
                   <div className="min-w-0 flex-1">
-                    {/* 이름 · 승률 */}
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="truncate text-sm font-bold text-text-primary">
                         {getChampionKoreanName(stat.championName)}
+                        <span className="ml-1.5 text-[11px] font-medium text-text-tertiary">
+                          {stat.games}판
+                        </span>
                       </p>
                       <span
                         className={cn(
-                          "shrink-0 text-sm font-black tabular-nums",
+                          "shrink-0 text-base font-black leading-none tabular-nums",
                           stat.games < 3
                             ? "text-text-secondary"
                             : winRate >= 60
@@ -153,7 +151,7 @@ export function ChampionStatsCard({
                       </span>
                     </div>
                     {/* 승(파랑) | 패(빨강) 비율 막대 */}
-                    <div className="mt-1 flex h-1 overflow-hidden rounded-full bg-bg-primary">
+                    <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-bg-primary">
                       {stat.wins > 0 && (
                         <div
                           className="bg-accent-primary"
@@ -164,22 +162,28 @@ export function ChampionStatsCard({
                         <div className="flex-1 bg-accent-danger/70" />
                       )}
                     </div>
-                    {/* 승패 · 판당 지표 — 한 줄. KDA 는 오른쪽 끝에 색으로 */}
-                    <div className="mt-1 flex items-center justify-between gap-2 text-[11px] tabular-nums text-text-tertiary">
-                      <span className="truncate">
-                        {stat.wins}승 {stat.losses}패 · CS {cs} · 피해{" "}
-                        {(damage / 1000).toFixed(1)}k
+                    <p className="mt-1.5 truncate text-[11px] tabular-nums text-text-tertiary">
+                      <span className="text-text-secondary">
+                        {stat.wins}승 {stat.losses}패
                       </span>
-                      <span
-                        className="shrink-0"
-                        title={`판당 ${per(stat.kills)}/${per(stat.deaths)}/${per(stat.assists)}`}
-                      >
-                        <span className={cn("font-bold", kdaTone(ratio))}>
-                          {ratio != null ? ratio.toFixed(2) : "Perfect"}
-                        </span>{" "}
-                        KDA
-                      </span>
-                    </div>
+                      {" · "}CS {cs}
+                      {" · "}피해 {damage.toLocaleString()}
+                    </p>
+                  </div>
+
+                  {/* KDA — 오른쪽 칸으로 떼어 크게 */}
+                  <div className="flex w-[68px] shrink-0 flex-col items-center justify-center border-l border-bg-elevated/60 pl-3">
+                    <span
+                      className={cn(
+                        "text-base font-black leading-tight tabular-nums",
+                        kdaTone(ratio),
+                      )}
+                    >
+                      {ratio != null ? ratio.toFixed(2) : "Perfect"}
+                    </span>
+                    <span className="text-[10px] tabular-nums text-text-tertiary">
+                      {per(stat.kills)}/{per(stat.deaths)}/{per(stat.assists)}
+                    </span>
                   </div>
                 </li>
               );
