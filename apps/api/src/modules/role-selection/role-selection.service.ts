@@ -39,7 +39,7 @@ interface PersistedRoleSelection {
   state: RoleSelectionState;
   /** userId → 사용한 연장 횟수 */
   extended: Record<string, number>;
-  /** 팀 역할 선택 완료를 누른 팀장 */
+  /** 팀 확정을 누른 팀장 */
   ready: string[];
 }
 
@@ -732,7 +732,7 @@ export class RoleSelectionService implements OnModuleInit {
       select: { id: true },
     });
     if (!team) {
-      throw new ForbiddenException("팀장만 팀 역할 선택을 완료할 수 있습니다.");
+      throw new ForbiddenException("팀장만 팀을 확정할 수 있습니다.");
     }
 
     let ready = this.readyCaptains.get(roomId);

@@ -82,7 +82,7 @@ async function checkLimit(
 export const ACTION_RATE_LIMITS = {
   /** 방 로비: 준비·관전·팀 선택·자동 밸런스 조작 */
   room: { limit: 20, windowSeconds: 10 },
-  /** 역할 선택: 역할 고르기·취소·연장·팀 역할 선택 완료 */
+  /** 역할 선택: 역할 고르기·취소·연장·팀 확정 */
   roleSelection: { limit: 15, windowSeconds: 10 },
   /** 가위바위보: 제출·진영 선택·준비·시작 (한 판에 몇 번 안 쓴다) */
   rps: { limit: 10, windowSeconds: 10 },
