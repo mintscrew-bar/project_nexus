@@ -84,7 +84,11 @@ export default function CustomGameStatsPreviewPage() {
         <div className="lg:col-span-2">
           <CustomGameStatsCard userId="preview-user" ranking={RANKING} />
         </div>
-        <ChampionStatsCard stats={CHAMPIONS} />
+        <div className="relative">
+          <div className="lg:absolute lg:inset-0">
+            <ChampionStatsCard stats={CHAMPIONS} fill />
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -334,11 +334,21 @@ export default function UserStatsPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Column */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* 내전 지표 — 경매 매물 카드와 같은 여덟 칸 + 라인별 전적. Riot 게임 전적이 있던 자리 */}
+        {/* 내전 지표 + 내전 챔피언 — 한 줄에 같은 높이로.
+            챔피언 카드는 높이를 정하지 않고(absolute) 내전 지표 높이에 맞춰 안에서 스크롤한다. */}
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            {/* 경매 매물 카드와 같은 여덟 칸 + 라인별 승률. Riot 게임 전적이 있던 자리 */}
             <CustomGameStatsCard userId={userId} ranking={nexusRanking} />
+          </div>
+          <div className="relative">
+            <div className="lg:absolute lg:inset-0">
+              <ChampionStatsCard stats={championStats} fill />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
 
             {/* 최근 내전 요약 — 2026-11-03 Riot 랭크·일반 전적은 유저 검색 화면에서 뺐다.
                 Riot 계정을 안 넘기면 요약 컴포넌트가 내전 탭 하나만 그린다. */}
@@ -389,12 +399,6 @@ export default function UserStatsPage() {
                 </div>
               )}
             </div>
-          </div>
-
-          {/* 내전 챔피언 — 2026-11-03 디자인 개편(승패 막대·판당 지표) */}
-          <div className="space-y-6">
-            <ChampionStatsCard stats={championStats} />
-          </div>
         </div>
       </div>
     </div>

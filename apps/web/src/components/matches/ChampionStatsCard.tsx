@@ -41,14 +41,31 @@ function kdaTone(ratio: number | null): string {
  * - 승/패를 한 줄 막대로 나눠 그려 승률을 길이로 읽게 한다
  * - KDA 는 비율을 크게, 판당 평균 K/D/A 를 작게
  * - 판당 CS·피해량을 함께 적어 경매 매물 카드의 지표와 같은 눈높이로 본다
+ * - 한 챔피언을 두 줄 높이로 줄였다 — 세 칸 상자는 옆 열보다 카드가 훨씬 길어졌다
+ *   (판당 K/D/A 는 KDA 에 마우스를 올리면 보인다)
  */
-export function ChampionStatsCard({ stats }: { stats: ChampionStat[] }) {
+export function ChampionStatsCard({
+  stats,
+  fill = false,
+}: {
+  stats: ChampionStat[];
+  /**
+   * 부모 높이를 꽉 채우고 목록은 그 안에서 스크롤한다(넓은 화면 전용).
+   * 유저 전적 화면에서 옆 "내전 지표" 카드와 높이를 맞출 때 쓴다.
+   * 좁은 화면(한 줄씩 쌓일 때)은 지금처럼 5개 + "더 보기".
+   */
+  fill?: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
-  const visible = expanded ? stats : stats.slice(0, INITIAL_COUNT);
   const totalGames = stats.reduce((sum, stat) => sum + stat.games, 0);
 
   return (
-    <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-5">
+    <div
+      className={cn(
+        "bg-bg-secondary border border-bg-tertiary rounded-xl p-5",
+        fill && "lg:flex lg:h-full lg:flex-col",
+      )}
+    >
       <div className="mb-4 flex items-center justify-between gap-2">
         <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
           <Swords className="h-5 w-5 text-accent-primary" />
@@ -67,8 +84,17 @@ export function ChampionStatsCard({ stats }: { stats: ChampionStat[] }) {
         </p>
       ) : (
         <>
-          <ul className="space-y-2">
-            {visible.map((stat) => {
+          <ul
+            className={cn(
+              "space-y-1.5",
+              // 넓은 화면에서는 남은 높이 안에서 스크롤 — 스크롤바가 붙지 않게 오른쪽 여백
+              fill &&
+                "lg:-mr-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2",
+            )}
+          >
+            {stats.map((stat, index) => {
+              // 접힌 상태에서 6번째부터는 숨긴다. fill 이면 넓은 화면에선 전부 보인다(스크롤).
+              const collapsed = !expanded && index >= INITIAL_COUNT;
               const winRate = Math.round((stat.wins / stat.games) * 100);
               const ratio =
                 stat.deaths > 0
@@ -86,90 +112,73 @@ export function ChampionStatsCard({ stats }: { stats: ChampionStat[] }) {
               return (
                 <li
                   key={stat.championId}
-                  className="rounded-lg bg-bg-tertiary/50 p-3"
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-lg bg-bg-tertiary/50 px-2.5 py-2",
+                    collapsed && (fill ? "hidden lg:flex" : "hidden"),
+                  )}
                 >
-                  <div className="flex items-center gap-3">
-                    {/* 아이콘 + 판수 */}
-                    <div className="relative shrink-0">
-                      <Image
-                        src={getChampionIcon(stat.championName)}
-                        alt={stat.championName}
-                        width={44}
-                        height={44}
-                        className="h-11 w-11 rounded-lg"
-                      />
-                      <span className="absolute -bottom-1 -right-1 rounded bg-bg-primary px-1 text-[10px] font-bold tabular-nums text-text-secondary ring-1 ring-bg-tertiary">
-                        {stat.games}판
-                      </span>
-                    </div>
-
-                    {/* 이름 + 승패 막대 */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="truncate text-sm font-bold text-text-primary">
-                          {getChampionKoreanName(stat.championName)}
-                        </p>
-                        <span
-                          className={cn(
-                            "shrink-0 text-sm font-black tabular-nums",
-                            stat.games < 3
-                              ? "text-text-secondary"
-                              : winRate >= 60
-                                ? "text-accent-primary"
-                                : winRate < 40
-                                  ? "text-accent-danger"
-                                  : "text-text-primary",
-                          )}
-                        >
-                          {winRate}%
-                        </span>
-                      </div>
-                      {/* 승(파랑) | 패(빨강) 비율 막대 */}
-                      <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-bg-primary">
-                        {stat.wins > 0 && (
-                          <div
-                            className="bg-accent-primary"
-                            style={{ width: `${winRate}%` }}
-                          />
-                        )}
-                        {stat.losses > 0 && (
-                          <div className="flex-1 bg-accent-danger/70" />
-                        )}
-                      </div>
-                      <p className="mt-1 text-[11px] tabular-nums text-text-tertiary">
-                        {stat.wins}승 {stat.losses}패
-                      </p>
-                    </div>
+                  {/* 아이콘 + 판수 */}
+                  <div className="relative shrink-0">
+                    <Image
+                      src={getChampionIcon(stat.championName)}
+                      alt={stat.championName}
+                      width={36}
+                      height={36}
+                      className="h-9 w-9 rounded-md"
+                    />
+                    <span className="absolute -bottom-1 -right-1 rounded bg-bg-primary px-0.5 text-[9px] font-bold tabular-nums text-text-secondary ring-1 ring-bg-tertiary">
+                      {stat.games}판
+                    </span>
                   </div>
 
-                  {/* 판당 지표 */}
-                  <div className="mt-2.5 grid grid-cols-3 gap-1.5 text-center">
-                    <div className="rounded-md bg-bg-primary/50 px-1 py-1.5">
-                      <p
+                  <div className="min-w-0 flex-1">
+                    {/* 이름 · 승률 */}
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="truncate text-sm font-bold text-text-primary">
+                        {getChampionKoreanName(stat.championName)}
+                      </p>
+                      <span
                         className={cn(
-                          "text-sm font-bold tabular-nums",
-                          kdaTone(ratio),
+                          "shrink-0 text-sm font-black tabular-nums",
+                          stat.games < 3
+                            ? "text-text-secondary"
+                            : winRate >= 60
+                              ? "text-accent-primary"
+                              : winRate < 40
+                                ? "text-accent-danger"
+                                : "text-text-primary",
                         )}
                       >
-                        {ratio != null ? ratio.toFixed(2) : "Perfect"}
-                      </p>
-                      <p className="truncate text-[10px] tabular-nums text-text-tertiary">
-                        {per(stat.kills)}/{per(stat.deaths)}/{per(stat.assists)}
-                      </p>
+                        {winRate}%
+                      </span>
                     </div>
-                    <div className="rounded-md bg-bg-primary/50 px-1 py-1.5">
-                      <p className="text-sm font-bold tabular-nums text-text-primary">
-                        {cs}
-                      </p>
-                      <p className="text-[10px] text-text-tertiary">평균 CS</p>
+                    {/* 승(파랑) | 패(빨강) 비율 막대 */}
+                    <div className="mt-1 flex h-1 overflow-hidden rounded-full bg-bg-primary">
+                      {stat.wins > 0 && (
+                        <div
+                          className="bg-accent-primary"
+                          style={{ width: `${winRate}%` }}
+                        />
+                      )}
+                      {stat.losses > 0 && (
+                        <div className="flex-1 bg-accent-danger/70" />
+                      )}
                     </div>
-                    <div className="rounded-md bg-bg-primary/50 px-1 py-1.5">
-                      <p className="text-sm font-bold tabular-nums text-text-primary">
-                        {damage.toLocaleString()}
-                      </p>
-                      <p className="text-[10px] text-text-tertiary">
-                        평균 피해량
-                      </p>
+                    {/* 승패 · 판당 지표 — 한 줄. KDA 는 오른쪽 끝에 색으로 */}
+                    <div className="mt-1 flex items-center justify-between gap-2 text-[11px] tabular-nums text-text-tertiary">
+                      <span className="truncate">
+                        {stat.wins}승 {stat.losses}패 · CS {cs} · 피해{" "}
+                        {(damage / 1000).toFixed(1)}k
+                      </span>
+                      <span
+                        className="shrink-0"
+                        title={`판당 ${per(stat.kills)}/${per(stat.deaths)}/${per(stat.assists)}`}
+                      >
+                        <span className={cn("font-bold", kdaTone(ratio))}>
+                          {ratio != null ? ratio.toFixed(2) : "Perfect"}
+                        </span>{" "}
+                        KDA
+                      </span>
                     </div>
                   </div>
                 </li>
@@ -179,9 +188,13 @@ export function ChampionStatsCard({ stats }: { stats: ChampionStat[] }) {
 
           {stats.length > INITIAL_COUNT && (
             <button
+              // fill 이면 넓은 화면에선 스크롤로 다 보이므로 버튼을 숨긴다(lg:hidden)
               type="button"
               onClick={() => setExpanded((value) => !value)}
-              className="mt-3 flex w-full items-center justify-center gap-1 rounded-lg py-2 text-xs font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+              className={cn(
+                "mt-3 flex w-full items-center justify-center gap-1 rounded-lg py-2 text-xs font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary",
+                fill && "lg:hidden",
+              )}
             >
               {expanded
                 ? "접기"
