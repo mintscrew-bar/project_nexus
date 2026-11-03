@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { GUIDE_BASE } from "@/lib/guide-links";
@@ -134,6 +135,42 @@ export function InfoCard({
     </Link>
   ) : (
     <article className={classes}>{content}</article>
+  );
+}
+
+/**
+ * 가이드 본문 캡처 이미지.
+ * 실제 화면을 찍은 것이라 너비 비율을 그대로 두고, 아래에 무엇을 보는 화면인지 한 줄 붙인다.
+ */
+export function GuideFigure({
+  src,
+  alt,
+  width,
+  height,
+  caption,
+}: {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  caption?: string;
+}) {
+  return (
+    <figure className="overflow-hidden rounded-2xl bg-bg-primary/35">
+      <Image
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        sizes="(min-width: 1152px) 1088px, 100vw"
+        className="h-auto w-full"
+      />
+      {caption && (
+        <figcaption className="px-4 py-3 text-xs leading-5 text-text-tertiary md:text-sm">
+          {caption}
+        </figcaption>
+      )}
+    </figure>
   );
 }
 

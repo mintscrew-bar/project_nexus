@@ -80,7 +80,9 @@ function LolTeamModesGuidePage() {
           </GuideStep>
           <GuideStep number={2} title="순서대로 선택">
             경매는 최고 입찰 팀이 영입하고, 스네이크는 화면에 표시된 순서로
-            선수를 선택합니다.
+            선수를 선택합니다. 경매 매물 카드에는 라인별 티어와 선호 챔피언,
+            내전 승률·평판·KDA·킬관여·피해량·CS·시야·골드가 함께 나오고,
+            맨 위 줄의 큰 숫자와 줄어드는 막대로 남은 시간을 보여줍니다.
           </GuideStep>
           <GuideStep number={3} title="역할 선택으로 이동">
             모든 선수가 배정되면 팀 구성을 확인한 뒤 역할 선택 단계로

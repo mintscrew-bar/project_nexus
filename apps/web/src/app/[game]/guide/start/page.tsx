@@ -60,7 +60,9 @@ function LolStartGuidePage() {
           <GuideStep number={2} title="참가와 준비">
             실제 플레이어가 모두 입장했는지 확인하고 준비를 받습니다. 관전자는
             팀 구성 인원에서 제외되며, 관전 허용 방이 만석이면 새 입장자는
-            자동으로 관전자가 됩니다.
+            자동으로 관전자가 됩니다. 친구 목록에서 우클릭 「내전 초대하기」를
+            쓰면 친구 화면에 바로 참가 팝업이 뜨고, 비공개 방이어도 비밀번호 없이
+            들어올 수 있습니다.
           </GuideStep>
           <GuideStep number={3} title="내전 시작">
             참가자 전원이 준비하고 Discord 음성 대기실에 들어오면 방장이 다음
@@ -99,6 +101,11 @@ function LolStartGuidePage() {
             icon={LockKeyhole}
             title="비공개 방"
             description="비밀번호를 켜면 비밀번호를 아는 사람만 입장할 수 있습니다. 비밀번호는 4자 이상이며 방 링크를 공유할 때 따로 전달해야 합니다."
+          />
+          <InfoCard
+            icon={DoorOpen}
+            title="방장 퇴장 시 해산"
+            description="켜 두면 대기실 단계에서 방장이 나갈 때 방을 해산합니다. 남은 참가자에게는 알림과 안내가 뜨고 내전 목록으로 이동합니다. 꺼 두면 방장 권한이 다른 참가자에게 넘어가며, 경기가 시작된 뒤에는 항상 이양됩니다."
           />
           <InfoCard
             icon={Eye}

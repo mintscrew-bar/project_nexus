@@ -91,7 +91,9 @@ function LolDiscordGuidePage() {
           </GuideStep>
           <GuideStep number={3} title="팀 채널 자동 이동">
             전원이 준비하고 대기실에 들어오면 방장이 시작합니다. 팀 편성이 끝난
-            뒤 봇이 참가자를 각 팀 음성 채널로 자동 이동시킵니다.
+            뒤 봇이 참가자를 각 팀 음성 채널로 자동 이동시킵니다. 팀 채널은
+            팀 인원보다 2자리 넉넉해서 관전자나 운영자가 들어가 인터뷰할 수
+            있습니다.
           </GuideStep>
         </ol>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
