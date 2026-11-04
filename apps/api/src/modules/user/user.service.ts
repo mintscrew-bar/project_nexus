@@ -11,6 +11,7 @@ import { BalanceScoreService } from "../common/balance-score.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { ReputationService } from "../reputation/reputation.service";
 import { UploadService } from "../upload/upload.service";
+import { NO_TEST_BOT_MATCH_WHERE } from "../common/test-bot.util";
 
 const STREAMER_PLATFORM_HOSTS: Record<StreamerPlatform, string[]> = {
   CHZZK: ["chzzk.naver.com"],
@@ -197,8 +198,9 @@ export class UserService {
       include: {
         team: {
           include: {
-            matchesAsTeamA: true,
-            matchesAsTeamB: true,
+            // 봇을 채워 시험한 판은 승패에서 뺀다(test-bot.util 참고)
+            matchesAsTeamA: { where: NO_TEST_BOT_MATCH_WHERE },
+            matchesAsTeamB: { where: NO_TEST_BOT_MATCH_WHERE },
           },
         },
       },
@@ -320,7 +322,12 @@ export class UserService {
       this.reputationService.getUserReputationStats(userId),
       // 내전 참여 기록(teamId 있는 것)에서 KDA 집계
       this.prisma.matchParticipant.aggregate({
-        where: { userId, teamId: { not: null } },
+        // 봇을 채워 시험한 판은 빼고 센다(test-bot.util 참고)
+        where: {
+          userId,
+          teamId: { not: null },
+          match: NO_TEST_BOT_MATCH_WHERE,
+        },
         // 경매 매물 카드가 KDA 아래에 내전 평균 피해량·CS·시야·골드를 함께 보여준다.
         _avg: {
           kills: true,

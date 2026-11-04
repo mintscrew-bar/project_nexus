@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@nexus/database";
+import { NO_TEST_BOT_MATCH_SQL } from "../../common/test-bot.util";
 
 export type CustomMatchPeriod = "30d" | "90d" | "all";
 export type CustomMatchGroupBy =
@@ -60,7 +61,8 @@ function buildSourceFilter(source?: MatchStatsSource): Prisma.Sql {
   if (!source || source === "all") return Prisma.empty;
   if (source === "custom") {
     // 내전: 방 삭제 여부와 무관한 Nexus 내부 토너먼트
-    return Prisma.sql`AND m."isInternal" = true`;
+    // 봇을 채워 시험한 판은 빼고 센다(test-bot.util 참고)
+    return Prisma.sql`AND m."isInternal" = true ${NO_TEST_BOT_MATCH_SQL}`;
   }
   // ranked-community: 외부 ranked 매치
   return Prisma.sql`AND m."isInternal" = false AND m."riotMatchId" IS NOT NULL`;

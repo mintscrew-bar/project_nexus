@@ -87,3 +87,62 @@ export function isTestBotUser(user: {
     false
   );
 }
+
+/**
+ * 봇이 한 명이라도 로스터에 들어간 판.
+ *
+ * 관리자가 봇을 채워 넣고 기능 시험을 한 판(예: 관리자 + testbot 9명)은 실제
+ * 내전이 아니다. 그런데 봇이 아닌 참가자(관리자)의 랭킹·전적에는 그대로 쌓여
+ * 리더보드와 전적 화면을 오염시켰다(2026-11-04 운영자 요청으로 제외).
+ *
+ * 로스터 스냅샷 기준으로 본다 — 봇은 Riot 수집 행(match_participants)을 남기지
+ * 않으므로 참가자 테이블로는 봇 판을 가려낼 수 없다. 봇 계정이 지워져 userId 가
+ * 비어도 걸리도록 스냅샷 닉네임도 함께 본다.
+ */
+export const TEST_BOT_MATCH_WHERE: Prisma.MatchWhereInput = {
+  rosterSnapshots: {
+    some: {
+      OR: [
+        { user: TEST_BOT_USER_WHERE },
+        { username: { startsWith: "testbot_", mode: "insensitive" } },
+        { username: { startsWith: "concbot_", mode: "insensitive" } },
+      ],
+    },
+  },
+};
+
+/** 봇이 끼지 않은 판만 — 랭킹·전적 집계의 match 조건에 펼쳐 넣는다 */
+export const NO_TEST_BOT_MATCH_WHERE: Prisma.MatchWhereInput = {
+  NOT: TEST_BOT_MATCH_WHERE,
+};
+
+/**
+ * 원시 SQL 집계용 같은 조건. `m` 이 matches 별칭이어야 한다.
+ * 조건은 TEST_BOT_USER_WHERE·TEST_BOT_MATCH_WHERE 와 같게 유지할 것.
+ */
+export const NO_TEST_BOT_MATCH_SQL = Prisma.sql`
+  AND NOT EXISTS (
+    SELECT 1
+    FROM "match_roster_snapshots" rs
+    LEFT JOIN "users" u ON u."id" = rs."userId"
+    WHERE rs."matchId" = m."id"
+      AND (
+        rs."username" ILIKE 'testbot\\_%'
+        OR rs."username" ILIKE 'concbot\\_%'
+        OR u."username" ILIKE 'testbot\\_%'
+        OR u."username" ILIKE 'concbot\\_%'
+        OR (u."email" IS NOT NULL AND u."email" ILIKE '%@nexus.test')
+        OR EXISTS (
+          SELECT 1
+          FROM "riot_accounts" ra
+          WHERE ra."userId" = u."id"
+            AND (
+              ra."puuid" LIKE 'bot\\_puuid\\_%'
+              OR ra."puuid" LIKE 'loadtest\\_b%'
+              OR ra."puuid" LIKE 'concbot\\_pu%'
+              OR UPPER(ra."tagLine") = 'BOT'
+            )
+        )
+      )
+  )
+`;

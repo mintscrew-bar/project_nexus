@@ -1,6 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { StatsService } from "./stats.service";
+import { NO_TEST_BOT_MATCH_WHERE } from "../common/test-bot.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { RiotMatchService } from "../riot/riot-match.service";
@@ -187,6 +188,7 @@ describe("StatsService", () => {
             userId,
             match: {
               isInternal: true,
+              ...NO_TEST_BOT_MATCH_WHERE,
             },
           },
         }),
@@ -388,6 +390,7 @@ describe("StatsService", () => {
             userId,
             match: {
               isInternal: true,
+              ...NO_TEST_BOT_MATCH_WHERE,
             },
           },
         }),

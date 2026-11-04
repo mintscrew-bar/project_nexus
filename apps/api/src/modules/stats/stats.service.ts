@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@nexus/database";
+import { NO_TEST_BOT_MATCH_WHERE } from "../common/test-bot.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { MatchDto, RiotMatchService } from "../riot/riot-match.service";
@@ -540,6 +541,7 @@ export class StatsService {
           userId,
           match: {
             isInternal: true,
+            ...NO_TEST_BOT_MATCH_WHERE,
             createdAt: {
               gte: seasonStart,
             },
@@ -593,6 +595,7 @@ export class StatsService {
           userId,
           match: {
             isInternal: true,
+            ...NO_TEST_BOT_MATCH_WHERE,
             createdAt: {
               gte: seasonStart,
             },
@@ -1175,6 +1178,8 @@ export class StatsService {
         userId,
         match: {
           isInternal: true,
+          // 봇을 채워 시험한 판은 전적에서 뺀다(test-bot.util 참고)
+          ...NO_TEST_BOT_MATCH_WHERE,
         },
       },
       select: {
@@ -1257,6 +1262,8 @@ export class StatsService {
         userId,
         match: {
           isInternal: true,
+          // 봇을 채워 시험한 판은 전적에서 뺀다(test-bot.util 참고)
+          ...NO_TEST_BOT_MATCH_WHERE,
         },
       },
       select: {

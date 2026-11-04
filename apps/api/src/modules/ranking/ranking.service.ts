@@ -1,12 +1,26 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnApplicationBootstrap,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { Role } from "@nexus/database";
 import { resolveWinnerSlot } from "../match/match-roster.util";
-import { TEST_BOT_USER_WHERE } from "../common/test-bot.util";
+import {
+  NO_TEST_BOT_MATCH_WHERE,
+  TEST_BOT_USER_WHERE,
+} from "../common/test-bot.util";
+
+/** 부팅 직후 DB·다른 모듈 준비를 기다렸다가 재계산한다 */
+const BOOT_RECALC_DELAY_MS = 60 * 1000;
+
+/** 리더보드에 보일 사람 — 봇 행이 남아 있어도(재계산 전) 목록·순위에서 뺀다 */
+const NOT_BOT_USER = { NOT: TEST_BOT_USER_WHERE };
 
 @Injectable()
-export class RankingService {
+export class RankingService implements OnApplicationBootstrap {
   private readonly logger = new Logger(RankingService.name);
   // 정렬은 판수 → 승률 순. 1판짜리 100% 가 위로 튀지 않게 많이 뛴 사람이 먼저다.
   // 랭킹 등재 최소 판수. 2026-11-03 10판 → 1판: 내전 성사 자체가 드물어 10판 조건이면 목록이 비어 있었다.
@@ -17,6 +31,24 @@ export class RankingService {
     private readonly prisma: PrismaService,
     private readonly balanceScores: BalanceScoreService,
   ) {}
+
+  /**
+   * 부팅할 때 한 번 전체 랭킹을 다시 계산한다.
+   *
+   * 랭킹은 경기가 끝날 때 그 경기 참가자만 갱신하는 저장값이라, 집계 규칙이
+   * 바뀌어도(예: 2026-11-04 봇 낀 판 제외) 다음 경기를 뛰기 전까지 옛 값이 남는다.
+   * 관리자 화면에 재계산 버튼이 없어 배포마다 한 번씩 맞춰 둔다.
+   * 대상이 수십 명이라 비용은 작다.
+   */
+  onApplicationBootstrap() {
+    // 테스트 환경에서는 타이머를 걸지 않는다
+    if (process.env.NODE_ENV === "test") return;
+    setTimeout(() => {
+      this.recalculateAllRankings().catch((error) =>
+        this.logger.warn(`부팅 후 랭킹 재계산 실패: ${error}`),
+      );
+    }, BOOT_RECALC_DELAY_MS).unref();
+  }
 
   /**
    * 테스트 봇인지 확인한다.
@@ -120,7 +152,12 @@ export class RankingService {
     const rosters = await this.prisma.matchRosterSnapshot.findMany({
       where: {
         userId,
-        match: { isInternal: true, status: "COMPLETED" },
+        // 봇을 채워 시험한 판은 실제 내전이 아니라 사람 쪽 전적에도 넣지 않는다
+        match: {
+          isInternal: true,
+          status: "COMPLETED",
+          ...NO_TEST_BOT_MATCH_WHERE,
+        },
       },
       select: {
         teamSlot: true,
@@ -256,9 +293,10 @@ export class RankingService {
     // 순위 번호는 검색 결과 안의 순서가 아니라 전체 랭킹 기준 순위여야 한다.
     const where = {
       totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
-      ...(search
-        ? {
-            user: {
+      user: {
+        ...NOT_BOT_USER,
+        ...(search
+          ? {
               OR: [
                 {
                   username: {
@@ -277,9 +315,9 @@ export class RankingService {
                   },
                 },
               ],
-            },
-          }
-        : {}),
+            }
+          : {}),
+      },
     };
 
     const [rankings, total] = await Promise.all([
@@ -341,6 +379,7 @@ export class RankingService {
     return this.prisma.nexusRanking.count({
       where: {
         totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
+        user: NOT_BOT_USER,
         OR: [
           { totalGames: { gt: totalGames } },
           { totalGames, winRate: { gt: winRate } },
@@ -365,7 +404,7 @@ export class RankingService {
 
     const [rankings, total] = await Promise.all([
       this.prisma.clanRanking.findMany({
-        where: { clanId },
+        where: { clanId, user: NOT_BOT_USER },
         include: {
           user: {
             select: {
@@ -379,7 +418,9 @@ export class RankingService {
         skip,
         take: limit,
       }),
-      this.prisma.clanRanking.count({ where: { clanId } }),
+      this.prisma.clanRanking.count({
+        where: { clanId, user: NOT_BOT_USER },
+      }),
     ]);
 
     const rankedData = rankings.map(
@@ -529,6 +570,7 @@ export class RankingService {
     const rankings = await this.prisma.nexusRanking.findMany({
       where: {
         totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
+        user: NOT_BOT_USER,
       },
       orderBy: [{ totalGames: "desc" }, { winRate: "desc" }],
       select: { id: true },

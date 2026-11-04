@@ -1,4 +1,8 @@
 import { RankingService } from "./ranking.service";
+import {
+  NO_TEST_BOT_MATCH_WHERE,
+  TEST_BOT_USER_WHERE,
+} from "../common/test-bot.util";
 
 describe("RankingService", () => {
   let service: RankingService;
@@ -84,7 +88,12 @@ describe("RankingService", () => {
         expect.objectContaining({
           where: {
             userId: "user-1",
-            match: { isInternal: true, status: "COMPLETED" },
+            // 봇을 채워 시험한 판은 사람 쪽 전적에서도 뺀다
+            match: {
+              isInternal: true,
+              status: "COMPLETED",
+              ...NO_TEST_BOT_MATCH_WHERE,
+            },
           },
         }),
       );
@@ -362,6 +371,21 @@ describe("RankingService", () => {
       });
       expect(where.user.OR[1].riotAccounts.some.gameName.contains).toBe("철수");
       expect(result.rankings[0].globalRank).toBe(5);
+    });
+
+    it("재계산 전에 남은 봇 행도 목록·순위 계산에서 뺀다", async () => {
+      prisma.nexusRanking.findMany.mockResolvedValue([
+        { id: "r1", totalGames: 3, winRate: 66.7 },
+      ]);
+      prisma.nexusRanking.count = jest.fn().mockResolvedValue(1);
+
+      await service.getGlobalRanking(1, 50, "철수");
+
+      const where = prisma.nexusRanking.findMany.mock.calls[0][0].where;
+      expect(where.user.NOT).toEqual(TEST_BOT_USER_WHERE);
+      // "나보다 위" 인원 수에서도 봇은 빠져야 순위 번호가 맞는다
+      const aboveWhere = prisma.nexusRanking.count.mock.calls[1][0].where;
+      expect(aboveWhere.user).toEqual({ NOT: TEST_BOT_USER_WHERE });
     });
   });
 });

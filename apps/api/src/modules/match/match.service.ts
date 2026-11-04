@@ -18,6 +18,7 @@ import { MatchAdvancementService } from "./match-advancement.service";
 import { MatchSeriesService } from "./match-series.service";
 import { RankingService } from "../ranking/ranking.service";
 import { BalanceScoreService } from "../common/balance-score.service";
+import { NO_TEST_BOT_MATCH_WHERE } from "../common/test-bot.util";
 import {
   Prisma,
   RoomStatus,
@@ -1536,8 +1537,10 @@ export class MatchService {
     const matches = await this.prisma.matchParticipant.findMany({
       where: {
         userId,
+        // 봇을 채워 시험한 판은 전적에서 뺀다(test-bot.util 참고)
         match: {
           isInternal: true,
+          ...NO_TEST_BOT_MATCH_WHERE,
         },
       },
       include: {
