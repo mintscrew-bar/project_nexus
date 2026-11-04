@@ -1600,12 +1600,15 @@ model NexusRoleRecord {
   wins       Int      @default(0)
   losses     Int      @default(0)
   winRate    Float    @default(0)
+  /// 그 라인 기록만으로 낸 보정 승률 점수 — 라인별 랭킹 정렬 기준
+  score      Float    @default(0)
   updatedAt  DateTime @updatedAt
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, role])
   @@index([userId])
   @@index([role, winRate])
+  @@index([role, score])
   @@map("nexus_role_records")
 }
 
@@ -1616,6 +1619,8 @@ model NexusRanking {
   wins         Int      @default(0)
   losses       Int      @default(0)
   winRate      Float    @default(0)
+  /// 보정 승률 점수(베이지안, 0~100). 랭킹 정렬 기준 — ranking-score.ts
+  score        Float    @default(0)
   globalRank   Int?
   recentWins   Int      @default(0)
   recentLosses Int      @default(0)
@@ -1624,6 +1629,7 @@ model NexusRanking {
 
   @@index([globalRank])
   @@index([winRate])
+  @@index([score])
   @@map("nexus_rankings")
 }
 

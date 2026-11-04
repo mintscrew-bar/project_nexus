@@ -8,6 +8,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { Role } from "@nexus/database";
 import { resolveWinnerSlot } from "../match/match-roster.util";
+import { rankingScore } from "./ranking-score";
 import {
   NO_TEST_BOT_MATCH_WHERE,
   TEST_BOT_USER_WHERE,
@@ -19,10 +20,32 @@ const BOOT_RECALC_DELAY_MS = 60 * 1000;
 /** 리더보드에 보일 사람 — 봇 행이 남아 있어도(재계산 전) 목록·순위에서 뺀다 */
 const NOT_BOT_USER = { NOT: TEST_BOT_USER_WHERE };
 
+/** 리더보드 정렬 — 보정 승률 점수 → 같으면 판수 많은 순 (ranking-score.ts) */
+const RANKING_ORDER = [
+  { score: "desc" as const },
+  { totalGames: "desc" as const },
+];
+
+/** 리더보드 행에 붙이는 내전 지표 (Riot 데이터가 수집된 경기 기준) */
+export interface RankingRowStats {
+  /** KDA 를 낸 경기 수 — 수동 입력 경기는 K/D/A 가 없어 판수보다 적을 수 있다 */
+  statGames: number;
+  avgKills: number;
+  avgDeaths: number;
+  avgAssists: number;
+  /** (K+A)/D, 데스 0 이면 K+A */
+  kda: number | null;
+  /** 내전 MVP 투표 1위 횟수 */
+  mvpCount: number;
+  /** 많이 한 챔피언 순 최대 3개 (Riot 챔피언 키) */
+  topChampions: string[];
+}
+
 @Injectable()
 export class RankingService implements OnApplicationBootstrap {
   private readonly logger = new Logger(RankingService.name);
-  // 정렬은 판수 → 승률 순. 1판짜리 100% 가 위로 튀지 않게 많이 뛴 사람이 먼저다.
+  // 정렬은 보정 승률 점수 순(ranking-score.ts). 1판짜리 100% 가 위로 튀지 않고,
+  // 많이 지기만 한 사람이 판수로 올라가지도 않는다.
   // 랭킹 등재 최소 판수. 2026-11-03 10판 → 1판: 내전 성사 자체가 드물어 10판 조건이면 목록이 비어 있었다.
   private static readonly MIN_GAMES_FOR_RANK = 1;
   private static readonly RECENT_GAMES_COUNT = 20;
@@ -96,6 +119,7 @@ export class RankingService implements OnApplicationBootstrap {
           wins,
           losses,
           winRate,
+          score: rankingScore(wins, totalGames),
           recentWins,
           recentLosses,
         },
@@ -104,6 +128,7 @@ export class RankingService implements OnApplicationBootstrap {
           wins,
           losses,
           winRate,
+          score: rankingScore(wins, totalGames),
           recentWins,
           recentLosses,
         },
@@ -242,6 +267,7 @@ export class RankingService implements OnApplicationBootstrap {
         wins: entry.wins,
         losses,
         winRate,
+        score: rankingScore(entry.wins, entry.totalGames),
       };
 
       await this.prisma.nexusRoleRecord.upsert({
@@ -284,108 +310,242 @@ export class RankingService implements OnApplicationBootstrap {
   }
 
   /**
-   * Get global ranking (paginated, minimum games required)
+   * 글로벌 랭킹 (페이지네이션, 내전 1판 이상).
+   * - role 을 주면 그 라인으로 뛴 경기만 모은 라인별 랭킹(nexus_role_records)
+   * - q 를 주면 사이트 닉네임·Riot 게임 이름으로 거른다
+   * 순위 번호는 검색 결과 안의 순서가 아니라 (그 탭의) 전체 랭킹 기준 순위다.
    */
-  async getGlobalRanking(page: number = 1, limit: number = 50, q?: string) {
+  async getGlobalRanking(
+    page: number = 1,
+    limit: number = 50,
+    q?: string,
+    role?: Role,
+  ) {
     const skip = (page - 1) * limit;
     const search = q?.trim();
-    // 검색어가 있으면 사이트 닉네임 또는 Riot 게임 이름으로 거른다.
-    // 순위 번호는 검색 결과 안의 순서가 아니라 전체 랭킹 기준 순위여야 한다.
-    const where = {
-      totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
-      user: {
-        ...NOT_BOT_USER,
-        ...(search
-          ? {
-              OR: [
-                {
-                  username: {
-                    contains: search,
-                    mode: "insensitive" as const,
-                  },
+    const userWhere = {
+      ...NOT_BOT_USER,
+      ...(search
+        ? {
+            OR: [
+              {
+                username: {
+                  contains: search,
+                  mode: "insensitive" as const,
                 },
-                {
-                  riotAccounts: {
-                    some: {
-                      gameName: {
-                        contains: search,
-                        mode: "insensitive" as const,
-                      },
+              },
+              {
+                riotAccounts: {
+                  some: {
+                    gameName: {
+                      contains: search,
+                      mode: "insensitive" as const,
                     },
                   },
                 },
-              ],
-            }
-          : {}),
+              },
+            ],
+          }
+        : {}),
+    };
+    const baseWhere = {
+      totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
+      user: userWhere,
+    };
+    const userInclude = {
+      user: {
+        select: {
+          id: true,
+          username: true,
+          avatar: true,
+          riotAccounts: {
+            where: { isPrimary: true },
+            select: {
+              gameName: true,
+              tagLine: true,
+              tier: true,
+              rank: true,
+            },
+            take: 1,
+          },
+        },
       },
     };
 
-    const [rankings, total] = await Promise.all([
-      this.prisma.nexusRanking.findMany({
-        where,
-        include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-              avatar: true,
-              riotAccounts: {
-                where: { isPrimary: true },
-                select: {
-                  gameName: true,
-                  tagLine: true,
-                  tier: true,
-                  rank: true,
-                },
-                take: 1,
-              },
-            },
-          },
-        },
-        orderBy: [{ totalGames: "desc" }, { winRate: "desc" }],
-        skip,
-        take: limit,
-      }),
-      this.prisma.nexusRanking.count({
-        where,
-      }),
-    ]);
+    // 종합과 라인별은 테이블만 다르고 모양(판수·승패·점수 + 유저)은 같다
+    const [rankings, total] = role
+      ? await Promise.all([
+          this.prisma.nexusRoleRecord.findMany({
+            where: { ...baseWhere, role },
+            include: userInclude,
+            orderBy: RANKING_ORDER,
+            skip,
+            take: limit,
+          }),
+          this.prisma.nexusRoleRecord.count({ where: { ...baseWhere, role } }),
+        ])
+      : await Promise.all([
+          this.prisma.nexusRanking.findMany({
+            where: baseWhere,
+            include: userInclude,
+            orderBy: RANKING_ORDER,
+            skip,
+            take: limit,
+          }),
+          this.prisma.nexusRanking.count({ where: baseWhere }),
+        ]);
+
+    const stats = await this.getRankingRowStats(
+      rankings.map((r) => r.userId),
+      role,
+    );
 
     // 순위 번호 — 검색 중이면 각자 전체 순위를 따로 센다(결과가 한 페이지라 비용이 작다)
-    const rankedData = search
-      ? await Promise.all(
-          rankings.map(async (r: (typeof rankings)[number]) => ({
-            ...r,
-            globalRank:
-              (await this.countRankedAbove(r.totalGames, r.winRate)) + 1,
-          })),
-        )
-      : rankings.map((r: (typeof rankings)[number], i: number) => ({
-          ...r,
-          globalRank: skip + i + 1,
-        }));
+    const rankedData = await Promise.all(
+      rankings.map(async (r, i) => ({
+        ...r,
+        globalRank: search
+          ? (await this.countRankedAbove(r.score, r.totalGames, role)) + 1
+          : skip + i + 1,
+        stats: stats.get(r.userId) ?? null,
+      })),
+    );
 
     return {
       rankings: rankedData,
       total,
       page,
       limit,
+      role: role ?? null,
       totalPages: Math.ceil(total / limit),
     };
   }
 
-  /** 정렬 기준(판수 → 승률)과 같은 순서로 "나보다 위" 인원을 센다 */
-  private countRankedAbove(totalGames: number, winRate: number) {
-    return this.prisma.nexusRanking.count({
-      where: {
-        totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
-        user: NOT_BOT_USER,
-        OR: [
-          { totalGames: { gt: totalGames } },
-          { totalGames, winRate: { gt: winRate } },
-        ],
-      },
+  /** 정렬 기준(점수 → 판수)과 같은 순서로 "나보다 위" 인원을 센다 */
+  private countRankedAbove(score: number, totalGames: number, role?: Role) {
+    const where = {
+      totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
+      user: NOT_BOT_USER,
+      OR: [{ score: { gt: score } }, { score, totalGames: { gt: totalGames } }],
+    };
+    return role
+      ? this.prisma.nexusRoleRecord.count({ where: { ...where, role } })
+      : this.prisma.nexusRanking.count({ where });
+  }
+
+  /**
+   * 리더보드 한 페이지 사람들의 KDA·MVP·주력 챔피언.
+   *
+   * 승패는 로스터 스냅샷으로 세지만 K/D/A·챔피언은 Riot 이 준 경기
+   * (match_participants)에만 있다. 그래서 statGames 가 판수보다 적을 수 있고,
+   * 화면은 statGames 가 0 이면 지표 칸을 비운다.
+   * 라인 탭이면 그 라인으로 뛴 경기만 센다 — KDA·챔피언은 Riot 포지션,
+   * MVP 는 역할 선택에서 배정된 라인 기준.
+   */
+  private async getRankingRowStats(
+    userIds: string[],
+    role?: Role,
+  ): Promise<Map<string, RankingRowStats>> {
+    const result = new Map<string, RankingRowStats>();
+    if (userIds.length === 0) return result;
+
+    const internalMatch = {
+      isInternal: true,
+      status: "COMPLETED" as const,
+      ...NO_TEST_BOT_MATCH_WHERE,
+    };
+    const participantWhere = {
+      userId: { in: userIds },
+      match: internalMatch,
+      ...(role ? { position: role } : {}),
+    };
+
+    const [kdaRows, championRows, mvpCounts] = await Promise.all([
+      this.prisma.matchParticipant.groupBy({
+        by: ["userId"],
+        where: participantWhere,
+        _sum: { kills: true, deaths: true, assists: true },
+        _count: { _all: true },
+      }),
+      this.prisma.matchParticipant.groupBy({
+        by: ["userId", "championName"],
+        where: participantWhere,
+        _count: { _all: true },
+      }),
+      this.countMvps(userIds, role, internalMatch),
+    ]);
+
+    // 챔피언은 판수 많은 순, 같으면 이름순으로 3개
+    const championsByUser = new Map<
+      string,
+      { name: string; games: number }[]
+    >();
+    for (const row of championRows) {
+      if (!row.userId || !row.championName) continue;
+      const list = championsByUser.get(row.userId) ?? [];
+      list.push({ name: row.championName, games: row._count._all });
+      championsByUser.set(row.userId, list);
+    }
+
+    const kdaByUser = new Map(kdaRows.map((row) => [row.userId, row]));
+    for (const userId of userIds) {
+      const row = kdaByUser.get(userId);
+      const games = row?._count._all ?? 0;
+      const kills = row?._sum.kills ?? 0;
+      const deaths = row?._sum.deaths ?? 0;
+      const assists = row?._sum.assists ?? 0;
+      const round1 = (value: number) => Math.round(value * 10) / 10;
+      result.set(userId, {
+        statGames: games,
+        avgKills: games ? round1(kills / games) : 0,
+        avgDeaths: games ? round1(deaths / games) : 0,
+        avgAssists: games ? round1(assists / games) : 0,
+        kda: games
+          ? Math.round(((kills + assists) / Math.max(1, deaths)) * 100) / 100
+          : null,
+        mvpCount: mvpCounts.get(userId) ?? 0,
+        topChampions: (championsByUser.get(userId) ?? [])
+          .sort((a, b) => b.games - a.games || a.name.localeCompare(b.name))
+          .slice(0, 3)
+          .map((champion) => champion.name),
+      });
+    }
+    return result;
+  }
+
+  /** 내전 MVP 횟수. 라인 탭이면 그 라인으로 배정된 경기에서 받은 것만 센다. */
+  private async countMvps(
+    userIds: string[],
+    role: Role | undefined,
+    internalMatch: object,
+  ): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    if (role) {
+      const rosters = await this.prisma.matchRosterSnapshot.findMany({
+        where: {
+          userId: { in: userIds },
+          assignedRole: role,
+          match: { ...internalMatch, mvpUserId: { in: userIds } },
+        },
+        select: { userId: true, match: { select: { mvpUserId: true } } },
+      });
+      for (const roster of rosters) {
+        if (roster.userId && roster.match.mvpUserId === roster.userId) {
+          counts.set(roster.userId, (counts.get(roster.userId) ?? 0) + 1);
+        }
+      }
+      return counts;
+    }
+
+    const rows = await this.prisma.match.groupBy({
+      by: ["mvpUserId"],
+      where: { ...internalMatch, mvpUserId: { in: userIds } },
+      _count: { _all: true },
     });
+    for (const row of rows) {
+      if (row.mvpUserId) counts.set(row.mvpUserId, row._count._all);
+    }
+    return counts;
   }
 
   /**
@@ -474,7 +634,7 @@ export class RankingService implements OnApplicationBootstrap {
     let globalRank: number | null = null;
     if (ranking.totalGames >= RankingService.MIN_GAMES_FOR_RANK) {
       globalRank =
-        (await this.countRankedAbove(ranking.totalGames, ranking.winRate)) + 1;
+        (await this.countRankedAbove(ranking.score, ranking.totalGames)) + 1;
     }
 
     return {
@@ -572,7 +732,7 @@ export class RankingService implements OnApplicationBootstrap {
         totalGames: { gte: RankingService.MIN_GAMES_FOR_RANK },
         user: NOT_BOT_USER,
       },
-      orderBy: [{ totalGames: "desc" }, { winRate: "desc" }],
+      orderBy: RANKING_ORDER,
       select: { id: true },
     });
 

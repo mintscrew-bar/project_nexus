@@ -2509,13 +2509,15 @@ export const rankingApi = {
     return response.data;
   },
 
+  /** role 을 주면 그 라인으로 뛴 경기만 모은 라인별 랭킹 */
   getGlobalRanking: async (
     page: number = 1,
     limit: number = 50,
     q?: string,
+    role?: "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT",
   ) => {
     const response = await apiClient.get("/ranking/global", {
-      params: { page, limit, ...(q ? { q } : {}) },
+      params: { page, limit, ...(q ? { q } : {}), ...(role ? { role } : {}) },
     });
     return response.data;
   },

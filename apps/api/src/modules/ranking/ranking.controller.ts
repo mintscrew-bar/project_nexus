@@ -20,7 +20,8 @@ export class RankingController {
   constructor(private readonly rankingService: RankingService) {}
 
   /**
-   * 글로벌 랭킹 (페이지네이션, 내전 1판 이상). q 를 주면 닉네임·소환사명으로 거른다.
+   * 글로벌 랭킹 (페이지네이션, 내전 1판 이상). q 를 주면 닉네임·소환사명으로 거르고,
+   * role 을 주면 그 라인으로 뛴 경기만 모은 라인별 랭킹을 준다.
    */
   @Get("global")
   async getGlobalRanking(@Query() query: RankingQueryDto) {
@@ -28,6 +29,7 @@ export class RankingController {
       query.page,
       query.limit,
       query.q,
+      query.role,
     );
   }
 

@@ -17,6 +17,11 @@ describe("RankingService", () => {
       },
       matchParticipant: {
         findMany: jest.fn(),
+        // 리더보드 지표(KDA·챔피언) — 기본은 수집된 경기 없음
+        groupBy: jest.fn().mockResolvedValue([]),
+      },
+      match: {
+        groupBy: jest.fn().mockResolvedValue([]),
       },
       matchRosterSnapshot: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -39,6 +44,7 @@ describe("RankingService", () => {
         upsert: jest.fn(),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
         findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
       },
     };
 
@@ -355,7 +361,7 @@ describe("RankingService", () => {
   describe("getGlobalRanking 검색", () => {
     it("닉네임·소환사명으로 거르고, 순위는 전체 랭킹 기준으로 센다", async () => {
       prisma.nexusRanking.findMany.mockResolvedValue([
-        { id: "r1", totalGames: 3, winRate: 66.7 },
+        { id: "r1", userId: "u1", totalGames: 3, winRate: 66.7, score: 56.3 },
       ]);
       prisma.nexusRanking.count = jest
         .fn()
@@ -375,7 +381,7 @@ describe("RankingService", () => {
 
     it("재계산 전에 남은 봇 행도 목록·순위 계산에서 뺀다", async () => {
       prisma.nexusRanking.findMany.mockResolvedValue([
-        { id: "r1", totalGames: 3, winRate: 66.7 },
+        { id: "r1", userId: "u1", totalGames: 3, winRate: 66.7, score: 56.3 },
       ]);
       prisma.nexusRanking.count = jest.fn().mockResolvedValue(1);
 
@@ -386,6 +392,81 @@ describe("RankingService", () => {
       // "나보다 위" 인원 수에서도 봇은 빠져야 순위 번호가 맞는다
       const aboveWhere = prisma.nexusRanking.count.mock.calls[1][0].where;
       expect(aboveWhere.user).toEqual({ NOT: TEST_BOT_USER_WHERE });
+    });
+  });
+
+  describe("getGlobalRanking 점수·라인·지표", () => {
+    it("종합은 보정 승률 점수 → 판수 순으로 줄 세운다", async () => {
+      prisma.nexusRanking.findMany.mockResolvedValue([]);
+      prisma.nexusRanking.count = jest.fn().mockResolvedValue(0);
+
+      await service.getGlobalRanking(1, 50);
+
+      expect(prisma.nexusRanking.findMany.mock.calls[0][0].orderBy).toEqual([
+        { score: "desc" },
+        { totalGames: "desc" },
+      ]);
+    });
+
+    it("role 을 주면 라인 기록 테이블에서 그 라인만 읽고, 나보다 위 인원도 그 라인에서 센다", async () => {
+      prisma.nexusRoleRecord.findMany.mockResolvedValue([
+        { id: "rr1", userId: "u1", role: "MID", totalGames: 4, score: 61.1 },
+      ]);
+      prisma.nexusRoleRecord.count = jest
+        .fn()
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(2);
+
+      const result = await service.getGlobalRanking(1, 50, "철수", "MID");
+
+      expect(prisma.nexusRoleRecord.findMany.mock.calls[0][0].where.role).toBe(
+        "MID",
+      );
+      const aboveWhere = prisma.nexusRoleRecord.count.mock.calls[1][0].where;
+      expect(aboveWhere.role).toBe("MID");
+      expect(aboveWhere.OR).toEqual([
+        { score: { gt: 61.1 } },
+        { score: 61.1, totalGames: { gt: 4 } },
+      ]);
+      expect(result.rankings[0].globalRank).toBe(3);
+      // KDA·챔피언도 그 라인 포지션으로 뛴 경기만 센다
+      expect(
+        prisma.matchParticipant.groupBy.mock.calls[0][0].where.position,
+      ).toBe("MID");
+    });
+
+    it("KDA·MVP·주력 챔피언을 행에 붙인다", async () => {
+      prisma.nexusRanking.findMany.mockResolvedValue([
+        { id: "r1", userId: "u1", totalGames: 3, score: 56.3 },
+      ]);
+      prisma.nexusRanking.count = jest.fn().mockResolvedValue(1);
+      prisma.matchParticipant.groupBy
+        .mockResolvedValueOnce([
+          {
+            userId: "u1",
+            _sum: { kills: 12, deaths: 4, assists: 8 },
+            _count: { _all: 2 },
+          },
+        ])
+        .mockResolvedValueOnce([
+          { userId: "u1", championName: "Ahri", _count: { _all: 1 } },
+          { userId: "u1", championName: "Zed", _count: { _all: 2 } },
+        ]);
+      prisma.match.groupBy.mockResolvedValue([
+        { mvpUserId: "u1", _count: { _all: 1 } },
+      ]);
+
+      const result = await service.getGlobalRanking(1, 50);
+
+      expect(result.rankings[0].stats).toEqual({
+        statGames: 2,
+        avgKills: 6,
+        avgDeaths: 2,
+        avgAssists: 4,
+        kda: 5,
+        mvpCount: 1,
+        topChampions: ["Zed", "Ahri"],
+      });
     });
   });
 });

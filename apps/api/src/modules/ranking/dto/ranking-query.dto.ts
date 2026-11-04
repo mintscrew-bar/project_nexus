@@ -5,7 +5,9 @@ import {
   Min,
   Max,
   MaxLength,
+  IsIn,
 } from "class-validator";
+import { Role } from "@nexus/database";
 
 export class RankingQueryDto {
   @IsOptional()
@@ -24,4 +26,9 @@ export class RankingQueryDto {
   @IsString()
   @MaxLength(30, { message: "검색어는 30자 이하여야 합니다." })
   q?: string;
+
+  /** 라인별 랭킹 — 없으면 종합 (글로벌 랭킹 전용) */
+  @IsOptional()
+  @IsIn(Object.values(Role), { message: "role 값이 올바르지 않습니다." })
+  role?: Role;
 }

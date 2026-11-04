@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCurrentGame, useGamePrefix } from "@/hooks/useCurrentGame";
 import { PubgRankingPage } from "./_PubgRankingPage";
@@ -11,7 +9,6 @@ import { rankingApi } from "@/lib/api-client";
 import { Skeleton, Button, EmptyState } from "@/components/ui";
 import {
   Trophy,
-  Crown,
   ChevronLeft,
   ChevronRight,
   Users,
@@ -19,9 +16,20 @@ import {
   X,
 } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
-import { getTierImage } from "@/components/matches/match-utils";
 import { RankingTour } from "@/components/onboarding/PrimaryPageTours";
 import { AdSlotCard } from "@/components/ads/AdSlot";
+import { LolRankingRow, type LolRankingEntry } from "./_LolRankingRow";
+
+/** 종합 + 라인별 탭. value 가 없으면 종합(nexus_rankings) */
+const ROLE_TABS = [
+  { value: undefined, label: "종합" },
+  { value: "TOP", label: "탑" },
+  { value: "JUNGLE", label: "정글" },
+  { value: "MID", label: "미드" },
+  { value: "ADC", label: "원딜" },
+  { value: "SUPPORT", label: "서포터" },
+] as const;
+type RankingRole = Exclude<(typeof ROLE_TABS)[number]["value"], undefined>;
 
 /**
  * 롤과 배그는 줄 세우는 기준 자체가 다르다 — 롤은 승률, 배그는 누적 포인트.
@@ -38,6 +46,7 @@ function LolRankingPage() {
   const gamePrefix = useGamePrefix();
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<"global" | "clan">("global");
+  const [role, setRole] = useState<RankingRole | undefined>(undefined);
   const limit = 50;
   // 닉네임·소환사명 검색. 프로필의 "랭킹 #N" 링크가 ?q= 로 이름을 넘겨준다.
   const [search, setSearch] = useState("");
@@ -50,40 +59,19 @@ function LolRankingPage() {
   }, []);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["globalRanking", page, debouncedSearch],
+    queryKey: ["globalRanking", page, debouncedSearch, role ?? "ALL"],
     queryFn: () =>
-      rankingApi.getGlobalRanking(page, limit, debouncedSearch || undefined),
+      rankingApi.getGlobalRanking(
+        page,
+        limit,
+        debouncedSearch || undefined,
+        role,
+      ),
     staleTime: 2 * 60 * 1000,
     // 검색어를 칠 때마다 목록이 스켈레톤으로 깜빡이지 않게 이전 결과를 잠시 보여준다
     placeholderData: (previous) => previous,
     enabled: tab === "global",
   });
-
-  const getRankBadge = (rank: number) => {
-    if (rank === 1)
-      return (
-        <div className="w-8 h-8 rounded-full bg-accent-gold/20 flex items-center justify-center">
-          <Crown className="h-5 w-5 text-accent-gold" />
-        </div>
-      );
-    if (rank === 2)
-      return (
-        <div className="w-8 h-8 rounded-full bg-gray-300/20 flex items-center justify-center">
-          <span className="text-sm font-bold text-gray-300">2</span>
-        </div>
-      );
-    if (rank === 3)
-      return (
-        <div className="w-8 h-8 rounded-full bg-orange-400/20 flex items-center justify-center">
-          <span className="text-sm font-bold text-orange-400">3</span>
-        </div>
-      );
-    return (
-      <div className="w-8 h-8 flex items-center justify-center">
-        <span className="text-sm font-medium text-text-secondary">{rank}</span>
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen">
@@ -99,6 +87,11 @@ function LolRankingPage() {
           </div>
           <p className="text-text-secondary">
             Nexus 내전 기록 기반 랭킹 (1판만 해도 등록)
+          </p>
+          <p className="mt-1 text-xs text-text-tertiary">
+            점수는 판수를 반영한 보정 승률입니다 — 모두에게 5판 분량의 50%를
+            깔고 계산해, 몇 판 안 한 전승보다 많이 뛰고 많이 이긴 사람이 위로
+            옵니다. KDA·챔피언은 기록이 수집된 내전 기준입니다.
           </p>
 
           {/* Tabs */}
@@ -141,6 +134,36 @@ function LolRankingPage() {
       >
         {tab === "global" && (
           <>
+            {/* 종합 → 라인별 탭. 라인 탭은 그 라인으로 뛴 경기만 따로 줄 세운다 */}
+            <div
+              role="tablist"
+              aria-label="라인별 랭킹"
+              className="mb-3 flex gap-1 overflow-x-auto rounded-xl bg-bg-secondary p-1"
+            >
+              {ROLE_TABS.map((item) => {
+                const active = role === item.value;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => {
+                      setRole(item.value);
+                      setPage(1);
+                    }}
+                    className={`flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                      active
+                        ? "bg-accent-primary text-accent-on"
+                        : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* 검색 — 순위 번호는 검색해도 전체 랭킹 기준 그대로 */}
             <div className="relative mb-4">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
@@ -193,11 +216,17 @@ function LolRankingPage() {
                 title={`"${debouncedSearch}" 검색 결과가 없습니다`}
                 description="내전을 한 판 이상 한 플레이어만 랭킹에 있습니다. 닉네임이나 소환사명을 다시 확인해 주세요."
               />
+            ) : role && (!data || data.rankings.length === 0) ? (
+              <EmptyState
+                icon={Trophy}
+                title="이 라인으로 기록된 내전이 아직 없습니다"
+                description="라인별 랭킹은 역할 선택에서 이 라인으로 배정돼 끝까지 치른 내전만 셉니다."
+              />
             ) : !data || data.rankings.length === 0 ? (
               <EmptyState
                 icon={Trophy}
                 title="아직 랭킹에 오른 플레이어가 없습니다"
-                description="내전을 한 판만 해도 랭킹에 등록됩니다. 판수가 많은 순, 같으면 승률 순으로 줄을 세웁니다. 첫 기록을 만들어보세요."
+                description="내전을 한 판만 해도 랭킹에 등록됩니다. 판수를 반영한 보정 승률 점수 순으로 줄을 세웁니다. 첫 기록을 만들어보세요."
                 action={{
                   label: "내전 방 둘러보기",
                   onClick: () => router.push(`${gamePrefix}/tournaments`),
@@ -205,85 +234,23 @@ function LolRankingPage() {
               />
             ) : (
               <>
+                {/* 열 머리 — 넓은 화면에서 지표가 무엇인지 알려준다 */}
+                <div className="mb-2 hidden items-center gap-4 px-4 text-[11px] text-text-tertiary sm:flex">
+                  <span className="flex-grow pl-[100px]">플레이어</span>
+                  <span className="hidden w-[84px] md:block">주력 챔피언</span>
+                  <span className="w-[92px] text-center">평균 KDA</span>
+                  <span className="w-[52px] text-center">MVP</span>
+                  <span className="w-[76px] text-right">승률</span>
+                  <span className="w-[64px] text-right">점수</span>
+                </div>
                 <div className="space-y-2">
-                  {data.rankings.map((entry: any) => {
-                    const riotAccount = entry.user.riotAccounts?.[0];
-                    const winRate = entry.winRate.toFixed(1);
-
-                    return (
-                      <Link
-                        key={entry.id}
-                        href={`${gamePrefix}/matches/user/${entry.userId}`}
-                        className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4 flex items-center gap-4 hover:bg-bg-tertiary/50 transition-colors"
-                      >
-                        {/* Rank */}
-                        {getRankBadge(entry.globalRank)}
-
-                        {/* Avatar */}
-                        <div className="w-10 h-10 rounded-lg bg-bg-tertiary flex items-center justify-center overflow-hidden">
-                          {entry.user.avatar ? (
-                            <Image
-                              src={entry.user.avatar}
-                              alt={entry.user.username}
-                              width={40}
-                              height={40}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-sm font-bold text-text-tertiary">
-                              {entry.user.username.charAt(0)}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Info */}
-                        <div className="flex-grow min-w-0">
-                          <p className="font-semibold text-text-primary truncate">
-                            {entry.user.username}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                            {riotAccount && (
-                              <span>
-                                {riotAccount.gameName}#{riotAccount.tagLine}
-                              </span>
-                            )}
-                            {riotAccount?.tier && (
-                              <span className="flex items-center gap-1">
-                                {getTierImage(riotAccount.tier) && (
-                                  <Image
-                                    src={getTierImage(riotAccount.tier)!}
-                                    alt={riotAccount.tier}
-                                    width={16}
-                                    height={16}
-                                    className="w-4 h-4"
-                                  />
-                                )}
-                                {riotAccount.tier} {riotAccount.rank}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Stats */}
-                        <div className="text-right flex-shrink-0">
-                          <p
-                            className={`font-bold text-sm ${
-                              parseFloat(winRate) >= 60
-                                ? "text-accent-success"
-                                : parseFloat(winRate) >= 50
-                                  ? "text-accent-primary"
-                                  : "text-accent-danger"
-                            }`}
-                          >
-                            {winRate}%
-                          </p>
-                          <p className="text-xs text-text-tertiary">
-                            {entry.totalGames}전 {entry.wins}승 {entry.losses}패
-                          </p>
-                        </div>
-                      </Link>
-                    );
-                  })}
+                  {data.rankings.map((entry: LolRankingEntry) => (
+                    <LolRankingRow
+                      key={entry.id}
+                      entry={entry}
+                      href={`${gamePrefix}/matches/user/${entry.userId}`}
+                    />
+                  ))}
                 </div>
 
                 {/* Pagination */}
