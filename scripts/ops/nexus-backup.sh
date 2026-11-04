@@ -15,6 +15,12 @@
 #   → core(캐시 데이터 제외)를 매일, full(전체)을 주 1회.
 #   core 에도 riot_match_cache 의 *스키마* 는 들어가므로 복원 후 테이블은 존재한다(비어 있을 뿐).
 #
+# 2026-11-04 추가 제외: core 가 하루 1GB(압축 전 5GB)로 커졌다. 대부분이 외부 랭크 데이터다.
+#   riot_match_archives 3.7GB(13만 매치) — 랭크 원본 압축 보관본. 영구 보존 대상이지만 매일 뜰 필요는
+#     없다. full(주간, R2 90일)에 들어가고, 사이 며칠치는 Riot 에서 다시 받을 수 있다.
+#   known_puuids 0.1GB — 수집 대상 탐색 큐. 다시 쌓인다.
+#   match_participants(1.4GB)는 못 뺀다 — 내전 기록이 같은 테이블에 있다.
+#
 # 설치: scripts/ops/install-cron.sh (sudo 불필요, 유저 crontab)
 # 수동 실행: scripts/ops/nexus-backup.sh
 # 복원 절차: docs/setup/RECOVERY_PLAYBOOK.md
@@ -30,7 +36,11 @@ KEEP_WEEKLY="${NEXUS_BACKUP_KEEP_WEEKLY:-3}"  # full 주간 보관 개수
 # 매일 full 을 뜨고 싶으면 1 로 둔다 (덤프 시간·용량이 크게 늘어난다)
 FULL_EVERY_RUN="${NEXUS_BACKUP_FULL_EVERY_RUN:-0}"
 # 데이터를 빼는 테이블 — 스키마는 유지되고 행만 비운다
-EXCLUDE_ARGS=(--exclude-table-data=riot_match_cache)
+EXCLUDE_ARGS=(
+  --exclude-table-data=riot_match_cache
+  --exclude-table-data=riot_match_archives
+  --exclude-table-data=known_puuids
+)
 WEBHOOK="${NEXUS_OPS_WEBHOOK:-}"
 PG_CONTAINER="${NEXUS_PG_CONTAINER:-nexus-postgres}"
 PG_USER="${POSTGRES_USER:-nexus}"

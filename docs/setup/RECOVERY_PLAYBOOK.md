@@ -103,7 +103,7 @@ cron 설치/확인은 `scripts/ops/install-cron.sh --show`.
 
 백업 위치: `~/nexus-backups/` (daily = core 덤프·업로드, weekly = full 덤프)
 
-- `db-core-*.sql.gz` — **매일**. `riot_match_cache` 데이터만 빠진 전체 DB. 평상시엔 이걸로 복원한다.
+- `db-core-*.sql.gz` — **매일**. 외부 랭크 캐시·보관본(`riot_match_cache`·`riot_match_archives`·`known_puuids`) 데이터만 빠진 전체 DB. 평상시엔 이걸로 복원한다. 랭크 보관본까지 필요하면 최신 `db-full` 을 쓴다.
 - `db-full-*.sql.gz` — **주 1회(일요일)**. 외부 매치 캐시까지 포함.
 - `uploads-*.tar.gz` — 업로드 볼륨(클랜 로고·배너 등)
 

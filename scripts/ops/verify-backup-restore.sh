@@ -19,7 +19,7 @@
 # 합격 기준:
 #   - 복원 중 psql 에러 0건
 #   - 운영에서 행이 있는 테이블이 복원본에서 비어 있지 않을 것
-#     (core 덤프가 일부러 데이터를 빼는 riot_match_cache 는 제외)
+#     (core 덤프가 일부러 데이터를 빼는 riot_match_cache·riot_match_archives·known_puuids 는 제외)
 #   - 덤프 이후 운영에서 행이 늘거나 지워지는 건 정상이라 행 수가 정확히 같을 필요는 없다.
 #     다만 복원본이 운영의 50% 미만이면 덤프가 덜 떠졌을 수 있어 경고로 표시한다.
 #
@@ -39,7 +39,7 @@ PG_DB="${POSTGRES_DB:-nexus}"
 PG_IMAGE="${NEXUS_RESTORE_PG_IMAGE:-postgres:16-alpine}"  # 운영과 같은 메이저 버전
 RCLONE_BIN="${NEXUS_RCLONE_BIN:-$HOME/.local/bin/rclone}"
 # core 덤프가 데이터를 일부러 빼는 테이블 — 복원본에서 비어 있는 게 정상이다
-EXPECTED_EMPTY="riot_match_cache"
+EXPECTED_EMPTY="riot_match_cache riot_match_archives known_puuids"
 
 TEST_NAME="nexus-restore-test-$$"
 WORK=$(mktemp -d)
