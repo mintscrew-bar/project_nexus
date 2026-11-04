@@ -323,6 +323,13 @@ function getItemIconUrl(itemId: number): string | null {
 
 // ─── Sub-Components ──────────────────────────────────
 
+/**
+ * 팀 비교 한 줄 — 가운데 지표 이름을 기준으로 두 팀 막대가 바깥쪽으로 뻗는다.
+ *
+ * 2026-11-04 한 줄 막대를 두 색으로 나눠 칠하던 방식에서 바꿨다. 나눠 칠하면
+ * 비율은 보여도 "얼마나 앞섰나"가 잘 안 읽혔다. 큰 쪽을 꽉 찬 길이로 잡아
+ * 차이가 막대 길이로 바로 보이게 한다. 앞선 팀 숫자만 진하게 둔다.
+ */
 function ComparisonBar({
   label,
   icon,
@@ -336,35 +343,50 @@ function ComparisonBar({
   valueB: number;
   format: (v: number) => string;
 }) {
-  // 양쪽 다 0이면 비율이 없다. 예전엔 B팀 100% 로 그려져 전부 빨강이었다.
-  const empty = valueA + valueB === 0;
-  const pctA = empty ? 50 : (valueA / (valueA + valueB)) * 100;
+  // 양쪽 다 0이면 막대 없이 숫자만 보인다
+  const max = Math.max(valueA, valueB);
+  const widthA = max > 0 ? (valueA / max) * 100 : 0;
+  const widthB = max > 0 ? (valueB / max) * 100 : 0;
+  const leadA = valueA > valueB;
+  const leadB = valueB > valueA;
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-xs">
-        <span className="font-bold text-text-primary">{format(valueA)}</span>
-        <span className="text-text-tertiary flex items-center gap-1">
-          {icon}
-          {label}
-        </span>
-        <span className="font-bold text-text-primary">{format(valueB)}</span>
-      </div>
-      <div className="flex h-2 rounded-full overflow-hidden bg-bg-tertiary">
+    <div className="grid grid-cols-[64px_minmax(0,1fr)_88px_minmax(0,1fr)_64px] items-center gap-x-3">
+      <span
+        className={`text-right text-sm tabular-nums ${leadA ? "font-bold" : "text-text-secondary"}`}
+        style={leadA ? { color: TEAM_A_COLOR } : undefined}
+      >
+        {format(valueA)}
+      </span>
+      <div className="flex h-2.5 justify-end rounded-sm bg-bg-tertiary/40">
         <div
-          className="h-full transition-all duration-500 rounded-l-full"
+          className="h-full rounded-sm transition-all duration-500"
           style={{
-            width: `${pctA}%`,
-            backgroundColor: empty ? "transparent" : TEAM_A_COLOR,
-          }}
-        />
-        <div
-          className="h-full transition-all duration-500 rounded-r-full"
-          style={{
-            width: `${100 - pctA}%`,
-            backgroundColor: empty ? "transparent" : TEAM_B_COLOR,
+            width: `${widthA}%`,
+            backgroundColor: TEAM_A_COLOR,
+            opacity: leadA ? 1 : 0.55,
           }}
         />
       </div>
+      <span className="flex items-center justify-center gap-1 text-xs text-text-tertiary">
+        {icon}
+        {label}
+      </span>
+      <div className="flex h-2.5 rounded-sm bg-bg-tertiary/40">
+        <div
+          className="h-full rounded-sm transition-all duration-500"
+          style={{
+            width: `${widthB}%`,
+            backgroundColor: TEAM_B_COLOR,
+            opacity: leadB ? 1 : 0.55,
+          }}
+        />
+      </div>
+      <span
+        className={`text-sm tabular-nums ${leadB ? "font-bold" : "text-text-secondary"}`}
+        style={leadB ? { color: TEAM_B_COLOR } : undefined}
+      >
+        {format(valueB)}
+      </span>
     </div>
   );
 }
