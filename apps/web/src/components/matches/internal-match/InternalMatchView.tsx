@@ -1405,7 +1405,21 @@ function DraftOnlyView({ match }: { match: MatchDetails }) {
 // (2026-11-02 "내전 기록 보는 방식 통일" — 어느 목록에서 열든 같은 모양)
 // 데이터 조회·뒤로가기·바깥 여백은 쓰는 쪽이 맡는다.
 
+/**
+ * 펼친 내전 전적의 탭.
+ * 정보가 한 줄로 쌓여 너무 길어져서(2026-11-04 운영자 요청) 세 갈래로 나눴다.
+ * 스코어보드는 탭 위에 항상 보이고, 탭과 내용은 스코어보드와 한 카드로 묶는다.
+ */
+const MATCH_TABS = [
+  { value: "overview", label: "종합" },
+  { value: "team", label: "팀 분석" },
+  { value: "detail", label: "상세 지표" },
+] as const;
+type MatchTab = (typeof MATCH_TABS)[number]["value"];
+
 export function InternalMatchView({ match }: { match: MatchDetails }) {
+  // 처음 펼치면 양 팀 선수 카드(종합)부터 보여준다
+  const [tab, setTab] = useState<MatchTab>("overview");
   // 골드 차이 그래프용 Riot 타임라인. Riot 매치 ID 가 있는(토너먼트 코드로 수집된)
   // 경기만 가능하다. 실패하면 그래프만 빠지고 나머지 화면은 그대로다.
   const riotMatchId = match?.riotMatchId ?? null;
@@ -1516,9 +1530,11 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
   const teamBBans = parseBans(teamBStats?.bans);
 
   return (
-    <div className="space-y-4">
+    // 스코어보드·탭·내용을 한 카드로 묶는다. 구분은 탭 줄 경계선과
+    // 한 톤 어두운 내용 영역 배경으로 준다(내용 속 카드들은 그 위에 떠 보인다).
+    <div className="overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
       {/* ──────────── Section 1: Match Header (Scoreboard) ──────────── */}
-      <div className="bg-bg-secondary border border-bg-tertiary rounded-xl overflow-hidden">
+      <div>
         {/* Team color gradient bar */}
         <div className="h-1 flex">
           <div
@@ -1623,262 +1639,308 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
         </div>
       </div>
 
-      {/* ──────────── 골드 차이 그래프 (대회 중계 방식) ──────────── */}
-      {timeline && (
-        <TeamGoldChart
-          timeline={timeline}
-          teams={[
-            {
-              name: match.teamA.name,
-              color: TEAM_A_COLOR,
-              puuids: teamAParticipants.flatMap((p) =>
-                p.puuid ? [p.puuid] : [],
-              ),
-              riotTeamId: teamAParticipants[0]?.riotTeamId ?? null,
-            },
-            {
-              name: match.teamB.name,
-              color: TEAM_B_COLOR,
-              puuids: teamBParticipants.flatMap((p) =>
-                p.puuid ? [p.puuid] : [],
-              ),
-              riotTeamId: teamBParticipants[0]?.riotTeamId ?? null,
-            },
-          ]}
-        />
-      )}
-
-      {/* ──────────── Section 2: Team Comparison Bars ──────────── */}
-      <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-5 space-y-3">
-        <ComparisonBar
-          label="총 킬"
-          icon={<Crosshair className="h-3 w-3" />}
-          valueA={aggA.kills}
-          valueB={aggB.kills}
-          format={(v) => v.toString()}
-        />
-        <ComparisonBar
-          label="총 골드"
-          icon={<Coins className="h-3 w-3" />}
-          valueA={aggA.gold}
-          valueB={aggB.gold}
-          format={(v) => (v / 1000).toFixed(1) + "k"}
-        />
-        <ComparisonBar
-          label="총 딜량"
-          icon={<Sword className="h-3 w-3" />}
-          valueA={aggA.damage}
-          valueB={aggB.damage}
-          format={(v) => (v / 1000).toFixed(1) + "k"}
-        />
-        <ComparisonBar
-          label="시야 점수"
-          icon={<Eye className="h-3 w-3" />}
-          valueA={aggA.vision}
-          valueB={aggB.vision}
-          format={(v) => v.toString()}
-        />
+      {/* ──────────── 탭 ──────────── */}
+      <div
+        role="tablist"
+        aria-label="경기 정보"
+        className="flex gap-6 border-t border-bg-tertiary px-5"
+      >
+        {MATCH_TABS.map((item) => {
+          const active = tab === item.value;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={(e) => {
+                // 전적 목록에서 펼친 상태라면 줄 접기로 번지지 않게 한다
+                e.stopPropagation();
+                setTab(item.value);
+              }}
+              className={`-mb-px border-b-2 py-2.5 text-sm font-semibold transition-colors ${
+                active
+                  ? "border-accent-primary text-text-primary"
+                  : "border-transparent text-text-tertiary hover:text-text-secondary"
+              }`}
+            >
+              {item.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* ──────────── Section 3: Objectives & Firsts ──────────── */}
-      {/* 팀당 한 줄: 팀 이름 · 공식 오브젝트 아이콘 · 달성한 "첫 ~" 배지만 */}
-      {(teamAStats || teamBStats) && (
-        <div className="bg-bg-secondary border border-bg-tertiary rounded-xl divide-y divide-bg-tertiary">
-          {(
-            [
-              {
-                name: match.teamA.name,
-                color: TEAM_A_COLOR,
-                stats: teamAStats,
-                side: 100,
-              },
-              {
-                name: match.teamB.name,
-                color: TEAM_B_COLOR,
-                stats: teamBStats,
-                side: 200,
-              },
-            ] as const
-          ).map((team) => (
-            <div
-              key={team.side}
-              className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3"
-            >
-              <div className="flex w-36 items-center gap-2 text-sm font-semibold text-text-secondary">
-                <div
-                  className="h-3 w-3 flex-shrink-0 rounded-full"
-                  style={{ backgroundColor: team.color }}
-                />
-                <span className="truncate">{team.name}</span>
-              </div>
-              <div className="flex items-center gap-5">
-                <ObjectiveIcon
-                  type="tower"
-                  count={team.stats?.towerKills ?? 0}
-                  side={team.side}
-                />
-                <ObjectiveIcon
-                  type="inhibitor"
-                  count={team.stats?.inhibitorKills ?? 0}
-                  side={team.side}
-                />
-                <ObjectiveIcon
-                  type="dragon"
-                  count={team.stats?.dragonKills ?? 0}
-                  side={team.side}
-                />
-                <ObjectiveIcon
-                  type="herald"
-                  count={team.stats?.riftHeraldKills ?? 0}
-                  side={team.side}
-                />
-                <ObjectiveIcon
-                  type="baron"
-                  count={team.stats?.baronKills ?? 0}
-                  side={team.side}
-                />
-              </div>
-              <div className="flex flex-wrap gap-1">
-                <FirstBadge
-                  label="선취점"
-                  active={team.stats?.firstBlood ?? false}
-                />
-                <FirstBadge
-                  label="첫 포탑"
-                  active={team.stats?.firstTower ?? false}
-                />
-                <FirstBadge
-                  label="첫 드래곤"
-                  active={team.stats?.firstDragon ?? false}
-                />
-                <FirstBadge
-                  label="첫 내셔 남작"
-                  active={team.stats?.firstBaron ?? false}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <div
+        role="tabpanel"
+        className="space-y-4 border-t border-bg-tertiary bg-bg-primary/40 p-4"
+      >
+        {tab === "team" && (
+          <>
+            {/* ──────────── 골드 차이 그래프 (대회 중계 방식) ──────────── */}
+            {timeline && (
+              <TeamGoldChart
+                timeline={timeline}
+                teams={[
+                  {
+                    name: match.teamA.name,
+                    color: TEAM_A_COLOR,
+                    puuids: teamAParticipants.flatMap((p) =>
+                      p.puuid ? [p.puuid] : [],
+                    ),
+                    riotTeamId: teamAParticipants[0]?.riotTeamId ?? null,
+                  },
+                  {
+                    name: match.teamB.name,
+                    color: TEAM_B_COLOR,
+                    puuids: teamBParticipants.flatMap((p) =>
+                      p.puuid ? [p.puuid] : [],
+                    ),
+                    riotTeamId: teamBParticipants[0]?.riotTeamId ?? null,
+                  },
+                ]}
+              />
+            )}
 
-      {/* ──────────── Section 4: Bans ──────────── */}
-      {(teamABans.length > 0 || teamBBans.length > 0) && (
-        <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-text-secondary mb-3">밴</h3>
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: TEAM_A_COLOR }}
-                />
-                <span className="text-xs text-text-tertiary">
-                  {match.teamA.name}
-                </span>
-              </div>
-              <div className="flex gap-1.5">
-                {teamABans.map((champId, idx) => (
-                  <Image
-                    key={idx}
-                    src={getChampionIconById(champId)}
-                    alt={`ban-${champId}`}
-                    width={36}
-                    height={36}
-                    className="w-9 h-9 rounded-lg grayscale opacity-60 border border-bg-tertiary"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                ))}
-                {teamABans.length === 0 && (
-                  <span className="text-xs text-text-tertiary">
-                    밴 정보 없음
-                  </span>
-                )}
-              </div>
+            {/* ──────────── Section 2: Team Comparison Bars ──────────── */}
+            <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-5 space-y-3">
+              <ComparisonBar
+                label="총 킬"
+                icon={<Crosshair className="h-3 w-3" />}
+                valueA={aggA.kills}
+                valueB={aggB.kills}
+                format={(v) => v.toString()}
+              />
+              <ComparisonBar
+                label="총 골드"
+                icon={<Coins className="h-3 w-3" />}
+                valueA={aggA.gold}
+                valueB={aggB.gold}
+                format={(v) => (v / 1000).toFixed(1) + "k"}
+              />
+              <ComparisonBar
+                label="총 딜량"
+                icon={<Sword className="h-3 w-3" />}
+                valueA={aggA.damage}
+                valueB={aggB.damage}
+                format={(v) => (v / 1000).toFixed(1) + "k"}
+              />
+              <ComparisonBar
+                label="시야 점수"
+                icon={<Eye className="h-3 w-3" />}
+                valueA={aggA.vision}
+                valueB={aggB.vision}
+                format={(v) => v.toString()}
+              />
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: TEAM_B_COLOR }}
-                />
-                <span className="text-xs text-text-tertiary">
-                  {match.teamB.name}
-                </span>
-              </div>
-              <div className="flex gap-1.5">
-                {teamBBans.map((champId, idx) => (
-                  <Image
-                    key={idx}
-                    src={getChampionIconById(champId)}
-                    alt={`ban-${champId}`}
-                    width={36}
-                    height={36}
-                    className="w-9 h-9 rounded-lg grayscale opacity-60 border border-bg-tertiary"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
+
+            {/* ──────────── Section 3: Objectives & Firsts ──────────── */}
+            {/* 팀당 한 줄: 팀 이름 · 공식 오브젝트 아이콘 · 달성한 "첫 ~" 배지만 */}
+            {(teamAStats || teamBStats) && (
+              <div className="bg-bg-secondary border border-bg-tertiary rounded-xl divide-y divide-bg-tertiary">
+                {(
+                  [
+                    {
+                      name: match.teamA.name,
+                      color: TEAM_A_COLOR,
+                      stats: teamAStats,
+                      side: 100,
+                    },
+                    {
+                      name: match.teamB.name,
+                      color: TEAM_B_COLOR,
+                      stats: teamBStats,
+                      side: 200,
+                    },
+                  ] as const
+                ).map((team) => (
+                  <div
+                    key={team.side}
+                    className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3"
+                  >
+                    <div className="flex w-36 items-center gap-2 text-sm font-semibold text-text-secondary">
+                      <div
+                        className="h-3 w-3 flex-shrink-0 rounded-full"
+                        style={{ backgroundColor: team.color }}
+                      />
+                      <span className="truncate">{team.name}</span>
+                    </div>
+                    <div className="flex items-center gap-5">
+                      <ObjectiveIcon
+                        type="tower"
+                        count={team.stats?.towerKills ?? 0}
+                        side={team.side}
+                      />
+                      <ObjectiveIcon
+                        type="inhibitor"
+                        count={team.stats?.inhibitorKills ?? 0}
+                        side={team.side}
+                      />
+                      <ObjectiveIcon
+                        type="dragon"
+                        count={team.stats?.dragonKills ?? 0}
+                        side={team.side}
+                      />
+                      <ObjectiveIcon
+                        type="herald"
+                        count={team.stats?.riftHeraldKills ?? 0}
+                        side={team.side}
+                      />
+                      <ObjectiveIcon
+                        type="baron"
+                        count={team.stats?.baronKills ?? 0}
+                        side={team.side}
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <FirstBadge
+                        label="선취점"
+                        active={team.stats?.firstBlood ?? false}
+                      />
+                      <FirstBadge
+                        label="첫 포탑"
+                        active={team.stats?.firstTower ?? false}
+                      />
+                      <FirstBadge
+                        label="첫 드래곤"
+                        active={team.stats?.firstDragon ?? false}
+                      />
+                      <FirstBadge
+                        label="첫 내셔 남작"
+                        active={team.stats?.firstBaron ?? false}
+                      />
+                    </div>
+                  </div>
                 ))}
-                {teamBBans.length === 0 && (
-                  <span className="text-xs text-text-tertiary">
-                    밴 정보 없음
-                  </span>
-                )}
               </div>
+            )}
+
+            {/* ──────────── Section 4: Bans ──────────── */}
+            {(teamABans.length > 0 || teamBBans.length > 0) && (
+              <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-5">
+                <h3 className="text-sm font-semibold text-text-secondary mb-3">
+                  밴
+                </h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: TEAM_A_COLOR }}
+                      />
+                      <span className="text-xs text-text-tertiary">
+                        {match.teamA.name}
+                      </span>
+                    </div>
+                    <div className="flex gap-1.5">
+                      {teamABans.map((champId, idx) => (
+                        <Image
+                          key={idx}
+                          src={getChampionIconById(champId)}
+                          alt={`ban-${champId}`}
+                          width={36}
+                          height={36}
+                          className="w-9 h-9 rounded-lg grayscale opacity-60 border border-bg-tertiary"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ))}
+                      {teamABans.length === 0 && (
+                        <span className="text-xs text-text-tertiary">
+                          밴 정보 없음
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: TEAM_B_COLOR }}
+                      />
+                      <span className="text-xs text-text-tertiary">
+                        {match.teamB.name}
+                      </span>
+                    </div>
+                    <div className="flex gap-1.5">
+                      {teamBBans.map((champId, idx) => (
+                        <Image
+                          key={idx}
+                          src={getChampionIconById(champId)}
+                          alt={`ban-${champId}`}
+                          width={36}
+                          height={36}
+                          className="w-9 h-9 rounded-lg grayscale opacity-60 border border-bg-tertiary"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ))}
+                      {teamBBans.length === 0 && (
+                        <span className="text-xs text-text-tertiary">
+                          밴 정보 없음
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ──────────── Section 5: Player Cards (Winner first) ──────────── */}
+        {tab === "overview" && (
+          <div className={isLargeMatch ? "" : "overflow-x-auto"}>
+            <div className={`${isLargeMatch ? "" : "min-w-[900px]"} space-y-4`}>
+              <TeamSection
+                teamName={winTeamName}
+                teamColor={winTeamColor}
+                isWinner={true}
+                participants={winTeam}
+                mvpId={mvpId}
+                aceId={null}
+                maxDamage={maxDamage}
+                gameDuration={gameDuration}
+                isLargeMatch={isLargeMatch}
+                defaultExpanded={true}
+              />
+              <TeamSection
+                teamName={loseTeamName}
+                teamColor={loseTeamColor}
+                isWinner={false}
+                participants={loseTeam}
+                mvpId={null}
+                aceId={aceId}
+                maxDamage={maxDamage}
+                gameDuration={gameDuration}
+                isLargeMatch={isLargeMatch}
+                defaultExpanded={!isLargeMatch}
+              />
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ──────────── Section 5: Player Cards (Winner first) ──────────── */}
-      <div className={isLargeMatch ? "" : "overflow-x-auto"}>
-        <div className={`${isLargeMatch ? "" : "min-w-[900px]"} space-y-4`}>
-          <TeamSection
-            teamName={winTeamName}
-            teamColor={winTeamColor}
-            isWinner={true}
-            participants={winTeam}
-            mvpId={mvpId}
-            aceId={null}
-            maxDamage={maxDamage}
+        {/* ──────────── Section 6: Detailed Stats Table ──────────── */}
+        {tab === "detail" && (
+          <DetailStatsTable
+            teams={[
+              {
+                name: winTeamName,
+                color: winTeamColor,
+                participants: winTeam,
+              },
+              {
+                name: loseTeamName,
+                color: loseTeamColor,
+                participants: loseTeam,
+              },
+            ]}
+            allParticipants={allParticipants}
             gameDuration={gameDuration}
-            isLargeMatch={isLargeMatch}
-            defaultExpanded={true}
           />
-          <TeamSection
-            teamName={loseTeamName}
-            teamColor={loseTeamColor}
-            isWinner={false}
-            participants={loseTeam}
-            mvpId={null}
-            aceId={aceId}
-            maxDamage={maxDamage}
-            gameDuration={gameDuration}
-            isLargeMatch={isLargeMatch}
-            defaultExpanded={!isLargeMatch}
-          />
-        </div>
+        )}
       </div>
-
-      {/* ──────────── Section 6: Detailed Stats Table ──────────── */}
-      <DetailStatsTable
-        teams={[
-          {
-            name: winTeamName,
-            color: winTeamColor,
-            participants: winTeam,
-          },
-          {
-            name: loseTeamName,
-            color: loseTeamColor,
-            participants: loseTeam,
-          },
-        ]}
-        allParticipants={allParticipants}
-        gameDuration={gameDuration}
-      />
     </div>
   );
 }
