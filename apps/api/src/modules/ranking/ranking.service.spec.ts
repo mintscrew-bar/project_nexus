@@ -20,7 +20,7 @@ describe("RankingService", () => {
         // 리더보드 지표(KDA·챔피언) — 기본은 수집된 경기 없음
         groupBy: jest.fn().mockResolvedValue([]),
       },
-      match: {
+      userRating: {
         groupBy: jest.fn().mockResolvedValue([]),
       },
       matchRosterSnapshot: {
@@ -435,7 +435,7 @@ describe("RankingService", () => {
       ).toBe("MID");
     });
 
-    it("KDA·MVP·주력 챔피언을 행에 붙인다", async () => {
+    it("KDA·평판·주력 챔피언을 행에 붙인다", async () => {
       prisma.nexusRanking.findMany.mockResolvedValue([
         { id: "r1", userId: "u1", totalGames: 3, score: 56.3 },
       ]);
@@ -452,8 +452,12 @@ describe("RankingService", () => {
           { userId: "u1", championName: "Ahri", _count: { _all: 1 } },
           { userId: "u1", championName: "Zed", _count: { _all: 2 } },
         ]);
-      prisma.match.groupBy.mockResolvedValue([
-        { mvpUserId: "u1", _count: { _all: 1 } },
+      prisma.userRating.groupBy.mockResolvedValue([
+        {
+          targetUserId: "u1",
+          _avg: { skillRating: 4, attitudeRating: 5, communicationRating: 4.3 },
+          _count: { _all: 3 },
+        },
       ]);
 
       const result = await service.getGlobalRanking(1, 50);
@@ -464,7 +468,7 @@ describe("RankingService", () => {
         avgDeaths: 2,
         avgAssists: 4,
         kda: 5,
-        mvpCount: 1,
+        reputation: { average: 4.4, count: 3 },
         topChampions: ["Zed", "Ahri"],
       });
     });

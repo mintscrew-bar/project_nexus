@@ -37,7 +37,8 @@ export interface LolRankingEntry {
     avgDeaths: number;
     avgAssists: number;
     kda: number | null;
-    mvpCount: number;
+    /** 함께 뛴 사람들의 평가 평균(1~5). 평가가 없으면 null */
+    reputation: { average: number; count: number } | null;
     topChampions: string[];
   } | null;
 }
@@ -223,17 +224,21 @@ export function LolRankingRow({
         )}
       </div>
 
-      {/* MVP */}
-      <div className="hidden w-[52px] flex-shrink-0 text-center sm:block">
-        <p
-          className={`flex items-center justify-center gap-0.5 text-sm font-bold ${
-            stats?.mvpCount ? "text-accent-gold" : "text-text-muted"
-          }`}
-        >
-          <Star className="h-3.5 w-3.5" />
-          {stats?.mvpCount ?? 0}
-        </p>
-        <p className="text-[10px] text-text-tertiary">MVP</p>
+      {/* 평판 — 경매 매물 카드와 같은 별점 평균 */}
+      <div className="hidden w-[60px] flex-shrink-0 text-center sm:block">
+        {stats?.reputation ? (
+          <>
+            <p className="flex items-center justify-center gap-0.5 text-sm font-bold text-text-primary">
+              <Star className="h-3.5 w-3.5 fill-accent-gold text-accent-gold" />
+              {stats.reputation.average.toFixed(1)}
+            </p>
+            <p className="text-[10px] text-text-tertiary">
+              {stats.reputation.count}명 평가
+            </p>
+          </>
+        ) : (
+          <p className="text-xs text-text-muted">평가 없음</p>
+        )}
       </div>
 
       {/* 승률 · 승패 */}

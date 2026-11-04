@@ -239,7 +239,7 @@ function LolRankingPage() {
                   <span className="flex-grow pl-[100px]">플레이어</span>
                   <span className="hidden w-[84px] md:block">주력 챔피언</span>
                   <span className="w-[92px] text-center">평균 KDA</span>
-                  <span className="w-[52px] text-center">MVP</span>
+                  <span className="w-[60px] text-center">평판</span>
                   <span className="w-[76px] text-right">승률</span>
                   <span className="w-[64px] text-right">점수</span>
                 </div>
