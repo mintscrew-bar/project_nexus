@@ -60,7 +60,7 @@ if [ ! -f "$ENV_FILE" ]; then
 
 # 백업 보관 위치와 개수 (core=매일, full=주간)
 : "${NEXUS_BACKUP_DIR:=$HOME/nexus-backups}"
-: "${NEXUS_BACKUP_KEEP_DAILY:=14}"
+: "${NEXUS_BACKUP_KEEP_DAILY:=7}"
 : "${NEXUS_BACKUP_KEEP_WEEKLY:=3}"
 
 # 호스트 밖 사본 (rsync 경로 또는 user@host:/path). 비워두면 로컬 사본만 남는다.

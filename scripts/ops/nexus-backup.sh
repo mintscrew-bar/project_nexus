@@ -25,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ -r "${NEXUS_OPS_ENV:-$HOME/.config/nexus-ops.env}" ] && . "${NEXUS_OPS_ENV:-$HOME/.config/nexus-ops.env}"
 
 BACKUP_DIR="${NEXUS_BACKUP_DIR:-$HOME/nexus-backups}"
-KEEP_DAILY="${NEXUS_BACKUP_KEEP_DAILY:-14}"   # core 일간 보관 개수 (작아서 넉넉히 둔다)
+KEEP_DAILY="${NEXUS_BACKUP_KEEP_DAILY:-7}"   # core 일간 보관 개수 — 하루 1GB 라 7개(R2 에는 30일 따로 남는다)
 KEEP_WEEKLY="${NEXUS_BACKUP_KEEP_WEEKLY:-3}"  # full 주간 보관 개수
 # 매일 full 을 뜨고 싶으면 1 로 둔다 (덤프 시간·용량이 크게 늘어난다)
 FULL_EVERY_RUN="${NEXUS_BACKUP_FULL_EVERY_RUN:-0}"
