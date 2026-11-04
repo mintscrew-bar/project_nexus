@@ -81,8 +81,8 @@ export function PubgRankingPage() {
             배그 내전 기록 기반 랭킹 — 누적 포인트 순
           </p>
           <p className="mt-1 text-xs text-text-tertiary">
-            팀 성적이 팀원 전원에게 같이 쌓입니다. 순위는 스크림마다 총점 →
-            킬 순으로 가립니다.
+            팀 성적이 팀원 전원에게 같이 쌓입니다. 순위는 스크림마다 총점 → 킬
+            순으로 가립니다.
           </p>
         </div>
       </div>
