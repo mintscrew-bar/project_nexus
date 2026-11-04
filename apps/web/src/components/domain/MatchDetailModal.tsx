@@ -4,11 +4,11 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
-import { Loader2, Swords, Trophy, Copy, ShieldCheck, AlertCircle, Star, Sword } from 'lucide-react';
+import { Loader2, Swords, Trophy, Copy, ShieldCheck, AlertCircle, Sword } from 'lucide-react';
 import { Match, SideTag, getTeamDisplayName, getTeamSide } from './BracketView';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
-import { matchApi, reputationApi } from '@/lib/api-client';
+import { matchApi } from '@/lib/api-client';
 import { connectMatchSocket, matchSocketHelpers } from '@/lib/socket-client';
 import { MatchRpsFlow, type RpsStateData, type RpsRevealData, type RpsHand } from './MatchRpsFlow';
 import { ChampionIcon, PositionIcon, POSITION_LABELS } from '@/app/[game]/tournaments/[id]/lobby/_components/icons';
@@ -53,31 +53,6 @@ interface MatchMember {
   };
 }
 
-interface VoteCandidate {
-  user: { id: string; username: string; avatar?: string | null };
-  count: number;
-}
-
-interface VoteData {
-  mvp: VoteCandidate[];
-  ace: VoteCandidate[];
-  myVotes: { mvp: string | null; ace: string | null } | null;
-}
-
-type RatingForm = {
-  skillRating: number;
-  attitudeRating: number;
-  communicationRating: number;
-  comment: string;
-};
-
-const DEFAULT_RATING_FORM: RatingForm = {
-  skillRating: 5,
-  attitudeRating: 5,
-  communicationRating: 5,
-  comment: '',
-};
-
 interface FullMatchDetails {
   teamA?: { id: string; name: string; captain?: { id: string; username: string }; members: MatchMember[] };
   teamB?: { id: string; name: string; captain?: { id: string; username: string }; members: MatchMember[] };
@@ -105,15 +80,7 @@ export function MatchDetailModal({
   const [isReporting, setIsReporting] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [fullMatch, setFullMatch] = useState<FullMatchDetails | null>(null);
-  const [voteData, setVoteData] = useState<VoteData | null>(null);
-  const [isLoadingVotes, setIsLoadingVotes] = useState(false);
-  const [submittingVote, setSubmittingVote] = useState<'MVP' | 'ACE' | null>(null);
-  const [voteError, setVoteError] = useState<string | null>(null);
-  const [ratingTargetId, setRatingTargetId] = useState<string | null>(null);
-  const [ratingForm, setRatingForm] = useState<RatingForm>(DEFAULT_RATING_FORM);
-  const [submittingRating, setSubmittingRating] = useState(false);
-  const [ratingError, setRatingError] = useState<string | null>(null);
-  const [ratingSubmittedIds, setRatingSubmittedIds] = useState<Set<string>>(new Set());
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   // 가위바위보 진영 결정
   const [rps, setRps] = useState<RpsStateData | null>(null);
@@ -137,12 +104,6 @@ export function MatchDetailModal({
     setRpsReadyState(null);
     rpsSeqRef.current = 0;
     setReportError(null);
-    setVoteError(null);
-    setRatingTargetId(null);
-    setRatingForm(DEFAULT_RATING_FORM);
-    setSubmittingRating(false);
-    setRatingError(null);
-    setRatingSubmittedIds(new Set());
     setIsStarting(false);
     setIsReporting(false);
   }, [match?.id]);
@@ -208,76 +169,27 @@ export function MatchDetailModal({
     }
   }, [currentGameStatus]);
 
-  const fetchVoteData = useCallback(async (matchId: string) => {
+  // 라인별 로스터에 쓰는 매치 상세.
+  // MVP/ACE 투표와 별점 평가는 없앴다 — MVP/ACE 는 Riot 기록으로 자동으로 정하고
+  // (api match/auto-mvp.util), 평판은 경기 뒤 칭찬 창(CommendationPrompt)이 받는다.
+  const fetchMatchDetails = useCallback(async (matchId: string) => {
     try {
-      const [details, votes] = await Promise.all([
-        matchApi.getMatch(matchId),
-        matchApi.getMatchVotes(matchId),
-      ]);
-      setFullMatch(details);
-      setVoteData(votes);
+      setFullMatch(await matchApi.getMatch(matchId));
     } catch {
-      setVoteError('투표 정보를 불러올 수 없습니다.');
+      setFullMatch(null);
     } finally {
-      setIsLoadingVotes(false);
+      setIsLoadingDetails(false);
     }
   }, []);
 
-  // 매치 열릴 때마다 라인별 멤버 데이터 로드 (모든 상태). COMPLETED일 때만 투표 정보도 함께.
+  // 매치 열릴 때마다 라인별 멤버 데이터 로드
   useEffect(() => {
     if (isOpen && match?.id) {
-      setIsLoadingVotes(true);
-      setVoteData(null);
+      setIsLoadingDetails(true);
       setFullMatch(null);
-      fetchVoteData(match.id);
+      fetchMatchDetails(match.id);
     }
-  }, [isOpen, match?.id, fetchVoteData]);
-
-  const handleVote = async (votedForId: string, voteType: 'MVP' | 'ACE') => {
-    if (!match) return;
-    setSubmittingVote(voteType);
-    setVoteError(null);
-    try {
-      await matchApi.submitVote(match.id, { votedForId, voteType });
-      const votes = await matchApi.getMatchVotes(match.id);
-      setVoteData(votes);
-    } catch (err: any) {
-      setVoteError(err?.response?.data?.message || '투표에 실패했습니다.');
-    } finally {
-      setSubmittingVote(null);
-    }
-  };
-
-  const handleSubmitRating = async () => {
-    if (!match || !ratingTargetId) return;
-    setSubmittingRating(true);
-    setRatingError(null);
-    try {
-      await reputationApi.rateUser({
-        targetUserId: ratingTargetId,
-        matchId: match.id,
-        skillRating: ratingForm.skillRating,
-        attitudeRating: ratingForm.attitudeRating,
-        communicationRating: ratingForm.communicationRating,
-        comment: ratingForm.comment.trim() || undefined,
-      });
-      setRatingSubmittedIds((prev) => new Set(prev).add(ratingTargetId));
-      setRatingTargetId(null);
-      setRatingForm(DEFAULT_RATING_FORM);
-    } catch (err: any) {
-      const status = err?.response?.status;
-      if (status === 409) {
-        setRatingSubmittedIds((prev) => new Set(prev).add(ratingTargetId));
-      }
-      setRatingError(
-        status === 409
-          ? '이미 이 유저를 평가했습니다.'
-          : err?.response?.data?.message || '평점 저장에 실패했습니다.',
-      );
-    } finally {
-      setSubmittingRating(false);
-    }
-  };
+  }, [isOpen, match?.id, fetchMatchDetails]);
 
   if (!match) return null;
 
@@ -488,53 +400,6 @@ export function MatchDetailModal({
           )}
         </div>
 
-        {/* MVP / ACE 투표 */}
-        {match.status === 'COMPLETED' && (
-          <div className="pt-2">
-            <h3 className="text-md font-semibold mb-3 text-text-primary flex items-center gap-2">
-              <Star className="h-4 w-4 text-accent-gold" />
-              MVP / ACE 투표
-            </h3>
-            {isLoadingVotes ? (
-              <div className="flex justify-center py-4">
-                <Loader2 className="h-5 w-5 animate-spin text-text-secondary" />
-              </div>
-            ) : fullMatch ? (
-              <VotePanels
-                fullMatch={fullMatch}
-                voteData={voteData}
-                currentUserId={user?.id}
-                submittingVote={submittingVote}
-                onVote={handleVote}
-              />
-            ) : null}
-            {voteError && (
-              <Alert variant="destructive" className="mt-2">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{voteError}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-        )}
-
-        {match.status === 'COMPLETED' && fullMatch && (
-          <RatingPanel
-            fullMatch={fullMatch}
-            currentUserId={user?.id}
-            selectedUserId={ratingTargetId}
-            form={ratingForm}
-            submittedIds={ratingSubmittedIds}
-            isSubmitting={submittingRating}
-            error={ratingError}
-            onSelect={(targetId) => {
-              setRatingTargetId(targetId);
-              setRatingError(null);
-            }}
-            onChange={setRatingForm}
-            onSubmit={handleSubmitRating}
-          />
-        )}
-
         {currentGameStatus === 'PENDING' && !rpsActive && match.team1 && match.team2 && (() => {
           const captainAId = rpsReadyState?.captainAId ?? match.team1.captain?.id;
           const captainBId = rpsReadyState?.captainBId ?? match.team2.captain?.id;
@@ -640,7 +505,7 @@ export function MatchDetailModal({
             fallbackTeam1Name={getTeamDisplayName(match.team1)}
             fallbackTeam2Name={getTeamDisplayName(match.team2)}
             winnerId={fullMatch?.winnerId}
-            isLoading={!fullMatch && isLoadingVotes}
+            isLoading={!fullMatch && isLoadingDetails}
             onOpenProfile={setProfileUserId}
           />
         </div>
@@ -653,355 +518,6 @@ export function MatchDetailModal({
       </div>
       <PlayerProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </Modal>
-  );
-}
-
-// ========================================
-// RatingPanel — 매치 참가자 상호 평점 UI
-// ========================================
-
-function RatingPanel({
-  fullMatch,
-  currentUserId,
-  selectedUserId,
-  form,
-  submittedIds,
-  isSubmitting,
-  error,
-  onSelect,
-  onChange,
-  onSubmit,
-}: {
-  fullMatch: FullMatchDetails;
-  currentUserId?: string;
-  selectedUserId: string | null;
-  form: RatingForm;
-  submittedIds: Set<string>;
-  isSubmitting: boolean;
-  error: string | null;
-  onSelect: (userId: string) => void;
-  onChange: (form: RatingForm) => void;
-  onSubmit: () => void;
-}) {
-  const allMembers = [
-    ...(fullMatch.teamA?.members ?? []),
-    ...(fullMatch.teamB?.members ?? []),
-  ];
-  const isCurrentUserParticipant = allMembers.some((member) => member.user.id === currentUserId);
-  const rateableMembers = allMembers.filter((member) => member.user.id !== currentUserId);
-  const selectedMember = rateableMembers.find((member) => member.user.id === selectedUserId) ?? null;
-  const selectedAlreadySubmitted = !!selectedUserId && submittedIds.has(selectedUserId);
-
-  return (
-    <div className="pt-4 border-t border-bg-tertiary space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-md font-semibold text-text-primary flex items-center gap-2">
-          <Star className="h-4 w-4 text-accent-gold" />
-          참가자 평점
-        </h3>
-        <Badge variant="secondary" size="sm">매치 기록</Badge>
-      </div>
-
-      {!isCurrentUserParticipant ? (
-        <p className="rounded-lg bg-bg-tertiary px-3 py-2 text-center text-xs text-text-tertiary">
-          참가자만 평점을 남길 수 있습니다.
-        </p>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {rateableMembers.map(({ user: member }) => {
-              const isSelected = selectedUserId === member.id;
-              const isSubmitted = submittedIds.has(member.id);
-
-              return (
-                <button
-                  key={member.id}
-                  type="button"
-                  className={cn(
-                    "min-w-0 rounded-lg border px-2 py-2 text-left transition-colors",
-                    isSelected
-                      ? "border-accent-gold bg-accent-gold/10"
-                      : "border-bg-tertiary bg-bg-secondary hover:bg-bg-tertiary",
-                  )}
-                  onClick={() => onSelect(member.id)}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-xs font-medium text-text-primary">{member.username}</span>
-                    {isSubmitted && <span className="text-[10px] font-semibold text-accent-success">완료</span>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {selectedMember ? (
-            <div className="rounded-lg bg-bg-tertiary p-3 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-text-primary">{selectedMember.user.username}</p>
-                  <p className="text-xs text-text-tertiary">1점부터 5점까지 선택</p>
-                </div>
-                {selectedAlreadySubmitted && <Badge variant="success" size="sm">평가 완료</Badge>}
-              </div>
-
-              <div className="space-y-2">
-                <RatingRow
-                  label="실력"
-                  value={form.skillRating}
-                  disabled={selectedAlreadySubmitted || isSubmitting}
-                  onChange={(value) => onChange({ ...form, skillRating: value })}
-                />
-                <RatingRow
-                  label="태도"
-                  value={form.attitudeRating}
-                  disabled={selectedAlreadySubmitted || isSubmitting}
-                  onChange={(value) => onChange({ ...form, attitudeRating: value })}
-                />
-                <RatingRow
-                  label="소통"
-                  value={form.communicationRating}
-                  disabled={selectedAlreadySubmitted || isSubmitting}
-                  onChange={(value) => onChange({ ...form, communicationRating: value })}
-                />
-              </div>
-
-              <textarea
-                value={form.comment}
-                maxLength={500}
-                disabled={selectedAlreadySubmitted || isSubmitting}
-                onChange={(event) => onChange({ ...form, comment: event.target.value })}
-                placeholder="선택 사항 메모"
-                className="min-h-[72px] w-full resize-none rounded-lg border border-bg-secondary bg-bg-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:border-accent-primary focus:outline-none disabled:opacity-60"
-              />
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button
-                type="button"
-                className="w-full"
-                size="sm"
-                variant="gold"
-                disabled={selectedAlreadySubmitted || isSubmitting}
-                onClick={onSubmit}
-              >
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4" />}
-                평점 저장
-              </Button>
-            </div>
-          ) : (
-            <p className="rounded-lg bg-bg-tertiary px-3 py-2 text-center text-xs text-text-tertiary">
-              평점을 남길 참가자를 선택하세요.
-            </p>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function RatingRow({
-  label,
-  value,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  disabled: boolean;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="w-10 text-xs font-medium text-text-secondary">{label}</span>
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5].map((score) => {
-          const isActive = score <= value;
-          return (
-            <button
-              key={score}
-              type="button"
-              className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-60",
-                isActive ? "text-accent-gold hover:bg-accent-gold/10" : "text-text-tertiary hover:bg-bg-secondary",
-              )}
-              aria-label={`${label} ${score}점`}
-              disabled={disabled}
-              onClick={() => onChange(score)}
-            >
-              <Star className={cn("h-4 w-4", isActive && "fill-current")} />
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ========================================
-// VotePanels — MVP(이긴 팀) / ACE(진 팀) 투표 UI
-// ========================================
-
-function VotePanels({
-  fullMatch,
-  voteData,
-  currentUserId,
-  submittingVote,
-  onVote,
-}: {
-  fullMatch: FullMatchDetails;
-  voteData: VoteData | null;
-  currentUserId?: string;
-  submittingVote: 'MVP' | 'ACE' | null;
-  onVote: (votedForId: string, voteType: 'MVP' | 'ACE') => void;
-}) {
-  const winnerTeam = fullMatch.winnerId === fullMatch.teamA?.id ? fullMatch.teamA : fullMatch.teamB;
-  const loserTeam = fullMatch.winnerId === fullMatch.teamA?.id ? fullMatch.teamB : fullMatch.teamA;
-
-  const mvpVotedFor = voteData?.myVotes?.mvp ?? null;
-  const aceVotedFor = voteData?.myVotes?.ace ?? null;
-
-  const getVoteCount = (type: 'MVP' | 'ACE', userId: string) => {
-    const list = type === 'MVP' ? voteData?.mvp : voteData?.ace;
-    return list?.find(v => v.user.id === userId)?.count ?? 0;
-  };
-
-  const maxCount = (type: 'MVP' | 'ACE') => {
-    const list = type === 'MVP' ? voteData?.mvp : voteData?.ace;
-    return Math.max(1, ...(list?.map(v => v.count) ?? [0]));
-  };
-
-  // 투표 자격: 이긴 팀/진 팀 어느 쪽이든 매치 참가자이면 모든 컬럼에 투표 가능
-  const allMembers = [
-    ...(fullMatch.teamA?.members ?? []),
-    ...(fullMatch.teamB?.members ?? []),
-  ];
-  const isCurrentUserParticipant = allMembers.some(m => m.user.id === currentUserId);
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <VoteColumn
-        title="MVP"
-        subtitle={winnerTeam ? getTeamDisplayName({ id: winnerTeam.id, name: winnerTeam.name, captain: winnerTeam.captain }) : '이긴 팀'}
-        icon={<Trophy className="h-4 w-4 text-accent-gold" />}
-        members={winnerTeam?.members ?? []}
-        voteType="MVP"
-        votedForId={mvpVotedFor}
-        isParticipant={isCurrentUserParticipant}
-        currentUserId={currentUserId}
-        getVoteCount={(id) => getVoteCount('MVP', id)}
-        maxCount={maxCount('MVP')}
-        isSubmitting={submittingVote !== null}
-        onVote={onVote}
-      />
-      <VoteColumn
-        title="ACE"
-        subtitle={loserTeam ? getTeamDisplayName({ id: loserTeam.id, name: loserTeam.name, captain: loserTeam.captain }) : '진 팀'}
-        icon={<Sword className="h-4 w-4 text-text-secondary" />}
-        members={loserTeam?.members ?? []}
-        voteType="ACE"
-        votedForId={aceVotedFor}
-        isParticipant={isCurrentUserParticipant}
-        currentUserId={currentUserId}
-        getVoteCount={(id) => getVoteCount('ACE', id)}
-        maxCount={maxCount('ACE')}
-        isSubmitting={submittingVote !== null}
-        onVote={onVote}
-      />
-    </div>
-  );
-}
-
-function VoteColumn({
-  title, subtitle, icon, members, voteType,
-  votedForId, isParticipant, currentUserId, getVoteCount, maxCount, isSubmitting, onVote,
-}: {
-  title: string;
-  subtitle: string;
-  icon: React.ReactNode;
-  members: MatchMember[];
-  voteType: 'MVP' | 'ACE';
-  votedForId: string | null;
-  isParticipant: boolean;
-  currentUserId?: string;
-  getVoteCount: (userId: string) => number;
-  maxCount: number;
-  isSubmitting: boolean;
-  onVote: (votedForId: string, voteType: 'MVP' | 'ACE') => void;
-}) {
-  const hasVoted = votedForId !== null;
-
-  return (
-    <div className="bg-bg-tertiary rounded-lg p-3 space-y-2">
-      <div className="flex items-center gap-1.5 mb-2">
-        {icon}
-        <span className="font-semibold text-sm text-text-primary">{title}</span>
-        <span className="text-xs text-text-secondary truncate">· {subtitle}</span>
-      </div>
-      {members.map(({ user: member }) => {
-        const count = getVoteCount(member.id);
-        const isVotedFor = votedForId === member.id;
-        const isMe = member.id === currentUserId;
-        // 본인 팀 내 본인은 투표 불가, 이미 투표했으면 불가
-        const canVote = isParticipant && !hasVoted && !isMe;
-
-        return (
-          <button
-            key={member.id}
-            className={`w-full text-left rounded-md px-2 py-1.5 transition-all ${
-              isVotedFor
-                ? 'bg-accent-gold/20 ring-1 ring-accent-gold/50'
-                : canVote
-                  ? 'hover:bg-bg-secondary cursor-pointer'
-                  : 'cursor-default'
-            }`}
-            onClick={() => canVote && onVote(member.id, voteType)}
-            disabled={!canVote || isSubmitting}
-          >
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <div className="w-5 h-5 rounded-full bg-bg-secondary overflow-hidden flex items-center justify-center text-xs font-bold text-text-secondary flex-shrink-0">
-                  {member.avatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={member.avatar} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    member.username.charAt(0).toUpperCase()
-                  )}
-                </div>
-                <span className={`text-xs truncate ${isVotedFor ? 'text-accent-gold font-semibold' : 'text-text-primary'}`}>
-                  {member.username}
-                  {isMe && <span className="text-text-tertiary ml-1">(나)</span>}
-                </span>
-              </div>
-              {isVotedFor && <span className="text-accent-gold text-xs flex-shrink-0">✓</span>}
-              {hasVoted && <span className="text-xs text-text-secondary flex-shrink-0">{count}</span>}
-            </div>
-            {/* 득표 진행 바 — 투표 후에만 표시 */}
-            {hasVoted && (
-              <div className="w-full bg-bg-secondary rounded-full h-1">
-                <div
-                  className={`h-1 rounded-full transition-all ${isVotedFor ? 'bg-accent-gold' : 'bg-text-tertiary'}`}
-                  style={{ width: `${(count / maxCount) * 100}%` }}
-                />
-              </div>
-            )}
-          </button>
-        );
-      })}
-      {!isParticipant && (
-        <p className="text-xs text-text-tertiary text-center pt-1">참가자만 투표 가능</p>
-      )}
-      {isParticipant && hasVoted && (
-        <p className="text-xs text-text-secondary text-center pt-1">투표 완료</p>
-      )}
-      {isParticipant && !hasVoted && (
-        <p className="text-xs text-text-tertiary text-center pt-1">클릭하여 투표</p>
-      )}
-    </div>
   );
 }
 

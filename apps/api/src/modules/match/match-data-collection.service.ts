@@ -3,6 +3,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RiotMatchService, MatchDto } from "../riot/riot-match.service";
 import { RankingService } from "../ranking/ranking.service";
 import { normalizeRiotPosition } from "./position-normalizer";
+import { applyAutoMvpAce } from "./auto-mvp.util";
 import { MAX_COLLECT_ATTEMPTS } from "./match-collect.constants";
 
 type CrossrefExpectedMember = {
@@ -634,6 +635,9 @@ export class MatchDataCollectionService {
             },
           });
         }
+
+        // 투표 대신 방금 저장한 기록으로 MVP·ACE 를 매긴다 (auto-mvp.util)
+        await applyAutoMvpAce(tx, matchId);
 
         await tx.match.update({
           where: { id: matchId },

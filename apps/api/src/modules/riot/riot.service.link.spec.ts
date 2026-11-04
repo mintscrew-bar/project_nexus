@@ -8,7 +8,17 @@ import { RiotService } from "./riot.service";
 describe("RiotService.linkUnclaimedMatchParticipants", () => {
   const makeService = (count: number) => {
     const prisma = {
-      matchParticipant: { updateMany: jest.fn().mockResolvedValue({ count }) },
+      matchParticipant: {
+        updateMany: jest.fn().mockResolvedValue({ count }),
+        // 연결할 경기 목록 — 자동 MVP·ACE 재계산 대상
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce(
+            Array.from({ length: count }, () => ({ matchId: "m1" })),
+          )
+          .mockResolvedValue([]),
+      },
+      match: { update: jest.fn().mockResolvedValue(undefined) },
       statsRecomputeQueue: { upsert: jest.fn().mockResolvedValue(undefined) },
     };
     // 생성자 의존성이 많아 프로토타입으로 만들고 필요한 것만 꽂는다
@@ -31,7 +41,8 @@ describe("RiotService.linkUnclaimedMatchParticipants", () => {
     });
     expect(prisma.statsRecomputeQueue.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userId: "user-1" } }),
-    );
+    ); // 같은 경기는 한 번만 MVP·ACE 를 다시 매긴다 (참가자 기록이 비어 있어 갱신은 없음)
+    expect(prisma.matchParticipant.findMany).toHaveBeenCalledTimes(2);
   });
 
   it("연결할 기록이 없으면 통계 재계산을 걸지 않는다", async () => {

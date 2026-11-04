@@ -15,8 +15,10 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { ReputationService } from "./reputation.service";
+import { CommendationService } from "./commendation.service";
 import {
   BanUserDto,
+  SubmitCommendationsDto,
   SubmitRatingDto,
   SubmitReportDto,
   UpdateReportStatusDto,
@@ -25,7 +27,32 @@ import { UserRole } from "@nexus/database";
 
 @Controller("reputation")
 export class ReputationController {
-  constructor(private readonly reputationService: ReputationService) {}
+  constructor(
+    private readonly reputationService: ReputationService,
+    private readonly commendationService: CommendationService,
+  ) {}
+
+  // ========================================
+  // Commendation (경기 뒤 칭찬)
+  // ========================================
+
+  /** 아직 칭찬 창을 안 끝낸 가장 최근 경기 (없으면 null) */
+  @Get("commendations/pending")
+  @UseGuards(JwtAuthGuard)
+  async getPendingCommendation(@CurrentUser("sub") userId: string) {
+    return this.commendationService.getPending(userId);
+  }
+
+  /** 칭찬 제출 — 빈 목록이면 건너뛰기 */
+  @Post("commendations")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async submitCommendations(
+    @CurrentUser("sub") userId: string,
+    @Body() dto: SubmitCommendationsDto,
+  ) {
+    return this.commendationService.submit(userId, dto);
+  }
 
   // ========================================
   // Rating System

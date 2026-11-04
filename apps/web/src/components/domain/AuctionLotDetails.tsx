@@ -2,7 +2,8 @@
 
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Star, Timer } from "lucide-react";
+import { AlertTriangle, ThumbsUp, Timer } from "lucide-react";
+import { commendationTagLabel } from "@/lib/commendation";
 import { Avatar, Badge } from "@/components/ui";
 import { TierBadge } from "./TierBadge";
 import { cn, getTierColor } from "@/lib/utils";
@@ -225,24 +226,28 @@ export function AuctionLotDetails({
       }
     />
   );
+  // 평판 = 받은 칭찬 수 + 가장 많이 받은 태그 (별점은 칭찬으로 바뀌었다)
+  const commendations = reputation?.commendations;
   const reputationCell = (
     <StatCell
       large
-      label="평판"
+      label="칭찬"
       value={
-        reputation && reputation.totalRatings > 0 ? (
+        commendations && commendations.total > 0 ? (
           <span className="inline-flex items-center gap-1">
-            <Star className="h-3.5 w-3.5 fill-accent-gold text-accent-gold" />
-            {reputation.overallAverage.toFixed(1)}
+            <ThumbsUp className="h-3.5 w-3.5 text-accent-primary" />
+            {commendations.total}
           </span>
         ) : (
           "—"
         )
       }
       sub={
-        reputation && reputation.totalRatings > 0
-          ? `${reputation.totalRatings}명 평가`
-          : "평가 없음"
+        commendations && commendations.total > 0
+          ? commendations.topTags[0]
+            ? commendationTagLabel(commendations.topTags[0].tag)
+            : "받은 칭찬"
+          : "아직 없음"
       }
     />
   );

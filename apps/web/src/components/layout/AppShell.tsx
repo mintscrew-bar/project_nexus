@@ -13,6 +13,7 @@ import { CreatorPromoStrip } from "./CreatorPromoStrip";
 import { ActiveRoomBanner } from "./ActiveRoomBanner";
 import { RoomStartAlertModal } from "@/components/rooms/RoomStartAlertModal";
 import { RoomInvitePopup } from "@/components/rooms/RoomInvitePopup";
+import { CommendationPrompt } from "@/components/reputation/CommendationPrompt";
 import { IconCdnFallback } from "./IconCdnFallback";
 import { PubgSurfaceGrain } from "./PubgSurfaceGrain";
 import { useLobbyStore } from "@/stores/lobby-store";
@@ -263,6 +264,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <RoomStartAlertModal />
       {/* 친구가 보낸 내전 초대 — 왼쪽 아래. 어느 페이지에 있든 뜬다. */}
       <RoomInvitePopup />
+      {/* 경기 뒤 칭찬 창 — 경매·로비 등 진행 화면에서는 스스로 숨는다 */}
+      <CommendationPrompt />
       <IconCdnFallback />
     </div>
   );

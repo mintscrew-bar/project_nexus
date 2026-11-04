@@ -1,7 +1,12 @@
 "use client";
 
 import type { ElementType, ReactNode } from "react";
+import { ThumbsUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  commendationTagLabel,
+  type CommendationSummary,
+} from "@/lib/commendation";
 
 /**
  * 프로필 통계 공통 컴포넌트
@@ -192,8 +197,14 @@ export interface ReputationStats {
   averageAttitude?: number | null;
   averageCommunication?: number | null;
   overallAverage?: number | null;
+  /** 받은 칭찬 — 평판 표시는 별점에서 칭찬으로 바뀌었다 */
+  commendations?: CommendationSummary | null;
 }
 
+/**
+ * 평판 요약 — 경기 뒤 함께 뛴 사람들에게 받은 칭찬 수와 많이 받은 태그.
+ * 예전 별점(실력·태도·소통)은 아무도 남기지 않아(2026-11 실측 0건) 칭찬으로 바꿨다.
+ */
 export function ReputationSummary({
   stats,
   className,
@@ -201,45 +212,47 @@ export function ReputationSummary({
   stats?: ReputationStats | null;
   className?: string;
 }) {
-  const totalRatings = stats?.totalRatings ?? 0;
-  const overallAverage = clampRating(stats?.overallAverage);
-  const hasRatings = totalRatings > 0;
+  const total = stats?.commendations?.total ?? 0;
+  const topTags = stats?.commendations?.topTags ?? [];
 
   return (
     <div className={cn("space-y-3", className)}>
-      <div className="rounded-xl border border-accent-gold/20 bg-bg-tertiary p-4">
-        <div className="flex items-start justify-between gap-4">
+      <div className="rounded-xl border border-accent-primary/20 bg-bg-tertiary p-4">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold text-text-tertiary">종합 평가</p>
+            <p className="text-xs font-semibold text-text-tertiary">받은 칭찬</p>
             <div className="mt-1 flex items-end gap-1.5">
-              <span className="text-3xl font-black leading-none text-text-primary">{overallAverage.toFixed(1)}</span>
-              <span className="pb-0.5 text-xs font-semibold text-text-tertiary">/ 5</span>
+              <span className="text-3xl font-black leading-none text-text-primary">{total}</span>
+              <span className="pb-0.5 text-xs font-semibold text-text-tertiary">회</span>
             </div>
           </div>
-          <div className="text-right">
-            <RatingStars value={overallAverage} />
-            <p className="mt-2 text-xs font-semibold text-text-tertiary">
-              {hasRatings ? `${totalRatings}개 평가` : "평가 없음"}
-            </p>
-          </div>
+          <ThumbsUp className={cn("h-8 w-8", total > 0 ? "text-accent-primary" : "text-text-muted")} />
         </div>
       </div>
 
-      {hasRatings ? (
+      {topTags.length > 0 ? (
         <div className="rounded-xl border border-bg-elevated bg-bg-tertiary/50 p-3">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs font-bold text-text-secondary">세부 항목</p>
-            <p className="text-[11px] font-semibold text-text-muted">5점 만점</p>
-          </div>
+          <p className="mb-3 text-xs font-bold text-text-secondary">많이 받은 칭찬</p>
           <div className="space-y-2.5">
-            <RepBar label="실력" value={stats?.averageSkill ?? 0} />
-            <RepBar label="태도" value={stats?.averageAttitude ?? 0} />
-            <RepBar label="소통" value={stats?.averageCommunication ?? 0} />
+            {topTags.map(({ tag, count }) => (
+              <div key={tag} className="flex items-center gap-3">
+                <span className="w-16 flex-shrink-0 text-xs font-semibold text-text-secondary">
+                  {commendationTagLabel(tag)}
+                </span>
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg-elevated">
+                  <div
+                    className="h-full rounded-full bg-accent-primary"
+                    style={{ width: `${Math.round((count / Math.max(1, total)) * 100)}%` }}
+                  />
+                </div>
+                <span className="w-6 text-right text-xs font-bold text-text-primary">{count}</span>
+              </div>
+            ))}
           </div>
         </div>
       ) : (
         <p className="rounded-xl border border-bg-elevated bg-bg-tertiary/50 px-3 py-4 text-center text-xs font-semibold text-text-tertiary">
-          완료된 매치에서 받은 평가가 아직 없습니다
+          {total > 0 ? "태그 없이 받은 칭찬만 있습니다" : "내전이 끝나면 함께 뛴 사람들이 칭찬을 남길 수 있습니다"}
         </p>
       )}
     </div>

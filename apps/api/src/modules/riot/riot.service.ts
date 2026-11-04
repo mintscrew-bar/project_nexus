@@ -23,6 +23,7 @@ import {
   toStoredPeakTier,
 } from "./riot-rank.util";
 import { RiotRateLimiterService } from "./riot-rate-limiter.service";
+import { applyAutoMvpAce } from "../match/auto-mvp.util";
 import { SingleFlight } from "@/common/utils/single-flight";
 
 // 티어별 포인트 (팀 밸런싱, 경매 선수 가치 산정에 사용)
@@ -180,10 +181,20 @@ export class RiotService {
     userId: string,
     puuid: string,
   ): Promise<number> {
+    const where = { puuid, userId: null, match: { isInternal: true } };
+    // 연결 전에 어느 경기인지 잡아 둔다 — 그 경기들의 MVP·ACE 를 다시 매긴다.
+    // 미연동이라 비워 둔 MVP 자리가 이 사람이었다면 이제 채워진다.
+    const claimed = await this.prisma.matchParticipant.findMany({
+      where,
+      select: { matchId: true },
+    });
     const { count } = await this.prisma.matchParticipant.updateMany({
-      where: { puuid, userId: null, match: { isInternal: true } },
+      where,
       data: { userId },
     });
+    for (const matchId of new Set(claimed.map((row) => row.matchId))) {
+      await applyAutoMvpAce(this.prisma, matchId);
+    }
     if (count > 0) {
       this.logger.log(
         `주인 없는 내전 기록 ${count}건을 연결 userId=${userId} puuid=${puuid}`,

@@ -10,6 +10,7 @@ import { ReportReason, ReportStatus } from "../community/community.types";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { MatchStatus } from "@nexus/database";
 import { resolveMatchMembers } from "../match/match-roster.util";
+import { summarizeCommendations } from "./commendation.service";
 
 export interface SubmitRatingDto {
   targetUserId: string;
@@ -149,9 +150,17 @@ export class ReputationService {
   }
 
   async getUserReputationStats(userId: string) {
-    const ratings = await this.prisma.userRating.findMany({
-      where: { targetUserId: userId },
-    });
+    const [ratings, commendationMap] = await Promise.all([
+      this.prisma.userRating.findMany({
+        where: { targetUserId: userId },
+      }),
+      // 평판 표시는 칭찬으로 바뀌었다. 별점 필드는 옛 화면 호환용으로 남긴다.
+      summarizeCommendations(this.prisma, [userId]),
+    ]);
+    const commendations = commendationMap.get(userId) ?? {
+      total: 0,
+      topTags: [],
+    };
 
     if (ratings.length === 0) {
       return {
@@ -160,6 +169,7 @@ export class ReputationService {
         averageAttitude: 0,
         averageCommunication: 0,
         overallAverage: 0,
+        commendations,
       };
     }
 
@@ -188,6 +198,7 @@ export class ReputationService {
       averageAttitude: parseFloat(avgAttitude.toFixed(2)),
       averageCommunication: parseFloat(avgCommunication.toFixed(2)),
       overallAverage: parseFloat(overall.toFixed(2)),
+      commendations,
     };
   }
 

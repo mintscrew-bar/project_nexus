@@ -9,6 +9,11 @@ import { BalanceScoreService } from "../common/balance-score.service";
 import { Role } from "@nexus/database";
 import { resolveWinnerSlot } from "../match/match-roster.util";
 import { rankingScore } from "./ranking-score";
+import { applyAutoMvpAce } from "../match/auto-mvp.util";
+import {
+  summarizeCommendations,
+  type CommendationSummary,
+} from "../reputation/commendation.service";
 import {
   NO_TEST_BOT_MATCH_WHERE,
   TEST_BOT_USER_WHERE,
@@ -35,12 +40,13 @@ export interface RankingRowStats {
   avgAssists: number;
   /** (K+A)/D, 데스 0 이면 K+A */
   kda: number | null;
+  /** 내전 MVP 횟수 — Riot 기록으로 자동으로 정한다 (match/auto-mvp.util) */
+  mvpCount: number;
   /**
-   * 평판 — 함께 뛴 사람들이 경기 뒤 남긴 실력·태도·소통 평가(1~5)의 평균.
-   * 경매 매물 카드·프로필과 같은 값(reputation.service getUserReputationStats).
-   * 평가가 없으면 null.
+   * 평판 — 경기 뒤 함께 뛴 사람들이 남긴 칭찬 수와 많이 받은 태그.
+   * 경매 매물 카드·프로필과 같은 값(reputation/commendation.service).
    */
-  reputation: { average: number; count: number } | null;
+  commendations: CommendationSummary;
   /** 많이 한 챔피언 순 최대 3개 (Riot 챔피언 키) */
   topChampions: string[];
 }
@@ -443,8 +449,8 @@ export class RankingService implements OnApplicationBootstrap {
    * 승패는 로스터 스냅샷으로 세지만 K/D/A·챔피언은 Riot 이 준 경기
    * (match_participants)에만 있다. 그래서 statGames 가 판수보다 적을 수 있고,
    * 화면은 statGames 가 0 이면 지표 칸을 비운다.
-   * 라인 탭이면 KDA·챔피언은 그 라인(Riot 포지션)으로 뛴 경기만 센다.
-   * 평판은 사람에 대한 평가라 라인과 무관하게 전체 값을 쓴다.
+   * 라인 탭이면 그 라인으로 뛴 경기만 센다 — KDA·챔피언은 Riot 포지션,
+   * MVP 는 역할 선택에서 배정된 라인 기준. 칭찬은 사람에 대한 평가라 전체 값을 쓴다.
    */
   private async getRankingRowStats(
     userIds: string[],
@@ -464,43 +470,22 @@ export class RankingService implements OnApplicationBootstrap {
       ...(role ? { position: role } : {}),
     };
 
-    const [kdaRows, championRows, ratingRows] = await Promise.all([
-      this.prisma.matchParticipant.groupBy({
-        by: ["userId"],
-        where: participantWhere,
-        _sum: { kills: true, deaths: true, assists: true },
-        _count: { _all: true },
-      }),
-      this.prisma.matchParticipant.groupBy({
-        by: ["userId", "championName"],
-        where: participantWhere,
-        _count: { _all: true },
-      }),
-      this.prisma.userRating.groupBy({
-        by: ["targetUserId"],
-        where: { targetUserId: { in: userIds } },
-        _avg: {
-          skillRating: true,
-          attitudeRating: true,
-          communicationRating: true,
-        },
-        _count: { _all: true },
-      }),
-    ]);
-
-    // 세 항목 평균의 평균 — 평가마다 세 항목이 다 있어 전체 평균과 같다
-    const reputationByUser = new Map(
-      ratingRows.map((row) => {
-        const average =
-          ((row._avg.skillRating ?? 0) +
-            (row._avg.attitudeRating ?? 0) +
-            (row._avg.communicationRating ?? 0)) /
-          3;
-        return [
-          row.targetUserId,
-          { average: Math.round(average * 10) / 10, count: row._count._all },
-        ];
-      }),
+    const [kdaRows, championRows, mvpCounts, commendations] = await Promise.all(
+      [
+        this.prisma.matchParticipant.groupBy({
+          by: ["userId"],
+          where: participantWhere,
+          _sum: { kills: true, deaths: true, assists: true },
+          _count: { _all: true },
+        }),
+        this.prisma.matchParticipant.groupBy({
+          by: ["userId", "championName"],
+          where: participantWhere,
+          _count: { _all: true },
+        }),
+        this.countMvps(userIds, role, internalMatch),
+        summarizeCommendations(this.prisma, userIds),
+      ],
     );
 
     // 챔피언은 판수 많은 순, 같으면 이름순으로 3개
@@ -531,7 +516,8 @@ export class RankingService implements OnApplicationBootstrap {
         kda: games
           ? Math.round(((kills + assists) / Math.max(1, deaths)) * 100) / 100
           : null,
-        reputation: reputationByUser.get(userId) ?? null,
+        mvpCount: mvpCounts.get(userId) ?? 0,
+        commendations: commendations.get(userId) ?? { total: 0, topTags: [] },
         topChampions: (championsByUser.get(userId) ?? [])
           .sort((a, b) => b.games - a.games || a.name.localeCompare(b.name))
           .slice(0, 3)
@@ -539,6 +525,41 @@ export class RankingService implements OnApplicationBootstrap {
       });
     }
     return result;
+  }
+
+  /** 내전 MVP 횟수. 라인 탭이면 그 라인으로 배정된 경기에서 받은 것만 센다. */
+  private async countMvps(
+    userIds: string[],
+    role: Role | undefined,
+    internalMatch: object,
+  ): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    if (role) {
+      const rosters = await this.prisma.matchRosterSnapshot.findMany({
+        where: {
+          userId: { in: userIds },
+          assignedRole: role,
+          match: { ...internalMatch, mvpUserId: { in: userIds } },
+        },
+        select: { userId: true, match: { select: { mvpUserId: true } } },
+      });
+      for (const roster of rosters) {
+        if (roster.userId && roster.match.mvpUserId === roster.userId) {
+          counts.set(roster.userId, (counts.get(roster.userId) ?? 0) + 1);
+        }
+      }
+      return counts;
+    }
+
+    const rows = await this.prisma.match.groupBy({
+      by: ["mvpUserId"],
+      where: { ...internalMatch, mvpUserId: { in: userIds } },
+      _count: { _all: true },
+    });
+    for (const row of rows) {
+      if (row.mvpUserId) counts.set(row.mvpUserId, row._count._all);
+    }
+    return counts;
   }
 
   /**
@@ -648,6 +669,16 @@ export class RankingService implements OnApplicationBootstrap {
     // 재계산으로도 0 이 되지 않고 리더보드에 그대로 남는다(실측 58행 중 19행).
     // 재계산 전에 봇 행을 지워 둬야 순위 번호도 봇을 뺀 기준으로 매겨진다.
     const purgedBotRows = await this.purgeTestBotRankings();
+
+    // MVP·ACE 는 투표가 아니라 Riot 기록으로 정한다(match/auto-mvp.util). 투표로 정해졌거나
+    // 자동 계산이 생기기 전에 수집된 판도 같은 기준으로 맞춘다 — 랭킹 MVP 칸이 이 값을 센다.
+    const collectedMatches = await this.prisma.match.findMany({
+      where: { isInternal: true, dataCollected: true },
+      select: { id: true },
+    });
+    for (const { id } of collectedMatches) {
+      await applyAutoMvpAce(this.prisma, id);
+    }
 
     // 기존에 외부 인제스트 매치로 오염된 ranking row도 0으로 재계산되도록
     // 현재 랭킹 테이블 사용자와 내전 참여자를 모두 대상으로 삼는다.

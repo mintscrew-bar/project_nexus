@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import type { CommendationSummary } from "@/lib/commendation";
 import { getDdragonVersion } from "./ddragon";
 import type { GameTitle } from "@nexus/types";
 
@@ -667,7 +668,11 @@ export const userApi = {
       /** 내전 평균 킬관여율(%). 수집된 값이 없으면 null */
       killParticipation?: number | null;
     } | null;
-    reputation: { overallAverage: number; totalRatings: number };
+    reputation: {
+      overallAverage: number;
+      totalRatings: number;
+      commendations?: CommendationSummary;
+    };
   }> => {
     const response = await apiClient.get(`/users/${userId}/hover-profile`, {
       params: { game },
@@ -2083,7 +2088,40 @@ export const boardApi = {
 };
 
 // 평판/신고 관련 API
+/** 칭찬 창을 띄울 경기 (GET /reputation/commendations/pending) */
+export interface PendingCommendation {
+  matchId: string;
+  completedAt: string;
+  roomName: string | null;
+  gameNumber: number | null;
+  players: {
+    userId: string;
+    username: string;
+    avatar: string | null;
+    teamSlot: string;
+    teamName: string;
+    role: string | null;
+    championName: string | null;
+    isTeammate: boolean;
+  }[];
+}
+
 export const reputationApi = {
+  /** 아직 칭찬 창을 안 끝낸 가장 최근 경기. 없으면 null */
+  getPendingCommendation: async (): Promise<PendingCommendation | null> => {
+    const response = await apiClient.get("/reputation/commendations/pending");
+    return response.data || null;
+  },
+
+  /** 칭찬 제출 — 빈 목록이면 건너뛰기 */
+  submitCommendations: async (data: {
+    matchId: string;
+    commendations: { targetUserId: string; tags: string[] }[];
+  }) => {
+    const response = await apiClient.post("/reputation/commendations", data);
+    return response.data;
+  },
+
   rateUser: async (data: {
     targetUserId: string;
     matchId: string;
@@ -2114,6 +2152,8 @@ export const reputationApi = {
     averageAttitude: number;
     averageCommunication: number;
     overallAverage: number;
+    /** 평판 표시는 칭찬으로 바뀌었다 — 받은 칭찬 수와 많이 받은 태그 */
+    commendations?: CommendationSummary;
   }> => {
     const response = await apiClient.get(`/reputation/users/${userId}/stats`);
     return response.data;

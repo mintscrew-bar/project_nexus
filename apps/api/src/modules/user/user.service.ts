@@ -422,6 +422,8 @@ export class UserService {
       reputation: {
         overallAverage: reputation.overallAverage,
         totalRatings: reputation.totalRatings,
+        // 경매 매물 카드의 평판 칸은 칭찬 수를 보여준다
+        commendations: reputation.commendations,
       },
     };
   }

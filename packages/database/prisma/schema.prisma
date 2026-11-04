@@ -99,6 +99,9 @@ model User {
   termsAgreements                TermsAgreement[]
   ratingsGiven                   UserRating[]          @relation("RaterUser")
   ratingsReceived                UserRating[]          @relation("RatedUser")
+  commendationsGiven             UserCommendation[]    @relation("CommendationGiver")
+  commendationsReceived          UserCommendation[]    @relation("CommendationReceiver")
+  commendationSessions           CommendationSession[]
   reportsSubmitted               UserReport[]          @relation("ReporterUser")
   reportsReceived                UserReport[]          @relation("ReportedUser")
   settings                       UserSettings?
@@ -823,6 +826,8 @@ model Match {
   mvpUser              User?                 @relation("MatchMVP", fields: [mvpUserId], references: [id], onDelete: SetNull)
   aceUser              User?                 @relation("MatchACE", fields: [aceUserId], references: [id], onDelete: SetNull)
   ratings              UserRating[]
+  commendations        UserCommendation[]
+  commendationSessions CommendationSession[]
   reports              UserReport[]
 
   @@index([roomId])
@@ -1356,6 +1361,42 @@ model PostLike {
   @@unique([userId, postId])
   @@index([postId])
   @@map("post_likes")
+}
+
+/// 내전 칭찬 — 경기 뒤 함께 뛴 사람 중 최대 3명에게 남긴다. 나쁜 평가는 받지 않고
+/// 신고(UserReport)로만 처리한다. 별점(UserRating)을 대신한다 — 별점은 9명 × 3항목이라
+/// 아무도 남기지 않았고(2026-11 실측 0건), 낮은 점수는 아는 사이 다툼이 됐다.
+model UserCommendation {
+  id           String   @id @default(cuid())
+  giverId      String
+  targetUserId String
+  matchId      String
+  /// 선택 태그 (MANNER, SHOTCALL, CARRY, TEAMWORK, MENTAL) — commendation.constants.ts
+  tags         String[] @default([])
+  createdAt    DateTime @default(now())
+  giver        User     @relation("CommendationGiver", fields: [giverId], references: [id], onDelete: Cascade)
+  target       User     @relation("CommendationReceiver", fields: [targetUserId], references: [id], onDelete: Cascade)
+  match        Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([giverId, targetUserId, matchId])
+  @@index([targetUserId])
+  @@index([matchId])
+  @@map("user_commendations")
+}
+
+/// 경기별 칭찬 창을 "끝냈다"는 표시 — 칭찬을 남겼든 건너뛰었든 한 번만 묻는다.
+model CommendationSession {
+  id        String   @id @default(cuid())
+  userId    String
+  matchId   String
+  /// 아무도 고르지 않고 닫았으면 true
+  skipped   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matchId])
+  @@map("commendation_sessions")
 }
 
 model UserRating {

@@ -2,12 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Crown, Medal, Star } from "lucide-react";
+import { Crown, Medal, Star, ThumbsUp } from "lucide-react";
 import { getChampionKoreanName } from "@nexus/types";
 import {
   getChampionIcon,
   getTierImage,
 } from "@/components/matches/match-utils";
+import {
+  commendationTagLabel,
+  type CommendationSummary,
+} from "@/lib/commendation";
 
 /** API(GET /ranking/global) 한 행. 종합·라인별이 같은 모양이다. */
 export interface LolRankingEntry {
@@ -37,8 +41,10 @@ export interface LolRankingEntry {
     avgDeaths: number;
     avgAssists: number;
     kda: number | null;
-    /** 함께 뛴 사람들의 평가 평균(1~5). 평가가 없으면 null */
-    reputation: { average: number; count: number } | null;
+    /** Riot 기록으로 자동으로 정한 MVP 횟수 */
+    mvpCount: number;
+    /** 평판 — 경기 뒤 함께 뛴 사람들에게 받은 칭찬 */
+    commendations: CommendationSummary;
     topChampions: string[];
   } | null;
 }
@@ -224,20 +230,35 @@ export function LolRankingRow({
         )}
       </div>
 
-      {/* 평판 — 경매 매물 카드와 같은 별점 평균 */}
-      <div className="hidden w-[60px] flex-shrink-0 text-center sm:block">
-        {stats?.reputation ? (
+      {/* MVP — Riot 기록으로 자동 (이긴 팀 캐리 1위) */}
+      <div className="hidden w-[52px] flex-shrink-0 text-center sm:block">
+        <p
+          className={`flex items-center justify-center gap-0.5 text-sm font-bold ${
+            stats?.mvpCount ? "text-accent-gold" : "text-text-muted"
+          }`}
+        >
+          <Star className="h-3.5 w-3.5" />
+          {stats?.mvpCount ?? 0}
+        </p>
+        <p className="text-[10px] text-text-tertiary">MVP</p>
+      </div>
+
+      {/* 평판 — 받은 칭찬 수와 가장 많이 받은 태그 */}
+      <div className="hidden w-[68px] flex-shrink-0 text-center sm:block">
+        {stats?.commendations.total ? (
           <>
-            <p className="flex items-center justify-center gap-0.5 text-sm font-bold text-text-primary">
-              <Star className="h-3.5 w-3.5 fill-accent-gold text-accent-gold" />
-              {stats.reputation.average.toFixed(1)}
+            <p className="flex items-center justify-center gap-1 text-sm font-bold text-text-primary">
+              <ThumbsUp className="h-3.5 w-3.5 text-accent-primary" />
+              {stats.commendations.total}
             </p>
-            <p className="text-[10px] text-text-tertiary">
-              {stats.reputation.count}명 평가
+            <p className="truncate text-[10px] text-text-tertiary">
+              {stats.commendations.topTags[0]
+                ? commendationTagLabel(stats.commendations.topTags[0].tag)
+                : "칭찬"}
             </p>
           </>
         ) : (
-          <p className="text-xs text-text-muted">평가 없음</p>
+          <p className="text-xs text-text-muted">칭찬 없음</p>
         )}
       </div>
 

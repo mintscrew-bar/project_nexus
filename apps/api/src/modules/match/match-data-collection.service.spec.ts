@@ -690,6 +690,8 @@ describe("MatchDataCollectionService", () => {
         matchParticipant: {
           deleteMany: jest.fn().mockResolvedValue(undefined),
           create: jest.fn().mockResolvedValue(undefined),
+          // 자동 MVP·ACE 계산이 저장된 참가자를 다시 읽는다 (auto-mvp.util)
+          findMany: jest.fn().mockResolvedValue([]),
         },
         matchTeamStats: {
           deleteMany: jest.fn().mockResolvedValue(undefined),
@@ -839,6 +841,8 @@ describe("MatchDataCollectionService", () => {
           matchParticipant: {
             deleteMany: jest.fn().mockResolvedValue(undefined),
             create: jest.fn().mockResolvedValue(undefined),
+            // 자동 MVP·ACE 계산이 저장된 참가자를 다시 읽는다 (auto-mvp.util)
+            findMany: jest.fn().mockResolvedValue([]),
           },
           matchTeamStats: {
             deleteMany: jest.fn().mockResolvedValue(undefined),
