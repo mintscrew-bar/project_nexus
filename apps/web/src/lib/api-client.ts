@@ -2501,9 +2501,10 @@ export const rankingApi = {
   getPubgRanking: async (
     page: number = 1,
     limit: number = 50,
+    q?: string,
   ): Promise<PubgRankingResponse> => {
     const response = await apiClient.get("/pubg/ranking", {
-      params: { page, limit },
+      params: { page, limit, ...(q ? { q } : {}) },
     });
     return response.data;
   },

@@ -86,10 +86,20 @@ export class PubgController {
    */
   @Public()
   @Get("ranking")
-  getRanking(@Query("page") page?: string, @Query("limit") limit?: string) {
+  getRanking(
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+    @Query("q") q?: string,
+  ) {
     const parsedPage = Math.max(1, Number(page) || 1);
     const parsedLimit = Math.min(100, Math.max(1, Number(limit) || 50));
-    return this.rankingService.getRanking(parsedPage, parsedLimit);
+    // 닉네임 검색어 — 롤 랭킹과 같은 30자 상한. 배열로 들어오면(?q=a&q=b) 무시한다.
+    const search = typeof q === "string" ? q.trim().slice(0, 30) : undefined;
+    return this.rankingService.getRanking(
+      parsedPage,
+      parsedLimit,
+      search || undefined,
+    );
   }
 
   /**

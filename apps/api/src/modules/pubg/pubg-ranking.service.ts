@@ -21,11 +21,36 @@ const MIN_SCRIMS = 1;
 export class PubgRankingService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getRanking(page = 1, limit = 50) {
+  async getRanking(page = 1, limit = 50, q?: string) {
     const scrims = await this.loadScrims();
-    const ranked = sortPubgRanking(
+    // 순위 번호는 검색과 무관하게 전체 랭킹 기준이다 — 거르기 전에 매긴다.
+    let ranked = sortPubgRanking(
       aggregatePubgRanking(scrims).filter((row) => row.scrims >= MIN_SCRIMS),
-    );
+    ).map((row, index) => ({ row, rank: index + 1 }));
+
+    // 검색어가 있으면 사이트 닉네임 또는 PUBG 닉네임 부분 일치(대소문자 무시)로 거른다.
+    // 대상은 이미 랭킹에 오른 사람으로 한정해 전체 유저를 훑지 않는다.
+    const search = q?.trim();
+    if (search) {
+      const matched = await this.prisma.user.findMany({
+        where: {
+          id: { in: ranked.map(({ row }) => row.userId) },
+          OR: [
+            { username: { contains: search, mode: "insensitive" } },
+            {
+              pubgAccounts: {
+                some: {
+                  playerName: { contains: search, mode: "insensitive" },
+                },
+              },
+            },
+          ],
+        },
+        select: { id: true },
+      });
+      const matchedIds = new Set(matched.map((user) => user.id));
+      ranked = ranked.filter(({ row }) => matchedIds.has(row.userId));
+    }
 
     const total = ranked.length;
     const start = (page - 1) * limit;
@@ -34,7 +59,7 @@ export class PubgRankingService {
     // 이름·아바타는 순위에 오른 사람만 붙인다. 전체를 조인하면 참가자 전원을
     // 읽게 된다.
     const users = await this.prisma.user.findMany({
-      where: { id: { in: slice.map((row) => row.userId) } },
+      where: { id: { in: slice.map(({ row }) => row.userId) } },
       select: {
         id: true,
         username: true,
@@ -49,9 +74,9 @@ export class PubgRankingService {
     const byId = new Map(users.map((user) => [user.id, user]));
 
     return {
-      rankings: slice.map((row, index) => ({
+      rankings: slice.map(({ row, rank }) => ({
         ...row,
-        rank: start + index + 1,
+        rank,
         user: byId.get(row.userId) ?? null,
       })),
       total,
