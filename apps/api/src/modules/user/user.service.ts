@@ -5,13 +5,14 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { GameTitle, StreamerPlatform } from "@nexus/database";
+import { GameTitle, MatchStatus, StreamerPlatform } from "@nexus/database";
 import { PrismaService } from "../prisma/prisma.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { DiscordAdminAlertService } from "../discord/discord-admin-alert.service";
 import { ReputationService } from "../reputation/reputation.service";
 import { UploadService } from "../upload/upload.service";
 import { NO_TEST_BOT_MATCH_WHERE } from "../common/test-bot.util";
+import { resolveWinnerSlot } from "../match/match-roster.util";
 
 const STREAMER_PLATFORM_HOSTS: Record<StreamerPlatform, string[]> = {
   CHZZK: ["chzzk.naver.com"],
@@ -192,15 +193,33 @@ export class UserService {
     };
   }
 
+  /**
+   * 내전 승패 요약.
+   *
+   * 예전에는 팀 멤버(TeamMember) → 팀의 경기로 셌다. 그런데 방이 정리되면 팀과
+   * 팀 멤버가 함께 지워져(Cascade) 끝난 내전이 승패에서 통째로 사라졌다.
+   * 방이 지워져도 남는 로스터 스냅샷으로 센다 — 랭킹(computeInternalRecord)과 같은 근거다.
+   */
   async getUserStats(userId: string, _requesterId?: string) {
-    const teamMembers = await this.prisma.teamMember.findMany({
-      where: { userId },
-      include: {
-        team: {
-          include: {
-            // 봇을 채워 시험한 판은 승패에서 뺀다(test-bot.util 참고)
-            matchesAsTeamA: { where: NO_TEST_BOT_MATCH_WHERE },
-            matchesAsTeamB: { where: NO_TEST_BOT_MATCH_WHERE },
+    const rosters = await this.prisma.matchRosterSnapshot.findMany({
+      where: {
+        userId,
+        // 봇을 채워 시험한 판은 승패에서 뺀다(test-bot.util 참고)
+        match: { isInternal: true, ...NO_TEST_BOT_MATCH_WHERE },
+      },
+      select: {
+        teamSlot: true,
+        match: {
+          select: {
+            status: true,
+            roomId: true,
+            roomIdSnapshot: true,
+            winnerId: true,
+            winnerIdSnapshot: true,
+            teamAId: true,
+            teamBId: true,
+            teamAIdSnapshot: true,
+            teamBIdSnapshot: true,
           },
         },
       },
@@ -208,30 +227,29 @@ export class UserService {
 
     let wins = 0;
     let losses = 0;
+    for (const roster of rosters) {
+      if (roster.match.status !== MatchStatus.COMPLETED) continue;
+      // 결과가 입력되지 않은 경기는 승패에 넣지 않는다
+      const winnerSlot = resolveWinnerSlot(roster.match);
+      if (!winnerSlot) continue;
+      if (winnerSlot === roster.teamSlot) wins++;
+      else losses++;
+    }
 
-    teamMembers.forEach((tm: (typeof teamMembers)[number]) => {
-      if (!tm.team) return;
-
-      const teamMatches = [
-        ...tm.team.matchesAsTeamA,
-        ...tm.team.matchesAsTeamB,
-      ];
-
-      teamMatches.forEach((match) => {
-        if (match.winnerId === tm.team!.id) {
-          wins++;
-        } else if (match.winnerId) {
-          losses++;
-        }
-      });
-    });
+    // 참여 = 내전에 나간 방 수. 한 방에서 여러 판(대진)을 뛰어도 한 번으로 센다.
+    const rooms = new Set(
+      rosters.map(
+        (roster) => roster.match.roomIdSnapshot ?? roster.match.roomId,
+      ),
+    );
+    rooms.delete(null);
 
     return {
       gamesPlayed: wins + losses,
       wins,
       losses,
       winRate: wins + losses > 0 ? (wins / (wins + losses)) * 100 : 0,
-      participations: teamMembers.length,
+      participations: rooms.size,
     };
   }
 
@@ -323,10 +341,11 @@ export class UserService {
       // 내전 참여 기록(teamId 있는 것)에서 KDA 집계
       this.prisma.matchParticipant.aggregate({
         // 봇을 채워 시험한 판은 빼고 센다(test-bot.util 참고)
+        // 예전 조건(teamId 있음)은 방이 정리되면 팀이 지워져 teamId 가 비는 바람에
+        // 끝난 내전이 전부 빠졌다. 내전 여부로 가른다(챔피언 통계와 같은 기준).
         where: {
           userId,
-          teamId: { not: null },
-          match: NO_TEST_BOT_MATCH_WHERE,
+          match: { isInternal: true, ...NO_TEST_BOT_MATCH_WHERE },
         },
         // 경매 매물 카드가 KDA 아래에 내전 평균 피해량·CS·시야·골드를 함께 보여준다.
         _avg: {
