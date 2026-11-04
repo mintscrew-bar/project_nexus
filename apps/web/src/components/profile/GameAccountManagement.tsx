@@ -51,6 +51,7 @@ import {
 } from "@/components/ui";
 import {
   Star,
+  ThumbsUp,
   Plus,
   RefreshCw,
   Shield,
@@ -80,10 +81,10 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
+import { commendationTagLabel } from "@/lib/commendation";
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 import { ChannelVerifyModal } from "@/components/domain/ChannelVerifyModal";
 import {
-  RatingStars,
   WinRateSparkline,
   getCombinedProfileMetrics,
 } from "@/components/domain/ProfileStats";
@@ -758,10 +759,6 @@ function formatTimeAgo(value?: string) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}시간 전`;
   return `${Math.floor(hours / 24)}일 전`;
-}
-
-function clampRating(value?: number | null) {
-  return Math.max(0, Math.min(5, Number(value || 0)));
 }
 
 function ProfileOverviewStat({
@@ -1985,8 +1982,11 @@ function LolProfilePage() {
     recentMatches,
     rankedChampStats,
   });
-  const reputationAverage = clampRating(rep?.overallAverage);
-  const reputationCount = rep?.totalRatings ?? 0;
+  // 평판 = 받은 칭찬. 별점은 아무도 남기지 않아(2026-11 실측 0건) 칭찬으로 바뀌었다.
+  const commendationTotal: number = rep?.commendations?.total ?? 0;
+  const commendationTags: { tag: string; count: number }[] = (
+    rep?.commendations?.topTags ?? []
+  ).slice(0, 3);
 
   return (
     <div className="flex-grow p-4 md:p-8">
@@ -2307,11 +2307,11 @@ function LolProfilePage() {
                     내전+랭크 합산 지표
                   </p>
                 </div>
-                {reputationCount > 0 && (
-                  <RatingStars
-                    value={reputationAverage}
-                    className="text-base"
-                  />
+                {commendationTotal > 0 && (
+                  <span className="inline-flex items-center gap-1 text-sm font-bold text-accent-primary">
+                    <ThumbsUp className="h-4 w-4" />
+                    {commendationTotal}
+                  </span>
                 )}
               </div>
 
@@ -2359,28 +2359,38 @@ function LolProfilePage() {
               <div className="mt-4 rounded-lg border border-bg-tertiary bg-bg-primary/70 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-text-tertiary">
-                    <Star className="h-3.5 w-3.5 text-accent-gold" />
-                    평판
+                    <ThumbsUp className="h-3.5 w-3.5 text-accent-primary" />
+                    받은 칭찬
                   </div>
                   <span className="text-xs font-semibold text-text-tertiary">
-                    {reputationCount > 0
-                      ? `${reputationCount}개 평가`
-                      : "평가 없음"}
+                    경기 뒤 함께 뛴 사람들이 남긴 칭찬
                   </span>
                 </div>
                 <div className="mt-3 flex items-end justify-between gap-3">
-                  <div>
-                    <p className="text-2xl font-black leading-none text-text-primary">
-                      {reputationAverage.toFixed(1)}
+                  <p className="text-2xl font-black leading-none text-text-primary">
+                    {commendationTotal}
+                    <span className="ml-1 text-xs font-semibold text-text-tertiary">
+                      회
+                    </span>
+                  </p>
+                  {commendationTags.length > 0 ? (
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {commendationTags.map(({ tag, count }) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-accent-primary/15 px-2 py-0.5 text-[11px] font-semibold text-accent-primary"
+                        >
+                          {commendationTagLabel(tag)} {count}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs font-semibold text-text-tertiary">
+                      {commendationTotal > 0
+                        ? "태그 없이 받은 칭찬만 있습니다"
+                        : "아직 받은 칭찬이 없습니다"}
                     </p>
-                    <p className="mt-2 text-xs font-semibold text-text-tertiary">
-                      5점 만점
-                    </p>
-                  </div>
-                  <RatingStars
-                    value={reputationAverage}
-                    className="text-base"
-                  />
+                  )}
                 </div>
               </div>
             </CardContent>

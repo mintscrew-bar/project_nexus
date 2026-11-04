@@ -5,10 +5,11 @@
 //
 // 실제 화면은 API 가 있어야 그려져서, 같은 카드에 가짜 집계를 넣어 확인한다.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CustomGameStatsCard } from "@/components/matches/CustomGameStatsCard";
 import { ChampionStatsCard } from "@/components/matches/ChampionStatsCard";
+import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 
 const RANKING = {
   totalGames: 23,
@@ -54,6 +55,9 @@ const CHAMPIONS = [
 export default function CustomGameStatsPreviewPage() {
   const queryClient = useQueryClient();
   const [seeded, setSeeded] = useState(false);
+  // 호버 카드는 window 크기로 자리를 잡아서 브라우저에서만 그린다
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   if (!seeded) {
     queryClient.setQueryData(["hoverProfile", "preview-user", "LOL"], {
       username: "preview",
@@ -75,7 +79,17 @@ export default function CustomGameStatsPreviewPage() {
         gold: 12380,
         killParticipation: 58,
       },
-      reputation: { overallAverage: 4.3, totalRatings: 12 },
+      reputation: {
+        overallAverage: 0,
+        totalRatings: 0,
+        commendations: {
+          total: 7,
+          topTags: [
+            { tag: "MANNER", count: 4 },
+            { tag: "SHOTCALL", count: 2 },
+          ],
+        },
+      },
     });
     setSeeded(true);
   }
@@ -93,6 +107,16 @@ export default function CustomGameStatsPreviewPage() {
           </div>
         </div>
       </div>
+      {/* 같은 호버 프로필 캐시로 그린 호버 카드 — 평판(받은 칭찬) 칸 확인용 */}
+      {mounted && (
+        <PlayerHoverCard
+          userId="preview-user"
+          anchorRect={new DOMRect(0, 760, 0, 0)}
+          onOpenProfile={() => {}}
+          onMouseEnter={() => {}}
+          onMouseLeave={() => {}}
+        />
+      )}
     </div>
   );
 }

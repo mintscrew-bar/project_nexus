@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Star } from "lucide-react";
+import { BarChart3, ThumbsUp } from "lucide-react";
+import { commendationTagLabel } from "@/lib/commendation";
 import { userApi } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui";
 import {
@@ -73,7 +74,7 @@ export function CustomGameStatsCard({
 
   const stats = profile?.stats;
   const kda = profile?.kda ?? null;
-  const reputation = profile?.reputation;
+  const commendations = profile?.reputation?.commendations;
   const games = stats ? stats.wins + stats.losses : 0;
   const kdaRatio =
     kda && kda.deaths > 0
@@ -106,7 +107,7 @@ export function CustomGameStatsCard({
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {/* 승률·평판은 평균이 아니라 그대로, 나머지는 판당 평균이라 "평균"을 붙인다 */}
+            {/* 승률·칭찬은 평균이 아니라 그대로, 나머지는 판당 평균이라 "평균"을 붙인다 */}
             <StatCell
               label="내전 승률"
               value={games > 0 ? `${Math.round(stats!.winRate)}%` : "—"}
@@ -119,22 +120,25 @@ export function CustomGameStatsCard({
                   : undefined
               }
             />
+            {/* 평판 = 받은 칭찬 수 + 가장 많이 받은 태그 (경매 매물 카드와 같은 칸) */}
             <StatCell
-              label="평판"
+              label="칭찬"
               value={
-                reputation && reputation.totalRatings > 0 ? (
+                commendations && commendations.total > 0 ? (
                   <span className="inline-flex items-center gap-1">
-                    <Star className="h-4 w-4 fill-accent-gold text-accent-gold" />
-                    {reputation.overallAverage.toFixed(1)}
+                    <ThumbsUp className="h-4 w-4 text-accent-primary" />
+                    {commendations.total}
                   </span>
                 ) : (
                   "—"
                 )
               }
               sub={
-                reputation && reputation.totalRatings > 0
-                  ? `${reputation.totalRatings}명 평가`
-                  : "평가 없음"
+                commendations && commendations.total > 0
+                  ? commendations.topTags[0]
+                    ? commendationTagLabel(commendations.topTags[0].tag)
+                    : "받은 칭찬"
+                  : "아직 없음"
               }
             />
             <StatCell

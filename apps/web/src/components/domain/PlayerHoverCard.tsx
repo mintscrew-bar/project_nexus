@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { Activity, ArrowRight, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { Activity, ArrowRight, ThumbsUp, TrendingUp, Users } from "lucide-react";
+import { commendationTagLabel, type CommendationSummary } from "@/lib/commendation";
 import { useQuery } from "@tanstack/react-query";
 import { userApi } from "@/lib/api-client";
 import { ChampionIcon, PositionIcon, POSITION_LABELS } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
@@ -115,45 +116,46 @@ function KdaStatCard({
   );
 }
 
+/**
+ * 평판 — 경기 뒤 함께 뛴 사람들에게 받은 칭찬 수와 많이 받은 태그(최대 3개).
+ * 예전 별점(신뢰도)은 아무도 남기지 않아(2026-11 실측 0건) 칭찬으로 바꿨다.
+ */
 function ReputationStatCard({
-  value,
-  count,
+  commendations,
 }: {
-  value: number;
-  count: number;
+  commendations?: CommendationSummary | null;
 }) {
+  const total = commendations?.total ?? 0;
+  const topTags = (commendations?.topTags ?? []).slice(0, 3);
   return (
     <section className="rounded-xl border border-bg-tertiary bg-bg-secondary p-3">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-text-tertiary">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          신뢰도
+          <ThumbsUp className="h-3.5 w-3.5" />
+          받은 칭찬
         </div>
-        <span className="text-[10px] text-text-muted">
-          {count > 0 ? `${count}개 평가` : "평가 없음"}
+        <span className="text-base font-black text-text-primary">
+          {total > 0 ? `${total}회` : "—"}
         </span>
       </div>
 
-      {count > 0 ? (
-        <div className="flex items-center justify-between">
-          <RatingStars value={value} />
-          <span className="text-base font-black text-text-primary">
-            {value.toFixed(1)}
-          </span>
+      {topTags.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {topTags.map(({ tag, count }) => (
+            <span
+              key={tag}
+              className="rounded-full bg-accent-primary/15 px-2 py-0.5 text-[11px] font-semibold text-accent-primary"
+            >
+              {commendationTagLabel(tag)} {count}
+            </span>
+          ))}
         </div>
       ) : (
-        <p className="text-sm font-semibold text-text-tertiary">아직 받은 평가가 없습니다</p>
+        <p className="text-sm font-semibold text-text-tertiary">
+          {total > 0 ? "태그 없이 받은 칭찬만 있습니다" : "아직 받은 칭찬이 없습니다"}
+        </p>
       )}
     </section>
-  );
-}
-
-function RatingStars({ value }: { value: number }) {
-  const rounded = Math.max(0, Math.min(5, Math.round(value)));
-  return (
-    <span className="text-sm text-yellow-400">
-      {"★".repeat(rounded)}<span className="text-text-muted/40">{"★".repeat(5 - rounded)}</span>
-    </span>
   );
 }
 
@@ -399,12 +401,9 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
               </div>
             )}
 
-            {/* ── 신뢰도 ── */}
+            {/* ── 평판(받은 칭찬) ── */}
             {!isActualBot && (
-              <ReputationStatCard
-                value={data.reputation.overallAverage}
-                count={data.reputation.totalRatings}
-              />
+              <ReputationStatCard commendations={data.reputation.commendations} />
             )}
 
             {!riot && (

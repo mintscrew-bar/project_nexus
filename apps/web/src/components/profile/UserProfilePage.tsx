@@ -58,7 +58,9 @@ import {
   Gavel,
   Activity,
   ExternalLink,
+  ThumbsUp,
 } from "lucide-react";
+import { commendationTagLabel } from "@/lib/commendation";
 import { TierBadge } from "@/components/domain/TierBadge";
 import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
@@ -833,15 +835,14 @@ export default function UserProfilePage() {
                         </>
                       )}
 
-                      {/* Reputation */}
-                      {profile.reputationScore != null && (
+                      {/* 평판 — 별점 대신 받은 칭찬 수와 가장 많이 받은 태그 */}
+                      {rep?.commendations?.total > 0 && (
                         <>
-                          <Star
-                            className="h-3 w-3 text-accent-gold flex-shrink-0"
-                            fill="currentColor"
-                          />
-                          <span className="text-accent-gold">
-                            {profile.reputationScore.toFixed(1)} / 5.0
+                          <ThumbsUp className="h-3 w-3 text-accent-primary flex-shrink-0" />
+                          <span className="text-accent-primary">
+                            칭찬 {rep.commendations.total}
+                            {rep.commendations.topTags?.[0] &&
+                              ` · ${commendationTagLabel(rep.commendations.topTags[0].tag)}`}
                           </span>
                           <span>·</span>
                         </>
