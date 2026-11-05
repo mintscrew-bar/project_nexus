@@ -12,6 +12,7 @@ import { guideGame, guideUrl } from "@/lib/guide-links";
 import {
   Bullet,
   BulletList,
+  GuideFigure,
   GuidePageLayout,
   GuideSection,
   GuideStep,
@@ -89,6 +90,22 @@ function LolTeamModesGuidePage() {
             넘어갑니다.
           </GuideStep>
         </ol>
+        <div className="mt-5 space-y-4">
+          <GuideFigure
+            src="/images/guide/auction.webp"
+            alt="경매 화면. 왼쪽에 팀별 남은 포인트와 영입한 선수, 가운데에 현재 매물의 라인별 티어·선호 챔피언·내전 기록과 남은 시간, 아래에 입찰 버튼, 오른쪽에 남은 매물과 채팅이 있다"
+            width={1600}
+            height={806}
+            caption="경매 — 왼쪽은 팀별 남은 포인트와 영입한 선수, 가운데는 지금 올라온 매물과 남은 시간, 오른쪽은 남은 매물 순서입니다. +50·+100·+250 버튼으로 금액을 올려 입찰합니다."
+          />
+          <GuideFigure
+            src="/images/guide/snake-ladder.webp"
+            alt="스네이크 픽 순서 추첨 사다리. 팀마다 세로줄을 따라 내려가 아래 번호에 닿고, 한 팀의 경로가 강조된다"
+            width={1106}
+            height={510}
+            caption="스네이크 픽 순서 추첨 — 시작하면 사다리를 타고 팀마다 픽 순서가 정해집니다. 그림은 8팀 예시입니다."
+          />
+        </div>
       </GuideSection>
 
       <GuideSection

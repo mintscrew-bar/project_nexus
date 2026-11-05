@@ -13,6 +13,7 @@ import { guideGame, guideUrl } from "@/lib/guide-links";
 import {
   Bullet,
   BulletList,
+  GuideFigure,
   GuidePageLayout,
   GuideSection,
   GuideStep,
@@ -70,6 +71,15 @@ function LolStartGuidePage() {
             확인할 수 있습니다.
           </GuideStep>
         </ol>
+        <div className="mt-5">
+          <GuideFigure
+            src="/images/guide/room-list.webp"
+            alt="내전 목록의 방 카드 세 장. 방 제목·방장·팀 구성 방식·생성 서버·관전 허용과 참가 인원 막대가 보이고, 대기 중·진행 중·비공개 상태가 표시된다"
+            width={1360}
+            height={270}
+            caption="내전 목록 — 방마다 팀 구성 방식, 음성 채널을 만들 서버, 관전 허용 여부와 참가 인원이 나옵니다. 자물쇠는 비공개 방, 빨간 막대는 정원이 찬 방입니다."
+          />
+        </div>
       </GuideSection>
 
       <GuideSection

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Brackets, Flag, Gamepad2, Trophy } from "lucide-react";
 import { guideGame, guideUrl } from "@/lib/guide-links";
-import { GuidePageLayout, GuideSection, GuideStep, InfoCard } from "../_components/GuidePageLayout";
+import { GuideFigure, GuidePageLayout, GuideSection, GuideStep, InfoCard } from "../_components/GuidePageLayout";
 import { PubgMatchFlowGuide } from "../_content/pubg";
 
 /**
@@ -54,6 +54,15 @@ function LolMatchFlowGuidePage() {
           <GuideStep number={2} title="진영 정하기와 경기 시작">경기마다 양 팀장이 가위바위보 단판으로 진영을 정합니다. 이긴 팀장이 블루·레드 중 하나를 고르고, 다전제의 다음 세트는 직전 세트에서 진 팀이 고릅니다. 진영이 정해지면 방장이 경기를 시작합니다.</GuideStep>
           <GuideStep number={3} title="결과 입력">승리 팀과 경기 결과를 확정하면 다음 대진과 전적에 반영됩니다.</GuideStep>
         </ol>
+        <div className="mt-5">
+          <GuideFigure
+            src="/images/guide/bracket.webp"
+            alt="4팀 단일 엘리미네이션 대진표. 준결승 두 경기와 결승이 이어져 있고, 끝난 경기는 이긴 팀에 트로피, 진행 중인 경기는 세트 번호와 블루·레드 진영이 표시된다"
+            width={1118}
+            height={900}
+            caption="대진표 — 경기 카드마다 다전제 길이(BO3)와 상태(대기·진행 중·완료)가 붙고, 진영이 정해지면 팀 옆에 블루·레드가 표시됩니다. 경기 카드를 누르면 진영 정하기·시작·결과 입력 창이 열립니다."
+          />
+        </div>
       </GuideSection>
 
       <GuideSection title="단계별 핵심">

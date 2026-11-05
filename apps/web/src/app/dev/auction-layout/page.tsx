@@ -28,12 +28,41 @@ const CHAMPIONS: Record<string, string[]> = {
   SUPPORT: ["Thresh", "Lulu", "Nautilus", "Leona", "Nami"],
 };
 
+// 가이드 캡처에도 쓰여서 실제 유저처럼 보이는 닉네임을 쓴다 (testbot_ 이름은 어색함)
+const NICKNAMES = [
+  "새벽정글러",
+  "미드는내꺼",
+  "원딜장인",
+  "서폿하는곰",
+  "탑솔킹",
+  "한타요정",
+  "와드지기",
+  "칼바람전사",
+  "용사냥꾼",
+  "바론스틸",
+  "점멸각",
+  "역전의명수",
+  "갱킹타이밍",
+  "라인전강자",
+  "로밍요정",
+  "포탑수비대",
+  "정글의왕",
+  "솔킬머신",
+  "궁극기장인",
+  "시야장악",
+  "드래곤헌터",
+  "백도어",
+  "카운터픽",
+  "운영의신",
+  "막타장인",
+];
+
 function mockPlayer(index: number) {
   const mainRole = ROLES[index % 5];
   const subRole = ROLES[(index + 2) % 5];
   return {
     id: `bot-${index}`,
-    username: `testbot_${String(index).padStart(2, "0")}`,
+    username: NICKNAMES[index % NICKNAMES.length],
     tier: TIERS[index % TIERS.length],
     rank: "II",
     mmr: 900 + ((index * 137) % 1300),
@@ -74,7 +103,7 @@ function useSeedHoverProfile() {
       avatar: null,
       riotAccount: {
         gameName: CURRENT.username,
-        tagLine: "BOT",
+        tagLine: "KR1",
         tier: "PLATINUM",
         rank: "IV",
         lp: 92,
@@ -121,7 +150,17 @@ function useSeedHoverProfile() {
         gold: 12380,
         killParticipation: 58,
       },
-      reputation: { overallAverage: 4.3, totalRatings: 12 },
+      reputation: {
+        overallAverage: 0,
+        totalRatings: 0,
+        commendations: {
+          total: 9,
+          topTags: [
+            { tag: "CARRY", count: 5 },
+            { tag: "MANNER", count: 3 },
+          ],
+        },
+      },
     });
     setSeeded(true);
   }
