@@ -285,13 +285,13 @@ function MatchCard({
         <div className="space-y-1">
           <TeamSlot
             team={match.team1}
-            isWinner={match.winner?.id === match.team1?.id}
+            isWinner={!!match.winner && match.winner.id === match.team1?.id}
             side={getTeamSide(sideBlueId, match.team1)}
             density="compact"
           />
           <TeamSlot
             team={match.team2}
-            isWinner={match.winner?.id === match.team2?.id}
+            isWinner={!!match.winner && match.winner.id === match.team2?.id}
             side={getTeamSide(sideBlueId, match.team2)}
             density="compact"
           />
@@ -348,7 +348,7 @@ function MatchCard({
       <div className="space-y-2">
         <TeamSlot
           team={match.team1}
-          isWinner={match.winner?.id === match.team1?.id}
+          isWinner={!!match.winner && match.winner.id === match.team1?.id}
           side={getTeamSide(sideBlueId, match.team1)}
         />
         <div className="flex items-center gap-2 px-1">
@@ -358,7 +358,7 @@ function MatchCard({
         </div>
         <TeamSlot
           team={match.team2}
-          isWinner={match.winner?.id === match.team2?.id}
+          isWinner={!!match.winner && match.winner.id === match.team2?.id}
           side={getTeamSide(sideBlueId, match.team2)}
         />
       </div>
