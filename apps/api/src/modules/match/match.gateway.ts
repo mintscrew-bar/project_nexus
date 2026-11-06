@@ -125,6 +125,8 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // 가위바위보 진행 상태 (인메모리 — 단일 인스턴스 가정). 최종 진영만 DB 저장.
   private readonly rpsStates = new Map<string, RpsState>();
+  /** 가위바위보 중계용 — 매치 → 방 id 캐시 (방송 오버레이는 bracket:방 을 구독한다) */
+  private readonly rpsRoomIds = new Map<string, Promise<string | null>>();
   private readonly rpsTimers = new Map<string, NodeJS.Timeout>();
   private readonly RPS_THROW_TIMEOUT = 30000; // 팀장 미제출 시 자동 랜덤
   private readonly RPS_SIDE_TIMEOUT = 30000; // 진영 미선택 시 자동 랜덤
@@ -314,9 +316,43 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private broadcastRpsState(state: RpsState) {
     // 상태가 바뀔 때마다 이 함수가 불리므로 여기서 저장하면 변경 지점을 빠뜨리지 않는다.
     this.persistRps(state);
-    this.server
-      .to(`match:${state.matchId}`)
-      .emit("rps:state", this.rpsStatePayload(state));
+    const payload = this.rpsStatePayload(state);
+    this.server.to(`match:${state.matchId}`).emit("rps:state", payload);
+    this.relayRpsToBroadcast(state.matchId, "state", payload);
+  }
+
+  /**
+   * 가위바위보 진행을 방송 오버레이에도 흘린다.
+   *
+   * 오버레이는 match:매치 가 아니라 bracket:방 만 구독해서(방송 토큰은 자기 방만 허용),
+   * 가위바위보가 도는 동안 방송 화면엔 아무것도 안 보였다. 같은 내용을 bracket 방에
+   * "broadcast-rps" 한 이벤트로 보낸다. 손은 공개(reveal) 뒤에만 실리므로 미리 새지 않는다.
+   */
+  private relayRpsToBroadcast(
+    matchId: string,
+    kind: "state" | "reveal" | "done",
+    payload: Record<string, unknown>,
+  ) {
+    // 연달아 오는 이벤트(상태 → 공개)가 방 조회를 두 번 하지 않게 조회 중인 약속을 캐시한다
+    let lookup = this.rpsRoomIds.get(matchId);
+    if (!lookup) {
+      lookup = this.matchService
+        .findById(matchId)
+        .then((match: any) => match?.roomId ?? null)
+        .catch(() => null);
+      this.rpsRoomIds.set(matchId, lookup);
+    }
+    void lookup.then((roomId) => {
+      if (!roomId) {
+        this.rpsRoomIds.delete(matchId);
+        return;
+      }
+      this.server
+        .to(`bracket:${roomId}`)
+        .emit("broadcast-rps", { kind, ...payload });
+      // 끝난 판은 캐시를 비운다
+      if (kind === "done") this.rpsRoomIds.delete(matchId);
+    });
   }
 
   // ── 재시작 복구 (소켓 점검 M4) ──
@@ -551,13 +587,15 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const r = this.rpsJudge(handA, handB);
     if (r === 0) {
       // 무승부 — 공개 후 재경기
-      this.server.to(`match:${matchId}`).emit("rps:reveal", {
+      const tieReveal = {
         matchId,
         handA,
         handB,
         tie: true,
         winnerTeamId: null,
-      });
+      };
+      this.server.to(`match:${matchId}`).emit("rps:reveal", tieReveal);
+      this.relayRpsToBroadcast(matchId, "reveal", tieReveal);
       state.submissions = new Map();
       this.broadcastRpsState(state);
       this.armRpsThrowTimeout(matchId);
@@ -569,13 +607,15 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     state.winnerTeamId = r === 1 ? state.teamAId : state.teamBId;
     state.phase = "side";
-    this.server.to(`match:${matchId}`).emit("rps:reveal", {
+    const reveal = {
       matchId,
       handA,
       handB,
       tie: false,
       winnerTeamId: state.winnerTeamId,
-    });
+    };
+    this.server.to(`match:${matchId}`).emit("rps:reveal", reveal);
+    this.relayRpsToBroadcast(matchId, "reveal", reveal);
     this.broadcastRpsState(state);
 
     void this.beginSidePhase(matchId);
@@ -618,12 +658,14 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    this.server.to(`match:${matchId}`).emit("rps:done", {
+    const done = {
       matchId,
       blueSideTeamId,
       redSideTeamId:
         blueSideTeamId === state.teamAId ? state.teamBId : state.teamAId,
-    });
+    };
+    this.server.to(`match:${matchId}`).emit("rps:done", done);
+    this.relayRpsToBroadcast(matchId, "done", done);
     this.broadcastRpsState(state);
 
     // 진영 확정·저장 완료 → 매치 시작(IN_PROGRESS + 토너먼트 코드). 서버가 호스트 권한으로 실행.

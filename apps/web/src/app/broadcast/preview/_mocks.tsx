@@ -19,6 +19,63 @@ import { AuctionBoardView } from "../[token]/_components/AuctionBoardView";
 import type { BroadcastAuctionData } from "../[token]/_live/useBroadcastAuction";
 import { SnakeDraftBoardView } from "../[token]/_components/SnakeDraftBoardView";
 import type { BroadcastSnakeDraftData } from "../[token]/_live/useBroadcastSnakeDraft";
+import {
+  RpsBroadcastScene,
+  type BroadcastRpsLive,
+} from "../[token]/_components/RpsBroadcastScene";
+
+/** 1세트 진영 결정 목업 — 제출 대기 / 공개(블루 웨이브 승) / 확정 */
+const mockRps = (key: string): BroadcastRpsLive => {
+  const base = {
+    matchId: "m1",
+    teamAId: "teamA",
+    teamBId: "teamB",
+    captainAId: "u0",
+    captainBId: "u5",
+  };
+  if (key === "rpsThrow") {
+    return {
+      state: {
+        ...base,
+        phase: "throw",
+        submitted: ["u5"],
+        winnerTeamId: null,
+        blueSideTeamId: null,
+      },
+      reveal: null,
+      done: null,
+    };
+  }
+  if (key === "rpsReveal") {
+    return {
+      state: {
+        ...base,
+        phase: "side",
+        submitted: ["u0", "u5"],
+        winnerTeamId: "teamA",
+        blueSideTeamId: null,
+      },
+      reveal: {
+        handA: "rock",
+        handB: "scissors",
+        tie: false,
+        winnerTeamId: "teamA",
+      },
+      done: null,
+    };
+  }
+  return {
+    state: {
+      ...base,
+      phase: "done",
+      submitted: ["u0", "u5"],
+      winnerTeamId: "teamA",
+      blueSideTeamId: "teamB",
+    },
+    reveal: null,
+    done: { blueSideTeamId: "teamB", redSideTeamId: "teamA" },
+  };
+};
 
 /**
  * /broadcast/preview — 방송 오버레이 디자인 확인용 목업 프리뷰(백엔드 불필요).
@@ -1081,6 +1138,9 @@ export const SCENES: { key: string; label: string }[] = [
   { key: "match", label: "경기 중계" },
   { key: "matchDone", label: "경기 결과" },
   { key: "sideSwap", label: "진영 교대" },
+  { key: "rpsThrow", label: "가위바위보(제출)" },
+  { key: "rpsReveal", label: "가위바위보(공개)" },
+  { key: "rpsDone", label: "진영 확정" },
   { key: "break", label: "휴식" },
   { key: "idle", label: "Idle(방 없음)" },
 ];
@@ -1257,6 +1317,11 @@ export function PreviewStage({
         },
       })}
     />
+  ) : sceneKey.startsWith("rps") ? (
+    <RpsBroadcastScene
+      snapshot={withSettings(SNAP.waiting)}
+      rps={mockRps(sceneKey)}
+    />
   ) : sceneKey === "matchDone" ? (
     <MatchResultScene snapshot={snapshot} />
   ) : sceneKey.startsWith("bracket") ? (
@@ -1293,7 +1358,8 @@ export function PreviewStage({
         isMatch ||
         sceneKey === "sideSwap" ||
         sceneKey === "matchIntro" ||
-        sceneKey === "lineup" ? null : (
+        sceneKey === "lineup" ||
+        sceneKey.startsWith("rps") ? null : (
           <LowerThird snapshot={snapshot} bg={bg} />
         )
       }

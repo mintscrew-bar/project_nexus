@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { broadcastApi } from "@/lib/api-client";
@@ -11,6 +11,10 @@ import {
 import { BroadcastShell } from "./_components/BroadcastShell";
 import { LowerThird } from "./_components/LowerThird";
 import { SideSwapScene } from "./_components/SideSwapScene";
+import {
+  RpsBroadcastScene,
+  type BroadcastRpsLive,
+} from "./_components/RpsBroadcastScene";
 import {
   RoomScene,
   MatchScene,
@@ -120,6 +124,9 @@ const SCENE_TRANSITIONS: Record<
     tone: "result",
   },
 };
+
+/** 진영이 확정된 뒤 공개 화면을 유지하는 시간 */
+const RPS_DONE_HOLD_MS = 5000;
 
 function sceneKeyOf({
   idle,
@@ -234,6 +241,22 @@ export default function BroadcastPage() {
   });
   const transition =
     SCENE_TRANSITIONS[broadcastSceneKey] ?? SCENE_TRANSITIONS.waiting;
+  const rpsTransition = {
+    label: "SIDE SELECT",
+    subLabel: "진영 결정",
+    eyebrow: "ROCK PAPER SCISSORS",
+    tone: "match" as const,
+  };
+
+  // 1세트 진영 결정(가위바위보) 라이브 — 서버가 bracket 방에 "broadcast-rps" 로 흘려 준다.
+  // 진영이 확정되면 공개 화면을 몇 초 보여 준 뒤 원래 장면으로 돌아간다.
+  const [rpsLive, setRpsLive] = useState<BroadcastRpsLive | null>(null);
+  const rpsFinished = !!rpsLive?.done || rpsLive?.state?.phase === "done";
+  useEffect(() => {
+    if (!rpsFinished) return;
+    const timer = setTimeout(() => setRpsLive(null), RPS_DONE_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [rpsFinished]);
 
   // 방송 소켓: bracket 룸 구독 → 경기 시작/결과/focus 변경 시 즉시 스냅샷 갱신
   useEffect(() => {
@@ -253,6 +276,23 @@ export default function BroadcastPage() {
     socket.on("tournament-completed", refetch);
     socket.on("broadcast-focus-updated", refetch);
     socket.on("broadcast-control-updated", refetch);
+    socket.on("broadcast-rps", (event: any) => {
+      setRpsLive((prev) => {
+        if (event.kind === "state") {
+          // 새 판(다른 매치)이면 공개 기록을 비운다
+          const sameMatch = prev?.state?.matchId === event.matchId;
+          return {
+            state: event,
+            reveal: sameMatch ? (prev?.reveal ?? null) : null,
+            done: sameMatch ? (prev?.done ?? null) : null,
+          };
+        }
+        if (!prev?.state || prev.state.matchId !== event.matchId) return prev;
+        if (event.kind === "reveal") return { ...prev, reveal: event };
+        if (event.kind === "done") return { ...prev, done: event };
+        return prev;
+      });
+    });
 
     return () => {
       socket.off("connect", subscribe);
@@ -316,44 +356,47 @@ export default function BroadcastPage() {
     return <div className="fixed inset-0 bg-transparent" />;
   }
 
-  const sceneNode =
-    snapshot.idle || displayScene === "idle" ? (
-      <IdleScene snapshot={snapshot} />
-    ) : displayScene === "break" ? (
-      <BreakScene snapshot={snapshot} />
-    ) : displayScene === "bracket" ? (
-      <BracketScene snapshot={snapshot} />
-    ) : displayScene === "summary" ? (
-      <TournamentSummaryScene snapshot={snapshot} />
-    ) : displayScene === "match-intro" ? (
-      <MatchIntroScene snapshot={snapshot} />
-    ) : displayScene === "lineup" ? (
-      <LineupOverlayScene snapshot={snapshot} />
-    ) : displayScene === "side-swap" ? (
-      <SideSwapScene snapshot={snapshot} />
-    ) : displayScene === "result" ? (
-      <MatchResultScene snapshot={snapshot} />
-    ) : displayScene === "match" ? (
-      <MatchScene snapshot={snapshot} />
-    ) : isAuctionRoom && token && roomId ? (
-      // 경매 단계는 정적 스냅샷 대신 기존 경매 화면(AuctionBoard)을 라이브로 중계
-      <BroadcastAuctionLive token={token} roomId={roomId} />
-    ) : isSnakeDraftRoom && token && roomId ? (
-      // 스네이크 드래프트도 /snake-draft 게이트웨이를 read-only 구독해 라이브 중계
-      <BroadcastSnakeDraftLive
-        token={token}
-        roomId={roomId}
-        snapshot={snapshot}
-      />
-    ) : displayScene === "teams" ? (
-      <TeamRevealScene snapshot={snapshot} />
-    ) : isRoleSelectionRoom || broadcastSceneKey === "role-selection" ? (
-      <RoleSelectionScene snapshot={snapshot} />
-    ) : (
-      <RoomScene snapshot={snapshot} />
-    );
+  const rpsActive = !!rpsLive?.state;
+  const sceneNode = rpsActive ? (
+    <RpsBroadcastScene snapshot={snapshot} rps={rpsLive!} />
+  ) : snapshot.idle || displayScene === "idle" ? (
+    <IdleScene snapshot={snapshot} />
+  ) : displayScene === "break" ? (
+    <BreakScene snapshot={snapshot} />
+  ) : displayScene === "bracket" ? (
+    <BracketScene snapshot={snapshot} />
+  ) : displayScene === "summary" ? (
+    <TournamentSummaryScene snapshot={snapshot} />
+  ) : displayScene === "match-intro" ? (
+    <MatchIntroScene snapshot={snapshot} />
+  ) : displayScene === "lineup" ? (
+    <LineupOverlayScene snapshot={snapshot} />
+  ) : displayScene === "side-swap" ? (
+    <SideSwapScene snapshot={snapshot} />
+  ) : displayScene === "result" ? (
+    <MatchResultScene snapshot={snapshot} />
+  ) : displayScene === "match" ? (
+    <MatchScene snapshot={snapshot} />
+  ) : isAuctionRoom && token && roomId ? (
+    // 경매 단계는 정적 스냅샷 대신 기존 경매 화면(AuctionBoard)을 라이브로 중계
+    <BroadcastAuctionLive token={token} roomId={roomId} />
+  ) : isSnakeDraftRoom && token && roomId ? (
+    // 스네이크 드래프트도 /snake-draft 게이트웨이를 read-only 구독해 라이브 중계
+    <BroadcastSnakeDraftLive
+      token={token}
+      roomId={roomId}
+      snapshot={snapshot}
+    />
+  ) : displayScene === "teams" ? (
+    <TeamRevealScene snapshot={snapshot} />
+  ) : isRoleSelectionRoom || broadcastSceneKey === "role-selection" ? (
+    <RoleSelectionScene snapshot={snapshot} />
+  ) : (
+    <RoomScene snapshot={snapshot} />
+  );
 
   const persistent =
+    rpsActive ||
     snapshot?.broadcast?.lowerThirdVisible === false ||
     displayScene === "match" ||
     displayScene === "match-intro" ||
@@ -388,8 +431,8 @@ export default function BroadcastPage() {
         settings={snapshot.settings}
         scene={sceneNode}
         persistent={persistent}
-        transitionKey={broadcastSceneKey}
-        transition={transition}
+        transitionKey={rpsActive ? "rps" : broadcastSceneKey}
+        transition={rpsActive ? rpsTransition : transition}
       />
     </>
   );
