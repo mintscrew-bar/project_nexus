@@ -58,7 +58,7 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
       >
         {match.currentGameNumber}세트
       </p>
-      <h1 className="relative mt-8 w-[1000px] text-[88px] font-black leading-none">
+      <h1 className="relative mt-8 w-[1000px] text-[64px] font-black leading-none">
         <span
           className="side-swap-motion side-swap-complete"
           style={{
@@ -101,7 +101,7 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
               {side === "blue" ? "블루 진영" : "레드 진영"}
             </p>
             <p
-              className="side-swap-motion relative z-10 mt-5 truncate text-[72px] font-black"
+              className="side-swap-motion relative z-10 mt-5 truncate text-[112px] font-black leading-tight"
               style={
                 {
                   color: sideColor(look, side),
@@ -110,7 +110,7 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
                     side === "blue" ? "red" : "blue",
                   ),
                   "--new-color": sideColor(look, side),
-                  "--arc-height": side === "blue" ? "-64px" : "64px",
+                  "--arc-height": side === "blue" ? "-88px" : "88px",
                   willChange: animate ? "transform, translate" : undefined,
                   animation: animate
                     ? `side-swap-${side} 1200ms cubic-bezier(.45,0,.25,1) 1000ms both, side-swap-arc 1200ms ease-in-out 1000ms both`
