@@ -142,6 +142,21 @@ export class BroadcastController {
   }
 
   // ── 로그인 조작 패널 ──
+  @Post("settings/background")
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor("background", { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
+  async uploadBackground(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException("파일이 업로드되지 않았습니다.");
+    const url = await this.uploadService.uploadImage(file, {
+      directory: "broadcast-backgrounds",
+      maxWidth: 2560,
+      maxHeight: 1440,
+      quality: 88,
+    });
+    return { url };
+  }
 
   @Get("control")
   @UseGuards(JwtAuthGuard)

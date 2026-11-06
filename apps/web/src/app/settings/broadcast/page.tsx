@@ -116,6 +116,9 @@ const BACKGROUND_LABELS: Record<
   grain: "필름 그레인",
   particles: "입자",
   transparent: "투명",
+  studio: "스튜디오",
+  technical: "테크니컬",
+  image: "직접 올린 이미지",
 };
 const FONT_LABELS: Record<BroadcastSettings["font"], string> = {
   default: "기본",
@@ -185,6 +188,29 @@ export default function BroadcastSettingsPage() {
   });
 
   const [uploading, setUploading] = useState(false);
+  const [uploadingBackground, setUploadingBackground] = useState(false);
+  const onBackground = async (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      addToast("배경 이미지는 5MB 이하로 올려주세요.", "error");
+      return;
+    }
+    setUploadingBackground(true);
+    try {
+      const { url } = await broadcastApi.uploadBackground(file);
+      setDraft((d) => ({
+        ...d,
+        background: { ...d.background, type: "image", imageUrl: url },
+      }));
+    } catch {
+      addToast(
+        "배경을 올리지 못했습니다. JPG·PNG·WebP·GIF 이미지를 확인해 주세요.",
+        "error",
+      );
+    } finally {
+      setUploadingBackground(false);
+    }
+  };
   const onLogo = async (file: File | undefined) => {
     if (!file) return;
     setUploading(true);
@@ -270,7 +296,9 @@ export default function BroadcastSettingsPage() {
           </Button>
           <Button
             size="sm"
-            disabled={!dirty || save.isPending}
+            disabled={
+              !dirty || save.isPending || uploading || uploadingBackground
+            }
             onClick={() => save.mutate()}
           >
             {save.isPending ? (
@@ -421,7 +449,78 @@ export default function BroadcastSettingsPage() {
                 set("background", { ...draft.background, type: v })
               }
             />
-            {draft.background.type !== "transparent" &&
+            {draft.background.type === "image" && (
+              <div className="mt-4 space-y-3">
+                <p className="text-xs text-text-tertiary">
+                  1920×1080 권장 · JPG, PNG, WebP, GIF · 최대 5MB. 업로드 후
+                  저장하면 방송에 적용됩니다.
+                </p>
+                <input
+                  aria-label="방송 배경 이미지 업로드"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  disabled={uploadingBackground}
+                  onChange={(e) => {
+                    void onBackground(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+                {uploadingBackground && (
+                  <p className="text-sm">배경 업로드 중…</p>
+                )}
+                {draft.background.imageUrl && (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={draft.background.imageUrl}
+                      alt="선택한 방송 배경"
+                      className="aspect-video w-full rounded-lg bg-black object-contain"
+                    />
+                    <Choice
+                      options={[
+                        ["cover", "화면 채우기"],
+                        ["contain", "이미지 전체 보기"],
+                      ]}
+                      value={draft.background.imageFit ?? "cover"}
+                      onChange={(v) =>
+                        set("background", { ...draft.background, imageFit: v })
+                      }
+                    />
+                    <RangeRow
+                      label="배경 어둡기"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={draft.background.imageDim ?? 40}
+                      display={`${draft.background.imageDim ?? 40}%`}
+                      onChange={(v) =>
+                        set("background", { ...draft.background, imageDim: v })
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="text-sm text-text-secondary underline"
+                      onClick={() =>
+                        set("background", {
+                          ...draft.background,
+                          type: "aurora",
+                          imageUrl: null,
+                        })
+                      }
+                    >
+                      이미지 사용 해제 · 기본 배경으로
+                    </button>
+                  </>
+                )}
+                {!draft.background.imageUrl && (
+                  <p className="text-sm text-text-secondary">
+                    배경으로 사용할 이미지를 올려주세요.
+                  </p>
+                )}
+              </div>
+            )}
+            {draft.background.type !== "image" &&
+              draft.background.type !== "transparent" &&
               draft.background.type !== "solid" && (
                 <RangeRow
                   label="효과 세기"

@@ -22,7 +22,11 @@ describe("normalizeBroadcastSettings (방송 커스터마이징 정규화)", () 
     });
     expect(result.colors).toEqual({ accent: "#FF00AA", blue: null, red: null });
     expect(result.font).toBe("display");
-    expect(result.background).toEqual({ type: "aurora", intensity: 70 });
+    expect(result.background).toEqual({
+      ...DEFAULT_BROADCAST_SETTINGS.background,
+      type: "aurora",
+      intensity: 70,
+    });
     expect(result.sfx).toEqual({ enabled: true, volume: 60 });
     expect(result.show).toEqual(DEFAULT_BROADCAST_SETTINGS.show);
   });
@@ -39,7 +43,11 @@ describe("normalizeBroadcastSettings (방송 커스터마이징 정규화)", () 
     expect(result.colors.accent).toBeNull();
     expect(result.preset).toBe("default");
     expect(result.scale).toBe(1.2);
-    expect(result.background).toEqual({ type: "aurora", intensity: 0 });
+    expect(result.background).toEqual({
+      ...DEFAULT_BROADCAST_SETTINGS.background,
+      type: "aurora",
+      intensity: 0,
+    });
     expect(result.transition.style).toBe("wipe");
     expect(result.nameDisplay).toBe("nickname");
   });
@@ -54,6 +62,36 @@ describe("normalizeBroadcastSettings (방송 커스터마이징 정규화)", () 
     ).toBe("/uploads/a.webp");
     for (const bad of ["javascript:alert(1)", "//evil.com/a.png", "http://x"]) {
       expect(normalizeBroadcastSettings({ logoUrl: bad }).logoUrl).toBeNull();
+    }
+  });
+
+  it("새 배경 옵션과 사용자 이미지 설정을 보존하고 잘못된 주소를 거른다", () => {
+    for (const type of ["aurora", "studio", "technical", "image"]) {
+      const background = normalizeBroadcastSettings({
+        background: {
+          type,
+          imageUrl: "/uploads/broadcast-backgrounds/test.webp",
+          imageFit: "contain",
+          imageDim: 65,
+        },
+      }).background;
+      expect(background.type).toBe(type);
+      expect(background.imageUrl).toBe(
+        "/uploads/broadcast-backgrounds/test.webp",
+      );
+      expect(background.imageFit).toBe("contain");
+      expect(background.imageDim).toBe(65);
+    }
+    for (const imageUrl of [
+      "javascript:alert(1)",
+      "//evil.com/a",
+      "http://example.com/a",
+    ]) {
+      expect(
+        normalizeBroadcastSettings({
+          background: { imageUrl, imageFit: "stretch", imageDim: 150 },
+        }).background,
+      ).toMatchObject({ imageUrl: null, imageFit: "cover", imageDim: 100 });
     }
   });
 

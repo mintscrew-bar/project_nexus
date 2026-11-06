@@ -28,6 +28,9 @@ export const BROADCAST_BACKGROUNDS = [
   "grain", // 단색 + 필름 그레인
   "particles", // 떠다니는 입자
   "transparent", // 배경 없이 패널만 — 게임·캠 화면 위에 합성
+  "studio",
+  "technical",
+  "image",
 ] as const;
 export type BroadcastBackground = (typeof BROADCAST_BACKGROUNDS)[number];
 
@@ -87,6 +90,9 @@ export interface BroadcastSettings {
     type: BroadcastBackground;
     /** 효과 세기 0 ~ 100 */
     intensity: number;
+    imageUrl?: string | null;
+    imageFit?: "cover" | "contain";
+    imageDim?: number;
   };
   transition: {
     style: BroadcastTransitionStyle;
@@ -121,7 +127,13 @@ export const DEFAULT_BROADCAST_SETTINGS: BroadcastSettings = {
   font: "default",
   idle: { title: null, subtitle: null },
   breakScreen: { title: null, subtitle: null },
-  background: { type: "aurora", intensity: 50 },
+  background: {
+    type: "aurora",
+    intensity: 50,
+    imageUrl: null,
+    imageFit: "cover",
+    imageDim: 40,
+  },
   transition: { style: "wipe", speed: "normal", showLabel: true },
   // OBS 오디오 믹서에 소스가 새로 생기면 놀랄 수 있어 기본은 꺼 둔다
   sfx: { enabled: false, volume: 60 },
@@ -224,6 +236,17 @@ export function normalizeBroadcastSettings(raw: unknown): BroadcastSettings {
       intensity: Math.round(
         clampNumber(background.intensity, 0, 100, d.background.intensity),
       ),
+      imageUrl:
+        typeof background.imageUrl === "string" &&
+        SAFE_URL.test(background.imageUrl)
+          ? background.imageUrl.slice(0, 500)
+          : null,
+      imageFit: oneOf(
+        background.imageFit,
+        ["cover", "contain"] as const,
+        "cover",
+      ),
+      imageDim: Math.round(clampNumber(background.imageDim, 0, 100, 40)),
     },
     transition: {
       style: oneOf(transition.style, BROADCAST_TRANSITIONS, d.transition.style),

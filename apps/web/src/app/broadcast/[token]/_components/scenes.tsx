@@ -215,13 +215,7 @@ function HudRule({ color }: { color: string }) {
  * 장면 배경 — 방송인이 고른 종류·세기대로 그린다(경기 중 점수판은 StageFrame 을 쓰지 않아 항상 투명).
  * 세기(0~100)는 효과 레이어의 불투명도에 곱한다. 50 이 예전 기본 모습이다.
  */
-export function StageBackground({
-  accent,
-  sideColors,
-}: {
-  accent: string;
-  sideColors?: { blue: string; red: string };
-}) {
+export function StageBackground({ accent }: { accent: string }) {
   const { settings } = useBroadcastLook();
   const { type, intensity } = settings.background;
   const k = intensity / 50; // 1 = 예전 기본 세기
@@ -229,6 +223,69 @@ export function StageBackground({
 
   // 애니메이션 정의를 배경이 직접 들고 다닌다 — 경매판처럼 StageFrame 밖에서 써도 돌게
   if (type === "transparent") return <style>{broadcastBgCss}</style>;
+
+  if (type === "studio" || type === "technical" || type === "image") {
+    return (
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+        style={{
+          background:
+            type === "studio"
+              ? "linear-gradient(125deg, #171a20, #0b0d12 60%)"
+              : type === "technical"
+                ? "linear-gradient(115deg, #101a23 0%, #101a23 27%, #0a1017 27%, #0a1017 74%, #17202a 74%)"
+                : "#070810",
+        }}
+      >
+        <style>{broadcastBgCss}</style>
+        {type === "image" && settings.background.imageUrl && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={settings.background.imageUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full"
+              style={{ objectFit: settings.background.imageFit ?? "cover" }}
+            />
+            <div
+              className="absolute inset-0 bg-black"
+              style={{ opacity: (settings.background.imageDim ?? 40) / 100 }}
+            />
+          </>
+        )}
+        {type === "studio" && (
+          <div className="absolute inset-0" style={{ opacity: fx(1) }}>
+            <div className="absolute inset-[4%] border border-white/[0.07]" />
+            {[
+              "top-[4%] left-[4%] border-l border-t",
+              "top-[4%] right-[4%] border-r border-t",
+              "bottom-[4%] left-[4%] border-l border-b",
+              "bottom-[4%] right-[4%] border-r border-b",
+            ].map((position) => (
+              <div
+                key={position}
+                className={`absolute h-[5%] w-[3%] border-white/35 ${position}`}
+              />
+            ))}
+          </div>
+        )}
+        {type === "technical" && (
+          <div className="absolute inset-0" style={{ opacity: fx(1) }}>
+            <div
+              className="absolute inset-0 opacity-[0.06]"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(0deg, transparent 0px, transparent 47px, #a6bed5 48px)",
+              }}
+            />
+            <div className="absolute -top-[20%] left-[23%] h-[140%] w-px rotate-[25deg] bg-white/15" />
+            <div className="absolute -top-[20%] right-[23%] h-[140%] w-px rotate-[25deg] bg-white/15" />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const base =
     type === "solid" || type === "grain" || type === "particles"
@@ -238,7 +295,7 @@ export function StageBackground({
   return (
     <div
       className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
-      style={{ background: sideColors ? "#06080d" : base }}
+      style={{ background: base }}
     >
       <style>{broadcastBgCss}</style>
       {(type === "aurora" || type === "gradient") && (
@@ -246,17 +303,15 @@ export function StageBackground({
           className="absolute -inset-[12%]"
           style={{
             animation:
-              type === "aurora" && !sideColors
+              type === "aurora"
                 ? "nexus-live-bg-pan 16s ease-in-out infinite"
                 : undefined,
             opacity: fx(1),
-            background: sideColors
-              ? `radial-gradient(ellipse at 8% 58%, ${sideColors.blue}22, transparent 46%), radial-gradient(ellipse at 92% 58%, ${sideColors.red}22, transparent 46%)`
-              : `radial-gradient(circle at 18% 20%, rgba(0,177,255,0.18), transparent 28%), radial-gradient(circle at 76% 28%, rgba(245,158,11,0.14), transparent 24%), radial-gradient(circle at 54% 82%, ${accent}2e, transparent 32%)`,
+            background: `radial-gradient(circle at 18% 20%, rgba(0,177,255,0.18), transparent 28%), radial-gradient(circle at 76% 28%, rgba(245,158,11,0.14), transparent 24%), radial-gradient(circle at 54% 82%, ${accent}2e, transparent 32%)`,
           }}
         />
       )}
-      {type === "aurora" && !sideColors && (
+      {type === "aurora" && (
         <>
           <div
             className="absolute inset-0"

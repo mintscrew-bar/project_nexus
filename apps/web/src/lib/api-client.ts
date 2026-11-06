@@ -745,9 +745,25 @@ export const broadcastApi = {
   uploadLogo: async (file: File): Promise<{ url: string }> => {
     const formData = new FormData();
     formData.append("logo", file);
-    const response = await apiClient.post("/broadcast/settings/logo", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await apiClient.post(
+      "/broadcast/settings/logo",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
+    return response.data;
+  },
+  uploadBackground: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append("background", file);
+    const response = await apiClient.post(
+      "/broadcast/settings/background",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
     return response.data;
   },
   // OBS 브라우저 소스용 읽기전용 스냅샷
