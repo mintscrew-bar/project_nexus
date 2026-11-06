@@ -7,6 +7,8 @@ import {
 } from "@nexus/types";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { MatchSeriesService } from "../match/match-series.service";
+import { UserService } from "../user/user.service";
+import { summarizeCommendations } from "../reputation/commendation.service";
 import type { SeriesScore } from "../match/match-series.service";
 import {
   hashBroadcastToken,
@@ -56,7 +58,52 @@ export class BroadcastService {
     private readonly prisma: PrismaService,
     private readonly balanceScores: BalanceScoreService,
     private readonly matchSeries: MatchSeriesService,
+    private readonly userService: UserService,
   ) {}
+
+  /**
+   * 방송 화면용 선수 프로필(경매 매물 카드의 라인별 티어·선호 챔피언·내전 지표·칭찬).
+   *
+   * 사이트의 hover-profile 은 로그인이 필요해 OBS 가 부를 수 없다. 토큰으로 방송인을
+   * 찾고, 그 방송인이 지금 송출하는 방의 참가자일 때만 돌려준다 — 토큰만 있으면
+   * 아무 유저나 조회하는 통로가 되지 않게.
+   */
+  async getPlayerProfile(token: string, userId: string) {
+    const streamer = token
+      ? await this.prisma.user.findUnique({
+          where: { broadcastTokenHash: hashBroadcastToken(token) },
+          select: { id: true, broadcastLiveRoomId: true },
+        })
+      : null;
+    if (!streamer) {
+      throw new NotFoundException("유효하지 않은 방송 링크입니다.");
+    }
+    const roomId = await activeRoomIdForUser(
+      this.prisma,
+      streamer.id,
+      streamer.broadcastLiveRoomId,
+    );
+    const participant = roomId
+      ? await this.prisma.roomParticipant.findFirst({
+          where: { roomId, userId },
+          select: { room: { select: { gameTitle: true } } },
+        })
+      : null;
+    if (!participant) {
+      throw new NotFoundException("송출 중인 방의 참가자가 아닙니다.");
+    }
+    const profile = await this.userService.getHoverProfile(
+      userId,
+      participant.room.gameTitle,
+    );
+    // 방송에 필요 없는 개인 링크는 뺀다
+    const {
+      streamerLinks: _links,
+      streamerProfiles: _profiles,
+      ...rest
+    } = profile;
+    return rest;
+  }
 
   /**
    * 방송 토큰 발급/재생성. 로그인 유저 본인 것만.
@@ -404,6 +451,137 @@ export class BroadcastService {
     };
   }
 
+  /**
+   * 선수 소개용 배지 — 전체 랭킹 순위·점수와 받은 칭찬 수·대표 태그.
+   * 랭킹에 없거나 칭찬이 없으면 그 칸은 비운다.
+   */
+  private async playerBadges(userIds: (string | null | undefined)[]) {
+    const ids = [...new Set(userIds.filter((id): id is string => !!id))];
+    if (ids.length === 0) return {};
+    const [rankings, commendations] = await Promise.all([
+      this.prisma.nexusRanking.findMany({
+        where: { userId: { in: ids } },
+        select: {
+          userId: true,
+          globalRank: true,
+          score: true,
+          totalGames: true,
+        },
+      }),
+      summarizeCommendations(this.prisma, ids),
+    ]);
+    const rankingByUser = new Map(rankings.map((r) => [r.userId, r]));
+    const badges: Record<
+      string,
+      {
+        rank: number | null;
+        score: number | null;
+        commendations: number;
+        topTag: string | null;
+      }
+    > = {};
+    for (const id of ids) {
+      const ranking = rankingByUser.get(id);
+      const praise = commendations.get(id);
+      badges[id] = {
+        rank: ranking?.globalRank ?? null,
+        score: ranking && ranking.totalGames > 0 ? ranking.score : null,
+        commendations: praise?.total ?? 0,
+        topTag: praise?.topTags[0]?.tag ?? null,
+      };
+    }
+    return badges;
+  }
+
+  /**
+   * 결과 화면용 Riot 기록 요약 — 수집된 판만. 없으면 null.
+   * MVP·ACE 는 기록으로 자동 결정된 값(match/auto-mvp.util)이고, 팀 합계는 진영 기준으로 담는다.
+   * 골드 차이 그래프는 오버레이가 riotMatchId 로 공개 타임라인을 직접 받는다.
+   */
+  private async riotResult(
+    matchId: string,
+    blueTeamId: string | null,
+    redTeamId: string | null,
+  ) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: {
+        dataCollected: true,
+        riotMatchId: true,
+        gameDuration: true,
+        mvpUserId: true,
+        aceUserId: true,
+        participants: {
+          select: {
+            userId: true,
+            puuid: true,
+            riotTeamId: true,
+            teamIdSnapshot: true,
+            championName: true,
+            kills: true,
+            deaths: true,
+            assists: true,
+            goldEarned: true,
+            totalDamageDealtToChampions: true,
+            user: { select: { username: true } },
+            riotIdSnapshot: true,
+          },
+        },
+        teamStats: {
+          select: {
+            teamIdSnapshot: true,
+            towerKills: true,
+            dragonKills: true,
+            baronKills: true,
+            riftHeraldKills: true,
+          },
+        },
+      },
+    });
+    if (!match?.dataCollected || match.participants.length === 0) return null;
+
+    const side = (teamId: string | null) => {
+      const members = match.participants.filter(
+        (p) => teamId && p.teamIdSnapshot === teamId,
+      );
+      const stats = match.teamStats.find((t) => t.teamIdSnapshot === teamId);
+      return {
+        kills: members.reduce((sum, p) => sum + p.kills, 0),
+        gold: members.reduce((sum, p) => sum + p.goldEarned, 0),
+        towers: stats?.towerKills ?? 0,
+        dragons: stats?.dragonKills ?? 0,
+        barons: stats?.baronKills ?? 0,
+        heralds: stats?.riftHeraldKills ?? 0,
+        riotTeamId: members[0]?.riotTeamId ?? null,
+        puuids: members.flatMap((p) => (p.puuid ? [p.puuid] : [])),
+      };
+    };
+    const pick = (userId: string | null) => {
+      const p = userId
+        ? match.participants.find((row) => row.userId === userId)
+        : null;
+      if (!p) return null;
+      return {
+        userId: p.userId,
+        username: p.user?.username ?? p.riotIdSnapshot ?? null,
+        championName: p.championName,
+        kills: p.kills,
+        deaths: p.deaths,
+        assists: p.assists,
+        damage: p.totalDamageDealtToChampions,
+      };
+    };
+
+    return {
+      riotMatchId: match.riotMatchId,
+      gameDuration: match.gameDuration,
+      mvp: pick(match.mvpUserId),
+      ace: pick(match.aceUserId),
+      blue: side(blueTeamId),
+      red: side(redTeamId),
+    };
+  }
+
   /** 클랜 → 방송 테마(엠블럼/배너/강조색). 클랜 없으면 null. */
   private clanTheme(clan: any) {
     if (!clan) return null;
@@ -690,13 +868,33 @@ export class BroadcastService {
             )
           : null;
 
+      const detail = this.matchDetail(
+        match,
+        teamById,
+        match ? seriesByMatchId.get(match.id) : null,
+      );
+      // 선수 소개(경기 소개·라인업)에 붙는 랭킹 순위·칭찬, 결과 화면의 기록 요약
+      const [badges, riotResult] = detail
+        ? await Promise.all([
+            this.playerBadges(
+              [
+                ...(detail.blue?.members ?? []),
+                ...(detail.red?.members ?? []),
+              ].map((m: any) => m.userId),
+            ),
+            match?.status === "COMPLETED"
+              ? this.riotResult(
+                  match.id,
+                  detail.blue?.id ?? null,
+                  detail.red?.id ?? null,
+                )
+              : Promise.resolve(null),
+          ])
+        : [{}, null];
+
       return {
         ...common,
-        match: this.matchDetail(
-          match,
-          teamById,
-          match ? seriesByMatchId.get(match.id) : null,
-        ),
+        match: detail ? { ...detail, badges, riot: riotResult } : null,
         ...(sideResult ? { sideResult } : {}),
       };
     }

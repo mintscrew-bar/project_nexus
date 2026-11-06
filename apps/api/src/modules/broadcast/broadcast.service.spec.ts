@@ -43,7 +43,7 @@ describe("BroadcastService auto 장면", () => {
       },
     };
     matchSeries = { getRoomSeriesScores: jest.fn().mockResolvedValue([]) };
-    service = new BroadcastService(prisma, {} as any, matchSeries);
+    service = new BroadcastService(prisma, {} as any, matchSeries, {} as any);
   });
 
   describe("다전제 세트 스코어", () => {

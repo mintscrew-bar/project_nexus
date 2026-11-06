@@ -20,13 +20,14 @@ export const BROADCAST_FONTS = [
 ] as const;
 export type BroadcastFont = (typeof BROADCAST_FONTS)[number];
 
+/** 장면(대기·경매·대진표 등) 뒤에 깔리는 배경. 경기 중 점수판은 항상 투명이다. */
 export const BROADCAST_BACKGROUNDS = [
-  "transparent", // 게임 화면 위에 합성 (기본)
+  "aurora", // 천천히 움직이는 빛 + 격자 (기존 기본 모습)
+  "gradient", // 움직이지 않는 은은한 그라데이션
   "solid", // 단색
-  "gradient", // 강조색 은은한 그라데이션 (예전 bg=opaque)
-  "aurora", // 천천히 움직이는 빛
-  "grain", // 필름 그레인
+  "grain", // 단색 + 필름 그레인
   "particles", // 떠다니는 입자
+  "transparent", // 배경 없이 패널만 — 게임·캠 화면 위에 합성
 ] as const;
 export type BroadcastBackground = (typeof BROADCAST_BACKGROUNDS)[number];
 
@@ -122,7 +123,7 @@ export const DEFAULT_BROADCAST_SETTINGS: BroadcastSettings = {
   font: "default",
   idle: { title: null, subtitle: null },
   breakScreen: { title: null, subtitle: null },
-  background: { type: "transparent", intensity: 50 },
+  background: { type: "aurora", intensity: 50 },
   transition: { style: "wipe", speed: "normal", showLabel: true },
   // OBS 오디오 믹서에 소스가 새로 생기면 놀랄 수 있어 기본은 꺼 둔다
   sfx: { enabled: false, volume: 60 },
