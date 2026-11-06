@@ -181,6 +181,17 @@ export class BroadcastController {
 
   // ── 공개 스냅샷 (OBS) ──
 
+  /** 경매 매물 카드용 선수 프로필 — 송출 중인 방의 참가자만 (서비스 주석 참고) */
+  @Get(":token/players/:userId")
+  @Public()
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  async getPlayerProfile(
+    @Param("token") token: string,
+    @Param("userId") userId: string,
+  ) {
+    return this.broadcastService.getPlayerProfile(token, userId);
+  }
+
   @Get(":token/snapshot")
   @Public()
   async getSnapshot(

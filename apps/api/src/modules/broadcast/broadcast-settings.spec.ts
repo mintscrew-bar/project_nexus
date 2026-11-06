@@ -39,7 +39,7 @@ describe("normalizeBroadcastSettings (방송 커스터마이징 정규화)", () 
     expect(result.colors.accent).toBeNull();
     expect(result.preset).toBe("default");
     expect(result.scale).toBe(1.2);
-    expect(result.background).toEqual({ type: "transparent", intensity: 0 });
+    expect(result.background).toEqual({ type: "aurora", intensity: 0 });
     expect(result.transition.style).toBe("wipe");
     expect(result.nameDisplay).toBe("nickname");
   });

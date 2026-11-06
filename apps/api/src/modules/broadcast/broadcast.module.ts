@@ -3,9 +3,10 @@ import { BroadcastController } from "./broadcast.controller";
 import { BroadcastService } from "./broadcast.service";
 import { MatchModule } from "../match/match.module";
 import { UploadModule } from "../upload/upload.module";
+import { UserModule } from "../user/user.module";
 
 @Module({
-  imports: [MatchModule, UploadModule],
+  imports: [MatchModule, UploadModule, UserModule],
   controllers: [BroadcastController],
   providers: [BroadcastService],
 })
