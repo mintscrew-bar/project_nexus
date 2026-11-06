@@ -25,14 +25,6 @@ import {
 const DEFAULT_ACCENT = "#8B5CF6";
 
 const broadcastBgCss = `
-@keyframes nexus-grain-shift {
-  0% { transform: translate(0, 0); }
-  20% { transform: translate(-3%, 2%); }
-  40% { transform: translate(2%, -3%); }
-  60% { transform: translate(-2%, -1%); }
-  80% { transform: translate(3%, 2%); }
-  100% { transform: translate(0, 0); }
-}
 @keyframes nexus-particle-rise {
   0% { transform: translate(0, 0); opacity: 0; }
   10% { opacity: 1; }
@@ -338,13 +330,8 @@ export function StageBackground({ accent }: { accent: string }) {
       )}
       {type === "grain" && (
         <div
-          className="absolute -inset-[10%]"
-          style={{
-            opacity: fx(0.22),
-            animation: "nexus-grain-shift 1.2s steps(6) infinite",
-            backgroundImage:
-              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.9'/></svg>\")",
-          }}
+          className="pubg-grain-film"
+          style={{ opacity: fx(1) }}
         />
       )}
       {type === "particles" && (
