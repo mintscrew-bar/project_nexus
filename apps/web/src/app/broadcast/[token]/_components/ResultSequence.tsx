@@ -371,13 +371,16 @@ function FlowStage({ match }: { match: any }) {
   const riot = match.riot;
   const blue = sideColor(look, "blue", match.blue?.color);
   const red = sideColor(look, "red", match.red?.color);
-  const { data: timeline } = useQuery({
+  const { data: fetchedTimeline } = useQuery({
     queryKey: ["broadcastTimeline", riot?.riotMatchId],
     queryFn: () => statsApi.getMatchTimeline(riot.riotMatchId),
     enabled: Boolean(riot?.riotMatchId),
     staleTime: Infinity,
     retry: false,
   });
+  // 미리보기는 외부 API 없이도 실제 그래프 컴포넌트를 검증할 수 있게 목업 타임라인을 싣는다.
+  // 운영 스냅샷에는 이 필드가 없으므로 riotMatchId 조회 결과만 사용한다.
+  const timeline = fetchedTimeline ?? riot?.timeline;
   const rows: {
     label: string;
     b: number;

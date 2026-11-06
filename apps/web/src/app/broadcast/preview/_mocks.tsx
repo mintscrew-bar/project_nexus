@@ -243,6 +243,105 @@ const mockBoardPlayers = (
     cs,
   }));
 
+/**
+ * 경기 결과 미리보기용 Riot 타임라인.
+ * 초반 접전 → 레드의 짧은 우세 → 블루가 오브젝트를 쌓으며 12.2K 차이로 끝나는 흐름이다.
+ * 실제 TeamGoldChart가 사용하는 participantFrames/events 모양을 그대로 써서 목업 전용
+ * 그래프를 따로 만들지 않는다.
+ */
+const MOCK_GOLD_TIMELINE = (() => {
+  const weights = [0.2, 0.19, 0.21, 0.24, 0.16];
+  const split = (total: number) => {
+    const values = weights.map((weight) => Math.round(total * weight));
+    values[4] += total - values.reduce((sum, value) => sum + value, 0);
+    return values;
+  };
+  const eventsByMinute: Record<number, any[]> = {
+    6: [
+      {
+        type: "ELITE_MONSTER_KILL",
+        monsterType: "HORDE",
+        killerTeamId: 100,
+      },
+    ],
+    9: [
+      {
+        type: "ELITE_MONSTER_KILL",
+        monsterType: "DRAGON",
+        killerTeamId: 200,
+      },
+    ],
+    12: [
+      { type: "BUILDING_KILL", buildingType: "TOWER_BUILDING", teamId: 200 },
+    ],
+    15: [
+      {
+        type: "ELITE_MONSTER_KILL",
+        monsterType: "DRAGON",
+        killerTeamId: 100,
+      },
+    ],
+    18: [
+      {
+        type: "ELITE_MONSTER_KILL",
+        monsterType: "RIFTHERALD",
+        killerTeamId: 100,
+      },
+    ],
+    21: [
+      {
+        type: "ELITE_MONSTER_KILL",
+        monsterType: "DRAGON",
+        killerTeamId: 100,
+      },
+    ],
+    24: [
+      {
+        type: "ELITE_MONSTER_KILL",
+        monsterType: "BARON_NASHOR",
+        killerTeamId: 100,
+      },
+    ],
+    27: [
+      {
+        type: "BUILDING_KILL",
+        buildingType: "INHIBITOR_BUILDING",
+        teamId: 200,
+      },
+    ],
+  };
+
+  return {
+    metadata: {
+      participants: Array.from({ length: 10 }, (_, i) =>
+        i < 5 ? `blue-${i + 1}` : `red-${i - 4}`,
+      ),
+    },
+    info: {
+      frames: Array.from({ length: 29 }, (_, minute) => {
+        const progress = minute / 28;
+        const blueTotal = Math.round(
+          2500 + 61800 * progress - 6000 * Math.sin(Math.PI * progress),
+        );
+        const redTotal = Math.round(2500 + 49600 * progress);
+        const blueGold = split(blueTotal);
+        const redGold = split(redTotal);
+        return {
+          timestamp: minute * 60_000,
+          participantFrames: Object.fromEntries([
+            ...blueGold.map((totalGold, i) => [i + 1, { totalGold }]),
+            ...redGold.map((totalGold, i) => [i + 6, { totalGold }]),
+          ]),
+          events: (eventsByMinute[minute] ?? []).map((event) => ({
+            ...event,
+            timestamp: minute * 60_000,
+          })),
+        };
+      }),
+    },
+  };
+})();
+
 export const SNAP: Record<string, any> = {
   waiting: {
     ...common("WAITING"),
@@ -569,9 +668,10 @@ export const SNAP: Record<string, any> = {
       redScore: 1,
       blue: TEAM_BLUE,
       red: TEAM_RED,
-      // Riot 기록이 수집된 판 — 자동 MVP·ACE, 진영 비교 (골드 그래프는 타임라인이 없어 대기 표시)
+      // Riot 기록이 수집된 판 — 자동 MVP·ACE, 진영 비교, 목업 골드 타임라인
       riot: {
         riotMatchId: null,
+        timeline: MOCK_GOLD_TIMELINE,
         gameDuration: 1712,
         mvp: {
           userId: "u2",
