@@ -39,7 +39,13 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
   };
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <StageBackground accent={look.accent} />
+      <StageBackground
+        accent={look.accent}
+        sideColors={{
+          blue: sideColor(look, "blue"),
+          red: sideColor(look, "red"),
+        }}
+      />
       <div className="relative flex h-full flex-col items-center justify-center px-32 text-center text-white">
         <style>{SWAP_CSS}</style>
         {title && (

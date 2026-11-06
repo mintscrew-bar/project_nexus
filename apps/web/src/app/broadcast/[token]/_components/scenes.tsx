@@ -156,11 +156,19 @@ export function statusLabel(status?: string): string {
 
 /** 강조색 — 방송인 설정 → 클랜 강조색 → 넥서스 보라 (look.tsx resolveLook) */
 export function accentOf(snapshot: any): string {
-  return resolveLook(snapshot?.settings, snapshot?.theme).accent || DEFAULT_ACCENT;
+  return (
+    resolveLook(snapshot?.settings, snapshot?.theme).accent || DEFAULT_ACCENT
+  );
 }
 
 /** 선수 이름 — 방송인 설정에 따라 닉네임 / Riot ID / 둘 다 (look.tsx playerDisplayName) */
-function PlayerName({ player, fallback = "" }: { player: any; fallback?: string }) {
+function PlayerName({
+  player,
+  fallback = "",
+}: {
+  player: any;
+  fallback?: string;
+}) {
   const { settings } = useBroadcastLook();
   return <>{playerDisplayName(player, settings.nameDisplay) || fallback}</>;
 }
@@ -168,7 +176,11 @@ function PlayerName({ player, fallback = "" }: { player: any; fallback?: string 
 /** 팀 이름 — 방송인 설정에 따라 팀 이름 또는 팀장 이름 (look.tsx teamDisplayName) */
 function TeamName({ team, fallback = "" }: { team: any; fallback?: string }) {
   const { settings } = useBroadcastLook();
-  return <>{team ? teamDisplayName(team, settings.teamLabel) || fallback : fallback}</>;
+  return (
+    <>
+      {team ? teamDisplayName(team, settings.teamLabel) || fallback : fallback}
+    </>
+  );
 }
 
 export function HudLabel({
@@ -203,7 +215,13 @@ function HudRule({ color }: { color: string }) {
  * 장면 배경 — 방송인이 고른 종류·세기대로 그린다(경기 중 점수판은 StageFrame 을 쓰지 않아 항상 투명).
  * 세기(0~100)는 효과 레이어의 불투명도에 곱한다. 50 이 예전 기본 모습이다.
  */
-export function StageBackground({ accent }: { accent: string }) {
+export function StageBackground({
+  accent,
+  sideColors,
+}: {
+  accent: string;
+  sideColors?: { blue: string; red: string };
+}) {
   const { settings } = useBroadcastLook();
   const { type, intensity } = settings.background;
   const k = intensity / 50; // 1 = 예전 기본 세기
@@ -220,7 +238,7 @@ export function StageBackground({ accent }: { accent: string }) {
   return (
     <div
       className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
-      style={{ background: base }}
+      style={{ background: sideColors ? "#06080d" : base }}
     >
       <style>{broadcastBgCss}</style>
       {(type === "aurora" || type === "gradient") && (
@@ -228,15 +246,17 @@ export function StageBackground({ accent }: { accent: string }) {
           className="absolute -inset-[12%]"
           style={{
             animation:
-              type === "aurora"
+              type === "aurora" && !sideColors
                 ? "nexus-live-bg-pan 16s ease-in-out infinite"
                 : undefined,
             opacity: fx(1),
-            background: `radial-gradient(circle at 18% 20%, rgba(0,177,255,0.18), transparent 28%), radial-gradient(circle at 76% 28%, rgba(245,158,11,0.14), transparent 24%), radial-gradient(circle at 54% 82%, ${accent}2e, transparent 32%)`,
+            background: sideColors
+              ? `radial-gradient(ellipse at 8% 58%, ${sideColors.blue}22, transparent 46%), radial-gradient(ellipse at 92% 58%, ${sideColors.red}22, transparent 46%)`
+              : `radial-gradient(circle at 18% 20%, rgba(0,177,255,0.18), transparent 28%), radial-gradient(circle at 76% 28%, rgba(245,158,11,0.14), transparent 24%), radial-gradient(circle at 54% 82%, ${accent}2e, transparent 32%)`,
           }}
         />
       )}
-      {type === "aurora" && (
+      {type === "aurora" && !sideColors && (
         <>
           <div
             className="absolute inset-0"
@@ -269,7 +289,9 @@ export function StageBackground({ accent }: { accent: string }) {
           }}
         />
       )}
-      {type === "particles" && <StageParticles accent={accent} opacity={fx(0.9)} />}
+      {type === "particles" && (
+        <StageParticles accent={accent} opacity={fx(0.9)} />
+      )}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.42)_72%,rgba(0,0,0,0.72)_100%)]" />
     </div>
   );
@@ -284,7 +306,13 @@ const PARTICLES = Array.from({ length: 36 }, (_, i) => ({
   drift: ((i % 5) - 2) * 18,
 }));
 
-function StageParticles({ accent, opacity }: { accent: string; opacity: number }) {
+function StageParticles({
+  accent,
+  opacity,
+}: {
+  accent: string;
+  opacity: number;
+}) {
   return (
     <div className="absolute inset-0" style={{ opacity }}>
       {PARTICLES.map((p, i) => (
@@ -368,7 +396,8 @@ export function IdleScene({ snapshot }: { snapshot: any }) {
           <h1 className="text-[86px] font-black leading-[0.96] tracking-normal text-white">
             {settings.idle.title ?? "곧 방송을 시작합니다"}
           </h1>
-          {(settings.idle.subtitle ?? (settings.show.englishLabels ? "Standby" : null)) && (
+          {(settings.idle.subtitle ??
+            (settings.show.englishLabels ? "Standby" : null)) && (
             <p
               className={`mt-8 text-2xl font-black text-white/36 ${
                 settings.idle.subtitle ? "" : "uppercase tracking-[0.34em]"
@@ -419,10 +448,13 @@ export function BreakScene({ snapshot }: { snapshot: any }) {
           <h1 className="text-[86px] font-black leading-[0.96] tracking-normal text-white">
             {settings.breakScreen.title ?? "잠시 후 계속됩니다"}
           </h1>
-          {(settings.breakScreen.subtitle ?? (settings.show.englishLabels ? "Be Right Back" : null)) && (
+          {(settings.breakScreen.subtitle ??
+            (settings.show.englishLabels ? "Be Right Back" : null)) && (
             <p
               className={`mt-8 text-2xl font-black text-white/36 ${
-                settings.breakScreen.subtitle ? "" : "uppercase tracking-[0.34em]"
+                settings.breakScreen.subtitle
+                  ? ""
+                  : "uppercase tracking-[0.34em]"
               }`}
             >
               {settings.breakScreen.subtitle ?? "Be Right Back"}
@@ -632,7 +664,9 @@ export function AuctionScene({ snapshot }: { snapshot: any }) {
                       key={member.userId ?? member.id ?? member.username}
                       className="grid grid-cols-[minmax(0,1fr)_64px] gap-2 text-sm font-bold text-white/72"
                     >
-                      <span className="truncate"><PlayerName player={member} fallback="-" /></span>
+                      <span className="truncate">
+                        <PlayerName player={member} fallback="-" />
+                      </span>
                       <span className="text-right text-white/34">
                         {member.soldPrice != null ? `${member.soldPrice}G` : ""}
                       </span>
@@ -668,7 +702,11 @@ function MatchFlank({
   align: "left" | "right";
 }) {
   const look = useBroadcastLook();
-  const teamColor = sideColor(look, side === "BLUE" ? "blue" : "red", team?.color);
+  const teamColor = sideColor(
+    look,
+    side === "BLUE" ? "blue" : "red",
+    team?.color,
+  );
   const right = align === "right";
 
   const scoreEl = (
@@ -924,51 +962,52 @@ export function MatchResultScene({ snapshot }: { snapshot: any }) {
           roomName={snapshot?.room?.name ?? null}
         />
       ) : (
-      <div className="flex h-full w-full flex-col items-center justify-center px-24 text-center">
-        <div style={{ animation: "nexus-result-rise 700ms ease-out both" }}>
-          <HudLabel color={winner?.color ?? accent}>MATCH RESULT</HudLabel>
-          <p className="mt-4 text-xl font-black uppercase tracking-[0.26em] text-white/40">
-            {roundLabel}
-            {match.matchNumber != null ? ` · MATCH ${match.matchNumber}` : ""}
-          </p>
-          <div className="mt-12 flex items-center justify-center gap-14">
-            <div className="min-w-[520px] border-y border-white/18 py-10">
-              <p className="text-sm font-black uppercase tracking-[0.34em] text-amber-300">
-                Winner
-              </p>
-              <h1
-                className="mt-5 truncate text-[82px] font-black leading-none"
-                style={{ color: winner?.color ?? accent }}
-              >
-                <TeamName team={winner} fallback="결과 확인 중" />
-              </h1>
-              <div className="mt-8 flex justify-center -space-x-2">
-                {(winner?.members ?? []).slice(0, 5).map((member: any) => (
-                  // 방송 토큰 스냅샷의 외부 아바타 URL을 그대로 표시한다.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={member.userId}
-                    src={
-                      member.avatar || "/images/placeholders/non-avatar-64.png"
-                    }
-                    alt=""
-                    className="h-16 w-16 rounded-full border-2 border-[#05070d] object-cover"
-                  />
-                ))}
+        <div className="flex h-full w-full flex-col items-center justify-center px-24 text-center">
+          <div style={{ animation: "nexus-result-rise 700ms ease-out both" }}>
+            <HudLabel color={winner?.color ?? accent}>MATCH RESULT</HudLabel>
+            <p className="mt-4 text-xl font-black uppercase tracking-[0.26em] text-white/40">
+              {roundLabel}
+              {match.matchNumber != null ? ` · MATCH ${match.matchNumber}` : ""}
+            </p>
+            <div className="mt-12 flex items-center justify-center gap-14">
+              <div className="min-w-[520px] border-y border-white/18 py-10">
+                <p className="text-sm font-black uppercase tracking-[0.34em] text-amber-300">
+                  Winner
+                </p>
+                <h1
+                  className="mt-5 truncate text-[82px] font-black leading-none"
+                  style={{ color: winner?.color ?? accent }}
+                >
+                  <TeamName team={winner} fallback="결과 확인 중" />
+                </h1>
+                <div className="mt-8 flex justify-center -space-x-2">
+                  {(winner?.members ?? []).slice(0, 5).map((member: any) => (
+                    // 방송 토큰 스냅샷의 외부 아바타 URL을 그대로 표시한다.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={member.userId}
+                      src={
+                        member.avatar ||
+                        "/images/placeholders/non-avatar-64.png"
+                      }
+                      alt=""
+                      className="h-16 w-16 rounded-full border-2 border-[#05070d] object-cover"
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="text-5xl font-black text-white/18">VS</div>
-            <div className="min-w-[420px] py-10 opacity-45">
-              <p className="text-sm font-black uppercase tracking-[0.34em] text-white/40">
-                Match Complete
-              </p>
-              <p className="mt-5 truncate text-[54px] font-black leading-none text-white">
-                <TeamName team={loser} fallback="상대 팀" />
-              </p>
+              <div className="text-5xl font-black text-white/18">VS</div>
+              <div className="min-w-[420px] py-10 opacity-45">
+                <p className="text-sm font-black uppercase tracking-[0.34em] text-white/40">
+                  Match Complete
+                </p>
+                <p className="mt-5 truncate text-[54px] font-black leading-none text-white">
+                  <TeamName team={loser} fallback="상대 팀" />
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       )}
     </StageFrame>
   );
@@ -1197,17 +1236,17 @@ function IntroMember({
       <div
         className={`mt-2 flex h-7 items-center gap-1.5 ${side === "right" ? "justify-end" : ""}`}
       >
-        {preferences.length > 0 ? (
-          preferences.map((preference: any, index: number) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={`${preference.championId}-${index}`}
-              src={getChampionIconUrl(preference.championId)}
-              alt=""
-              className="h-7 w-7 rounded-full border border-white/18 object-cover"
-            />
-          ))
-        ) : null}
+        {preferences.length > 0
+          ? preferences.map((preference: any, index: number) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={`${preference.championId}-${index}`}
+                src={getChampionIconUrl(preference.championId)}
+                alt=""
+                className="h-7 w-7 rounded-full border border-white/18 object-cover"
+              />
+            ))
+          : null}
       </div>
     </div>
   );
