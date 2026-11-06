@@ -17,7 +17,6 @@ const SWAP_CSS = `
   0%, 100% { translate: 0 0; }
   50% { translate: 0 var(--arc-height); }
 }
-@keyframes side-swap-arrow { from { transform: rotate(0deg); } to { transform: rotate(180deg); } }
 @keyframes side-swap-pending { from { opacity: 1; } to { opacity: 0; } }
 @keyframes side-swap-complete { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
@@ -75,8 +74,13 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
             }
           >
             <p
-              className="text-2xl font-black tracking-widest"
-              style={{ color: sideColor(look, side) }}
+              className="side-swap-motion text-2xl font-black tracking-widest"
+              style={{
+                color: sideColor(look, side),
+                animation: animate
+                  ? "side-swap-complete 280ms ease-out 1500ms both"
+                  : undefined,
+              }}
             >
               {side === "blue" ? "블루 진영" : "레드 진영"}
             </p>
@@ -90,7 +94,7 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
                     side === "blue" ? "red" : "blue",
                   ),
                   "--new-color": sideColor(look, side),
-                  "--arc-height": side === "blue" ? "-48px" : "48px",
+                  "--arc-height": side === "blue" ? "-64px" : "64px",
                   willChange: animate ? "transform, translate" : undefined,
                   animation: animate
                     ? `side-swap-${side} 1200ms cubic-bezier(.45,0,.25,1) 250ms both, side-swap-arc 1200ms ease-in-out 250ms both`
@@ -102,17 +106,6 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
             </p>
           </div>
         ))}
-        <span
-          className="side-swap-motion col-start-2 row-start-1 text-[72px] text-white/35"
-          style={{
-            animation: animate
-              ? "side-swap-arrow 1200ms cubic-bezier(.45,0,.25,1) 250ms both"
-              : undefined,
-          }}
-          aria-hidden
-        >
-          ⇄
-        </span>
       </div>
       <p className="mt-14 text-[28px] font-black text-white/60">
         {match.status === "IN_PROGRESS"
