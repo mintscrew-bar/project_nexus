@@ -5,18 +5,21 @@ import type { CSSProperties } from "react";
 
 const SWAP_CSS = `
 @keyframes side-swap-blue {
-  0%, 20% { transform: translateX(calc(100% + 184px)); color: var(--old-color); }
-  55% { transform: translate(calc(50% + 92px), -58px); color: var(--old-color); }
-  85%, 100% { transform: none; color: var(--new-color); }
+  from { transform: translateX(calc(100% + 184px)); color: var(--old-color); }
+  to { transform: translateX(0); color: var(--new-color); }
 }
 @keyframes side-swap-red {
-  0%, 20% { transform: translateX(calc(-100% - 184px)); color: var(--old-color); }
-  55% { transform: translate(calc(-50% - 92px), 58px); color: var(--old-color); }
-  85%, 100% { transform: none; color: var(--new-color); }
+  from { transform: translateX(calc(-100% - 184px)); color: var(--old-color); }
+  to { transform: translateX(0); color: var(--new-color); }
+}
+/* 가로 이동과 곡선 높이를 분리해 가운데서 감속·재출발하지 않게 한다. */
+@keyframes side-swap-arc {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 var(--arc-height); }
 }
 @keyframes side-swap-arrow { from { transform: rotate(0deg); } to { transform: rotate(180deg); } }
-@keyframes side-swap-pending { 0%, 84% { opacity: 1; } 85%, 100% { opacity: 0; } }
-@keyframes side-swap-complete { 0%, 84% { opacity: 0; } 85%, 100% { opacity: 1; } }
+@keyframes side-swap-pending { from { opacity: 1; } to { opacity: 0; } }
+@keyframes side-swap-complete { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .side-swap-motion { animation: none !important; }
   .side-swap-pending { display: none; }
@@ -47,7 +50,7 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
           className="side-swap-motion side-swap-complete"
           style={{
             animation: animate
-              ? "side-swap-complete 1400ms linear both"
+              ? "side-swap-complete 280ms ease-out 1550ms both"
               : undefined,
           }}
         >
@@ -57,7 +60,7 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
           <span
             aria-hidden
             className="side-swap-motion side-swap-pending absolute inset-0"
-            style={{ animation: "side-swap-pending 1400ms linear both" }}
+            style={{ animation: "side-swap-pending 220ms ease-in 1320ms both" }}
           >
             진영 교대
           </span>
@@ -87,8 +90,10 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
                     side === "blue" ? "red" : "blue",
                   ),
                   "--new-color": sideColor(look, side),
+                  "--arc-height": side === "blue" ? "-48px" : "48px",
+                  willChange: animate ? "transform, translate" : undefined,
                   animation: animate
-                    ? `side-swap-${side} 1400ms cubic-bezier(.4,0,.2,1) both`
+                    ? `side-swap-${side} 1200ms cubic-bezier(.45,0,.25,1) 250ms both, side-swap-arc 1200ms ease-in-out 250ms both`
                     : undefined,
                 } as CSSProperties
               }
@@ -101,7 +106,7 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
           className="side-swap-motion col-start-2 row-start-1 text-[72px] text-white/35"
           style={{
             animation: animate
-              ? "side-swap-arrow 1000ms ease-in-out 280ms both"
+              ? "side-swap-arrow 1200ms cubic-bezier(.45,0,.25,1) 250ms both"
               : undefined,
           }}
           aria-hidden
