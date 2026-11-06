@@ -9,30 +9,41 @@ export function BackgroundMotion({ type }: { type: "studio" | "technical" }) {
     >
       <style>{`
       @keyframes bc-frame-trace { to { stroke-dashoffset: -2000; } }
+      @keyframes bc-studio-sweep { 0%, 100% { transform: translateX(-14%); opacity: .4; } 50% { transform: translateX(14%); opacity: .8; } }
       @keyframes bc-edge-drift { 0%, 100% { transform: translateX(-4%); opacity: .75; } 50% { transform: translateX(4%); opacity: 1; } }
       @media (prefers-reduced-motion: reduce) { .bc-background-motion { animation: none !important; } }
     `}</style>
       {type === "studio" ? (
-        <svg
-          className="absolute inset-0 h-full w-full"
-          viewBox="0 0 1920 1080"
-          preserveAspectRatio="none"
-        >
-          <rect
-            x="77"
-            y="43"
-            width="1766"
-            height="994"
-            fill="none"
-            stroke="white"
-            strokeOpacity=".42"
-            strokeWidth="2.5"
-            pathLength="2000"
-            strokeDasharray="150 850"
-            className="bc-background-motion"
-            style={{ animation: "bc-frame-trace 22s linear infinite" }}
+        <>
+          <div
+            className="bc-background-motion absolute -inset-x-[20%] inset-y-0"
+            style={{
+              animation: "bc-studio-sweep 10s ease-in-out infinite",
+              background:
+                "linear-gradient(115deg, transparent 10%, rgba(185,200,220,.07) 20%, transparent 32%, transparent 68%, rgba(185,200,220,.07) 80%, transparent 90%)",
+            }}
           />
-        </svg>
+          <svg
+            className="absolute inset-0 h-full w-full"
+            viewBox="0 0 1920 1080"
+            preserveAspectRatio="none"
+          >
+            <rect
+              x="77"
+              y="43"
+              width="1766"
+              height="994"
+              fill="none"
+              stroke="white"
+              strokeOpacity=".55"
+              strokeWidth="3"
+              pathLength="2000"
+              strokeDasharray="230 770"
+              className="bc-background-motion"
+              style={{ animation: "bc-frame-trace 12s linear infinite" }}
+            />
+          </svg>
+        </>
       ) : (
         <div
           className="bc-background-motion absolute -inset-x-[5%] inset-y-0"
