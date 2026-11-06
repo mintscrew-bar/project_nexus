@@ -42,45 +42,55 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
     animation: animate ? "side-swap-context 4000ms linear both" : undefined,
   };
   return (
-    <div className="flex h-full flex-col items-center justify-center px-32 pb-16 text-center text-white">
+    <div className="relative flex h-full flex-col items-center justify-center px-32 text-center text-white">
       <style>{SWAP_CSS}</style>
       {title && (
         <p
-          className="side-swap-motion max-w-full truncate text-[36px] font-black text-white/80"
+          className="side-swap-motion absolute left-20 top-16 max-w-[1000px] truncate text-[28px] font-black text-white/50"
           style={contextStyle}
         >
           {title}
         </p>
       )}
-      <p
-        className="side-swap-motion mt-4 text-[28px] font-black text-white/60"
-        style={contextStyle}
-      >
-        {match.currentGameNumber}세트
-      </p>
-      <h1 className="relative mt-8 w-[1000px] text-[64px] font-black leading-none">
-        <span
-          className="side-swap-motion side-swap-complete"
-          style={{
-            animation: animate
-              ? "side-swap-complete 280ms ease-out 2400ms both"
-              : undefined,
-          }}
+      <div className="flex items-center justify-center gap-6">
+        <p
+          className="side-swap-motion border-r border-white/25 pr-6 text-[32px] font-black text-white/60"
+          style={contextStyle}
         >
-          진영 교대 완료
-        </span>
-        {animate && (
+          {match.currentGameNumber}세트
+        </p>
+        <h1 className="relative text-[64px] font-black leading-none">
           <span
-            aria-hidden
-            className="side-swap-motion side-swap-pending absolute inset-0"
+            className="side-swap-motion side-swap-complete"
             style={{
-              animation: "side-swap-pending 200ms ease-in 800ms both",
+              animation: animate
+                ? "side-swap-complete 280ms ease-out 2400ms both"
+                : undefined,
             }}
           >
-            진영 교대
+            진영 교대 완료
           </span>
-        )}
-      </h1>
+          {animate && (
+            <span
+              aria-hidden
+              className="side-swap-motion side-swap-pending absolute inset-0"
+              style={{
+                animation: "side-swap-pending 200ms ease-in 800ms both",
+              }}
+            >
+              진영 교대
+            </span>
+          )}
+        </h1>
+      </div>
+      <p
+        className="side-swap-motion mt-4 text-[26px] font-black text-white/50"
+        style={contextStyle}
+      >
+        {match.status === "IN_PROGRESS"
+          ? "다음 세트가 시작됩니다"
+          : "양 팀 준비 후 경기가 시작됩니다"}
+      </p>
       <div className="mt-16 grid w-full grid-cols-[minmax(0,1fr)_120px_minmax(0,1fr)] items-center gap-8">
         {(["blue", "red"] as const).map((side, index) => (
           <div
@@ -123,14 +133,6 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
           </div>
         ))}
       </div>
-      <p
-        className="side-swap-motion mt-14 text-[28px] font-black text-white/60"
-        style={contextStyle}
-      >
-        {match.status === "IN_PROGRESS"
-          ? "다음 세트가 시작됩니다"
-          : "양 팀 준비 후 경기가 시작됩니다"}
-      </p>
     </div>
   );
 }
