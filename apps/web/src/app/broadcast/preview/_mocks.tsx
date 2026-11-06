@@ -2,6 +2,7 @@
 
 import { BroadcastShell } from "../[token]/_components/BroadcastShell";
 import { LowerThird } from "../[token]/_components/LowerThird";
+import { SideSwapScene } from "../[token]/_components/SideSwapScene";
 import {
   RoomScene,
   MatchScene,
@@ -1079,6 +1080,7 @@ export const SCENES: { key: string; label: string }[] = [
   { key: "lineup", label: "라인업 패널" },
   { key: "match", label: "경기 중계" },
   { key: "matchDone", label: "경기 결과" },
+  { key: "sideSwap", label: "진영 교대" },
   { key: "break", label: "휴식" },
   { key: "idle", label: "Idle(방 없음)" },
 ];
@@ -1242,6 +1244,19 @@ export function PreviewStage({
     <IdleScene snapshot={snapshot} />
   ) : sceneKey === "break" ? (
     <BreakScene snapshot={snapshot} />
+  ) : sceneKey === "sideSwap" ? (
+    <SideSwapScene
+      snapshot={withSettings({
+        ...SNAP.matchDone,
+        match: {
+          ...SNAP.matchDone.match,
+          status: "PENDING",
+          currentGameNumber: 2,
+          blue: TEAM_RED,
+          red: TEAM_BLUE,
+        },
+      })}
+    />
   ) : sceneKey === "matchDone" ? (
     <MatchResultScene snapshot={snapshot} />
   ) : sceneKey.startsWith("bracket") ? (
@@ -1275,7 +1290,10 @@ export function PreviewStage({
       scene={sceneNode}
       persistent={
         // 실제 오버레이처럼 경기·경기 소개·라인업·결과 장면에는 하단바를 띄우지 않는다
-        isMatch || sceneKey === "matchIntro" || sceneKey === "lineup" ? null : (
+        isMatch ||
+        sceneKey === "sideSwap" ||
+        sceneKey === "matchIntro" ||
+        sceneKey === "lineup" ? null : (
           <LowerThird snapshot={snapshot} bg={bg} />
         )
       }
