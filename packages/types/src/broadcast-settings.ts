@@ -34,7 +34,7 @@ export const BROADCAST_BACKGROUNDS = [
 ] as const;
 export type BroadcastBackground = (typeof BROADCAST_BACKGROUNDS)[number];
 
-export const BROADCAST_TRANSITIONS = ["wipe", "fade", "slide", "none"] as const;
+export const BROADCAST_TRANSITIONS = ["wipe", "fade", "slide", "shutter", "diagonal", "center", "custom", "none"] as const;
 export type BroadcastTransitionStyle = (typeof BROADCAST_TRANSITIONS)[number];
 
 export const BROADCAST_TRANSITION_SPEEDS = ["slow", "normal", "fast"] as const;
@@ -99,6 +99,11 @@ export interface BroadcastSettings {
     speed: BroadcastTransitionSpeed;
     /** 전환 때 장면 이름(AUCTION DRAFT 등)을 띄울지 */
     showLabel: boolean;
+    color?: string | null;
+    backgroundColor?: string | null;
+    videoUrl?: string | null;
+    durationMs?: number;
+    cutMs?: number;
   };
   sfx: {
     enabled: boolean;
@@ -134,7 +139,7 @@ export const DEFAULT_BROADCAST_SETTINGS: BroadcastSettings = {
     imageFit: "cover",
     imageDim: 40,
   },
-  transition: { style: "wipe", speed: "normal", showLabel: true },
+  transition: { style: "wipe", speed: "normal", showLabel: true, color: null, backgroundColor: null, videoUrl: null, durationMs: 2000, cutMs: 1000 },
   // OBS 오디오 믹서에 소스가 새로 생기면 놀랄 수 있어 기본은 꺼 둔다
   sfx: { enabled: false, volume: 60 },
   nameDisplay: "nickname",
@@ -256,6 +261,11 @@ export function normalizeBroadcastSettings(raw: unknown): BroadcastSettings {
         d.transition.speed,
       ),
       showLabel: bool(transition.showLabel, d.transition.showLabel),
+      color: color(transition.color),
+      backgroundColor: color(transition.backgroundColor),
+      videoUrl: typeof transition.videoUrl === "string" && SAFE_URL.test(transition.videoUrl) ? transition.videoUrl.slice(0, 500) : null,
+      durationMs: Math.round(clampNumber(transition.durationMs, 500, 10000, 2000)),
+      cutMs: Math.round(clampNumber(transition.cutMs, 0, clampNumber(transition.durationMs, 500, 10000, 2000), Math.min(1000, clampNumber(transition.durationMs, 500, 10000, 2000)))),
     },
     sfx: {
       enabled: bool(sfx.enabled, d.sfx.enabled),
