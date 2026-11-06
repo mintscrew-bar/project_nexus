@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BackgroundMotion } from "../[token]/_components/BackgroundMotion";
 
 const CONCEPTS = [
   {
@@ -28,6 +29,9 @@ function ConceptStage({ index }: { index: number }) {
       className="absolute inset-0 overflow-hidden"
       style={{ background: CONCEPTS[index].background }}
     >
+      {(index === 0 || index === 2) && (
+        <BackgroundMotion type={index === 0 ? "studio" : "technical"} />
+      )}
       {index === 0 && (
         <>
           <div className="absolute inset-[4%] border border-white/[0.07]" />

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { commendationTagLabel } from "@/lib/commendation";
 import { ResultSequence } from "./ResultSequence";
+import { BackgroundMotion } from "./BackgroundMotion";
 import type { ReactNode } from "react";
 import { getChampionIconUrl } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { getTierIcon } from "@/lib/tier-icon";
@@ -256,6 +257,7 @@ export function StageBackground({ accent }: { accent: string }) {
         )}
         {type === "studio" && (
           <div className="absolute inset-0" style={{ opacity: fx(1) }}>
+            <BackgroundMotion type="studio" />
             <div className="absolute inset-[4%] border border-white/[0.07]" />
             {[
               "top-[4%] left-[4%] border-l border-t",
@@ -272,6 +274,7 @@ export function StageBackground({ accent }: { accent: string }) {
         )}
         {type === "technical" && (
           <div className="absolute inset-0" style={{ opacity: fx(1) }}>
+            <BackgroundMotion type="technical" />
             <div
               className="absolute inset-0 opacity-[0.06]"
               style={{
