@@ -278,14 +278,14 @@ function WinStage({
       />
       {roomName && (
         <p
-          className="max-w-[1400px] truncate text-[34px] font-black text-white/80"
+          className="max-w-[1440px] truncate text-[36px] font-black text-white/85"
           style={{ animation: "rs-rise 500ms ease-out both" }}
         >
           {roomName}
         </p>
       )}
       <p
-        className="mt-3 pl-[0.3em] text-2xl font-black tracking-[0.3em] text-white/45"
+        className="mt-3 pl-[0.3em] text-2xl font-black tracking-[0.3em] text-white/55"
         style={{ animation: "rs-rise 500ms ease-out 100ms both" }}
       >
         {roundLine(match, roundLabel)}
@@ -302,7 +302,7 @@ function WinStage({
         const ls = stamp.length > 2 ? "0.22em" : "0.5em";
         return (
           <p
-            className="mt-12 text-[64px] font-black leading-none text-white"
+            className="mt-11 text-[56px] font-black leading-none text-white"
             style={{
               ["--rs-ls" as any]: ls,
               paddingLeft: ls,
@@ -315,7 +315,7 @@ function WinStage({
         );
       })()}
       <h1
-        className="mt-6 max-w-full truncate text-[190px] font-black leading-[1]"
+        className="mt-6 max-w-[1500px] truncate text-[clamp(112px,10vw,190px)] font-black leading-[1]"
         style={{
           color,
           animation:
@@ -329,15 +329,15 @@ function WinStage({
         style={{ animation: "rs-line-center 700ms ease-out 1300ms both" }}
       />
       <p
-        className="mt-7 flex items-baseline gap-8 text-3xl font-black text-white/55"
+        className="mt-7 flex items-center gap-5 text-[28px] font-black text-white/65"
         style={{ animation: "rs-rise 500ms ease-out 1500ms both" }}
       >
         <span>
           vs {teamDisplayName(loser, settings.teamLabel) || "상대 팀"}
         </span>
         {series && (
-          <span className="tabular-nums">
-            <span className="mr-2 text-xl text-white/40">세트</span>
+          <span className="border-l border-white/20 pl-5 tabular-nums">
+            <span className="mr-2 text-lg text-white/50">세트</span>
             <span style={{ color }}>
               {winnerIsRed ? series.red : series.blue}
             </span>
@@ -348,15 +348,17 @@ function WinStage({
           </span>
         )}
         {riot && (
-          <span className="tabular-nums">
+          <span className="border-l border-white/20 pl-5 tabular-nums">
+            <span className="mr-2 text-lg text-white/50">킬</span>
             <span style={{ color }}>{winKills}</span>
             <span className="mx-2 text-white/30">:</span>
             <span className="text-white/70">{loseKills}</span>
-            <span className="ml-2 text-xl text-white/40">킬</span>
           </span>
         )}
         {duration && (
-          <span className="tabular-nums text-white/40">{duration}</span>
+          <span className="border-l border-white/20 pl-5 tabular-nums text-white/55">
+            {duration}
+          </span>
         )}
       </p>
     </div>
@@ -683,11 +685,19 @@ function BoardStage({
               {series ? series.red : riot.red.kills}
             </span>
           </p>
-          <p className="mt-2 text-xl font-black tabular-nums text-white/45">
-            {series
-              ? `세트 스코어 · ${series.bestOf}판 ${Math.ceil(series.bestOf / 2)}선승 · 이번 세트 ${riot.blue.kills} : ${riot.red.kills} 킬`
-              : "킬"}
-          </p>
+          {series ? (
+            <>
+              <p className="mt-2 text-lg font-black text-white/50">
+                {series.bestOf}판 {Math.ceil(series.bestOf / 2)}선승 · 세트
+                스코어
+              </p>
+              <p className="mt-1 text-xl font-black tabular-nums text-white/70">
+                이번 세트 {riot.blue.kills} : {riot.red.kills} 킬
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-xl font-black text-white/55">킬</p>
+          )}
         </div>
         <TeamHead
           name={teamDisplayName(match.red, look.settings.teamLabel)}
@@ -707,7 +717,7 @@ function BoardStage({
           return (
             <div
               key={i}
-              className="grid h-[92px] grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)] items-stretch gap-3"
+              className="grid h-[96px] grid-cols-[minmax(0,1fr)_76px_minmax(0,1fr)] items-stretch gap-4"
               style={
                 animate
                   ? {
@@ -724,7 +734,7 @@ function BoardStage({
                 maxDamage={maxDamage}
                 riot={riot}
               />
-              <div className="flex flex-col items-center justify-center rounded-xl bg-black/25">
+              <div className="flex flex-col items-center justify-center border-x border-white/10">
                 {roleIcon && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -772,7 +782,7 @@ function TeamHead({
     >
       <p
         className="min-w-0 truncate text-[52px] font-black leading-none"
-        style={{ color: won ? color : "rgba(255,255,255,0.5)" }}
+        style={{ color: won ? color : "rgba(255,255,255,0.7)" }}
       >
         {name}
       </p>
@@ -783,7 +793,7 @@ function TeamHead({
             ? { background: color, color: "#fff" }
             : {
                 background: "rgba(255,255,255,0.08)",
-                color: "rgba(255,255,255,0.5)",
+                color: "rgba(255,255,255,0.7)",
               }
         }
       >
@@ -852,7 +862,7 @@ function LanePlayer({
   );
   // 피해량 막대는 가운데(라인 칸) 쪽으로 자란다
   const damage = (
-    <div className="w-[200px] shrink-0">
+    <div className="w-[210px] shrink-0">
       <div
         className={`flex h-2 overflow-hidden rounded-full bg-white/10 ${
           left ? "justify-end" : "justify-start"
@@ -864,7 +874,7 @@ function LanePlayer({
         />
       </div>
       <p
-        className={`mt-1 text-sm font-black tabular-nums text-white/55 ${
+        className={`mt-1 text-base font-black tabular-nums text-white/70 ${
           left ? "text-right" : "text-left"
         }`}
       >
@@ -876,14 +886,8 @@ function LanePlayer({
   return (
     <div
       className={`flex items-center gap-5 rounded-xl bg-black/35 px-5 ${
-        won ? "" : "opacity-55"
+        won ? "" : "opacity-75"
       } ${left ? "" : "flex-row-reverse"}`}
-      style={{
-        // 이긴 쪽만 바깥쪽 끝에 팀 색 띠
-        [left ? "borderLeft" : "borderRight"]: `6px solid ${
-          won ? color : "transparent"
-        }`,
-      }}
     >
       {icon}
       <div className="min-w-0 flex-1">{name}</div>
