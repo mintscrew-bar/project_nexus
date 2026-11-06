@@ -129,6 +129,39 @@ describe("BroadcastService auto 장면", () => {
     expect(result.scene).toBe("match");
   });
 
+  it("결과 재생 뒤 다음 세트가 있으면 4초간 진영 교대를 안내한다", async () => {
+    const clock = jest.spyOn(Date, "now").mockReturnValue(now);
+    const completedAt = new Date(now - 23_000);
+    mockMatches({ completed: { id: "set-1", completedAt } });
+    jest
+      .spyOn(service as any, "nextSeriesMatch")
+      .mockResolvedValue({ id: "set-2" });
+    try {
+      expect(await resolve({})).toEqual({
+        scene: "side-swap",
+        nextChangeAt: completedAt.getTime() + 26_000,
+      });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it("시리즈가 완료된 방에는 진영 교대 안내를 내보내지 않는다", async () => {
+    mockMatches({
+      completed: { id: "set-3", completedAt: new Date(now - 23_000) },
+    });
+    const next = jest.spyOn(service as any, "nextSeriesMatch");
+    expect((await resolve({ status: "COMPLETED" })).scene).toBe("summary");
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("단판처럼 다음 세트가 없으면 교대 장면을 건너뛴다", async () => {
+    mockMatches({
+      completed: { id: "single", completedAt: new Date(now - 23_000) },
+    });
+    expect((await resolve({})).scene).toBe("bracket");
+  });
+
   it("방장이 결과를 본 뒤 다음 경기를 고르면 그 선택을 따른다", async () => {
     mockMatches({
       live: { id: "match-2", startedAt: new Date(now - 1_000) },

@@ -10,6 +10,7 @@ import {
 } from "@/lib/socket-client";
 import { BroadcastShell } from "./_components/BroadcastShell";
 import { LowerThird } from "./_components/LowerThird";
+import { SideSwapScene } from "./_components/SideSwapScene";
 import {
   RoomScene,
   MatchScene,
@@ -107,6 +108,11 @@ const SCENE_TRANSITIONS: Record<
     eyebrow: "RESULT CONFIRMED",
     tone: "result",
   },
+  "side-swap": {
+    label: "진영 교대",
+    subLabel: "다음 세트",
+    tone: "match",
+  },
   summary: {
     label: "TOURNAMENT COMPLETE",
     subLabel: "전체 결과",
@@ -141,6 +147,7 @@ function sceneKeyOf({
   if (scene === "draft") return "draft";
   if (scene === "teams") return "teams";
   if (scene === "result") return "result";
+  if (scene === "side-swap") return "side-swap";
   if (scene === "summary") return "summary";
   if (scene === "room") return "waiting";
   if (scene === "match") {
@@ -322,6 +329,8 @@ export default function BroadcastPage() {
       <MatchIntroScene snapshot={snapshot} />
     ) : displayScene === "lineup" ? (
       <LineupOverlayScene snapshot={snapshot} />
+    ) : displayScene === "side-swap" ? (
+      <SideSwapScene snapshot={snapshot} />
     ) : displayScene === "result" ? (
       <MatchResultScene snapshot={snapshot} />
     ) : displayScene === "match" ? (
@@ -350,6 +359,7 @@ export default function BroadcastPage() {
     displayScene === "match-intro" ||
     displayScene === "lineup" ||
     displayScene === "result" ||
+    displayScene === "side-swap" ||
     displayScene === "summary" ? null : (
       <>
         <LowerThird snapshot={snapshot} bg={bg} />

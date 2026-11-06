@@ -28,6 +28,7 @@ export type BroadcastScene =
   | "match"
   | "bracket"
   | "result"
+  | "side-swap"
   | "summary"
   | "idle"
   | "break";
@@ -38,6 +39,7 @@ export type BroadcastScene =
  * 멈춘다(scenes.tsx MatchResultScene). 스코어보드를 읽을 시간까지 22초.
  */
 const RESULT_SCENE_MS = 22_000;
+const SIDE_SWAP_SCENE_MS = 4_000;
 /**
  * 중계 중인 경기 화면에 다른 경기 결과를 띄워 두는 시간.
  *
@@ -866,6 +868,20 @@ export class BroadcastService {
       sceneNextChangeAt: resolved.nextChangeAt,
     };
 
+    if (effectiveScene === "side-swap") {
+      const completed = await this.latestCompletedMatch(roomId);
+      const next = await this.nextSeriesMatch(roomId, completed);
+      return {
+        ...common,
+        match: next
+          ? {
+              ...this.matchDetail(next, teamById),
+              currentGameNumber: next.gameNumber,
+            }
+          : null,
+      };
+    }
+
     if (
       effectiveScene === "match" ||
       effectiveScene === "match-intro" ||
@@ -1031,6 +1047,11 @@ export class BroadcastService {
         latestCompleted.completedAt.getTime() + RESULT_SCENE_MS;
       if (now <= resultUntil) {
         return { scene: "result", nextChangeAt: resultUntil };
+      }
+      const swapUntil = resultUntil + SIDE_SWAP_SCENE_MS;
+      if (now <= swapUntil && room.status !== "COMPLETED") {
+        const next = await this.nextSeriesMatch(roomId, latestCompleted);
+        if (next) return { scene: "side-swap", nextChangeAt: swapUntil };
       }
     }
 
@@ -1218,7 +1239,22 @@ export class BroadcastService {
     return this.prisma.match.findFirst({
       where: { roomId, status: "COMPLETED", completedAt: { not: null } },
       orderBy: { completedAt: "desc" },
-      select: { id: true, completedAt: true },
+      select: { id: true, completedAt: true, seriesId: true, gameNumber: true },
+    });
+  }
+
+  /** 같은 시리즈의 바로 다음 세트만 안내한다. 단판·최종 세트에는 존재하지 않는다. */
+  private async nextSeriesMatch(roomId: string, completed: any) {
+    if (!completed?.seriesId) return null;
+    return this.prisma.match.findFirst({
+      where: {
+        roomId,
+        seriesId: completed.seriesId,
+        gameNumber: completed.gameNumber + 1,
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+        blueSideTeamId: { not: null },
+        series: { bestOf: { gt: 1 }, status: { not: "COMPLETED" } },
+      },
     });
   }
 
