@@ -19,6 +19,11 @@ const SWAP_CSS = `
 }
 @keyframes side-swap-pending { from { opacity: 1; } to { opacity: 0; } }
 @keyframes side-swap-complete { from { opacity: 0; } to { opacity: 1; } }
+@keyframes side-swap-emphasis {
+  0%, 28% { transform: scale(.9); color: rgba(255,255,255,.6); }
+  48%, 85% { transform: scale(1.06); color: white; }
+  100% { transform: scale(1); color: white; }
+}
 @media (prefers-reduced-motion: reduce) {
   .side-swap-motion { animation: none !important; }
   .side-swap-pending { display: none; }
@@ -44,22 +49,25 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
       <p className="mt-4 text-[28px] font-black text-white/60">
         {match.currentGameNumber}세트
       </p>
-      <h1 className="relative mt-8 text-[88px] font-black leading-none">
+      <h1 className="relative mt-8 w-[1000px] text-[88px] font-black leading-none">
         <span
           className="side-swap-motion side-swap-complete"
           style={{
             animation: animate
-              ? "side-swap-complete 280ms ease-out 1550ms both"
+              ? "side-swap-complete 280ms ease-out 2000ms both"
               : undefined,
           }}
         >
-          진영 교대 완료
+          완료
         </span>
         {animate && (
           <span
             aria-hidden
             className="side-swap-motion side-swap-pending absolute inset-0"
-            style={{ animation: "side-swap-pending 220ms ease-in 1320ms both" }}
+            style={{
+              animation:
+                "side-swap-emphasis 1900ms ease-in-out both, side-swap-pending 200ms ease-in 1800ms both",
+            }}
           >
             진영 교대
           </span>
@@ -78,7 +86,7 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
               style={{
                 color: sideColor(look, side),
                 animation: animate
-                  ? "side-swap-complete 280ms ease-out 1500ms both"
+                  ? "side-swap-complete 280ms ease-out 1950ms both"
                   : undefined,
               }}
             >
@@ -97,7 +105,7 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
                   "--arc-height": side === "blue" ? "-64px" : "64px",
                   willChange: animate ? "transform, translate" : undefined,
                   animation: animate
-                    ? `side-swap-${side} 1200ms cubic-bezier(.45,0,.25,1) 250ms both, side-swap-arc 1200ms ease-in-out 250ms both`
+                    ? `side-swap-${side} 1200ms cubic-bezier(.45,0,.25,1) 600ms both, side-swap-arc 1200ms ease-in-out 600ms both`
                     : undefined,
                 } as CSSProperties
               }
