@@ -16,11 +16,11 @@ export function BackgroundMotion({ type }: { type: "studio" | "technical" }) {
       {type === "studio" ? (
         <>
           <div
-            className="bc-background-motion absolute -inset-x-[20%] inset-y-0"
+            className="bc-background-motion absolute -inset-[25%]"
             style={{
               animation: "bc-studio-sweep 10s ease-in-out infinite",
               background:
-                "linear-gradient(115deg, transparent 10%, rgba(185,200,220,.07) 20%, transparent 32%, transparent 68%, rgba(185,200,220,.07) 80%, transparent 90%)",
+                "radial-gradient(ellipse at 18% 35%, rgba(185,200,220,.12) 0%, rgba(185,200,220,.06) 22%, rgba(185,200,220,0) 58%), radial-gradient(ellipse at 82% 65%, rgba(185,200,220,.09) 0%, rgba(185,200,220,.04) 24%, rgba(185,200,220,0) 60%)",
             }}
           />
           <svg
@@ -37,6 +37,7 @@ export function BackgroundMotion({ type }: { type: "studio" | "technical" }) {
               stroke="white"
               strokeOpacity=".55"
               strokeWidth="3"
+              strokeLinecap="round"
               pathLength="2000"
               strokeDasharray="230 770"
               className="bc-background-motion"
