@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 const OPTIONS = [
   { name: "양옆 셔터", detail: "양쪽에서 닫힌 뒤 새 화면을 공개합니다." },
@@ -9,9 +10,9 @@ const OPTIONS = [
 ];
 
 const CSS = `
-@keyframes tx-left { 0% { transform: translateX(-102%); } 38%, 62% { transform: translateX(0); } 100% { transform: translateX(-102%); } }
-@keyframes tx-right { 0% { transform: translateX(102%); } 38%, 62% { transform: translateX(0); } 100% { transform: translateX(102%); } }
-@keyframes tx-diagonal { 0% { transform: translateX(-130%) skewX(-16deg); } 45%, 55% { transform: translateX(0) skewX(-16deg); } 100% { transform: translateX(130%) skewX(-16deg); } }
+@keyframes tx-left { 0%, 100% { transform: translateX(-102%); } 38%, 62% { transform: translateX(0); } }
+@keyframes tx-right { 0%, 100% { transform: translateX(102%); } 38%, 62% { transform: translateX(0); } }
+@keyframes tx-diagonal { 0% { transform: translateX(-130%) skewX(-16deg); } 45%, 55% { transform: translateX(0) skewX(-16deg); } 100% { transform: translateX(-130%) skewX(-16deg); } }
 @keyframes tx-center { 0% { transform: scaleY(0); } 38%, 62% { transform: scaleY(1); } 100% { transform: scaleY(0); } }
 @keyframes tx-caption { 0%, 30% { opacity: 0; transform: translateY(12px); } 42%, 60% { opacity: 1; transform: none; } 75%, 100% { opacity: 0; transform: translateY(-12px); } }
 @media (prefers-reduced-motion: reduce) { .tx-effect { animation-timing-function: steps(1,end) !important; } }
@@ -46,9 +47,10 @@ export default function TransitionConceptsPage() {
       <div className="mx-auto max-w-[1440px]">
         <h1 className="text-xl font-bold">화면 전환 시안</h1>
         <p className="mt-2 text-sm text-white/50">
-          버튼을 누르면 경기 소개와 결과 화면 사이를 전환합니다. 실제 방송
-          설정에는 아직 적용하지 않은 비교용 시안입니다.
+          전환 모양을 비교해 볼 수 있습니다. 선택한 스타일과 색상, 직접 만든
+          WebM 영상은 방송 화면 설정에서 지정하세요.
         </p>
+        <Link href="/settings/broadcast" className="mt-3 inline-flex rounded-md border border-white/20 px-3 py-2 text-sm font-semibold hover:bg-white/10">방송 화면 설정에서 적용하기 →</Link>
         <div className="my-5 grid grid-cols-3 gap-3">
           {OPTIONS.map((option, index) => (
             <button

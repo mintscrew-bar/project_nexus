@@ -133,6 +133,10 @@ const TRANSITION_LABELS: Record<
   wipe: "와이프",
   fade: "페이드",
   slide: "슬라이드",
+  shutter: "양옆 셔터",
+  diagonal: "사선 스윕",
+  center: "중앙 펼침",
+  custom: "내 영상",
   none: "없음",
 };
 const SPEED_LABELS: Record<BroadcastSettings["transition"]["speed"], string> = {
@@ -150,11 +154,17 @@ export default function BroadcastSettingsPage() {
   const { isAuthenticated, isLoading } = useAuthStore();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
+  const [previewMode, setPreviewMode] = useState(false);
+  const previewUrlsRef = useRef<string[]>([]);
+  useEffect(() => {
+    setPreviewMode(process.env.NODE_ENV !== "production" && new URLSearchParams(window.location.search).get("preview") === "1");
+  }, []);
+  useEffect(() => () => previewUrlsRef.current.forEach(URL.revokeObjectURL), []);
 
   const { data: saved } = useQuery({
     queryKey: ["broadcastSettings"],
     queryFn: broadcastApi.getSettings,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !previewMode,
   });
   const [draft, setDraft] = useState<BroadcastSettings>(
     DEFAULT_BROADCAST_SETTINGS,
@@ -189,6 +199,7 @@ export default function BroadcastSettingsPage() {
 
   const [uploading, setUploading] = useState(false);
   const [uploadingBackground, setUploadingBackground] = useState(false);
+  const [uploadingTransition, setUploadingTransition] = useState(false);
   const onBackground = async (file: File | undefined) => {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
@@ -223,6 +234,42 @@ export default function BroadcastSettingsPage() {
       setUploading(false);
     }
   };
+  const onTransition = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".webm") || file.size > 20 * 1024 * 1024) {
+      addToast("20MB 이하 WebM 영상만 올릴 수 있습니다.", "error");
+      return;
+    }
+    setUploadingTransition(true);
+    try {
+      const objectUrl = URL.createObjectURL(file);
+      const durationSeconds = await new Promise<number>((resolve, reject) => {
+        const media = document.createElement("video");
+        const timeout = window.setTimeout(() => finish(new Error("영상 정보를 읽지 못했습니다.")), 10_000);
+        const finish = (error?: Error) => {
+          window.clearTimeout(timeout);
+          URL.revokeObjectURL(objectUrl);
+          error ? reject(error) : resolve(media.duration);
+        };
+        media.preload = "metadata";
+        media.onloadedmetadata = () => finish();
+        media.onerror = () => finish(new Error("올바른 WebM 영상이 아닙니다."));
+        media.src = objectUrl;
+      });
+      if (!Number.isFinite(durationSeconds) || durationSeconds < 0.5 || durationSeconds > 10) {
+        throw new Error("전환 영상은 0.5~10초 길이로 만들어 주세요.");
+      }
+      const { url } = previewMode ? { url: URL.createObjectURL(file) } : await broadcastApi.uploadTransition(file);
+      if (previewMode) previewUrlsRef.current.push(url);
+      const durationMs = Math.round(durationSeconds * 1000);
+      setDraft((d) => ({ ...d, transition: { ...d.transition, style: "custom", videoUrl: url, durationMs, cutMs: Math.round(durationMs / 2) } }));
+      addToast(previewMode ? "미리보기용 전환 영상을 불러왔습니다." : "전환 영상을 불러왔습니다. 저장하면 방송에 적용됩니다.", "success");
+    } catch (error) {
+      addToast(error instanceof Error && error.message.includes("전환 영상은") ? error.message : "전환 영상을 올리지 못했습니다. 20MB 이하의 재생 가능한 WebM인지 확인해 주세요.", "error");
+    } finally {
+      setUploadingTransition(false);
+    }
+  };
 
   // 편집 도우미 — 중첩 항목 하나만 바꾼다
   const set = useCallback(
@@ -236,10 +283,10 @@ export default function BroadcastSettingsPage() {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const post = useCallback(() => {
     frameRef.current?.contentWindow?.postMessage(
-      { type: MESSAGE_TYPE, settings: draft },
+      { type: MESSAGE_TYPE, settings: draft, sceneKey: scene },
       window.location.origin,
     );
-  }, [draft]);
+  }, [draft, scene]);
   useEffect(() => {
     post();
   }, [post]);
@@ -252,7 +299,7 @@ export default function BroadcastSettingsPage() {
     return () => window.removeEventListener("message", onReady);
   }, [post]);
 
-  if (!isLoading && !isAuthenticated) {
+  if (!isLoading && !isAuthenticated && !previewMode) {
     return (
       <main className="mx-auto max-w-xl px-4 py-20 text-center">
         <p className="text-text-secondary">
@@ -264,6 +311,14 @@ export default function BroadcastSettingsPage() {
         >
           로그인
         </Link>
+        {process.env.NODE_ENV !== "production" && (
+          <Link
+            href="/settings/broadcast?preview=1"
+            className="mt-3 block text-sm text-text-tertiary underline hover:text-text-primary"
+          >
+            로컬 설정 화면 미리보기
+          </Link>
+        )}
       </main>
     );
   }
@@ -282,8 +337,7 @@ export default function BroadcastSettingsPage() {
             방송 화면 꾸미기
           </h1>
           <p className="mt-1 text-sm text-text-secondary">
-            OBS 오버레이의 색·로고·배경·전환·효과음을 바꿉니다. 저장하면 송출
-            중인 화면에도 바로 반영됩니다.
+            OBS 오버레이의 색·로고·배경·전환·효과음을 바꿉니다. 저장하면 송출 중인 화면에도 바로 반영됩니다.
           </p>
         </div>
         <div className="flex gap-2">
@@ -297,7 +351,7 @@ export default function BroadcastSettingsPage() {
           <Button
             size="sm"
             disabled={
-              !dirty || save.isPending || uploading || uploadingBackground
+              previewMode || !dirty || save.isPending || uploading || uploadingBackground || uploadingTransition || (draft.transition.style === "custom" && !draft.transition.videoUrl)
             }
             onClick={() => save.mutate()}
           >
@@ -306,14 +360,20 @@ export default function BroadcastSettingsPage() {
             ) : (
               <Save className="mr-1.5 h-4 w-4" />
             )}
-            {dirty ? "저장" : "저장됨"}
+            {previewMode ? "미리보기 전용" : dirty ? "저장" : "저장됨"}
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[440px_minmax(0,1fr)]">
+      {previewMode && (
+        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          로컬 미리보기 모드입니다. 색상·전환을 바꿔 오른쪽 화면에서 확인할 수 있습니다. 변경 사항과 올린 영상은 이 브라우저에서만 임시로 보이며 저장되지 않습니다.
+        </div>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         {/* ── 설정 ── */}
-        <div className="space-y-4 xl:max-h-[calc(100vh-180px)] xl:overflow-y-auto xl:pr-2">
+        <div className="space-y-4 md:max-h-[calc(100vh-180px)] md:overflow-y-auto md:pr-2">
           <Section title="빠른 설정">
             <div className="grid grid-cols-3 gap-2">
               {QUICK_PRESETS.map((preset) => (
@@ -578,26 +638,46 @@ export default function BroadcastSettingsPage() {
             />
             {draft.transition.style !== "none" && (
               <>
-                <p className="mb-1.5 mt-3 text-sm text-text-secondary">속도</p>
-                <Choice
-                  options={
-                    Object.entries(SPEED_LABELS) as [
-                      BroadcastSettings["transition"]["speed"],
-                      string,
-                    ][]
-                  }
-                  value={draft.transition.speed}
-                  onChange={(v) =>
-                    set("transition", { ...draft.transition, speed: v })
-                  }
-                />
-                <ToggleRow
-                  label="전환 때 장면 이름 띄우기"
-                  checked={draft.transition.showLabel}
-                  onChange={(v) =>
-                    set("transition", { ...draft.transition, showLabel: v })
-                  }
-                />
+                {draft.transition.style !== "custom" && (
+                  <>
+                    <p className="mb-1.5 mt-3 text-sm text-text-secondary">속도</p>
+                    <Choice
+                      options={
+                        Object.entries(SPEED_LABELS) as [
+                          BroadcastSettings["transition"]["speed"],
+                          string,
+                        ][]
+                      }
+                      value={draft.transition.speed}
+                      onChange={(v) =>
+                        set("transition", { ...draft.transition, speed: v })
+                      }
+                    />
+                    <ToggleRow
+                      label="전환 때 장면 이름 띄우기"
+                      checked={draft.transition.showLabel}
+                      onChange={(v) =>
+                        set("transition", { ...draft.transition, showLabel: v })
+                      }
+                    />
+                  </>
+                )}
+                {draft.transition.style === "custom" ? (
+                  <div className="mt-4 space-y-3 rounded-lg border border-bg-tertiary p-3">
+                    <p className="text-xs text-text-secondary">투명 배경 WebM 권장 · 0.5~10초 · 최대 20MB</p>
+                    {!draft.transition.videoUrl && <p className="text-sm text-amber-400">영상을 올리면 저장할 수 있습니다.</p>}
+                    <input aria-label="사용자 전환 영상 업로드" type="file" accept="video/webm,.webm" disabled={uploadingTransition} onChange={(e) => { void onTransition(e.target.files?.[0]); e.target.value = ""; }} />
+                    {uploadingTransition && <p className="text-sm">전환 영상 업로드 중…</p>}
+                    {draft.transition.videoUrl && <video src={draft.transition.videoUrl} controls muted playsInline className="max-h-32 w-full rounded bg-black" />}
+                    <RangeRow label="전환 길이" min={500} max={10000} step={100} value={draft.transition.durationMs ?? 2000} display={`${((draft.transition.durationMs ?? 2000) / 1000).toFixed(1)}초`} onChange={(v) => set("transition", { ...draft.transition, durationMs: v, cutMs: Math.min(draft.transition.cutMs ?? v / 2, v) })} />
+                    <RangeRow label="장면 교체 시점" min={0} max={draft.transition.durationMs ?? 2000} step={50} value={draft.transition.cutMs ?? 1000} display={`${((draft.transition.cutMs ?? 1000) / 1000).toFixed(2)}초`} onChange={(v) => set("transition", { ...draft.transition, cutMs: v })} />
+                  </div>
+                ) : (
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <ColorField label="전환 색" value={draft.transition.color ?? null} fallback={draft.colors.accent ?? "#8B5CF6"} onChange={(v) => set("transition", { ...draft.transition, color: v })} />
+                    <ColorField label="바탕 색" value={draft.transition.backgroundColor ?? null} fallback="#09090B" onChange={(v) => set("transition", { ...draft.transition, backgroundColor: v })} />
+                  </div>
+                )}
               </>
             )}
             <ToggleRow
@@ -684,7 +764,8 @@ export default function BroadcastSettingsPage() {
         </div>
 
         {/* ── 미리보기 ── */}
-        <div className="xl:sticky xl:top-20 xl:self-start">
+        <div className="md:sticky md:top-20 md:self-start">
+          <h2 className="mb-2 text-sm font-bold text-text-primary">오버레이 미리보기</h2>
           <div className="mb-2 flex flex-wrap gap-1.5">
             {PREVIEW_SCENES.map((item) => (
               <button
@@ -701,19 +782,24 @@ export default function BroadcastSettingsPage() {
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={() => setScene((current) => current === "matchIntro" ? "matchDone" : "matchIntro")}
+            className="mb-2 rounded-lg border border-accent-primary/40 px-3 py-1.5 text-sm font-semibold text-accent-primary hover:bg-accent-primary/10"
+          >
+            전환 다시 보기
+          </button>
           <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-bg-tertiary bg-black">
             <iframe
               ref={frameRef}
-              key={scene}
-              src={`/broadcast/sample?scene=${scene}`}
+              src="/broadcast/sample"
               title="방송 화면 미리보기"
               className="absolute inset-0 h-full w-full"
               onLoad={post}
             />
           </div>
           <p className="mt-2 text-xs text-text-tertiary">
-            예시 데이터로 그린 미리보기입니다. 장면을 바꾸면 전환 효과도 볼 수
-            있습니다.
+            예시 장면을 선택해 전환을 확인하세요. 선택한 색과 전환 방식이 바로 반영됩니다.
           </p>
         </div>
       </div>

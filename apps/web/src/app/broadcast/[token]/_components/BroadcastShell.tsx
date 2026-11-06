@@ -70,7 +70,9 @@ export function BroadcastShell({
     font,
     scale: userScale,
   } = look.settings;
-  const transitionMs = TRANSITION_DURATION_MS[transitionSetting.speed];
+  const transitionMs = transitionSetting.style === "custom"
+    ? transitionSetting.durationMs ?? 2000
+    : TRANSITION_DURATION_MS[transitionSetting.speed];
   const transitionOff = transitionSetting.style === "none";
   const fontFamily = BROADCAST_FONT_FAMILY[font];
 
@@ -102,14 +104,17 @@ export function BroadcastShell({
     }
 
     setTransitionActive(true);
-    // 막이 화면을 다 덮는 지점(전체의 54%)에서 장면을 갈아 끼운다
+    // 사용자 클립은 슬라이더의 교체 시점, 기본 전환은 막이 덮이는 지점에서 교체한다.
+    const cutAt = transitionSetting.style === "custom"
+      ? Math.min(transitionMs, Math.max(0, transitionSetting.cutMs ?? transitionMs / 2))
+      : Math.round(transitionMs * 0.54);
     timersRef.current.push(
       setTimeout(
         () => {
           setDisplayScene(latestSceneRef.current);
           currentKeyRef.current = transitionKey;
         },
-        Math.round(transitionMs * 0.54),
+        cutAt,
       ),
       setTimeout(() => setTransitionActive(false), transitionMs),
     );
@@ -118,7 +123,7 @@ export function BroadcastShell({
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [transitionKey, transitionMs, transitionOff]);
+  }, [transitionKey, transitionMs, transitionOff, transitionSetting.style, transitionSetting.cutMs]);
 
   return (
     <BroadcastLookProvider look={look}>
@@ -173,8 +178,8 @@ export function BroadcastShell({
           <div
             className="absolute inset-0 transition-[filter,opacity] duration-300"
             style={{
-              filter: transitionActive ? "brightness(0.42) blur(2px)" : "none",
-              opacity: transitionActive ? 0.72 : 1,
+              filter: transitionActive && !["shutter", "diagonal", "center", "custom"].includes(transitionSetting.style) ? "brightness(0.42) blur(2px)" : "none",
+              opacity: transitionActive && !["shutter", "diagonal", "center", "custom"].includes(transitionSetting.style) ? 0.72 : 1,
               transform: userScale !== 1 ? `scale(${userScale})` : undefined,
               transformOrigin: "center center",
             }}
@@ -191,6 +196,9 @@ export function BroadcastShell({
             style={transitionSetting.style}
             durationMs={transitionMs}
             showLabel={transitionSetting.showLabel}
+            color={transitionSetting.color ?? null}
+            backgroundColor={transitionSetting.backgroundColor ?? "#09090B"}
+            videoUrl={transitionSetting.videoUrl ?? null}
             showEyebrow={look.settings.show.englishLabels}
             label={transition?.label ?? "NEXT PHASE"}
             subLabel={transition?.subLabel}
@@ -222,6 +230,9 @@ function BroadcastTransition({
   style,
   durationMs,
   showLabel,
+  color,
+  backgroundColor,
+  videoUrl,
   showEyebrow,
   label,
   subLabel,
@@ -235,14 +246,16 @@ function BroadcastTransition({
   style: BroadcastSettings["transition"]["style"];
   durationMs: number;
   showLabel: boolean;
+  color: string | null;
+  backgroundColor: string;
+  videoUrl: string | null;
   showEyebrow: boolean;
   label: string;
   subLabel?: string;
   eyebrow?: string;
   tone?: "phase" | "match" | "result";
 }) {
-  const toneColor =
-    tone === "result" ? "#F6C945" : tone === "match" ? "#60A5FA" : accent;
+  const toneColor = color ?? (tone === "result" ? "#F6C945" : tone === "match" ? "#60A5FA" : accent);
 
   if (!active || style === "none") return null;
 
@@ -253,6 +266,32 @@ function BroadcastTransition({
       : style === "slide"
         ? "nexus-transition-slide"
         : null;
+
+  if (style === "custom" || style === "shutter" || style === "diagonal" || style === "center") {
+    return (
+      <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden">
+        <style>{`
+          @keyframes nexus-transition-mark { 0%,24% { opacity: 0; transform: translateY(12px); } 42%,78% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-8px); } }
+          @keyframes nexus-shutter-left { 0%,100% { transform: translateX(-101%); } 42%,58% { transform: translateX(0); } }
+          @keyframes nexus-shutter-right { 0%,100% { transform: translateX(101%); } 42%,58% { transform: translateX(0); } }
+          @keyframes nexus-diagonal { 0% { transform: translateX(-120%) skewX(-14deg); } 44%,56% { transform: translateX(0) skewX(-14deg); } 100% { transform: translateX(-120%) skewX(-14deg); } }
+          @keyframes nexus-center { 0%,100% { transform: scaleX(0); } 40%,60% { transform: scaleX(1); } }
+        `}</style>
+        {style === "custom" ? (
+          videoUrl ? <video key={videoUrl} src={videoUrl} autoPlay muted playsInline preload="auto" className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0" style={{ background: backgroundColor }} />
+        ) : (
+          <div className="absolute inset-0 overflow-hidden">
+            {style === "shutter" ? (
+              <><div className="absolute inset-y-0 left-0 w-1/2 border-r-[10px]" style={{ background: backgroundColor, borderColor: toneColor, animation: `nexus-shutter-left ${ms} cubic-bezier(.7,0,.2,1) both` }} /><div className="absolute inset-y-0 right-0 w-1/2 border-l-[10px]" style={{ background: backgroundColor, borderColor: toneColor, animation: `nexus-shutter-right ${ms} cubic-bezier(.7,0,.2,1) both` }} /></>
+            ) : (
+              <div className="absolute inset-y-0 border-x-[10px]" style={{ background: backgroundColor, borderColor: toneColor, width: style === "diagonal" ? "140%" : "100%", left: style === "diagonal" ? "-20%" : 0, transformOrigin: "center", animation: `${style === "diagonal" ? "nexus-diagonal" : "nexus-center"} ${ms} cubic-bezier(.7,0,.2,1) both` }} />
+            )}
+            {showLabel && <div className="absolute inset-0 flex items-center justify-center" style={{ animation: `nexus-transition-mark ${ms} ease both` }}><p className="text-[56px] font-black tracking-[0.35em] text-white">{label}</p></div>}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden">
@@ -282,8 +321,8 @@ function BroadcastTransition({
         }
       `}</style>
       <div
-        className="absolute inset-0 bg-black/90"
-        style={{ animation: `nexus-transition-fade ${ms} ease both` }}
+        className="absolute inset-0"
+        style={{ background: backgroundColor, animation: `nexus-transition-fade ${ms} ease both` }}
       />
       <div
         className="absolute inset-0"

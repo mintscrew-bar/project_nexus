@@ -15,7 +15,7 @@ const MESSAGE_TYPE = "nexus-broadcast-settings";
 
 function SampleStage() {
   const params = useSearchParams();
-  const sceneKey = params.get("scene") ?? "auction";
+  const [sceneKey, setSceneKey] = useState(params.get("scene") ?? "auction");
   const [settings, setSettings] = useState<unknown>(undefined);
 
   useEffect(() => {
@@ -24,6 +24,7 @@ function SampleStage() {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type !== MESSAGE_TYPE) return;
       setSettings(event.data.settings);
+      if (typeof event.data.sceneKey === "string") setSceneKey(event.data.sceneKey);
     };
     window.addEventListener("message", onMessage);
     // 준비됐다고 알려 부모가 첫 설정을 보내게 한다

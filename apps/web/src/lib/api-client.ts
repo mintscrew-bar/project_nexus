@@ -766,6 +766,12 @@ export const broadcastApi = {
     );
     return response.data;
   },
+  uploadTransition: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append("transition", file);
+    const response = await apiClient.post("/broadcast/settings/transition", formData, { headers: { "Content-Type": "multipart/form-data" } });
+    return response.data;
+  },
   // OBS 브라우저 소스용 읽기전용 스냅샷
   getSnapshot: async (
     token: string,

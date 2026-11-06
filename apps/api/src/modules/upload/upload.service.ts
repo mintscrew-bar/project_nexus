@@ -183,7 +183,20 @@ export class UploadService {
     return { mime: detected.mime, ext: detected.ext };
   }
 
-  private createObjectKey(directory: string, ext: ".gif" | ".webp"): string {
+  /** 방송 전환용 WebM. 이미지 업로드와 같은 저장 드라이버를 사용한다. */
+  async uploadBroadcastTransition(file: Express.Multer.File): Promise<string> {
+    const data = file?.buffer;
+    if (!data || data.length < 16 || data.length > 20 * 1024 * 1024 ||
+      data.readUInt32BE(0) !== 0x1a45dfa3 || !data.subarray(0, 4096).includes(Buffer.from("webm"))) {
+      throw new BadRequestException("20MB 이하 WebM 영상만 업로드할 수 있습니다.");
+    }
+    const key = this.createObjectKey("broadcast-transitions", ".webm");
+    if (this.driver === "r2") await this.putR2Object(key, data, "video/webm");
+    else await this.writeLocalObject(key, data);
+    return this.toPublicUrl(key);
+  }
+
+  private createObjectKey(directory: string, ext: ".gif" | ".webp" | ".webm"): string {
     const now = new Date();
     const year = String(now.getUTCFullYear());
     const month = String(now.getUTCMonth() + 1).padStart(2, "0");
