@@ -144,7 +144,9 @@ export class BroadcastController {
   // ── 로그인 조작 패널 ──
   @Post("settings/transition")
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor("transition", { limits: { fileSize: 20 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FileInterceptor("transition", { limits: { fileSize: 20 * 1024 * 1024 } }),
+  )
   async uploadTransition(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException("파일이 업로드되지 않았습니다.");
     return { url: await this.uploadService.uploadBroadcastTransition(file) };
