@@ -1,6 +1,10 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { randomBytes } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
+import {
+  normalizeBroadcastSettings,
+  type BroadcastSettings,
+} from "@nexus/types";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { MatchSeriesService } from "../match/match-series.service";
 import type { SeriesScore } from "../match/match-series.service";
@@ -212,6 +216,35 @@ export class BroadcastService {
       : null;
   }
 
+  /** 방송 커스터마이징 조회 — 저장된 게 없으면 기본값 */
+  async getSettings(userId: string): Promise<BroadcastSettings> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { broadcastSettings: true },
+    });
+    return normalizeBroadcastSettings(user?.broadcastSettings);
+  }
+
+  /**
+   * 방송 커스터마이징 저장. 전체 설정을 받아 정규화한 값만 저장한다 —
+   * 화면에서 보낸 값이 일부 잘못돼도 그 칸만 기본값으로 돌아간다.
+   * 반환값의 roomId 로 컨트롤러가 송출 중인 오버레이에 바로 알린다.
+   */
+  async updateSettings(userId: string, raw: unknown) {
+    const settings = normalizeBroadcastSettings(raw);
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { broadcastSettings: settings as any },
+      select: { broadcastLiveRoomId: true },
+    });
+    const roomId = await activeRoomIdForUser(
+      this.prisma,
+      userId,
+      user.broadcastLiveRoomId,
+    );
+    return { settings, roomId };
+  }
+
   async getControlState(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -399,6 +432,7 @@ export class BroadcastService {
             broadcastScene: true,
             broadcastLowerThirdVisible: true,
             broadcastAnnouncement: true,
+            broadcastSettings: true,
             clanMemberships: {
               take: 1,
               select: {
@@ -420,6 +454,8 @@ export class BroadcastService {
       throw new NotFoundException("유효하지 않은 방송 링크입니다.");
 
     const control = this.controlState(streamer);
+    // 방송인 커스터마이징 — 오버레이가 색·문구·배경·전환을 여기서 읽는다
+    const settings = normalizeBroadcastSettings(streamer.broadcastSettings);
     const streamerTheme = this.clanTheme(
       streamer.clanMemberships?.[0]?.clan ?? null,
     );
@@ -436,6 +472,7 @@ export class BroadcastService {
         scene: scene === "control" ? "idle" : scene,
         room: null,
         theme: streamerTheme,
+        settings,
         streamer: { name: streamer.username },
         teams: [],
         broadcast: control,
@@ -575,6 +612,7 @@ export class BroadcastService {
     const effectiveScene = resolved.scene;
 
     const common = {
+      settings,
       room: {
         id: room.id,
         name: room.name,
