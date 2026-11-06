@@ -17,6 +17,9 @@ describe("BroadcastService 결과 요약·선수 배지", () => {
       assists: 2,
       goldEarned: gold,
       totalDamageDealtToChampions: 10000,
+      totalMinionsKilled: 150,
+      neutralMinionsKilled: 10,
+      position: userId === "a" ? "MID" : "TOP",
       user: { username: userId },
       riotIdSnapshot: null,
     });
@@ -64,18 +67,19 @@ describe("BroadcastService 결과 요약·선수 배지", () => {
     expect(result.mvp).toMatchObject({ userId: "a", kills: 10 });
     expect(result.ace).toMatchObject({ userId: "c" });
     expect(result.riotMatchId).toBe("KR_1");
+    // 스코어보드 — 라인 순서(탑 먼저), CS 는 미니언+정글
+    expect(result.blue.players.map((p: any) => p.userId)).toEqual(["b", "a"]);
+    expect(result.blue.players[0]).toMatchObject({ cs: 160, gold: 9000 });
   });
 
   it("수집되지 않은 판은 null", async () => {
     const service = make({
       match: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({
-            dataCollected: false,
-            participants: [],
-            teamStats: [],
-          }),
+        findUnique: jest.fn().mockResolvedValue({
+          dataCollected: false,
+          participants: [],
+          teamStats: [],
+        }),
       },
     });
     expect(await service.riotResult("m1", "a", "b")).toBeNull();

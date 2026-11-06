@@ -32,7 +32,8 @@ const cspReportOnly = [
   // API REST + Socket.IO(ws/wss) + GA/AdSense 비콘
   "connect-src 'self' ws: wss: https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://*.adtrafficquality.google https://static.cloudflareinsights.com",
   // AdSense iframe
-  "frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://*.adtrafficquality.google",
+  // 'self' — 방송 설정 화면이 미리보기(/broadcast/sample)를 iframe 으로 띄운다
+  "frame-src 'self' https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://*.adtrafficquality.google",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -156,6 +157,15 @@ const nextConfig = {
             key: "X-Robots-Tag",
             value: "noindex, nofollow, noarchive",
           },
+        ],
+      },
+      {
+        // 방송 설정 화면의 실시간 미리보기 — 목업만 그리는 페이지라 같은 사이트 iframe 은 허용한다.
+        // 위 /broadcast 차단 규칙보다 뒤에 둬야 같은 헤더를 덮어쓴다.
+        source: "/broadcast/sample",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
         ],
       },
       {

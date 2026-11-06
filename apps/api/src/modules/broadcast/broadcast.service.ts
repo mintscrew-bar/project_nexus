@@ -32,7 +32,12 @@ export type BroadcastScene =
   | "idle"
   | "break";
 
-const RESULT_SCENE_MS = 12_000;
+/**
+ * 자동 모드에서 경기 결과 장면을 띄워 두는 시간.
+ * 결과 화면은 승리 → 게임 흐름 → MVP → ACE 순서로 약 14초 동안 재생된 뒤 전체 스코어보드에서
+ * 멈춘다(scenes.tsx MatchResultScene). 스코어보드를 읽을 시간까지 22초.
+ */
+const RESULT_SCENE_MS = 22_000;
 /**
  * 중계 중인 경기 화면에 다른 경기 결과를 띄워 두는 시간.
  *
@@ -50,6 +55,14 @@ const MATCH_INTRO_SCENE_MS = 60_000;
  * - OBS 브라우저 소스가 접속 시 현재 상태를 hydrate 하는 스냅샷 제공(read-only).
  *   토큰은 유저에 귀속되고, 오버레이는 그 유저의 활성 방을 자동 추종한다.
  */
+/** 스코어보드 줄 순서 — 탑·정글·미드·원딜·서폿, 모르는 포지션은 맨 뒤 */
+const POSITION_ORDER = (position: string | null | undefined) => {
+  const index = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"].indexOf(
+    position ?? "",
+  );
+  return index === -1 ? 9 : index;
+};
+
 @Injectable()
 export class BroadcastService {
   private readonly logger = new Logger(BroadcastService.name);
@@ -377,6 +390,7 @@ export class BroadcastService {
       return {
         userId: m.userId,
         username: m.user?.username ?? null,
+        gameName: account?.gameName ?? null,
         avatar: m.user?.avatar ?? null,
         assignedRole: m.assignedRole ?? null,
         soldPrice: m.soldPrice ?? null,
@@ -406,6 +420,9 @@ export class BroadcastService {
       name: team.name,
       color: team.color ?? null,
       captainId: team.captainId,
+      // 방송인이 "팀장 이름으로 표시"를 고르면 팀 이름 대신 쓴다
+      captainName:
+        members.find((m: any) => m.userId === team.captainId)?.username ?? null,
       initialBudget: team.initialBudget,
       remainingBudget: team.remainingBudget,
       balanceTotal,
@@ -523,6 +540,9 @@ export class BroadcastService {
             assists: true,
             goldEarned: true,
             totalDamageDealtToChampions: true,
+            totalMinionsKilled: true,
+            neutralMinionsKilled: true,
+            position: true,
             user: { select: { username: true } },
             riotIdSnapshot: true,
           },
@@ -554,6 +574,24 @@ export class BroadcastService {
         heralds: stats?.riftHeraldKills ?? 0,
         riotTeamId: members[0]?.riotTeamId ?? null,
         puuids: members.flatMap((p) => (p.puuid ? [p.puuid] : [])),
+        // 결과 화면 스코어보드 — 라인 순서(탑→서폿)로
+        players: [...members]
+          .sort(
+            (a, b) => POSITION_ORDER(a.position) - POSITION_ORDER(b.position),
+          )
+          .map((p) => ({
+            userId: p.userId,
+            username: p.user?.username ?? p.riotIdSnapshot ?? null,
+            gameName: p.riotIdSnapshot?.split("#")[0] ?? null,
+            championName: p.championName,
+            position: p.position,
+            kills: p.kills,
+            deaths: p.deaths,
+            assists: p.assists,
+            damage: p.totalDamageDealtToChampions,
+            gold: p.goldEarned,
+            cs: p.totalMinionsKilled + p.neutralMinionsKilled,
+          })),
       };
     };
     const pick = (userId: string | null) => {
@@ -583,6 +621,7 @@ export class BroadcastService {
   }
 
   /** 클랜 → 방송 테마(엠블럼/배너/강조색). 클랜 없으면 null. */
+
   private clanTheme(clan: any) {
     if (!clan) return null;
     return {
@@ -713,7 +752,8 @@ export class BroadcastService {
                     { createdAt: "asc" },
                   ],
                   take: 1,
-                  select: { tier: true, rank: true, lp: true },
+                  // gameName — 방송인이 "Riot ID 로 표시"를 고르면 쓴다
+                  select: { tier: true, rank: true, lp: true, gameName: true },
                 },
               },
             },
@@ -747,6 +787,7 @@ export class BroadcastService {
                         tier: true,
                         rank: true,
                         lp: true,
+                        gameName: true,
                         balanceScores: true,
                         balanceScoreVersion: true,
                         championPreferences: {
@@ -805,6 +846,7 @@ export class BroadcastService {
           return {
             userId: p.userId,
             username: p.user?.username ?? null,
+            gameName: riot?.gameName ?? null,
             avatar: p.user?.avatar ?? null,
             isReady: p.isReady,
             isCaptain: p.isCaptain,

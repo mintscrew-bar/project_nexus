@@ -10,6 +10,7 @@ import {
   Button,
 } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
+import Link from "next/link";
 import { broadcastApi } from "@/lib/api-client";
 import { openBroadcastControlWindow } from "@/lib/open-broadcast-control";
 
@@ -220,6 +221,19 @@ export function BroadcastTokenSection() {
           내가 방을 만들 때마다 그 방이 자동으로 방송 화면에 나옵니다. 링크를
           매번 바꿀 필요가 없습니다.
         </p>
+        {/* 오버레이 꾸미기 — 색·로고·배경·전환·효과음 (별도 화면, 실시간 미리보기) */}
+        <Link
+          href="/settings/broadcast"
+          className="flex items-center justify-between gap-3 rounded-lg border border-accent-primary/30 bg-accent-primary/5 px-4 py-3 text-sm transition-colors hover:bg-accent-primary/10"
+        >
+          <span>
+            <span className="font-semibold text-text-primary">방송 화면 꾸미기</span>
+            <span className="ml-2 text-text-secondary">
+              색·로고·배경·전환·효과음·이름 표시
+            </span>
+          </span>
+          <span className="text-accent-primary">열기 →</span>
+        </Link>
 
         {/* OBS 등록 방법 — 항상 노출되는 사용 가이드 */}
         <div className="rounded-lg border border-bg-elevated bg-bg-tertiary/60 p-3 text-xs text-text-secondary">

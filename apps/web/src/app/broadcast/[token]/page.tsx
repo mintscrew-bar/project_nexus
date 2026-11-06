@@ -375,6 +375,7 @@ export default function BroadcastPage() {
       <BroadcastShell
         bg={bg}
         theme={snapshot.theme}
+        settings={snapshot.settings}
         scene={sceneNode}
         persistent={persistent}
         transitionKey={broadcastSceneKey}

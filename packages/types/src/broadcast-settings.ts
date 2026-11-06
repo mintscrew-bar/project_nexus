@@ -73,7 +73,6 @@ export interface BroadcastSettings {
   preset: BroadcastPreset;
   /** 전체 크기 배율 0.8 ~ 1.2 */
   scale: number;
-  lowerThirdPosition: "bottom" | "top";
   font: BroadcastFont;
   idle: {
     /** 대기 화면 큰 문구 (null 이면 "곧 방송을 시작합니다") */
@@ -119,7 +118,6 @@ export const DEFAULT_BROADCAST_SETTINGS: BroadcastSettings = {
   },
   preset: "default",
   scale: 1,
-  lowerThirdPosition: "bottom",
   font: "default",
   idle: { title: null, subtitle: null },
   breakScreen: { title: null, subtitle: null },
@@ -215,11 +213,6 @@ export function normalizeBroadcastSettings(raw: unknown): BroadcastSettings {
     },
     preset: oneOf(r.preset, BROADCAST_PRESETS, d.preset),
     scale: Math.round(clampNumber(r.scale, 0.8, 1.2, d.scale) * 100) / 100,
-    lowerThirdPosition: oneOf(
-      r.lowerThirdPosition,
-      ["bottom", "top"] as const,
-      d.lowerThirdPosition,
-    ),
     font: oneOf(r.font, BROADCAST_FONTS, d.font),
     idle: { title: text(idle.title, 40), subtitle: text(idle.subtitle, 60) },
     breakScreen: {
