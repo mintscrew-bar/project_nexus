@@ -19,10 +19,10 @@ const SWAP_CSS = `
 }
 @keyframes side-swap-pending { from { opacity: 1; } to { opacity: 0; } }
 @keyframes side-swap-complete { from { opacity: 0; } to { opacity: 1; } }
-@keyframes side-swap-emphasis {
-  0%, 28% { transform: scale(.9); color: rgba(255,255,255,.6); }
-  48%, 85% { transform: scale(1.06); color: white; }
-  100% { transform: scale(1); color: white; }
+@keyframes side-swap-context {
+  0%, 20% { opacity: 1; }
+  25%, 58% { opacity: 0; }
+  65%, 100% { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .side-swap-motion { animation: none !important; }
@@ -38,15 +38,24 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
   if (!match) return null;
   const title = look.settings.title ?? snapshot?.room?.name;
   const animate = look.settings.transition.style !== "none";
+  const contextStyle = {
+    animation: animate ? "side-swap-context 4000ms linear both" : undefined,
+  };
   return (
     <div className="flex h-full flex-col items-center justify-center px-32 pb-16 text-center text-white">
       <style>{SWAP_CSS}</style>
       {title && (
-        <p className="max-w-full truncate text-[36px] font-black text-white/80">
+        <p
+          className="side-swap-motion max-w-full truncate text-[36px] font-black text-white/80"
+          style={contextStyle}
+        >
           {title}
         </p>
       )}
-      <p className="mt-4 text-[28px] font-black text-white/60">
+      <p
+        className="side-swap-motion mt-4 text-[28px] font-black text-white/60"
+        style={contextStyle}
+      >
         {match.currentGameNumber}세트
       </p>
       <h1 className="relative mt-8 w-[1000px] text-[88px] font-black leading-none">
@@ -54,19 +63,18 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
           className="side-swap-motion side-swap-complete"
           style={{
             animation: animate
-              ? "side-swap-complete 280ms ease-out 2000ms both"
+              ? "side-swap-complete 280ms ease-out 2400ms both"
               : undefined,
           }}
         >
-          완료
+          진영 교대 완료
         </span>
         {animate && (
           <span
             aria-hidden
             className="side-swap-motion side-swap-pending absolute inset-0"
             style={{
-              animation:
-                "side-swap-emphasis 1900ms ease-in-out both, side-swap-pending 200ms ease-in 1800ms both",
+              animation: "side-swap-pending 200ms ease-in 800ms both",
             }}
           >
             진영 교대
@@ -86,7 +94,7 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
               style={{
                 color: sideColor(look, side),
                 animation: animate
-                  ? "side-swap-complete 280ms ease-out 1950ms both"
+                  ? "side-swap-complete 280ms ease-out 2400ms both"
                   : undefined,
               }}
             >
@@ -105,7 +113,7 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
                   "--arc-height": side === "blue" ? "-64px" : "64px",
                   willChange: animate ? "transform, translate" : undefined,
                   animation: animate
-                    ? `side-swap-${side} 1200ms cubic-bezier(.45,0,.25,1) 600ms both, side-swap-arc 1200ms ease-in-out 600ms both`
+                    ? `side-swap-${side} 1200ms cubic-bezier(.45,0,.25,1) 1000ms both, side-swap-arc 1200ms ease-in-out 1000ms both`
                     : undefined,
                 } as CSSProperties
               }
@@ -115,7 +123,10 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
           </div>
         ))}
       </div>
-      <p className="mt-14 text-[28px] font-black text-white/60">
+      <p
+        className="side-swap-motion mt-14 text-[28px] font-black text-white/60"
+        style={contextStyle}
+      >
         {match.status === "IN_PROGRESS"
           ? "다음 세트가 시작됩니다"
           : "양 팀 준비 후 경기가 시작됩니다"}
