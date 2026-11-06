@@ -4,7 +4,11 @@ import {
   Post,
   Delete,
   Patch,
+  Put,
   Param,
+  BadRequestException,
+  UploadedFile,
+  UseInterceptors,
   Body,
   Query,
   UseGuards,
@@ -21,6 +25,9 @@ import {
   UpdateBroadcastControlDto,
 } from "./dto/broadcast-control.dto";
 import { MatchGateway } from "../match/match.gateway";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { UploadService } from "../upload/upload.service";
+import { UpdateBroadcastSettingsDto } from "./dto/broadcast-settings.dto";
 
 /**
  * 방송 오버레이 엔드포인트.
@@ -32,6 +39,7 @@ export class BroadcastController {
   constructor(
     private readonly broadcastService: BroadcastService,
     private readonly matchGateway: MatchGateway,
+    private readonly uploadService: UploadService,
   ) {}
 
   // ── 스트리머 토큰 관리 (로그인 필요) ──
@@ -88,6 +96,49 @@ export class BroadcastController {
   @HttpCode(HttpStatus.OK)
   async revokeControlToken(@CurrentUser("sub") userId: string) {
     return this.broadcastService.revokeControlToken(userId);
+  }
+
+  // ── 방송 커스터마이징 (로그인 스트리머 본인) ──
+
+  @Get("settings")
+  @UseGuards(JwtAuthGuard)
+  async getSettings(@CurrentUser("sub") userId: string) {
+    return this.broadcastService.getSettings(userId);
+  }
+
+  /** 전체 설정을 받아 정규화해 저장한다. 송출 중이면 오버레이가 바로 다시 그린다. */
+  @Put("settings")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateSettings(
+    @CurrentUser("sub") userId: string,
+    @Body() body: UpdateBroadcastSettingsDto,
+  ) {
+    const { settings, roomId } = await this.broadcastService.updateSettings(
+      userId,
+      body.settings,
+    );
+    if (roomId) {
+      this.matchGateway.emitBroadcastControl(roomId, { settingsUpdated: true });
+    }
+    return settings;
+  }
+
+  /** 하단바·대기 화면 로고 업로드 — 주소만 돌려주고 저장은 설정 저장 때 한다 */
+  @Post("settings/logo")
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor("logo"))
+  async uploadLogo(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException("파일이 업로드되지 않았습니다.");
+    }
+    const url = await this.uploadService.uploadImage(file, {
+      directory: "broadcast-logos",
+      maxWidth: 512,
+      maxHeight: 512,
+      quality: 86,
+    });
+    return { url };
   }
 
   // ── 로그인 조작 패널 ──
