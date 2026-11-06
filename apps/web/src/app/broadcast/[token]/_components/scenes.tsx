@@ -1,10 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { commendationTagLabel } from "@/lib/commendation";
+import { ResultSequence } from "./ResultSequence";
 import type { ReactNode } from "react";
 import { getChampionIconUrl } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { getTierIcon } from "@/lib/tier-icon";
 import { getRoleIcon, normalizeRole } from "@/lib/role-icon";
+import {
+  isEnglishLabel,
+  playerDisplayName,
+  sideColor,
+  resolveLook,
+  teamDisplayName,
+  useBroadcastLook,
+} from "./look";
 
 /**
  * Nexus Broadcast HUD scenes.
@@ -14,6 +24,20 @@ import { getRoleIcon, normalizeRole } from "@/lib/role-icon";
 const DEFAULT_ACCENT = "#8B5CF6";
 
 const broadcastBgCss = `
+@keyframes nexus-grain-shift {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-3%, 2%); }
+  40% { transform: translate(2%, -3%); }
+  60% { transform: translate(-2%, -1%); }
+  80% { transform: translate(3%, 2%); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes nexus-particle-rise {
+  0% { transform: translate(0, 0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(var(--drift, 0px), -1120px); opacity: 0; }
+}
 @keyframes nexus-live-bg-pan {
   0% { transform: translate3d(-3%, -2%, 0) scale(1.04); }
   50% { transform: translate3d(3%, 2%, 0) scale(1.08); }
@@ -130,8 +154,21 @@ export function statusLabel(status?: string): string {
   return STATUS_LABELS[status] ?? status;
 }
 
+/** 강조색 — 방송인 설정 → 클랜 강조색 → 넥서스 보라 (look.tsx resolveLook) */
 export function accentOf(snapshot: any): string {
-  return snapshot?.theme?.accentColor || DEFAULT_ACCENT;
+  return resolveLook(snapshot?.settings, snapshot?.theme).accent || DEFAULT_ACCENT;
+}
+
+/** 선수 이름 — 방송인 설정에 따라 닉네임 / Riot ID / 둘 다 (look.tsx playerDisplayName) */
+function PlayerName({ player, fallback = "" }: { player: any; fallback?: string }) {
+  const { settings } = useBroadcastLook();
+  return <>{playerDisplayName(player, settings.nameDisplay) || fallback}</>;
+}
+
+/** 팀 이름 — 방송인 설정에 따라 팀 이름 또는 팀장 이름 (look.tsx teamDisplayName) */
+function TeamName({ team, fallback = "" }: { team: any; fallback?: string }) {
+  const { settings } = useBroadcastLook();
+  return <>{team ? teamDisplayName(team, settings.teamLabel) || fallback : fallback}</>;
 }
 
 export function HudLabel({
@@ -141,6 +178,9 @@ export function HudLabel({
   children: string;
   color?: string;
 }) {
+  // "영어 머리글 끄기" — LIVE AUCTION·STARTING LINEUP 같은 장식용 영어 줄을 숨긴다
+  const { settings } = useBroadcastLook();
+  if (!settings.show.englishLabels && isEnglishLabel(children)) return null;
   return (
     <p
       className="text-sm font-black uppercase tracking-[0.42em]"
@@ -159,6 +199,113 @@ function HudRule({ color }: { color: string }) {
   );
 }
 
+/**
+ * 장면 배경 — 방송인이 고른 종류·세기대로 그린다(경기 중 점수판은 StageFrame 을 쓰지 않아 항상 투명).
+ * 세기(0~100)는 효과 레이어의 불투명도에 곱한다. 50 이 예전 기본 모습이다.
+ */
+export function StageBackground({ accent }: { accent: string }) {
+  const { settings } = useBroadcastLook();
+  const { type, intensity } = settings.background;
+  const k = intensity / 50; // 1 = 예전 기본 세기
+  const fx = (value: number) => Math.min(1, value * k);
+
+  // 애니메이션 정의를 배경이 직접 들고 다닌다 — 경매판처럼 StageFrame 밖에서 써도 돌게
+  if (type === "transparent") return <style>{broadcastBgCss}</style>;
+
+  const base =
+    type === "solid" || type === "grain" || type === "particles"
+      ? "#070810"
+      : "linear-gradient(135deg, #061018 0%, #070812 45%, #120816 100%)";
+
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+      style={{ background: base }}
+    >
+      <style>{broadcastBgCss}</style>
+      {(type === "aurora" || type === "gradient") && (
+        <div
+          className="absolute -inset-[12%]"
+          style={{
+            animation:
+              type === "aurora"
+                ? "nexus-live-bg-pan 16s ease-in-out infinite"
+                : undefined,
+            opacity: fx(1),
+            background: `radial-gradient(circle at 18% 20%, rgba(0,177,255,0.18), transparent 28%), radial-gradient(circle at 76% 28%, rgba(245,158,11,0.14), transparent 24%), radial-gradient(circle at 54% 82%, ${accent}2e, transparent 32%)`,
+          }}
+        />
+      )}
+      {type === "aurora" && (
+        <>
+          <div
+            className="absolute inset-0"
+            style={{
+              opacity: fx(0.08),
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)",
+              backgroundSize: "56px 56px",
+            }}
+          />
+          <div
+            className="absolute -inset-y-20 left-0 w-full"
+            style={{
+              animation: "nexus-live-scan 9s ease-in-out infinite",
+              opacity: fx(1),
+              background:
+                "linear-gradient(100deg, transparent 0%, rgba(0,177,255,0.08) 36%, rgba(255,255,255,0.07) 50%, rgba(245,158,11,0.06) 64%, transparent 100%)",
+            }}
+          />
+        </>
+      )}
+      {type === "grain" && (
+        <div
+          className="absolute -inset-[10%]"
+          style={{
+            opacity: fx(0.22),
+            animation: "nexus-grain-shift 1.2s steps(6) infinite",
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.9'/></svg>\")",
+          }}
+        />
+      )}
+      {type === "particles" && <StageParticles accent={accent} opacity={fx(0.9)} />}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.42)_72%,rgba(0,0,0,0.72)_100%)]" />
+    </div>
+  );
+}
+
+/** 떠다니는 입자 — 위치·속도는 고정 표로 둬서 다시 그려도 튀지 않는다 */
+const PARTICLES = Array.from({ length: 36 }, (_, i) => ({
+  left: (i * 37) % 100,
+  size: 2 + ((i * 7) % 4),
+  duration: 14 + ((i * 11) % 16),
+  delay: -((i * 13) % 20),
+  drift: ((i % 5) - 2) * 18,
+}));
+
+function StageParticles({ accent, opacity }: { accent: string; opacity: number }) {
+  return (
+    <div className="absolute inset-0" style={{ opacity }}>
+      {PARTICLES.map((p, i) => (
+        <span
+          key={i}
+          className="absolute bottom-[-12px] rounded-full"
+          style={{
+            left: `${p.left}%`,
+            width: p.size,
+            height: p.size,
+            background: i % 3 === 0 ? accent : "rgba(255,255,255,0.7)",
+            boxShadow: `0 0 ${p.size * 3}px ${i % 3 === 0 ? accent : "rgba(255,255,255,0.5)"}`,
+            animation: `nexus-particle-rise ${p.duration}s linear ${p.delay}s infinite`,
+            ["--drift" as any]: `${p.drift}px`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function StageFrame({
   children,
   accent,
@@ -169,35 +316,9 @@ export function StageFrame({
   showTopRule?: boolean;
 }) {
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#05070d] text-white">
+    <div className="relative h-full w-full overflow-hidden text-white">
       <style>{broadcastBgCss}</style>
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <div
-          className="absolute -inset-[12%]"
-          style={{
-            animation: "nexus-live-bg-pan 16s ease-in-out infinite",
-            background:
-              "radial-gradient(circle at 18% 20%, rgba(0,177,255,0.18), transparent 28%), radial-gradient(circle at 76% 28%, rgba(245,158,11,0.14), transparent 24%), radial-gradient(circle at 54% 82%, rgba(139,92,246,0.18), transparent 32%), linear-gradient(135deg, #061018 0%, #070812 45%, #120816 100%)",
-          }}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.08]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)",
-            backgroundSize: "56px 56px",
-          }}
-        />
-        <div
-          className="absolute -inset-y-20 left-0 w-full"
-          style={{
-            animation: "nexus-live-scan 9s ease-in-out infinite",
-            background:
-              "linear-gradient(100deg, transparent 0%, rgba(0,177,255,0.08) 36%, rgba(255,255,255,0.07) 50%, rgba(245,158,11,0.06) 64%, transparent 100%)",
-          }}
-        />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.42)_72%,rgba(0,0,0,0.72)_100%)]" />
-      </div>
+      <StageBackground accent={accent} />
       {showTopRule && (
         <div
           className="absolute left-24 right-24 top-24 z-10 h-px"
@@ -215,6 +336,7 @@ export function StageFrame({
 export function IdleScene({ snapshot }: { snapshot: any }) {
   const accent = accentOf(snapshot);
   const theme = snapshot?.theme;
+  const { settings, logo, mark } = useBroadcastLook();
   const title = theme?.clanName || snapshot?.streamer?.name || "NEXUS";
 
   return (
@@ -222,10 +344,10 @@ export function IdleScene({ snapshot }: { snapshot: any }) {
       <div className="flex h-full w-full items-center px-28">
         <div className="w-full max-w-[1320px]">
           <div className="mb-8 flex items-center gap-5">
-            {theme?.logo ? (
+            {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={theme.logo}
+                src={logo}
                 alt=""
                 className="h-16 w-16 rounded-sm object-cover"
               />
@@ -234,7 +356,7 @@ export function IdleScene({ snapshot }: { snapshot: any }) {
                 className="flex h-16 w-16 items-center justify-center border-y text-2xl font-black"
                 style={{ borderColor: accent }}
               >
-                NX
+                {mark}
               </div>
             )}
             <div>
@@ -244,11 +366,17 @@ export function IdleScene({ snapshot }: { snapshot: any }) {
           </div>
           <HudRule color={accent} />
           <h1 className="text-[86px] font-black leading-[0.96] tracking-normal text-white">
-            곧 방송을 시작합니다
+            {settings.idle.title ?? "곧 방송을 시작합니다"}
           </h1>
-          <p className="mt-8 text-2xl font-black uppercase tracking-[0.34em] text-white/36">
-            Standby
-          </p>
+          {(settings.idle.subtitle ?? (settings.show.englishLabels ? "Standby" : null)) && (
+            <p
+              className={`mt-8 text-2xl font-black text-white/36 ${
+                settings.idle.subtitle ? "" : "uppercase tracking-[0.34em]"
+              }`}
+            >
+              {settings.idle.subtitle ?? "Standby"}
+            </p>
+          )}
         </div>
       </div>
     </StageFrame>
@@ -259,6 +387,7 @@ export function IdleScene({ snapshot }: { snapshot: any }) {
 export function BreakScene({ snapshot }: { snapshot: any }) {
   const accent = accentOf(snapshot);
   const theme = snapshot?.theme;
+  const { settings, logo, mark } = useBroadcastLook();
   const title = theme?.clanName || snapshot?.room?.name || "NEXUS";
 
   return (
@@ -266,10 +395,10 @@ export function BreakScene({ snapshot }: { snapshot: any }) {
       <div className="flex h-full w-full items-center px-28">
         <div className="w-full max-w-[1320px]">
           <div className="mb-8 flex items-center gap-5">
-            {theme?.logo ? (
+            {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={theme.logo}
+                src={logo}
                 alt=""
                 className="h-16 w-16 rounded-sm object-cover"
               />
@@ -278,7 +407,7 @@ export function BreakScene({ snapshot }: { snapshot: any }) {
                 className="flex h-16 w-16 items-center justify-center border-y text-2xl font-black"
                 style={{ borderColor: accent }}
               >
-                NX
+                {mark}
               </div>
             )}
             <div>
@@ -288,11 +417,17 @@ export function BreakScene({ snapshot }: { snapshot: any }) {
           </div>
           <HudRule color={accent} />
           <h1 className="text-[86px] font-black leading-[0.96] tracking-normal text-white">
-            잠시 후 계속됩니다
+            {settings.breakScreen.title ?? "잠시 후 계속됩니다"}
           </h1>
-          <p className="mt-8 text-2xl font-black uppercase tracking-[0.34em] text-white/36">
-            Be Right Back
-          </p>
+          {(settings.breakScreen.subtitle ?? (settings.show.englishLabels ? "Be Right Back" : null)) && (
+            <p
+              className={`mt-8 text-2xl font-black text-white/36 ${
+                settings.breakScreen.subtitle ? "" : "uppercase tracking-[0.34em]"
+              }`}
+            >
+              {settings.breakScreen.subtitle ?? "Be Right Back"}
+            </p>
+          )}
         </div>
       </div>
     </StageFrame>
@@ -398,7 +533,7 @@ export function WaitingScene({ snapshot }: { snapshot: any }) {
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col leading-tight">
                       <span className="truncate font-black text-white/84">
-                        {participant.username ?? "대기자"}
+                        <PlayerName player={participant} fallback="대기자" />
                       </span>
                       <span
                         className={`flex min-w-0 items-center gap-1 font-black tracking-wide ${tierText}`}
@@ -485,7 +620,7 @@ export function AuctionScene({ snapshot }: { snapshot: any }) {
                     style={{ background: teamColor }}
                   />
                   <p className="min-w-0 flex-1 truncate text-2xl font-black text-white">
-                    {team.name}
+                    <TeamName team={team} />
                   </p>
                 </div>
                 <p className="mb-4 text-xl font-black tabular-nums text-amber-300">
@@ -497,7 +632,7 @@ export function AuctionScene({ snapshot }: { snapshot: any }) {
                       key={member.userId ?? member.id ?? member.username}
                       className="grid grid-cols-[minmax(0,1fr)_64px] gap-2 text-sm font-bold text-white/72"
                     >
-                      <span className="truncate">{member.username ?? "-"}</span>
+                      <span className="truncate"><PlayerName player={member} fallback="-" /></span>
                       <span className="text-right text-white/34">
                         {member.soldPrice != null ? `${member.soldPrice}G` : ""}
                       </span>
@@ -532,8 +667,8 @@ function MatchFlank({
   lose: boolean;
   align: "left" | "right";
 }) {
-  const sideColor = side === "BLUE" ? "#3B82F6" : "#EF4444";
-  const teamColor = team?.color || sideColor;
+  const look = useBroadcastLook();
+  const teamColor = sideColor(look, side === "BLUE" ? "blue" : "red", team?.color);
   const right = align === "right";
 
   const scoreEl = (
@@ -563,7 +698,7 @@ function MatchFlank({
         )}
       </div>
       <p className="max-w-[440px] truncate text-[34px] font-black leading-tight text-white">
-        {team?.name ?? "미정"}
+        <TeamName team={team} fallback="미정" />
       </p>
     </div>
   );
@@ -710,7 +845,7 @@ function SideResultBanner({ result }: { result?: any }) {
             : "min-w-0 flex-1 truncate text-[22px] font-bold text-white/50"
         }
       >
-        {team?.name ?? "TBD"}
+        <TeamName team={team} fallback="TBD" />
       </span>
       {isSeries ? (
         <span
@@ -779,6 +914,16 @@ export function MatchResultScene({ snapshot }: { snapshot: any }) {
 
   return (
     <StageFrame accent={winner?.color ?? accent}>
+      {match.riot ? (
+        // Riot 기록이 있는 판 — 승리 → 게임 흐름 → MVP → ACE → 스코어보드 순서로 재생
+        <ResultSequence
+          match={match}
+          winner={winner}
+          loser={loser}
+          roundLabel={roundLabel}
+          roomName={snapshot?.room?.name ?? null}
+        />
+      ) : (
       <div className="flex h-full w-full flex-col items-center justify-center px-24 text-center">
         <div style={{ animation: "nexus-result-rise 700ms ease-out both" }}>
           <HudLabel color={winner?.color ?? accent}>MATCH RESULT</HudLabel>
@@ -795,7 +940,7 @@ export function MatchResultScene({ snapshot }: { snapshot: any }) {
                 className="mt-5 truncate text-[82px] font-black leading-none"
                 style={{ color: winner?.color ?? accent }}
               >
-                {winner?.name ?? "결과 확인 중"}
+                <TeamName team={winner} fallback="결과 확인 중" />
               </h1>
               <div className="mt-8 flex justify-center -space-x-2">
                 {(winner?.members ?? []).slice(0, 5).map((member: any) => (
@@ -818,12 +963,13 @@ export function MatchResultScene({ snapshot }: { snapshot: any }) {
                 Match Complete
               </p>
               <p className="mt-5 truncate text-[54px] font-black leading-none text-white">
-                {loser?.name ?? "상대 팀"}
+                <TeamName team={loser} fallback="상대 팀" />
               </p>
             </div>
           </div>
         </div>
       </div>
+      )}
     </StageFrame>
   );
 }
@@ -862,9 +1008,19 @@ function introRosterOf(team: any) {
   }));
 }
 
-function MatchIntroTeam({ team, side }: { team: any; side: "left" | "right" }) {
+function MatchIntroTeam({
+  team,
+  side,
+  badges,
+}: {
+  team: any;
+  side: "left" | "right";
+  /** 선수별 랭킹 순위·칭찬 (스냅샷 match.badges) */
+  badges?: Record<string, any>;
+}) {
+  const look = useBroadcastLook();
   const roster = introRosterOf(team);
-  const color = team?.color ?? (side === "left" ? "#3B82F6" : "#EF4444");
+  const color = sideColor(look, side === "left" ? "blue" : "red", team?.color);
 
   return (
     <section className="min-w-0">
@@ -883,7 +1039,7 @@ function MatchIntroTeam({ team, side }: { team: any; side: "left" | "right" }) {
             className="mt-2 truncate text-[42px] font-black leading-none"
             style={{ color }}
           >
-            {team?.name ?? "팀 미정"}
+            <TeamName team={team} fallback="팀 미정" />
           </h2>
         </div>
         {team?.balanceTotal != null && (
@@ -902,30 +1058,48 @@ function MatchIntroTeam({ team, side }: { team: any; side: "left" | "right" }) {
           </div>
         )}
       </div>
-      <div className="mt-5 grid gap-2">
+      {/* 한 장의 판 안에 5줄 — 줄 사이는 가는 구분선 하나만. 예전엔 줄마다 위아래 테두리가 있어
+          줄 사이에 선이 두 줄씩 겹쳤다(2026-11-06 운영자 피드백). 바깥쪽 끝에 팀 색 띠. */}
+      <div
+        className="mt-5 overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/[0.07]"
+        style={{
+          boxShadow: `inset ${side === "left" ? "4px" : "-4px"} 0 0 ${color}`,
+        }}
+      >
         {roster.map(({ role, member }, index) => (
           <div
             key={role}
-            className={`grid h-[96px] items-center gap-4 border-y border-white/12 bg-black/34 px-5 ${
+            className={`grid h-[96px] items-center gap-4 px-6 ${
+              index > 0 ? "border-t border-white/[0.06]" : ""
+            } ${
               side === "left"
                 ? "grid-cols-[54px_64px_minmax(0,1fr)]"
                 : "grid-cols-[minmax(0,1fr)_64px_54px] text-right"
             }`}
             style={{
               animation: `nexus-roster-in-${side} 520ms ease-out ${220 + index * 360}ms both`,
-              borderColor: `${color}66`,
             }}
           >
             {side === "left" ? (
               <>
                 <IntroRole role={role} />
-                <IntroAvatar member={member} />
-                <IntroMember member={member} role={role} side={side} />
+                <IntroAvatar member={member} color={color} />
+                <IntroMember
+                  member={member}
+                  role={role}
+                  side={side}
+                  badge={member ? badges?.[member.userId] : undefined}
+                />
               </>
             ) : (
               <>
-                <IntroMember member={member} role={role} side={side} />
-                <IntroAvatar member={member} />
+                <IntroMember
+                  member={member}
+                  role={role}
+                  side={side}
+                  badge={member ? badges?.[member.userId] : undefined}
+                />
+                <IntroAvatar member={member} color={color} />
                 <IntroRole role={role} />
               </>
             )}
@@ -952,14 +1126,15 @@ function IntroRole({ role }: { role: string }) {
   );
 }
 
-function IntroAvatar({ member }: { member?: any }) {
+function IntroAvatar({ member, color }: { member?: any; color?: string }) {
   return (
     // 방송 토큰 스냅샷의 외부 아바타 URL을 그대로 표시한다.
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={member?.avatar || "/images/placeholders/non-avatar-64.png"}
       alt=""
-      className="h-14 w-14 rounded-full border-2 border-white/16 object-cover"
+      className="h-14 w-14 rounded-full object-cover"
+      style={{ boxShadow: `0 0 0 2px ${color ?? "rgba(255,255,255,0.16)"}99` }}
     />
   );
 }
@@ -968,11 +1143,20 @@ function IntroMember({
   member,
   role,
   side,
+  badge,
 }: {
   member?: any;
   role: string;
   side: "left" | "right";
+  badge?: {
+    rank: number | null;
+    score: number | null;
+    commendations: number;
+    topTag: string | null;
+  };
 }) {
+  const { settings, accent } = useBroadcastLook();
+  const showBadge = settings.show.playerBadges && badge;
   const preferences = (member?.championPreferences ?? [])
     .filter((item: any) => normalizeRole(item.role) === role)
     .sort((a: any, b: any) => Number(a.order ?? 0) - Number(b.order ?? 0))
@@ -984,7 +1168,7 @@ function IntroMember({
         className={`flex min-w-0 items-center gap-2 ${side === "right" ? "justify-end" : ""}`}
       >
         <p className="truncate text-xl font-black text-white">
-          {member?.username ?? "미정"}
+          <PlayerName player={member} fallback="미정" />
         </p>
         <span className="shrink-0 text-[11px] font-bold uppercase text-white/42">
           {member?.tier ?? "UNRANKED"}
@@ -992,6 +1176,21 @@ function IntroMember({
         {member?.lineScore != null && (
           <span className="shrink-0 text-sm font-black tabular-nums text-white/72">
             {Number(member.lineScore).toFixed(1)}
+          </span>
+        )}
+        {/* 랭킹 순위·칭찬 — 사이트 랭킹·칭찬과 같은 값 */}
+        {showBadge && badge.rank != null && (
+          <span
+            className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-black tabular-nums"
+            style={{ background: `${accent}33`, color: "#fff" }}
+          >
+            랭킹 #{badge.rank}
+          </span>
+        )}
+        {showBadge && badge.commendations > 0 && (
+          <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-black text-white/80">
+            칭찬 {badge.commendations}
+            {badge.topTag ? ` · ${commendationTagLabel(badge.topTag)}` : ""}
           </span>
         )}
       </div>
@@ -1008,11 +1207,7 @@ function IntroMember({
               className="h-7 w-7 rounded-full border border-white/18 object-cover"
             />
           ))
-        ) : (
-          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/22">
-            No Preferences
-          </span>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -1043,13 +1238,13 @@ export function MatchIntroScene({ snapshot }: { snapshot: any }) {
           </p>
         </div>
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_120px_minmax(0,1fr)] items-center gap-7">
-          <MatchIntroTeam team={match.blue} side="left" />
+          <MatchIntroTeam team={match.blue} side="left" badges={match.badges} />
           <div className="flex h-full items-center justify-center">
             <span className="text-[58px] font-black italic text-white/22">
               VS
             </span>
           </div>
-          <MatchIntroTeam team={match.red} side="right" />
+          <MatchIntroTeam team={match.red} side="right" badges={match.badges} />
         </div>
       </div>
     </StageFrame>
@@ -1065,10 +1260,10 @@ export function LineupOverlayScene({ snapshot }: { snapshot: any }) {
       <style>{broadcastBgCss}</style>
       <div className="absolute inset-x-8 top-8 flex items-start justify-between gap-[460px]">
         <div className="w-[690px] border-y border-blue-400/35 bg-black/80 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
-          <MatchIntroTeam team={match.blue} side="left" />
+          <MatchIntroTeam team={match.blue} side="left" badges={match.badges} />
         </div>
         <div className="w-[690px] border-y border-red-400/35 bg-black/80 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm">
-          <MatchIntroTeam team={match.red} side="right" />
+          <MatchIntroTeam team={match.red} side="right" badges={match.badges} />
         </div>
       </div>
     </div>
@@ -1142,7 +1337,7 @@ function RoleSlot({
             <p
               className={`truncate font-black text-white ${compact ? "text-sm" : "text-base"}`}
             >
-              {member.username}
+              <PlayerName player={member} />
             </p>
             {badge && (
               <p
@@ -1202,7 +1397,7 @@ function RoleSelectionTeam({
         <div className="flex min-w-0 items-center gap-3">
           <span className="h-3 w-3 shrink-0" style={{ background: color }} />
           <p className="truncate text-xl font-black text-white">
-            {team?.name ?? "팀"}
+            <TeamName team={team} fallback="팀" />
           </p>
         </div>
         <span className="text-xs font-black text-white/42">
@@ -1227,7 +1422,7 @@ function RoleSelectionTeam({
                 key={member.id ?? member.userId ?? member.username}
                 className="max-w-[150px] truncate bg-white/[0.04] px-2 py-1 text-[10px] font-black text-white/36"
               >
-                {member.username}
+                <PlayerName player={member} />
               </span>
             ))}
           </div>
@@ -1341,6 +1536,7 @@ function BracketMatchCard({
   compact?: boolean;
   dense?: boolean;
 }) {
+  const look = useBroadcastLook();
   const blue = match?.blue ?? null;
   const red = match?.red ?? null;
   const hasSides = !!match?.blueSideTeamId;
@@ -1396,7 +1592,7 @@ function BracketMatchCard({
           <BracketTeamRow
             team={blue}
             side={hasSides ? "BLUE" : "A"}
-            color="#3B82F6"
+            color={look.blue}
             win={!!blueWin}
             pending={!blue || !hasSides}
             dense={dense}
@@ -1404,7 +1600,7 @@ function BracketMatchCard({
           <BracketTeamRow
             team={red}
             side={hasSides ? "RED" : "B"}
-            color="#EF4444"
+            color={look.red}
             win={!!redWin}
             pending={!red || !hasSides}
             dense={dense}
@@ -1456,7 +1652,7 @@ function BracketTeamRow({
             : "truncate text-[18px] font-black leading-none text-white"
         }
       >
-        {team?.name ?? "미정"}
+        <TeamName team={team} fallback="미정" />
       </span>
       {win && (
         <span className="text-right text-[12px] font-black uppercase text-amber-300">
@@ -1776,7 +1972,7 @@ function DoubleElimBoard({
               Champion
             </p>
             <p className="mt-2 truncate text-xl font-black text-white">
-              {champion?.name ?? "승자"}
+              <TeamName team={champion} fallback="승자" />
             </p>
           </div>
         </>
@@ -2113,7 +2309,7 @@ export function TournamentSummaryScene({ snapshot }: { snapshot: any }) {
               className="mt-2 truncate text-4xl font-black"
               style={{ color: winner?.color ?? accent }}
             >
-              {winner?.name ?? "결과 집계 중"}
+              <TeamName team={winner} fallback="결과 집계 중" />
             </p>
           </div>
         </div>
@@ -2183,7 +2379,7 @@ function RevealMemberRow({
       )}
       <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
         <p className="truncate text-2xl font-black text-white">
-          {member.username}
+          <PlayerName player={member} />
           {isCaptain && (
             <span
               className="ml-2 align-middle text-sm font-black"
@@ -2384,7 +2580,7 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                         className="min-w-0 truncate text-3xl font-black tracking-wide text-white"
                         style={{ textShadow: `0 0 24px ${teamColor}55` }}
                       >
-                        {team.name}
+                        <TeamName team={team} />
                       </p>
                       {team.balanceTotal != null && (
                         <div className="shrink-0 text-right">

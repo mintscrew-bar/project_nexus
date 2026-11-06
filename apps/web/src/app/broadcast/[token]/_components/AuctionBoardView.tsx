@@ -1,27 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { playerDisplayName, useBroadcastLook } from "./look";
+import { StageBackground } from "./scenes";
+import { AuctionLotCard } from "./LotProfilePanel";
+import { useEffect, useMemo, useRef } from "react";
 import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { getTierIcon } from "@/lib/tier-icon";
 import type { BroadcastAuctionData } from "../_live/useBroadcastAuction";
-import { getRoleIcon } from "@/lib/role-icon";
 
 /**
  * 방송용 경매 화면.
  * 앱 화면을 그대로 복제하기보다 OBS에서 바로 읽히는 중계 그래픽으로 재구성한다.
  */
 
-const ROLE_LABELS: Record<string, string> = {
-  TOP: "TOP",
-  JUNGLE: "JGL",
-  MID: "MID",
-  MIDDLE: "MID",
-  ADC: "ADC",
-  BOTTOM: "ADC",
-  SUPPORT: "SUP",
-  UTILITY: "SUP",
-};
 
 const liveBgCss = `
 @keyframes nexus-live-bg-pan {
@@ -53,10 +45,6 @@ const userIdOf = (value: any) => value?.id ?? value?.userId;
 
 const tierIconUrl = getTierIcon;
 
-const roleLabel = (role?: string | null) => {
-  if (!role) return null;
-  return ROLE_LABELS[role.toUpperCase()] ?? role.toUpperCase();
-};
 
 const normalizeAvatarSrc = (
   src?: string | null,
@@ -88,31 +76,17 @@ const sortTeams = (teams: any[]) =>
     return na.localeCompare(nb);
   });
 
-function RoleIcon({ role, dim }: { role?: string | null; dim?: boolean }) {
-  if (!role) return null;
-  const url = getRoleIcon(role.toUpperCase());
-  if (!url) return null;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={url}
-      alt={role}
-      width={22}
-      height={22}
-      className={cn("object-contain brightness-0 invert", dim && "opacity-45")}
-    />
-  );
-}
-
 function PlayerPortrait({
   src,
   alt,
   className,
+  style,
   placeholder = DEFAULT_AVATAR_SRC,
 }: {
   src?: string | null;
   alt: string;
   className?: string;
+  style?: React.CSSProperties;
   placeholder?: string;
 }) {
   const normalizedSrc = normalizeAvatarSrc(src, placeholder);
@@ -123,6 +97,7 @@ function PlayerPortrait({
       src={normalizedSrc}
       alt={alt}
       className={cn("object-cover", className)}
+      style={style}
       onError={(event) => {
         if (event.currentTarget.src.endsWith(placeholder)) return;
         event.currentTarget.src = placeholder;
@@ -173,7 +148,8 @@ function TeamCard({
 }) {
   const members = team.members ?? [];
   const budget = team.remainingGold ?? team.remainingBudget ?? 0;
-  const color = team.color ?? (align === "left" ? "#3B82F6" : "#EF4444");
+  const look = useBroadcastLook();
+  const color = team.color ?? (align === "left" ? look.blue : look.red);
   const isCurrentBidder =
     auctionState?.currentHighestBidder === team.id ||
     auctionState?.currentHighestBidder === team.captainId;
@@ -331,7 +307,13 @@ function MultiTeamBoard({
   teams: any[];
   auctionState: any;
 }) {
-  const columns = teams.length <= 4 ? "grid-cols-2" : "grid-cols-2";
+  // 매물 카드 아래 남은 높이에 팀이 다 들어가게 — 2팀은 2열, 3~6팀은 3열, 그 이상은 4열
+  const columns =
+    teams.length <= 2
+      ? "grid-cols-2"
+      : teams.length <= 6
+        ? "grid-cols-3"
+        : "grid-cols-4";
 
   return (
     <section className="flex min-h-0 flex-col py-1">
@@ -348,14 +330,15 @@ function MultiTeamBoard({
       `}</style>
       <div
         className={cn(
-          "grid min-h-0 flex-1 content-center gap-6",
+          // 위에 선수 정보 판이 있어 가운데 정렬하면 사이가 벌어진다 — 위로 붙인다
+          "grid min-h-0 flex-1 content-start gap-6 pt-2",
           columns,
         )}
       >
         {teams.map((team, index) => (
           <div
             key={team.id ?? index}
-            className={cn("min-w-0", index % 2 === 1 && "translate-y-5")}
+            className="min-w-0"
           >
             <CompactTeamCard
               team={team}
@@ -565,341 +548,6 @@ function CompactTeamCard({
   );
 }
 
-function CurrentLot({
-  auctionState,
-  teams,
-  compact = false,
-}: {
-  auctionState: any;
-  teams: any[];
-  compact?: boolean;
-}) {
-  const player = auctionState.currentPlayer;
-  const [timeLeft, setTimeLeft] = useState(0);
-  // 카운트다운 각 초마다 "딱!" 하고 튀는 플래시 상태
-  const [tick, setTick] = useState(false);
-
-  useEffect(() => {
-    const update = () =>
-      setTimeLeft(
-        Math.max(0, Math.ceil(((auctionState.timerEnd ?? 0) - Date.now()) / 1000)),
-      );
-    update();
-    const interval = setInterval(update, 100);
-    return () => clearInterval(interval);
-  }, [auctionState.timerEnd]);
-
-  // 남은 시간(정수 초)이 바뀔 때마다 짧게 플래시를 켰다 끈다 → 초 단위로 반짝
-  useEffect(() => {
-    if (timeLeft <= 0 || timeLeft > 5) {
-      setTick(false);
-      return;
-    }
-    setTick(true);
-    const t = setTimeout(() => setTick(false), 200);
-    return () => clearTimeout(t);
-  }, [timeLeft]);
-
-  const bidderTeam = teams.find(
-    (team) =>
-      team.id === auctionState.currentHighestBidder ||
-      team.captainId === auctionState.currentHighestBidder,
-  );
-  const bidderName =
-    auctionState.currentHighestBidderName ??
-    bidderTeam?.captainName ??
-    bidderTeam?.name ??
-    "입찰 대기";
-  const tierIcon = tierIconUrl(player?.tier);
-  const mainRole = roleLabel(player?.mainRole ?? player?.position);
-  const subRole = roleLabel(player?.subRole);
-  const timerDanger = timeLeft <= 5;
-
-  return (
-    <section
-      className={cn(
-        "relative min-h-0 overflow-hidden rounded-lg border border-white/10 bg-black/44 shadow-[0_20px_70px_rgba(0,0,0,0.42)]",
-      )}
-    >
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(139,92,246,0.24),transparent_46%),radial-gradient(circle_at_78%_18%,rgba(245,158,11,0.22),transparent_30%)]" />
-      <div className="absolute inset-x-0 top-0 h-1 bg-violet-400/80" />
-      <div
-        className={cn(
-          "relative grid",
-          compact ? "grid-rows-[auto_auto]" : "h-full grid-rows-[1fr_auto]",
-        )}
-      >
-        {compact ? (
-          <div className="flex flex-col gap-4 p-7">
-            {/* 윗줄: 포트레이트 + [이름·타이머·뱃지] */}
-            <div className="flex min-w-0 items-center gap-5">
-              <div className="relative shrink-0">
-                <PlayerPortrait
-                  src={player?.avatar}
-                  alt={player?.username ?? "player"}
-                  placeholder={AVATAR_PLACEHOLDER.md}
-                  className="h-24 w-24 rounded-full ring-2 ring-violet-400/70"
-                />
-                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-violet-400 px-2 py-0.5 text-[10px] font-black text-black">
-                  LOT
-                </span>
-              </div>
-              <div className="min-w-0 flex-1">
-                {/* 이름 + 타이머 한 줄 */}
-                <div className="flex min-w-0 items-center gap-3">
-                  <h1 className="min-w-0 flex-1 truncate text-5xl font-black leading-none text-white">
-                    {player?.username ?? "대기 중"}
-                  </h1>
-                  <span
-                    className={cn(
-                      "flex shrink-0 items-baseline gap-0.5 rounded-xl px-4 py-2 font-black tabular-nums leading-none ring-1 transition-all duration-150 will-change-transform",
-                      timerDanger
-                        ? tick
-                          ? "scale-110 bg-red-500/70 text-white ring-red-300/90 shadow-[0_0_46px_rgba(239,68,68,0.8)]"
-                          : "scale-100 bg-red-500/20 text-red-300 ring-red-400/50 shadow-[0_0_18px_rgba(239,68,68,0.32)]"
-                        : "bg-violet-500/30 text-white ring-violet-300/60 shadow-[0_0_26px_rgba(139,92,246,0.4)]",
-                    )}
-                  >
-                    <span className="text-5xl">{timeLeft}</span>
-                    <span className="text-lg opacity-70">s</span>
-                  </span>
-                </div>
-                {/* 뱃지 */}
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="flex shrink-0 items-center gap-1.5 rounded bg-white/[0.07] px-2.5 py-1 text-sm font-black text-white ring-1 ring-white/10">
-                    {tierIcon && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={tierIcon} alt="" width={15} height={15} />
-                    )}
-                    {player?.tier ?? "UNRANKED"}
-                  </span>
-                  {mainRole && (
-                    <span className="flex shrink-0 items-center gap-1.5 rounded bg-violet-500/15 px-2.5 py-1 text-sm font-black text-violet-100 ring-1 ring-violet-300/25">
-                      <RoleIcon role={player?.mainRole ?? player?.position} />
-                      {mainRole}
-                    </span>
-                  )}
-                  {subRole && (
-                    <span className="shrink-0 rounded bg-white/[0.04] px-2.5 py-1 text-sm font-bold text-white/50 ring-1 ring-white/8">
-                      {subRole}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            {/* 아랫줄: 금액 + 리딩팀 */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-md bg-black/36 px-4 py-3.5 ring-1 ring-amber-300/22">
-                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">Current Bid</p>
-                <div className="mt-1.5 flex items-end gap-1.5">
-                  <span className="text-5xl font-black tabular-nums leading-none text-amber-300">
-                    {(auctionState.currentHighestBid ?? 0).toLocaleString()}
-                  </span>
-                  <span className="mb-0.5 text-lg font-black text-amber-300/60">G</span>
-                </div>
-              </div>
-              <div className="rounded-md bg-black/30 px-4 py-3.5 ring-1 ring-white/8">
-                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">Leading Team</p>
-                <div className="mt-1.5 flex min-w-0 items-center gap-2">
-                  {bidderTeam?.color && (
-                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: bidderTeam.color }} />
-                  )}
-                  <span className="truncate text-3xl font-black text-white">{bidderName}</span>
-                </div>
-              </div>
-            </div>
-            {auctionState.yuchalCount > 0 && (
-              <p className="rounded bg-amber-300/10 px-2 py-1 text-xs font-black text-amber-200">
-                유찰 {auctionState.yuchalCount}회
-              </p>
-            )}
-          </div>
-        ) : (
-          <div
-            className={cn(
-              "grid min-h-0 items-start",
-              "grid-cols-[minmax(0,1fr)_260px] gap-8 p-8",
-            )}
-          >
-          <div className="min-w-0">
-            <div className="mb-6 flex items-center gap-4">
-              <div className="relative shrink-0">
-                <PlayerPortrait
-                  src={player?.avatar}
-                  alt={player?.username ?? "player"}
-                  placeholder={AVATAR_PLACEHOLDER.md}
-                  className="h-28 w-28 rounded-full ring-2 ring-violet-400/70"
-                />
-                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-violet-400 px-2 py-0.5 text-[11px] font-black text-black">
-                  LOT
-                </span>
-              </div>
-              <div className="min-w-0">
-                <p className="mb-1 text-sm font-black uppercase tracking-[0.35em] text-violet-300">
-                  Current Player
-                </p>
-                <h1 className="truncate text-7xl font-black leading-none text-white">
-                  {player?.username ?? "대기 중"}
-                  </h1>
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <span className="flex items-center gap-2 rounded-md bg-white/[0.07] px-4 py-1.5 text-base font-black text-white ring-1 ring-white/10">
-                      {tierIcon && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={tierIcon} alt="" width={22} height={22} />
-                      )}
-                      {player?.tier ?? "UNRANKED"}
-                    </span>
-                  {mainRole && (
-                    <span className="flex items-center gap-2 rounded-md bg-violet-500/15 px-4 py-1.5 text-base font-black text-violet-100 ring-1 ring-violet-300/25">
-                      <RoleIcon role={player?.mainRole ?? player?.position} />
-                      {mainRole}
-                    </span>
-                  )}
-                  {subRole && (
-                    <span className="rounded-md bg-white/[0.04] px-3 py-1 text-sm font-bold text-white/50 ring-1 ring-white/8">
-                      {subRole}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-md bg-black/36 px-5 py-4 ring-1 ring-amber-300/25">
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-white/40">Current Bid</p>
-                <div className="mt-2 flex items-end gap-3">
-                  <span className="text-6xl font-black tabular-nums leading-none text-amber-300">
-                    {(auctionState.currentHighestBid ?? 0).toLocaleString()}
-                  </span>
-                  <span className="mb-1 text-xl font-black text-amber-300/60">G</span>
-                </div>
-              </div>
-              <div className="rounded-md bg-black/30 px-5 py-4 ring-1 ring-white/8">
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-white/40">Leading Team</p>
-                <div className="mt-3 flex min-w-0 items-center gap-3">
-                  {bidderTeam?.color && (
-                    <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: bidderTeam.color }} />
-                  )}
-                  <span className="truncate text-3xl font-black text-white">{bidderName}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-col items-center justify-center border-y border-white/12 bg-black/24">
-            <p className="mb-4 text-xs font-black uppercase tracking-[0.32em] text-white/38">
-              Time Left
-            </p>
-            <div
-              className={cn(
-                "flex h-44 w-44 items-center justify-center rounded-full border-[10px] bg-black/42",
-                timerDanger
-                  ? "border-rose-500 text-rose-400 shadow-[0_0_46px_rgba(244,63,94,0.38)]"
-                  : "border-violet-400 text-white shadow-[0_0_46px_rgba(139,92,246,0.25)]",
-              )}
-            >
-              <span className="text-8xl font-black tabular-nums leading-none">
-                {timeLeft}
-              </span>
-            </div>
-            {auctionState.yuchalCount > 0 && (
-              <p className="mt-5 rounded bg-amber-300/14 px-3 py-1 text-sm font-black text-amber-200">
-                유찰 {auctionState.yuchalCount}회
-              </p>
-            )}
-          </div>
-        </div>
-        )}
-
-        {!compact && <CurrentLotTeamStrip teams={teams} />}
-      </div>
-    </section>
-  );
-}
-
-function CurrentLotTeamStrip({
-  teams,
-  compact = false,
-}: {
-  teams: any[];
-  compact?: boolean;
-}) {
-  if (teams.length <= 2) {
-    return (
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center border-t border-white/10 bg-black/42 px-8 py-4">
-        <TeamMiniStat team={teams[0]} />
-        <span className="px-8 text-sm font-black uppercase tracking-[0.45em] text-white/30">
-          Auction Draft
-        </span>
-        <TeamMiniStat team={teams[1]} align="right" />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "grid grid-cols-[auto_minmax(0,1fr)] items-center border-t border-white/10 bg-black/42",
-        compact ? "gap-4 px-6 py-3" : "gap-5 px-8 py-4",
-      )}
-    >
-      <span
-        className={cn(
-          "font-black uppercase tracking-[0.45em] text-white/30",
-          compact ? "text-xs" : "text-sm",
-        )}
-      >
-        Auction Draft
-      </span>
-      <div className="grid min-w-0 grid-cols-4 gap-2">
-        {teams.slice(0, 4).map((team) => (
-          <TeamMiniStat key={team.id} team={team} compact />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TeamMiniStat({
-  team,
-  align = "left",
-  compact = false,
-}: {
-  team?: any;
-  align?: "left" | "right";
-  compact?: boolean;
-}) {
-  if (!team) return <div />;
-  const budget = team.remainingGold ?? team.remainingBudget ?? 0;
-  return (
-    <div
-      className={cn(
-        "flex min-w-0 items-center gap-3",
-        align === "right" && "justify-end",
-      )}
-    >
-      <span
-        className="h-3 w-3 rounded-full"
-        style={{ backgroundColor: team.color ?? "#8B5CF6" }}
-      />
-      <span
-        className={cn(
-          "truncate font-black text-white",
-          compact ? "text-sm" : "max-w-[260px] text-lg",
-        )}
-      >
-        {team.name}
-      </span>
-      <span
-        className={cn(
-          "font-black tabular-nums text-amber-300",
-          compact ? "text-sm" : "text-base",
-        )}
-      >
-        {budget.toLocaleString()}G
-      </span>
-    </div>
-  );
-}
-
 function BroadcastHeader({
   teams,
   players,
@@ -1105,9 +753,12 @@ function MultiAuxDeck({
 }) {
   // 최신순(위가 최신). 영역보다 많으면 영역 안에서 스크롤되도록 넉넉히 보관.
   const recentBids = bidHistory.filter((entry) => !entry.isSeparator).slice(-40).reverse();
+  // 남은 선수 목록·입찰 기록은 방송인이 각각 끌 수 있다
+  const { settings } = useBroadcastLook();
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 px-1">
+      {settings.show.pool && (
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="mb-2 flex shrink-0 items-center justify-between px-1">
           <p className="text-xs font-black uppercase tracking-[0.28em] text-violet-200">
@@ -1150,7 +801,15 @@ function MultiAuxDeck({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col border-t border-white/8 pt-4">
+      )}
+
+      {settings.show.bidLog && (
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col",
+          settings.show.pool && "border-t border-white/8 pt-4",
+        )}
+      >
         <div className="mb-2 flex shrink-0 items-center justify-between px-1">
           <p className="text-xs font-black uppercase tracking-[0.28em] text-amber-200">
             Bid Log
@@ -1179,48 +838,35 @@ function MultiAuxDeck({
           </div>
         )}
       </div>
+      )}
     </section>
   );
 }
 
-export function AuctionBoardView({ data }: { data: BroadcastAuctionData }) {
+export function AuctionBoardView({
+  data,
+  token,
+  lotProfile,
+}: {
+  data: BroadcastAuctionData;
+  /** 방송 토큰 — 매물 선수 프로필 조회용. 미리보기는 lotProfile 을 직접 넘긴다 */
+  token?: string;
+  lotProfile?: any;
+}) {
   const { auctionState, teams, players, captainPhase, status, bidHistory } = data;
   const sortedTeams = useMemo(() => sortTeams(teams), [teams]);
   const currentPlayerId =
     auctionState?.currentPlayer?.id ?? auctionState?.currentPlayer?.userId;
+  const { accent, settings } = useBroadcastLook();
+  const showAux = settings.show.pool || settings.show.bidLog;
 
   return (
     <div
-      className="relative flex h-full w-full flex-col gap-5 overflow-hidden bg-[#05070d] px-10 pb-36 pt-8 text-white"
+      className="relative flex h-full w-full flex-col gap-5 overflow-hidden px-10 pb-36 pt-8 text-white"
     >
       <style>{liveBgCss}</style>
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <div
-          className="absolute -inset-[12%]"
-          style={{
-            animation: "nexus-live-bg-pan 16s ease-in-out infinite",
-            background:
-              "radial-gradient(circle at 18% 20%, rgba(0,177,255,0.18), transparent 28%), radial-gradient(circle at 76% 28%, rgba(245,158,11,0.14), transparent 24%), radial-gradient(circle at 54% 82%, rgba(139,92,246,0.18), transparent 32%), linear-gradient(135deg, #061018 0%, #070812 45%, #120816 100%)",
-          }}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.08]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)",
-            backgroundSize: "56px 56px",
-          }}
-        />
-        <div
-          className="absolute -inset-y-20 left-0 w-full"
-          style={{
-            animation: "nexus-live-scan 9s ease-in-out infinite",
-            background:
-              "linear-gradient(100deg, transparent 0%, rgba(0,177,255,0.08) 36%, rgba(255,255,255,0.07) 50%, rgba(245,158,11,0.06) 64%, transparent 100%)",
-          }}
-        />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.42)_72%,rgba(0,0,0,0.72)_100%)]" />
-      </div>
+      {/* 배경 — 방송인이 고른 종류·세기 (scenes.tsx StageBackground 와 같은 것) */}
+      <StageBackground accent={accent} />
       <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-5">
         {auctionState ? (
           <>
@@ -1230,16 +876,29 @@ export function AuctionBoardView({ data }: { data: BroadcastAuctionData }) {
             connected={data.connected}
           />
 
-          <main className="grid min-h-0 flex-1 grid-cols-[600px_minmax(0,1fr)] gap-5">
-            <div className="flex min-h-0 flex-col gap-4">
-              <CurrentLot auctionState={auctionState} teams={sortedTeams} compact />
+          {/* 왼쪽: 남은 선수·입찰 기록(방송인이 끌 수 있다) / 오른쪽: 매물 카드 한 장 + 팀 현황 */}
+          <main
+            className={cn(
+              "grid min-h-0 flex-1 gap-5",
+              showAux ? "grid-cols-[400px_minmax(0,1fr)]" : "grid-cols-1",
+            )}
+          >
+            {showAux && (
               <MultiAuxDeck
                 players={players}
                 currentPlayerId={currentPlayerId}
                 bidHistory={bidHistory}
               />
+            )}
+            <div className="flex min-h-0 flex-col gap-5">
+              <AuctionLotCard
+                auctionState={auctionState}
+                teams={sortedTeams}
+                token={token}
+                profile={lotProfile}
+              />
+              <MultiTeamBoard teams={sortedTeams} auctionState={auctionState} />
             </div>
-            <MultiTeamBoard teams={sortedTeams} auctionState={auctionState} />
           </main>
           </>
         ) : (

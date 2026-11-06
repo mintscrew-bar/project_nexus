@@ -1,6 +1,7 @@
 "use client";
 
 import { accentOf, statusLabel } from "./scenes";
+import { useBroadcastLook } from "./look";
 
 /**
  * 공통 하단 상태 바.
@@ -14,10 +15,13 @@ export function LowerThird({
   /** 투명 오버레이인지 풀씬인지. 투명이면 backdrop-blur 를 끈다. */
   bg?: "transparent" | "opaque";
 }) {
-  if (!snapshot?.room) return null;
+  const { settings, logo, mark } = useBroadcastLook();
+  if (!snapshot?.room || !settings.show.lowerThird) return null;
   const accent = accentOf(snapshot);
   const room = snapshot.room;
-  const theme = snapshot.theme;
+  // 방송인이 정한 제목·보조 문구가 있으면 방 제목·진행 단계 대신 쓴다
+  const title = settings.title ?? room.name;
+  const subtitle = settings.subtitle ?? statusLabel(room.status);
 
   return (
     <div className="absolute bottom-12 left-12 right-12 select-none">
@@ -38,11 +42,11 @@ export function LowerThird({
             className="flex h-10 min-w-10 items-center justify-center border-y px-2 text-xl font-black"
             style={{ borderColor: accent }}
           >
-            {theme?.logo ? (
+            {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={theme.logo} alt="" className="h-7 w-7 object-cover" />
+              <img src={logo} alt="" className="h-7 w-7 object-cover" />
             ) : (
-              (theme?.clanTag ?? "NX").slice(0, 3)
+              mark
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -60,10 +64,10 @@ export function LowerThird({
 
         <div className="flex min-w-0 flex-1 items-center gap-5 px-5">
           <span className="shrink-0 text-xs font-black uppercase tracking-[0.28em] text-white/38">
-            {statusLabel(room.status)}
+            {subtitle}
           </span>
           <span className="min-w-0 truncate text-xl font-black text-white">
-            {room.name}
+            {title}
           </span>
         </div>
 

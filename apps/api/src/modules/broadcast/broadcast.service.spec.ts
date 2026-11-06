@@ -114,8 +114,8 @@ describe("BroadcastService auto 장면", () => {
     });
 
     expect(result.scene).toBe("result");
-    // 12초를 채우고 전환하도록 전환 시각을 함께 준다.
-    expect(result.nextChangeAt).toBe(completedAt.getTime() + 12_000);
+    // 결과 재생(약 14초)과 스코어보드를 다 보여 준 뒤 전환하도록 전환 시각을 함께 준다.
+    expect(result.nextChangeAt).toBe(completedAt.getTime() + 22_000);
   });
 
   it("결과 시간이 지나면 진행 중 경기로 넘어간다", async () => {

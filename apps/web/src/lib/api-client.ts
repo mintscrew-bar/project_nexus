@@ -1,7 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import type { CommendationSummary } from "@/lib/commendation";
 import { getDdragonVersion } from "./ddragon";
-import type { GameTitle } from "@nexus/types";
+import type { BroadcastSettings, GameTitle } from "@nexus/types";
 
 // 보이지 않는 유니코드 문자 제거 (복사-붙여넣기 시 포함되는 bidirectional formatting 등)
 const stripInvisibleChars = (str: string): string =>
@@ -722,6 +722,34 @@ export const userApi = {
 // - 토큰은 스트리머(유저)당 1개. OBS에 한 번 등록하면 활성 방을 자동 추종.
 // - 스냅샷은 공개(토큰 인증), 토큰 관리는 로그인 본인, 송출 제어는 방 호스트.
 export const broadcastApi = {
+  /** 경매 매물 카드용 선수 프로필 — 송출 중인 방의 참가자만 (로그인 불필요, 토큰 인증) */
+  getPlayerProfile: async (token: string, userId: string) => {
+    const response = await publicApiClient.get(
+      `/broadcast/${token}/players/${encodeURIComponent(userId)}`,
+    );
+    return response.data as Awaited<ReturnType<typeof userApi.getHoverProfile>>;
+  },
+  /** 방송 커스터마이징 — 내 설정 */
+  getSettings: async (): Promise<BroadcastSettings> => {
+    const response = await apiClient.get("/broadcast/settings");
+    return response.data;
+  },
+  /** 방송 커스터마이징 저장 — 전체 설정을 보내고, 서버가 정규화한 값을 돌려받는다 */
+  updateSettings: async (
+    settings: BroadcastSettings,
+  ): Promise<BroadcastSettings> => {
+    const response = await apiClient.put("/broadcast/settings", { settings });
+    return response.data;
+  },
+  /** 방송 로고 업로드 — 주소만 받고, 저장은 설정 저장 때 */
+  uploadLogo: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append("logo", file);
+    const response = await apiClient.post("/broadcast/settings/logo", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
   // OBS 브라우저 소스용 읽기전용 스냅샷
   getSnapshot: async (
     token: string,
