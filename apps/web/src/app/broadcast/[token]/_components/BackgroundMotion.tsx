@@ -9,7 +9,7 @@ export function BackgroundMotion({ type }: { type: "studio" | "technical" }) {
     >
       <style>{`
       @keyframes bc-frame-trace { to { stroke-dashoffset: -2000; } }
-      @keyframes bc-edge-drift { 0%, 100% { transform: translateX(-2.2%); opacity: .55; } 50% { transform: translateX(2.2%); opacity: .85; } }
+      @keyframes bc-edge-drift { 0%, 100% { transform: translateX(-4%); opacity: .75; } 50% { transform: translateX(4%); opacity: 1; } }
       @media (prefers-reduced-motion: reduce) { .bc-background-motion { animation: none !important; } }
     `}</style>
       {type === "studio" ? (
@@ -37,9 +37,9 @@ export function BackgroundMotion({ type }: { type: "studio" | "technical" }) {
         <div
           className="bc-background-motion absolute -inset-x-[5%] inset-y-0"
           style={{
-            animation: "bc-edge-drift 14s ease-in-out infinite",
+            animation: "bc-edge-drift 8s ease-in-out infinite",
             background:
-              "linear-gradient(115deg, transparent 17%, rgba(150,186,215,.14) 17.1%, rgba(150,186,215,.05) 23%, transparent 23.1%, transparent 77%, rgba(150,186,215,.07) 77.1%, rgba(150,186,215,.14) 83%, transparent 83.1%)",
+              "linear-gradient(115deg, transparent 17%, rgba(175,210,240,.34) 17.1%, rgba(175,210,240,.34) 17.2%, rgba(150,186,215,.11) 17.3%, rgba(150,186,215,.025) 23%, transparent 23.1%, transparent 77%, rgba(150,186,215,.025) 77.1%, rgba(150,186,215,.11) 82.7%, rgba(175,210,240,.34) 82.8%, rgba(175,210,240,.34) 82.9%, transparent 83%)",
           }}
         />
       )}
