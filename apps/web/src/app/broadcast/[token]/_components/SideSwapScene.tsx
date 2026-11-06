@@ -1,21 +1,15 @@
 "use client";
 
 import { sideColor, teamDisplayName, useBroadcastLook } from "./look";
-import type { CSSProperties } from "react";
 
 const SWAP_CSS = `
-@keyframes side-swap-blue {
-  from { transform: translateX(calc(100% + 184px)); color: var(--old-color); }
-  to { transform: translateX(0); color: var(--new-color); }
+@keyframes side-swap-out {
+  from { transform: translateY(0); }
+  to { transform: translateY(-115%); }
 }
-@keyframes side-swap-red {
-  from { transform: translateX(calc(-100% - 184px)); color: var(--old-color); }
-  to { transform: translateX(0); color: var(--new-color); }
-}
-/* 가로 이동과 곡선 높이를 분리해 가운데서 감속·재출발하지 않게 한다. */
-@keyframes side-swap-arc {
-  0%, 100% { translate: 0 0; }
-  50% { translate: 0 var(--arc-height); }
+@keyframes side-swap-in {
+  from { transform: translateY(115%); }
+  to { transform: translateY(0); }
 }
 @keyframes side-swap-pending { from { opacity: 1; } to { opacity: 0; } }
 @keyframes side-swap-complete { from { opacity: 0; } to { opacity: 1; } }
@@ -27,6 +21,7 @@ const SWAP_CSS = `
 @media (prefers-reduced-motion: reduce) {
   .side-swap-motion { animation: none !important; }
   .side-swap-pending { display: none; }
+  .side-swap-old { display: none; }
   .side-swap-complete { opacity: 1 !important; }
 }
 `;
@@ -110,26 +105,35 @@ export function SideSwapScene({ snapshot }: { snapshot: any }) {
             >
               {side === "blue" ? "블루 진영" : "레드 진영"}
             </p>
-            <p
-              className="side-swap-motion relative z-10 mt-5 truncate text-[112px] font-black leading-tight"
-              style={
-                {
+            <div className="relative mt-5 overflow-hidden text-[112px] font-black leading-tight">
+              {animate && (
+                <p
+                  aria-hidden
+                  className="side-swap-motion side-swap-old absolute inset-0 truncate"
+                  style={{
+                    color: sideColor(look, side),
+                    animation:
+                      "side-swap-out 800ms cubic-bezier(.65,0,.35,1) 1000ms both",
+                  }}
+                >
+                  {teamDisplayName(
+                    match[side === "blue" ? "red" : "blue"],
+                    look.settings.teamLabel,
+                  )}
+                </p>
+              )}
+              <p
+                className="side-swap-motion truncate"
+                style={{
                   color: sideColor(look, side),
-                  "--old-color": sideColor(
-                    look,
-                    side === "blue" ? "red" : "blue",
-                  ),
-                  "--new-color": sideColor(look, side),
-                  "--arc-height": side === "blue" ? "-88px" : "88px",
-                  willChange: animate ? "transform, translate" : undefined,
                   animation: animate
-                    ? `side-swap-${side} 1200ms cubic-bezier(.45,0,.25,1) 1000ms both, side-swap-arc 1200ms ease-in-out 1000ms both`
+                    ? "side-swap-in 800ms cubic-bezier(.22,1,.36,1) 1200ms both"
                     : undefined,
-                } as CSSProperties
-              }
-            >
-              {teamDisplayName(match[side], look.settings.teamLabel)}
-            </p>
+                }}
+              >
+                {teamDisplayName(match[side], look.settings.teamLabel)}
+              </p>
+            </div>
           </div>
         ))}
       </div>
