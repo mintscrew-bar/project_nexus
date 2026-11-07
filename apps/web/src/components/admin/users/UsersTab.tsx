@@ -993,9 +993,15 @@ export function UsersTab({
                     : "border-bg-elevated bg-bg-tertiary text-text-muted hover:text-text-primary"
                 }`}
               >
-                개인 공지(알림)
+                개인 공지(모달+알림)
               </button>
             </div>
+            {msgMode === "notification" && (
+              <p className="text-xs text-text-muted">
+                받는 사람 화면에 모달로 뜨고, 🔔 알림에도 남습니다. 모달에서
+                확인하거나 알림을 읽으면 다시 뜨지 않습니다.
+              </p>
+            )}
 
             {msgMode === "notification" && (
               <div>

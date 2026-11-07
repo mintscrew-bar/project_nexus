@@ -14,6 +14,7 @@ import { ActiveRoomBanner } from "./ActiveRoomBanner";
 import { RoomStartAlertModal } from "@/components/rooms/RoomStartAlertModal";
 import { RoomInvitePopup } from "@/components/rooms/RoomInvitePopup";
 import { CommendationPrompt } from "@/components/reputation/CommendationPrompt";
+import { NoticePopup } from "@/components/notifications/NoticePopup";
 import { IconCdnFallback } from "./IconCdnFallback";
 import { PubgSurfaceGrain } from "./PubgSurfaceGrain";
 import { useLobbyStore } from "@/stores/lobby-store";
@@ -266,6 +267,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <RoomInvitePopup />
       {/* 경기 뒤 칭찬 창 — 경매·로비 등 진행 화면에서는 스스로 숨는다 */}
       <CommendationPrompt />
+      {/* 운영자 공지 모달(개인 공지·모달 전체 공지) — 진행 화면에서는 스스로 숨는다 */}
+      <NoticePopup />
       <IconCdnFallback />
     </div>
   );

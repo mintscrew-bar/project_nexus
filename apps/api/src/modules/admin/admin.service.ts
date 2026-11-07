@@ -28,7 +28,10 @@ import { DiscordVoiceService } from "../discord/discord-voice.service";
 import { RoomService } from "../room/room.service";
 import { DmService } from "../dm/dm.service";
 import { DmGateway } from "../dm/dm.gateway";
-import { NotificationService } from "../notification/notification.service";
+import {
+  NotificationService,
+  POPUP_NOTICE_DATA,
+} from "../notification/notification.service";
 import {
   decryptSensitive,
   sensitiveLookup,
@@ -862,11 +865,15 @@ export class AdminService {
 
   // ── Announcements ─────────────────────────────────────────────────────────
 
+  /**
+   * 전체 공지 — 모든 유저에게 SYSTEM 알림. popup 이면 접속 시 모달로도 띄운다.
+   */
   async sendAnnouncement(
     title: string,
     message: string,
     adminId: string,
     link?: string,
+    popup = false,
   ) {
     const BATCH_SIZE = 1000;
     let sent = 0;
@@ -890,6 +897,7 @@ export class AdminService {
           title,
           message,
           link: link ?? null,
+          ...(popup ? { data: POPUP_NOTICE_DATA } : {}),
         })),
       });
 
@@ -907,6 +915,7 @@ export class AdminService {
       {
         title,
         sentCount: sent,
+        popup,
       },
     );
 
@@ -916,7 +925,8 @@ export class AdminService {
   /**
    * 특정 유저(단일/다중)에게 개인 메시지를 보낸다.
    * - mode "dm": 기존 DM 시스템으로 쪽지 발송(운영자 계정 발신) + 실시간 푸시
-   * - mode "notification": SYSTEM 알림(🔔)으로 개인 공지 발송(제목/링크 지원) + 실시간 푸시
+   * - mode "notification": SYSTEM 알림(🔔)으로 개인 공지 발송(제목/링크 지원) + 실시간 푸시.
+   *   개인 공지는 항상 모달로도 뜬다(data.popup, 운영자 결정 2026-11-07)
    * 두 경로 모두 실시간 전달이 되며, 존재하지 않는 대상과 발신자 본인은 건너뛴다.
    */
   async sendUserMessage(
@@ -958,6 +968,7 @@ export class AdminService {
           title: dto.title?.trim() || "운영자 공지",
           message: dto.content,
           link: dto.link?.trim() || undefined,
+          data: POPUP_NOTICE_DATA,
         });
       }
       sent++;

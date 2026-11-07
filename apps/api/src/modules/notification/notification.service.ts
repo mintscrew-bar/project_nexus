@@ -29,6 +29,16 @@ export const FRIENDS_PANEL_NOTIFICATION_TYPES: NotificationType[] = [
   "CLAN_ANNOUNCEMENT",
 ];
 
+/**
+ * 모달로 띄우는 공지 표시. 운영자 공지(개인 공지는 항상, 전체 공지는 선택)에
+ * data.popup = true 를 실어 보내면, 사이트가 읽지 않은 동안 화면 가운데 모달로 띄운다.
+ * 모달에서 "확인"을 누르거나 🔔 에서 읽으면(isRead) 다시 뜨지 않는다.
+ */
+export const POPUP_NOTICE_DATA = { popup: true } as const;
+
+/** 한 번에 내려 주는 모달 공지 수 — 쌓여 있어도 최근 것부터 이만큼만 */
+const POPUP_NOTICE_LIMIT = 5;
+
 @Injectable()
 export class NotificationService {
   constructor(
@@ -72,6 +82,31 @@ export class NotificationService {
       take: limit,
       skip: offset,
     });
+  }
+
+  /**
+   * 아직 확인하지 않은 모달 공지 — 오래된 것부터 차례로 띄우도록 오름차순.
+   * (최근 POPUP_NOTICE_LIMIT 개 안에서)
+   */
+  async getPendingPopups(userId: string) {
+    const recent = await this.prisma.notification.findMany({
+      where: {
+        userId,
+        type: "SYSTEM",
+        isRead: false,
+        data: { path: ["popup"], equals: true },
+      },
+      orderBy: { createdAt: "desc" },
+      take: POPUP_NOTICE_LIMIT,
+      select: {
+        id: true,
+        title: true,
+        message: true,
+        link: true,
+        createdAt: true,
+      },
+    });
+    return recent.reverse();
   }
 
   /**

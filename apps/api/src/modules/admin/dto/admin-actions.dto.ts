@@ -75,6 +75,12 @@ export class SendAnnouncementDto {
   @IsString()
   @MaxLength(500, { message: "링크는 500자 이하여야 합니다." })
   link?: string;
+
+  /** 접속 중인/다음에 접속하는 유저에게 모달로도 띄운다 (🔔 알림에는 항상 남는다) */
+  @IsOptional()
+  @KeepRaw()
+  @IsBoolean({ message: "popup은 true 또는 false여야 합니다." })
+  popup?: boolean;
 }
 
 /** 봇 데이터 정리. 둘 다 생략하면 컨트롤러가 거부한다. */

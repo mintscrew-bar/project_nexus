@@ -37,6 +37,12 @@ export class NotificationController {
   /**
    * Get unread count
    */
+  /** 아직 확인하지 않은 모달 공지 (운영자 공지 중 popup 표시된 것) */
+  @Get("popups")
+  async getPendingPopups(@CurrentUser("sub") userId: string) {
+    return this.notificationService.getPendingPopups(userId);
+  }
+
   @Get("unread-count")
   async getUnreadCount(@CurrentUser("sub") userId: string) {
     const count = await this.notificationService.getUnreadCount(userId);

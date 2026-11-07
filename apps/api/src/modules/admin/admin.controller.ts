@@ -358,6 +358,7 @@ export class AdminController {
       body.message,
       req.user.sub,
       body.link,
+      body.popup ?? false,
     );
   }
 

@@ -2386,11 +2386,26 @@ export const presenceApi = {
 };
 
 // 알림 관련 API
+/** 운영자 모달 공지 — 알림 중 data.popup 이 붙은 것 */
+export type PopupNotice = {
+  id: string;
+  title: string;
+  message: string;
+  link: string | null;
+  createdAt: string;
+};
+
 export const notificationApi = {
   getNotifications: async (limit = 20, offset = 0) => {
     const response = await apiClient.get("/notifications", {
       params: { limit, offset },
     });
+    return response.data;
+  },
+
+  /** 아직 확인하지 않은 운영자 모달 공지 (먼저 온 것부터) */
+  getPopups: async (): Promise<PopupNotice[]> => {
+    const response = await apiClient.get("/notifications/popups");
     return response.data;
   },
 
@@ -2929,11 +2944,17 @@ export const adminApi = {
     return response.data;
   },
   // Announcements
-  sendAnnouncement: async (title: string, message: string, link?: string) => {
+  sendAnnouncement: async (
+    title: string,
+    message: string,
+    link?: string,
+    popup = false,
+  ) => {
     const response = await apiClient.post("/admin/announcements", {
       title,
       message,
       link,
+      popup,
     });
     return response.data;
   },

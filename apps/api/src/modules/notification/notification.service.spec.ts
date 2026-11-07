@@ -1,6 +1,7 @@
 import {
   FRIENDS_PANEL_NOTIFICATION_TYPES,
   NotificationService,
+  POPUP_NOTICE_DATA,
 } from "./notification.service";
 
 /**
@@ -49,5 +50,32 @@ describe("NotificationService 알림 범위", () => {
     for (const kept of ["MATCH_RESULT", "COMMENT", "STREAMER_LIVE", "SYSTEM"]) {
       expect(FRIENDS_PANEL_NOTIFICATION_TYPES).not.toContain(kept);
     }
+  });
+});
+
+describe("NotificationService 모달 공지", () => {
+  it("읽지 않은 운영자 공지 중 popup 표시된 것만, 오래된 것부터 돌려준다", async () => {
+    const rows = [
+      { id: "new", title: "b", message: "m", link: null, createdAt: 2 },
+      { id: "old", title: "a", message: "m", link: null, createdAt: 1 },
+    ];
+    const prisma = {
+      notification: { findMany: jest.fn().mockResolvedValue([...rows]) },
+    } as any;
+    const service = new NotificationService(prisma, {} as any);
+
+    const popups = await service.getPendingPopups("user-1");
+
+    const query = prisma.notification.findMany.mock.calls[0][0];
+    expect(query.where).toEqual({
+      userId: "user-1",
+      type: "SYSTEM",
+      isRead: false,
+      data: { path: ["popup"], equals: true },
+    });
+    // 최근 것부터 잘라 온 뒤 순서를 뒤집어, 화면에는 먼저 온 공지가 먼저 뜬다
+    expect(query.orderBy).toEqual({ createdAt: "desc" });
+    expect(popups.map((p: any) => p.id)).toEqual(["old", "new"]);
+    expect(POPUP_NOTICE_DATA).toEqual({ popup: true });
   });
 });
