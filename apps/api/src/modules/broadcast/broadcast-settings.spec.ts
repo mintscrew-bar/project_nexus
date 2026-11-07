@@ -105,4 +105,29 @@ describe("normalizeBroadcastSettings (방송 커스터마이징 정규화)", () 
     expect(result.subtitle).toBeNull();
     expect(result.idle.title).toHaveLength(40);
   });
+
+  it("공지 프리셋은 문자열만, 80자·6개까지 남긴다", () => {
+    const s = normalizeBroadcastSettings({
+      announcementPresets: [
+        "  잠시 후 경매 시작  ",
+        "",
+        42,
+        "x".repeat(120),
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+      ],
+    });
+    expect(s.announcementPresets).toEqual([
+      "잠시 후 경매 시작",
+      "x".repeat(80),
+      "a",
+      "b",
+      "c",
+      "d",
+    ]);
+    expect(normalizeBroadcastSettings({}).announcementPresets).toEqual([]);
+  });
 });

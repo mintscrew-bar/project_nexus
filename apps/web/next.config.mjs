@@ -169,6 +169,15 @@ const nextConfig = {
         ],
       },
       {
+        // 조작 패널의 송출 미리보기 — 단기 미리보기 토큰(pv_)으로 연 오버레이만 같은 사이트 iframe 허용.
+        // 진짜 OBS 토큰 링크는 위 /broadcast 규칙대로 계속 차단한다.
+        source: "/broadcast/:token(pv_[^/]+)",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+        ],
+      },
+      {
         source: "/community/:path(write|bookmarks)(.*)",
         headers: [
           ...denyFramingHeaders,

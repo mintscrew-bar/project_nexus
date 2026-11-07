@@ -12,11 +12,14 @@ import { summarizeCommendations } from "../reputation/commendation.service";
 import type { SeriesScore } from "../match/match-series.service";
 import {
   hashBroadcastToken,
+  broadcastStreamerWhere,
   activeRoomIdForUser,
+  createPreviewToken,
 } from "./broadcast-resolve.util";
 import {
   BROADCAST_CONTROL_SCENES,
   BroadcastControlScene,
+  BroadcastCueDto,
   UpdateBroadcastControlDto,
 } from "./dto/broadcast-control.dto";
 
@@ -86,7 +89,7 @@ export class BroadcastService {
   async getPlayerProfile(token: string, userId: string) {
     const streamer = token
       ? await this.prisma.user.findUnique({
-          where: { broadcastTokenHash: hashBroadcastToken(token) },
+          where: broadcastStreamerWhere(token),
           select: { id: true, broadcastLiveRoomId: true },
         })
       : null;
@@ -241,11 +244,14 @@ export class BroadcastService {
     broadcastScene?: string | null;
     broadcastLowerThirdVisible?: boolean | null;
     broadcastAnnouncement?: string | null;
+    broadcastBreakEndsAt?: Date | null;
   }) {
     return {
       scene: this.normalizeControlScene(user.broadcastScene),
       lowerThirdVisible: user.broadcastLowerThirdVisible ?? true,
       announcement: user.broadcastAnnouncement ?? null,
+      // 휴식 카운트다운 종료 시각(ISO). 휴식 화면이 남은 시간을 그린다
+      breakEndsAt: user.broadcastBreakEndsAt?.toISOString() ?? null,
     };
   }
 
@@ -315,6 +321,7 @@ export class BroadcastService {
         broadcastScene: true,
         broadcastLowerThirdVisible: true,
         broadcastAnnouncement: true,
+        broadcastBreakEndsAt: true,
       },
     });
     if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
@@ -341,6 +348,12 @@ export class BroadcastService {
     if (dto.announcement !== undefined) {
       data.broadcastAnnouncement = this.cleanAnnouncement(dto.announcement);
     }
+    if (dto.breakMinutes !== undefined) {
+      data.broadcastBreakEndsAt =
+        dto.breakMinutes == null
+          ? null
+          : new Date(Date.now() + dto.breakMinutes * 60_000);
+    }
 
     const user = await this.prisma.user.update({
       where: { id: userId },
@@ -350,6 +363,7 @@ export class BroadcastService {
         broadcastScene: true,
         broadcastLowerThirdVisible: true,
         broadcastAnnouncement: true,
+        broadcastBreakEndsAt: true,
       },
     });
     const roomId = await activeRoomIdForUser(
@@ -363,6 +377,61 @@ export class BroadcastService {
       roomId,
       room,
       focusMatchId: room?.focusMatchId ?? null,
+    };
+  }
+
+  /**
+   * 조작 패널 미리보기 토큰 — 패널이 "지금 송출 화면"을 iframe 으로 띄울 때 쓴다.
+   * 본인 방송 화면만 보이고 12시간 뒤 만료된다(broadcast-resolve.util 주석 참고).
+   */
+  issuePreviewToken(userId: string) {
+    const issued = createPreviewToken(userId);
+    if (!issued) {
+      throw new NotFoundException("미리보기를 사용할 수 없습니다.");
+    }
+    return {
+      token: issued.token,
+      expiresAt: new Date(issued.expiresAt).toISOString(),
+    };
+  }
+
+  /**
+   * 즉석 연출 신호 — 저장하지 않고 송출 중인 방의 오버레이로 한 번 보낸다.
+   * 선수 카드는 그 방 참가자만 허용한다(오버레이도 프로필 조회에서 한 번 더 막는다).
+   */
+  async prepareCue(userId: string, dto: BroadcastCueDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { broadcastLiveRoomId: true },
+    });
+    if (!user) throw new NotFoundException("유저를 찾을 수 없습니다.");
+    const roomId = await activeRoomIdForUser(
+      this.prisma,
+      userId,
+      user.broadcastLiveRoomId,
+    );
+    if (!roomId) {
+      throw new NotFoundException("송출 중인 방이 없습니다.");
+    }
+    if (dto.type === "player") {
+      const participant = dto.userId
+        ? await this.prisma.roomParticipant.findFirst({
+            where: { roomId, userId: dto.userId },
+            select: { userId: true },
+          })
+        : null;
+      if (!participant) {
+        throw new NotFoundException("송출 중인 방의 참가자가 아닙니다.");
+      }
+    }
+    return {
+      roomId,
+      cue: {
+        type: dto.type,
+        userId: dto.type === "player" ? dto.userId : undefined,
+        // 같은 신호를 연달아 보내도 오버레이가 새 신호로 알아보게 하는 값
+        at: Date.now(),
+      },
     };
   }
 
@@ -643,7 +712,7 @@ export class BroadcastService {
     // 토큰 → 스트리머(유저). 무효한 토큰만 에러; 활성 방이 없는 건 정상(대기 상태).
     const streamer = token
       ? await this.prisma.user.findUnique({
-          where: { broadcastTokenHash: hashBroadcastToken(token) },
+          where: broadcastStreamerWhere(token),
           select: {
             id: true,
             username: true,
@@ -651,6 +720,7 @@ export class BroadcastService {
             broadcastScene: true,
             broadcastLowerThirdVisible: true,
             broadcastAnnouncement: true,
+            broadcastBreakEndsAt: true,
             broadcastSettings: true,
             clanMemberships: {
               take: 1,

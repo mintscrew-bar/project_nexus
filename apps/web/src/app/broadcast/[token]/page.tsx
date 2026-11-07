@@ -11,6 +11,7 @@ import {
 import { BroadcastShell } from "./_components/BroadcastShell";
 import { LowerThird } from "./_components/LowerThird";
 import { SideSwapScene } from "./_components/SideSwapScene";
+import { PlayerSpotlightCard } from "./_components/LotProfilePanel";
 import {
   RpsBroadcastScene,
   type BroadcastRpsLive,
@@ -125,6 +126,9 @@ const SCENE_TRANSITIONS: Record<
   },
 };
 
+/** 조작 패널에서 띄운 선수 카드를 보여 주는 시간 */
+const PLAYER_SPOTLIGHT_MS = 12_000;
+
 /** 진영이 확정된 뒤 공개 화면을 유지하는 시간 */
 const RPS_DONE_HOLD_MS = 5000;
 
@@ -184,6 +188,8 @@ export default function BroadcastPage() {
   // 방송 PC 한 대로 인코딩까지 돌리는 환경(프릭샷 등)을 위한 저사양 모드.
   // ?fx=low 를 붙이면 장식용 무한 애니메이션을 멈춘다. 정보 표시에는 영향이 없다.
   const lowFx = search?.get("fx") === "low";
+  // 조작 패널 미리보기(iframe) — 방송인 PC 에서 효과음이 OBS 와 겹쳐 두 번 나지 않게 끈다
+  const previewMode = search?.get("preview") === "1";
 
   const queryKey = useMemo(
     () => ["broadcastSnapshot", token, scene, matchId],
@@ -258,6 +264,18 @@ export default function BroadcastPage() {
     return () => clearTimeout(timer);
   }, [rpsFinished]);
 
+  // 즉석 연출(조작 패널 → "broadcast-cue"): 결과 다시 보기 · 선수 카드
+  const [replayNonce, setReplayNonce] = useState(0);
+  const [spotlight, setSpotlight] = useState<{
+    userId: string;
+    at: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!spotlight) return;
+    const timer = setTimeout(() => setSpotlight(null), PLAYER_SPOTLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [spotlight]);
+
   // 방송 소켓: bracket 룸 구독 → 경기 시작/결과/focus 변경 시 즉시 스냅샷 갱신
   useEffect(() => {
     if (!token || !roomId) return;
@@ -276,6 +294,17 @@ export default function BroadcastPage() {
     socket.on("tournament-completed", refetch);
     socket.on("broadcast-focus-updated", refetch);
     socket.on("broadcast-control-updated", refetch);
+    socket.on("broadcast-cue", (cue: any) => {
+      if (cue?.type === "replay-result") {
+        // 결과 장면을 새로 마운트해 타이포그래피 연출을 처음부터 다시 재생한다
+        setReplayNonce((n) => n + 1);
+        refetch();
+      } else if (cue?.type === "player" && typeof cue.userId === "string") {
+        setSpotlight({ userId: cue.userId, at: Number(cue.at) || Date.now() });
+      } else if (cue?.type === "clear-player") {
+        setSpotlight(null);
+      }
+    });
     socket.on("broadcast-rps", (event: any) => {
       setRpsLive((prev) => {
         if (event.kind === "state") {
@@ -374,7 +403,7 @@ export default function BroadcastPage() {
   ) : displayScene === "side-swap" ? (
     <SideSwapScene snapshot={snapshot} />
   ) : displayScene === "result" ? (
-    <MatchResultScene snapshot={snapshot} />
+    <MatchResultScene key={`result-${replayNonce}`} snapshot={snapshot} />
   ) : displayScene === "match" ? (
     <MatchScene snapshot={snapshot} />
   ) : isAuctionRoom && token && roomId ? (
@@ -395,7 +424,7 @@ export default function BroadcastPage() {
     <RoomScene snapshot={snapshot} />
   );
 
-  const persistent =
+  const sceneOverlay =
     rpsActive ||
     snapshot?.broadcast?.lowerThirdVisible === false ||
     displayScene === "match" ||
@@ -409,6 +438,30 @@ export default function BroadcastPage() {
         <BroadcastAnnouncement text={snapshot?.broadcast?.announcement} />
       </>
     );
+  // 선수 카드는 장면과 상관없이 맨 위에 잠깐 올라온다
+  const persistent = (
+    <>
+      {sceneOverlay}
+      {spotlight && token && (
+        <div className="absolute bottom-20 left-1/2 z-30 w-[1560px] -translate-x-1/2">
+          <PlayerSpotlightCard
+            key={spotlight.at}
+            token={token}
+            userId={spotlight.userId}
+            teams={snapshot?.teams ?? []}
+          />
+        </div>
+      )}
+    </>
+  );
+  // 미리보기에서는 효과음을 끈다 (설정 자체는 그대로)
+  const shellSettings =
+    previewMode && snapshot.settings
+      ? {
+          ...snapshot.settings,
+          sfx: { ...snapshot.settings.sfx, enabled: false },
+        }
+      : snapshot.settings;
 
   return (
     <>
@@ -428,7 +481,7 @@ export default function BroadcastPage() {
       <BroadcastShell
         bg={bg}
         theme={snapshot.theme}
-        settings={snapshot.settings}
+        settings={shellSettings}
         scene={sceneNode}
         persistent={persistent}
         transitionKey={rpsActive ? "rps" : broadcastSceneKey}

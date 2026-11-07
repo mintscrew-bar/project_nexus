@@ -1027,6 +1027,11 @@ export class MatchGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`bracket:${roomId}`).emit("broadcast-control-updated", data);
   }
 
+  /** 조작 패널의 즉석 연출 신호(결과 다시 보기·선수 카드)를 방송 오버레이로 보낸다 */
+  emitBroadcastCue(roomId: string, cue: Record<string, unknown>) {
+    this.server.to(`bracket:${roomId}`).emit("broadcast-cue", cue);
+  }
+
   emitBracketUpdate(roomId: string, data: { matches: any[] }) {
     this.server.to(`bracket:${roomId}`).emit("bracket-updated", data);
   }

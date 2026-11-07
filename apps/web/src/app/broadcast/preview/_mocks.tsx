@@ -1,6 +1,7 @@
 "use client";
 
 import { BroadcastShell } from "../[token]/_components/BroadcastShell";
+import { PlayerSpotlightCard } from "../[token]/_components/LotProfilePanel";
 import { LowerThird } from "../[token]/_components/LowerThird";
 import { SideSwapScene } from "../[token]/_components/SideSwapScene";
 import {
@@ -1142,6 +1143,8 @@ export const SCENES: { key: string; label: string }[] = [
   { key: "rpsReveal", label: "가위바위보(공개)" },
   { key: "rpsDone", label: "진영 확정" },
   { key: "break", label: "휴식" },
+  { key: "breakCountdown", label: "휴식(카운트다운)" },
+  { key: "playerSpotlight", label: "선수 카드" },
   { key: "idle", label: "Idle(방 없음)" },
 ];
 
@@ -1275,6 +1278,11 @@ export const PREVIEW_TRANSITIONS: Record<
  * 관리자 미리보기(/broadcast/preview)와 방송 설정 화면의 실시간 미리보기
  * (/broadcast/sample, iframe)가 같이 쓴다. settings 를 넘기면 커스터마이징이 그대로 반영된다.
  */
+/** 선수 카드 목업 — 첫 팀의 두 번째 선수(팀·배정 라인 표시 확인용) */
+function spotlightUserId(snapshot: any): string {
+  return snapshot?.teams?.[0]?.members?.[1]?.userId ?? "mock-player";
+}
+
 export function PreviewStage({
   sceneKey,
   bg,
@@ -1285,7 +1293,20 @@ export function PreviewStage({
   settings?: unknown;
 }) {
   const baseSnapshot =
-    SNAP[sceneKey] ?? (sceneKey === "break" ? SNAP.waiting : SNAP.auction);
+    sceneKey === "breakCountdown"
+      ? {
+          ...SNAP.waiting,
+          broadcast: {
+            ...(SNAP.waiting.broadcast ?? {}),
+            breakEndsAt: new Date(
+              Date.now() + 4 * 60_000 + 32_000,
+            ).toISOString(),
+          },
+        }
+      : sceneKey === "playerSpotlight"
+        ? SNAP.match
+        : (SNAP[sceneKey] ??
+          (sceneKey === "break" ? SNAP.waiting : SNAP.auction));
   // 목업 스냅샷에 방송인 설정을 얹는다 — 장면들이 snapshot.settings 를 읽는다
   const snapshot = settings ? { ...baseSnapshot, settings } : baseSnapshot;
   const isMatch = sceneKey === "match" || sceneKey === "matchDone";
@@ -1302,8 +1323,10 @@ export function PreviewStage({
   const withSettings = (snap: any) => (settings ? { ...snap, settings } : snap);
   const sceneNode = snapshot.idle ? (
     <IdleScene snapshot={snapshot} />
-  ) : sceneKey === "break" ? (
+  ) : sceneKey === "break" || sceneKey === "breakCountdown" ? (
     <BreakScene snapshot={snapshot} />
+  ) : sceneKey === "playerSpotlight" ? (
+    <MatchIntroScene snapshot={withSettings(SNAP.match)} />
   ) : sceneKey === "sideSwap" ? (
     <SideSwapScene
       snapshot={withSettings({
@@ -1359,7 +1382,16 @@ export function PreviewStage({
         sceneKey === "sideSwap" ||
         sceneKey === "matchIntro" ||
         sceneKey === "lineup" ||
-        sceneKey.startsWith("rps") ? null : (
+        sceneKey.startsWith("rps") ? null : sceneKey === "playerSpotlight" ? (
+          // 조작 패널 "선수 카드" — 실제 오버레이와 같은 자리(하단 가운데)
+          <div className="absolute bottom-20 left-1/2 z-30 w-[1560px] -translate-x-1/2">
+            <PlayerSpotlightCard
+              userId={spotlightUserId(snapshot)}
+              teams={snapshot.teams ?? []}
+              profile={MOCK_LOT_PROFILE}
+            />
+          </div>
+        ) : (
           <LowerThird snapshot={snapshot} bg={bg} />
         )
       }

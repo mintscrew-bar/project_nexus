@@ -22,6 +22,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { BroadcastService, BroadcastScene } from "./broadcast.service";
 import {
   BroadcastControlActionDto,
+  BroadcastCueDto,
   UpdateBroadcastControlDto,
 } from "./dto/broadcast-control.dto";
 import { MatchGateway } from "../match/match.gateway";
@@ -183,6 +184,29 @@ export class BroadcastController {
     const result = await this.broadcastService.updateControlState(userId, body);
     this.matchGateway.emitBroadcastControl(result.roomId, result);
     return result;
+  }
+
+  /** 조작 패널 송출 미리보기용 단기 토큰 (본인 화면만, 12시간) */
+  @Get("control/preview-token")
+  @UseGuards(JwtAuthGuard)
+  async getPreviewToken(@CurrentUser("sub") userId: string) {
+    return this.broadcastService.issuePreviewToken(userId);
+  }
+
+  /** 즉석 연출 — 결과 다시 보기, 선수 카드 띄우기/내리기 */
+  @Post("control/cue")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async sendCue(
+    @CurrentUser("sub") userId: string,
+    @Body() body: BroadcastCueDto,
+  ) {
+    const { roomId, cue } = await this.broadcastService.prepareCue(
+      userId,
+      body,
+    );
+    this.matchGateway.emitBroadcastCue(roomId, cue);
+    return { ok: true, cue };
   }
 
   // ── Stream Deck / Ulanzi bridge 등 외부 장비용 webhook ──

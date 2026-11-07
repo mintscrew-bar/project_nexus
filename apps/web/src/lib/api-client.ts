@@ -837,22 +837,34 @@ export const broadcastApi = {
   },
   getControl: async () => {
     const response = await apiClient.get(`/broadcast/control`);
-    return response.data as {
-      scene: BroadcastControlScene;
-      lowerThirdVisible: boolean;
-      announcement: string | null;
+    return response.data as BroadcastControlState & {
       roomId: string | null;
       room: BroadcastControlRoom | null;
       focusMatchId: string | null;
     };
   },
-  updateControl: async (body: Partial<BroadcastControlState>) => {
+  updateControl: async (body: BroadcastControlPatch) => {
     const response = await apiClient.patch(`/broadcast/control`, body);
     return response.data as BroadcastControlState & {
       roomId: string | null;
       room: BroadcastControlRoom | null;
       focusMatchId: string | null;
     };
+  },
+  /** 조작 패널 송출 미리보기용 단기 토큰 (본인 화면만, 12시간) */
+  getPreviewToken: async () => {
+    const response = await apiClient.get(`/broadcast/control/preview-token`);
+    return response.data as { token: string; expiresAt: string };
+  },
+  /** 즉석 연출 — 결과 다시 보기 · 선수 카드 띄우기/내리기 */
+  sendCue: async (
+    body:
+      | { type: "replay-result" }
+      | { type: "player"; userId: string }
+      | { type: "clear-player" },
+  ) => {
+    const response = await apiClient.post(`/broadcast/control/cue`, body);
+    return response.data as { ok: boolean };
   },
   // 로비 방송 상태: 토큰 발급 여부 + 이 방 고정 송출 여부 (호스트)
   getLiveState: async (roomId: string) => {
@@ -893,7 +905,14 @@ export type BroadcastControlState = {
   scene: BroadcastControlScene;
   lowerThirdVisible: boolean;
   announcement: string | null;
+  /** 휴식 카운트다운 종료 시각(ISO). 없으면 카운트다운 없음 */
+  breakEndsAt: string | null;
 };
+
+/** PATCH /broadcast/control 본문 — breakMinutes 는 저장 시 종료 시각으로 바뀐다 */
+export type BroadcastControlPatch = Partial<
+  Omit<BroadcastControlState, "breakEndsAt">
+> & { breakMinutes?: number | null };
 
 export type BroadcastControlRoom = {
   id: string;

@@ -223,78 +223,194 @@ export function AuctionLotCard({
 
         {/* ── 오른쪽: 어떻게 쓰나 ── */}
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)] gap-6 border-l border-white/10 pl-7">
-          <div className="min-w-0">
-            <p className="mb-2.5 text-sm font-black text-white/55">
-              라인별 실력
-            </p>
-            <div className="grid gap-1">
-              {LANES.map((lane) => {
-                const laneTier = riot?.roleTiers?.find(
-                  (t) => t.role === lane.key,
-                );
-                const champs = (riot?.championPreferences ?? [])
-                  .filter((c) => c.role === lane.key)
-                  .sort((a, b) => a.order - b.order)
-                  .slice(0, 3);
-                const isMain = mainRole === lane.key;
-                const laneTierIcon = laneTier
-                  ? getTierIcon(laneTier.tier)
-                  : null;
-                const roleIcon = getRoleIcon(lane.key);
-                return (
-                  <div
-                    key={lane.key}
-                    className="grid h-[52px] grid-cols-[78px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3"
-                    style={{
-                      background: isMain
-                        ? `${accent}22`
-                        : "rgba(255,255,255,0.03)",
-                    }}
-                  >
-                    <span className="flex items-center gap-2 text-base font-black text-white">
-                      {roleIcon && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={roleIcon}
-                          alt=""
-                          className="h-4 w-4 brightness-0 invert"
-                        />
-                      )}
-                      {lane.label}
-                    </span>
-                    <span className="flex min-w-0 items-center gap-1.5 truncate text-base font-black text-white/80">
-                      {laneTierIcon && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={laneTierIcon} alt="" width={20} height={20} />
-                      )}
-                      {laneTier
-                        ? `${laneTier.tier} ${laneTier.rank ?? ""}`.trim()
-                        : "—"}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      {champs.map((c) => {
-                        const icon = getChampionIconUrl(c.championId);
-                        return icon ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            key={`${c.championId}-${c.order}`}
-                            src={icon}
-                            alt=""
-                            className="h-9 w-9 rounded-md"
-                          />
-                        ) : null;
-                      })}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <LaneSkills riot={riot} mainRole={mainRole} />
 
           {settings.show.lotStats && <LotStats profile={profile} />}
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * 선수 카드 — 조작 패널의 "선수 카드 띄우기"로 어떤 장면 위에든 잠깐 올라온다.
+ * 매물 카드에서 입찰 부분만 빼고, 소속 팀과 배정 라인을 붙였다.
+ * 데이터는 매물 카드와 같은 방송 전용 프로필(송출 중인 방 참가자만).
+ */
+export function PlayerSpotlightCard({
+  token,
+  userId,
+  teams,
+  profile: profileOverride,
+}: {
+  token?: string;
+  userId: string;
+  teams: any[];
+  /** 미리보기용 — 넘기면 조회하지 않는다 */
+  profile?: Profile | null;
+}) {
+  const { accent, settings } = useBroadcastLook();
+  const { data } = useLotProfile(
+    profileOverride === undefined ? token : undefined,
+    userId,
+  );
+  const profile = profileOverride ?? data ?? null;
+  // 프로필이 오기 전에는 빈 카드를 띄우지 않는다 (조회 실패 시에도 조용히 안 뜬다)
+  if (!profile) return null;
+  const riot = profile.riotAccount ?? null;
+  const team = teams.find((t) =>
+    (t.members ?? []).some((m: any) => m.userId === userId),
+  );
+  const member = team?.members?.find((m: any) => m.userId === userId);
+  const teamColor = team?.color ?? accent;
+  const name =
+    playerDisplayName(
+      { username: profile.username, riotAccount: riot },
+      settings.nameDisplay,
+    ) || "선수";
+  const mainRole = riot?.mainRole ?? null;
+  const assigned = member?.assignedRole as string | undefined;
+  const tier = riot?.tier ?? null;
+  const tierIcon = tier ? getTierIcon(tier) : null;
+
+  return (
+    <section
+      className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0B0D11]/[0.97] shadow-[0_24px_80px_rgba(0,0,0,0.65)] backdrop-blur-md"
+      style={{ animation: "spotlight-in 520ms cubic-bezier(.2,.8,.2,1) both" }}
+    >
+      <style>{`@keyframes spotlight-in { from { opacity: 0; transform: translateY(60px); } to { opacity: 1; transform: none; } }`}</style>
+      {/* 소속 팀 색 띠 */}
+      <div className="h-1.5 w-full" style={{ background: teamColor }} />
+      <div className="relative grid grid-cols-[400px_minmax(0,1fr)] gap-7 p-7">
+        <div className="flex min-w-0 flex-col">
+          <div className="flex items-center gap-5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={profile.avatar || AVATAR_FALLBACK}
+              alt=""
+              className="h-24 w-24 shrink-0 rounded-full object-cover"
+              style={{ boxShadow: `0 0 0 3px ${teamColor}` }}
+              onError={(e) => {
+                e.currentTarget.src = AVATAR_FALLBACK;
+              }}
+            />
+            <div className="min-w-0">
+              <h1 className="truncate text-[52px] font-black leading-none text-white">
+                {name}
+              </h1>
+              {riot && settings.nameDisplay === "nickname" && (
+                <p className="mt-2 truncate text-base font-bold text-white/40">
+                  {riot.gameName}#{riot.tagLine}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            {team && (
+              <span
+                className="rounded-md px-3 py-1.5 text-base font-black text-white"
+                style={{ background: `${teamColor}40` }}
+              >
+                {team.name}
+              </span>
+            )}
+            {assigned && ROLE_KO[assigned] && (
+              <span className="rounded-md bg-white/[0.08] px-3 py-1.5 text-base font-black text-white">
+                {ROLE_KO[assigned]}
+              </span>
+            )}
+            <span className="flex items-center gap-1.5 rounded-md bg-white/[0.07] px-3 py-1.5 text-base font-black text-white">
+              {tierIcon && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={tierIcon} alt="" width={20} height={20} />
+              )}
+              {tier ?? "UNRANKED"}
+            </span>
+          </div>
+          {member?.soldPrice != null && (
+            <p className="mt-auto pt-6 text-xl font-black text-amber-300">
+              낙찰가 {Number(member.soldPrice).toLocaleString()} G
+            </p>
+          )}
+        </div>
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)] gap-6 border-l border-white/10 pl-7">
+          <LaneSkills riot={riot} mainRole={assigned ?? mainRole} />
+          {settings.show.lotStats && <LotStats profile={profile} />}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** 라인별 실력 — 라인·티어·선호 챔피언 (매물 카드·선수 카드 공용) */
+function LaneSkills({
+  riot,
+  mainRole,
+}: {
+  riot: Profile["riotAccount"] | null;
+  mainRole?: string | null;
+}) {
+  const { accent } = useBroadcastLook();
+  return (
+    <div className="min-w-0">
+      <p className="mb-2.5 text-sm font-black text-white/55">라인별 실력</p>
+      <div className="grid gap-1">
+        {LANES.map((lane) => {
+          const laneTier = riot?.roleTiers?.find((t) => t.role === lane.key);
+          const champs = (riot?.championPreferences ?? [])
+            .filter((c) => c.role === lane.key)
+            .sort((a, b) => a.order - b.order)
+            .slice(0, 3);
+          const isMain = mainRole === lane.key;
+          const laneTierIcon = laneTier ? getTierIcon(laneTier.tier) : null;
+          const roleIcon = getRoleIcon(lane.key);
+          return (
+            <div
+              key={lane.key}
+              className="grid h-[52px] grid-cols-[78px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3"
+              style={{
+                background: isMain ? `${accent}22` : "rgba(255,255,255,0.03)",
+              }}
+            >
+              <span className="flex items-center gap-2 text-base font-black text-white">
+                {roleIcon && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={roleIcon}
+                    alt=""
+                    className="h-4 w-4 brightness-0 invert"
+                  />
+                )}
+                {lane.label}
+              </span>
+              <span className="flex min-w-0 items-center gap-1.5 truncate text-base font-black text-white/80">
+                {laneTierIcon && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={laneTierIcon} alt="" width={20} height={20} />
+                )}
+                {laneTier
+                  ? `${laneTier.tier} ${laneTier.rank ?? ""}`.trim()
+                  : "—"}
+              </span>
+              <span className="flex items-center gap-1">
+                {champs.map((c) => {
+                  const icon = getChampionIconUrl(c.championId);
+                  return icon ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={`${c.championId}-${c.order}`}
+                      src={icon}
+                      alt=""
+                      className="h-9 w-9 rounded-md"
+                    />
+                  ) : null;
+                })}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

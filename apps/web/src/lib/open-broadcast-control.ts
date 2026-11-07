@@ -1,5 +1,5 @@
-const BROADCAST_CONTROL_WIDTH = 820;
-const BROADCAST_CONTROL_HEIGHT = 540;
+const BROADCAST_CONTROL_WIDTH = 1240;
+const BROADCAST_CONTROL_HEIGHT = 860;
 
 export function openBroadcastControlWindow(path = "/broadcast-control") {
   if (typeof window === "undefined") return;

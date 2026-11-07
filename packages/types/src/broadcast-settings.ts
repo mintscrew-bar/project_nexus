@@ -112,6 +112,8 @@ export interface BroadcastSettings {
   };
   nameDisplay: BroadcastNameDisplay;
   teamLabel: BroadcastTeamLabel;
+  /** 조작 패널 공지 문구 프리셋 — 자주 쓰는 안내를 한 번에 띄운다 (최대 6개, 80자) */
+  announcementPresets: string[];
 }
 
 export const DEFAULT_BROADCAST_SETTINGS: BroadcastSettings = {
@@ -144,6 +146,7 @@ export const DEFAULT_BROADCAST_SETTINGS: BroadcastSettings = {
   sfx: { enabled: false, volume: 60 },
   nameDisplay: "nickname",
   teamLabel: "team",
+  announcementPresets: [],
 };
 
 /** 넥서스 기본 진영 색 — 설정이 비었을 때 */
@@ -192,6 +195,11 @@ const clampNumber = (
   typeof value === "number" && Number.isFinite(value)
     ? Math.min(max, Math.max(min, value))
     : fallback;
+
+/** 공지 문구 길이 상한 — 조작 패널 공지와 같다 */
+export const BROADCAST_ANNOUNCEMENT_MAX = 80;
+/** 공지 프리셋 개수 상한 */
+export const BROADCAST_ANNOUNCEMENT_PRESET_MAX = 6;
 
 /**
  * 어떤 값이 와도 완전하고 안전한 설정으로 맞춘다.
@@ -273,5 +281,11 @@ export function normalizeBroadcastSettings(raw: unknown): BroadcastSettings {
     },
     nameDisplay: oneOf(r.nameDisplay, BROADCAST_NAME_DISPLAYS, d.nameDisplay),
     teamLabel: oneOf(r.teamLabel, BROADCAST_TEAM_LABELS, d.teamLabel),
+    announcementPresets: Array.isArray(r.announcementPresets)
+      ? r.announcementPresets
+          .map((item) => text(item, BROADCAST_ANNOUNCEMENT_MAX))
+          .filter((item): item is string => item !== null)
+          .slice(0, BROADCAST_ANNOUNCEMENT_PRESET_MAX)
+      : [],
   };
 }

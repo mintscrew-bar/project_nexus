@@ -329,10 +329,7 @@ export function StageBackground({ accent }: { accent: string }) {
         </>
       )}
       {type === "grain" && (
-        <div
-          className="pubg-grain-film"
-          style={{ opacity: fx(1) }}
-        />
+        <div className="pubg-grain-film" style={{ opacity: fx(1) }} />
       )}
       {type === "particles" && (
         <StageParticles accent={accent} opacity={fx(0.9)} />
@@ -505,9 +502,61 @@ export function BreakScene({ snapshot }: { snapshot: any }) {
               {settings.breakScreen.subtitle ?? "Be Right Back"}
             </p>
           )}
+          <BreakCountdown
+            endsAt={snapshot?.broadcast?.breakEndsAt ?? null}
+            accent={accent}
+          />
         </div>
       </div>
     </StageFrame>
+  );
+}
+
+/**
+ * 휴식 카운트다운 — 조작 패널에서 "휴식 N분"을 누르면 서버가 종료 시각을 저장한다.
+ * 0이 되면 "곧 재개합니다"로 바뀌고, 장면은 방송인이 직접 넘긴다(자동 전환하지 않는다).
+ */
+function BreakCountdown({
+  endsAt,
+  accent,
+}: {
+  endsAt: string | null;
+  accent: string;
+}) {
+  const target = endsAt ? Date.parse(endsAt) : NaN;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!Number.isFinite(target)) return;
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [target]);
+  if (!Number.isFinite(target)) return null;
+  const left = Math.max(0, Math.ceil((target - now) / 1000));
+  const mm = String(Math.floor(left / 60)).padStart(2, "0");
+  const ss = String(left % 60).padStart(2, "0");
+  return (
+    <div className="mt-12 flex items-end gap-6">
+      {left > 0 ? (
+        <>
+          <span className="pb-3 text-2xl font-black text-white/50">
+            재개까지
+          </span>
+          <span
+            className="text-[120px] font-black tabular-nums leading-none"
+            style={{ color: accent }}
+          >
+            {mm}:{ss}
+          </span>
+        </>
+      ) : (
+        <span
+          className="text-[64px] font-black leading-none"
+          style={{ color: accent }}
+        >
+          곧 재개합니다
+        </span>
+      )}
+    </div>
   );
 }
 
