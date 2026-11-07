@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { commendationTagLabel } from "@/lib/commendation";
 import { ResultSequence } from "./ResultSequence";
 import { BackgroundMotion } from "./BackgroundMotion";
@@ -2477,10 +2477,13 @@ function RevealMemberRow({
   member,
   teamColor,
   isCaptain,
+  justSwapped = false,
 }: {
   member: any;
   teamColor: string;
   isCaptain: boolean;
+  /** 자동 밸런스 검토 중 이 라인 자리에 방금 다른 사람이 들어왔다 */
+  justSwapped?: boolean;
 }) {
   // 대기화면과 같은 배지 규칙을 써서 방송 전체의 티어 표기를 통일한다
   const badge = tierBadge(member.tier, member.rank, member.lp);
@@ -2493,7 +2496,17 @@ function RevealMemberRow({
     // 프레임리스: 테두리·배경 없이, 행 자체를 실하게 만들어 내용이 곧 블록이 되게 한다.
     // 아바타를 키우고 이름/티어를 2행으로 쌓으면 행 하나가 덩어리로 읽혀서
     // 세로를 꽉 채워도 흩어져 보이지 않는다.
-    <div className="flex h-full min-h-0 w-full items-center gap-4">
+    <div
+      className="relative flex h-full min-h-0 w-full items-center gap-4 rounded-xl"
+      style={
+        justSwapped
+          ? {
+              animation: "bc-lane-swap 2.4s ease-out",
+              ["--bc-swap" as string]: `${teamColor}55`,
+            }
+          : undefined
+      }
+    >
       <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white/10">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -2587,6 +2600,52 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
       ? Math.max(...totals) - Math.min(...totals)
       : null;
   const rerollCount = snapshot?.room?.autoBalanceRerollCount ?? 0;
+
+  // 자동 밸런스는 팀장이 아무 라인이나 될 수 있다. 팀장을 맨 위에 올리면
+  // 교체할 때마다 행 순서가 흔들려 팀끼리 라인 줄이 안 맞는다.
+  // 그래서 자동 밸런스 방은 팀장과 상관없이 라인 순으로만 세운다.
+  // 같은 줄 = 같은 라인이라, 교체하면 그 사람이 자기 라인 줄로 들어간다.
+  const laneLayout = snapshot?.room?.teamMode === "AUTO_BALANCE";
+
+  // 교체 감지: 팀·라인 자리마다 누가 있었는지 기억했다가 바뀐 자리를 잠깐 강조한다.
+  // (첫 화면은 비교 대상이 없으니 강조하지 않는다)
+  const slotOwnersRef = useRef<Map<string, string> | null>(null);
+  const [swappedSlots, setSwappedSlots] = useState<Set<string>>(new Set());
+  const slotSignature = laneLayout
+    ? teams
+        .flatMap((team) =>
+          (team.members ?? []).map(
+            (member: any) =>
+              `${team.id}:${member.assignedRole ?? "-"}=${member.userId}`,
+          ),
+        )
+        .sort()
+        .join("|")
+    : "";
+  useEffect(() => {
+    if (!laneLayout) return;
+    const next = new Map<string, string>();
+    for (const team of teams) {
+      for (const member of team.members ?? []) {
+        if (member.assignedRole) {
+          next.set(`${team.id}:${member.assignedRole}`, member.userId);
+        }
+      }
+    }
+    const previous = slotOwnersRef.current;
+    slotOwnersRef.current = next;
+    if (!previous) return;
+    const changed = new Set<string>();
+    next.forEach((userId, slot) => {
+      const before = previous.get(slot);
+      if (before && before !== userId) changed.add(slot);
+    });
+    if (changed.size === 0) return;
+    setSwappedSlots(changed);
+    const timer = setTimeout(() => setSwappedSlots(new Set()), 2400);
+    return () => clearTimeout(timer);
+  }, [slotSignature]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 팀마다 인원이 달라도 행 높이를 맞추기 위해 최대 인원 기준으로 트랙을 잡는다.
   // (1fr 트랙이라 남는 세로 공간 없이 패널을 꽉 채운다)
   const maxMembers = Math.max(
@@ -2607,6 +2666,14 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
 
   return (
     <StageFrame accent={accent}>
+      {/* 라인 교체 강조 — 팀 컬러 빛이 행 뒤에서 번졌다 사라진다 */}
+      <style>{`
+        @keyframes bc-lane-swap {
+          0% { background: var(--bc-swap); box-shadow: 0 0 0 2px var(--bc-swap); transform: translateX(10px); }
+          25% { transform: translateX(0); }
+          100% { background: transparent; box-shadow: 0 0 0 0 transparent; }
+        }
+      `}</style>
       <div className="flex h-full w-full flex-col px-24 pb-36 pt-16">
         <div className="flex items-end justify-between gap-8">
           <div className="min-w-0">
@@ -2667,9 +2734,12 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
               return index === -1 ? ROLE_ORDER.length : index;
             };
             const members = [...(team.members ?? [])].sort((a, b) => {
-              const aCaptain = a.userId === team.captainId ? 0 : 1;
-              const bCaptain = b.userId === team.captainId ? 0 : 1;
-              if (aCaptain !== bCaptain) return aCaptain - bCaptain;
+              // 자동 밸런스는 라인 줄을 맞추려고 팀장 우선을 쓰지 않는다
+              if (!laneLayout) {
+                const aCaptain = a.userId === team.captainId ? 0 : 1;
+                const bCaptain = b.userId === team.captainId ? 0 : 1;
+                if (aCaptain !== bCaptain) return aCaptain - bCaptain;
+              }
 
               const byRole = roleRank(a) - roleRank(b);
               if (byRole !== 0) return byRole;
@@ -2742,6 +2812,9 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                           member={member}
                           teamColor={teamColor}
                           isCaptain={member.userId === team.captainId}
+                          justSwapped={swappedSlots.has(
+                            `${team.id}:${member.assignedRole}`,
+                          )}
                         />
                       ))}
                     </div>
