@@ -28,7 +28,6 @@ import {
   TabsContent,
 } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { roomSocketHelpers } from "@/lib/socket-client";
 import { useShallow } from "zustand/react/shallow";
 import {
   Users,
@@ -95,6 +94,7 @@ export default function TournamentLobbyPage() {
     kickParticipant,
     toggleSpectator,
     selectTeam,
+    emitWithAck,
   } = useLobbyStore(
     useShallow((state) => ({
       connect: state.connect,
@@ -108,6 +108,7 @@ export default function TournamentLobbyPage() {
       kickParticipant: state.kickParticipant,
       toggleSpectator: state.toggleSpectator,
       selectTeam: state.selectTeam,
+      emitWithAck: state.emitWithAck,
     })),
   );
 
@@ -876,10 +877,10 @@ export default function TournamentLobbyPage() {
         }),
       }))}
       onReroll={async (pinnedUserIds) => {
-        const result = await roomSocketHelpers.rerollAutoBalance(
-          room.id,
+        const result = await emitWithAck("auto-balance-reroll", {
+          roomId: room.id,
           pinnedUserIds,
-        );
+        });
         if (!result.success) {
           addToast(result.error ?? "재편성에 실패했습니다.", "error");
           return;
@@ -888,7 +889,9 @@ export default function TournamentLobbyPage() {
         playSfx(GAME_SFX.rebalance);
       }}
       onConfirm={async () => {
-        const result = await roomSocketHelpers.confirmAutoBalance(room.id);
+        const result = await emitWithAck("auto-balance-confirm", {
+          roomId: room.id,
+        });
         if (!result.success) {
           addToast(result.error ?? "확정에 실패했습니다.", "error");
           return;
@@ -906,17 +909,19 @@ export default function TournamentLobbyPage() {
       rerollCount={room.autoBalanceRerollCount ?? 0}
       undoDepth={room.undoDepth ?? 0}
       onUndo={async () => {
-        const result = await roomSocketHelpers.undoAutoBalance(room.id);
+        const result = await emitWithAck("auto-balance-undo", {
+          roomId: room.id,
+        });
         if (!result.success) {
           addToast(result.error ?? "편성 되감기에 실패했습니다.", "error");
         }
       }}
       onSwap={async (userIdA, userIdB) => {
-        const result = await roomSocketHelpers.swapAutoBalance(
-          room.id,
+        const result = await emitWithAck("auto-balance-swap", {
+          roomId: room.id,
           userIdA,
           userIdB,
-        );
+        });
         if (!result.success) {
           addToast(result.error ?? "자리 교체에 실패했습니다.", "error");
           return;

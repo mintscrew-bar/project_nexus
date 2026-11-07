@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ExecutionContext, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
 import {
@@ -26,6 +26,17 @@ export class AuthAwareThrottlerGuard extends ThrottlerGuard {
     private readonly configService: ConfigService,
   ) {
     super(options, storageService, reflector);
+  }
+
+  /**
+   * HTTP 요청에만 건다.
+   * 전역 가드(APP_GUARD)라 소켓 이벤트 핸들러에도 걸리는데, 소켓에는 응답 객체가 없어
+   * 페이로드 없이 온 이벤트("unsubscribe-room-list" 등)에서 setResponseHeader 가
+   * undefined.header 를 읽다 터졌다. 소켓 이벤트 제한은 게이트웨이의 guardAction 이 맡는다.
+   */
+  protected async shouldSkip(context: ExecutionContext): Promise<boolean> {
+    if (context.getType() !== "http") return true;
+    return super.shouldSkip(context);
   }
 
   protected async getTracker(req: Record<string, any>): Promise<string> {

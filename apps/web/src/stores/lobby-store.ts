@@ -174,7 +174,18 @@ interface LobbyStoreState {
     onError?: (msg: string) => void,
     onSuccess?: () => void,
   ) => void;
+  /**
+   * 로비 소켓으로 이벤트를 보내고 서버 응답(ACK)을 기다린다.
+   * 자동 밸런스 편성(주사위·되감기·자리 교체·확정)이 쓴다.
+   */
+  emitWithAck: (
+    event: string,
+    payload: Record<string, unknown>,
+  ) => Promise<{ success: boolean; error?: string }>;
 }
+
+/** 서버가 응답하지 않을 때 버튼이 영영 멈추지 않도록 끊는 시간 */
+const ACK_TIMEOUT_MS = 10_000;
 
 export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
   startAlert: null,
@@ -527,4 +538,27 @@ export const useLobbyStore = create<LobbyStoreState>((set, get) => ({
       );
     }
   },
+
+  emitWithAck: (event, payload) =>
+    new Promise((resolve) => {
+      // 로비는 이 스토어가 만든 소켓으로만 접속한다.
+      // (socket-client 의 전역 roomSocket 은 로비에서 비어 있다 — 그걸 쓰면 항상 "연결 안 됨")
+      const { socket } = get();
+      if (!socket?.connected) {
+        resolve({ success: false, error: "서버에 연결되어 있지 않습니다." });
+        return;
+      }
+      socket
+        .timeout(ACK_TIMEOUT_MS)
+        .emit(event, payload, (err: Error | null, response: any) => {
+          if (err) {
+            resolve({
+              success: false,
+              error: "서버 응답이 없습니다. 잠시 후 다시 시도해 주세요.",
+            });
+            return;
+          }
+          resolve(response ?? { success: false });
+        });
+    }),
 }));
