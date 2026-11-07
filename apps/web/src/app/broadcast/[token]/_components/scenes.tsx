@@ -2577,6 +2577,276 @@ function RevealMemberRow({
 }
 
 /**
+ * 자동 밸런스 2팀 대진 — 같은 라인끼리 가운데 라인 아이콘을 사이에 두고 마주 본다.
+ * 게임 로비처럼 "이 줄은 미드 맞대결"이 한눈에 읽히게 하는 것이 목적이다.
+ * 교체가 일어나면 바뀐 라인 카드가 팀 컬러로 번쩍인다.
+ */
+function LaneFaceOff({
+  teams,
+  accent,
+  swappedSlots,
+}: {
+  teams: any[];
+  accent: string;
+  swappedSlots: Set<string>;
+}) {
+  const [left, right] = teams;
+  const leftColor = left?.color || "#3B82F6";
+  const rightColor = right?.color || "#EF4444";
+  const byRole = (team: any) => {
+    const map = new Map<string, any>();
+    for (const member of team?.members ?? []) {
+      const role = normalizeRole(member.assignedRole);
+      if (role) map.set(role, member);
+    }
+    return map;
+  };
+  const leftByRole = byRole(left);
+  const rightByRole = byRole(right);
+  const gap =
+    typeof left?.balanceTotal === "number" &&
+    typeof right?.balanceTotal === "number"
+      ? Math.abs(left.balanceTotal - right.balanceTotal)
+      : null;
+
+  return (
+    <div className="mt-2 flex min-h-0 flex-1 flex-col gap-4">
+      {/* 팀 머리 — 양 끝에 팀명·팀 점수, 가운데 점수 차 */}
+      <div className="grid grid-cols-[1fr_168px_1fr] items-end gap-6">
+        <FaceOffTeamHead team={left} color={leftColor} side="left" />
+        <div className="text-center">
+          <p className="text-5xl font-black italic tracking-tight text-white/90">
+            VS
+          </p>
+          {gap !== null && (
+            <p className="mt-1 text-sm font-black tabular-nums text-white/45">
+              차이 <span style={{ color: accent }}>{gap.toFixed(1)}</span>
+            </p>
+          )}
+        </div>
+        <FaceOffTeamHead team={right} color={rightColor} side="right" />
+      </div>
+
+      <div className="grid min-h-0 flex-1 grid-rows-5 gap-3">
+        {ROLE_ORDER.map((role) => {
+          const roleIcon = getRoleIcon(role);
+          return (
+            <div
+              key={role}
+              className="grid min-h-0 grid-cols-[1fr_168px_1fr] items-stretch gap-6"
+            >
+              <FaceOffCard
+                member={leftByRole.get(role)}
+                team={left}
+                color={leftColor}
+                side="left"
+                swapped={swappedSlots.has(`${left?.id}:${role}`)}
+              />
+              {/* 가운데 라인 축 — 위아래 줄을 잇는 얇은 선 위에 라인 아이콘 */}
+              <div className="relative flex flex-col items-center justify-center gap-1.5">
+                <span className="absolute inset-y-[-8px] left-1/2 w-px -translate-x-1/2 bg-white/10" />
+                <span
+                  className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-[#0B0D11]"
+                  style={{ boxShadow: `0 0 28px ${accent}33` }}
+                >
+                  {roleIcon && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={roleIcon}
+                      alt={role}
+                      className="h-9 w-9 brightness-0 invert"
+                    />
+                  )}
+                </span>
+                <span className="relative rounded bg-[#0B0D11] px-1.5 text-xs font-black tracking-[0.3em] text-white/55">
+                  {ROLE_NAMES[role] ?? role}
+                </span>
+              </div>
+              <FaceOffCard
+                member={rightByRole.get(role)}
+                team={right}
+                color={rightColor}
+                side="right"
+                swapped={swappedSlots.has(`${right?.id}:${role}`)}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function FaceOffTeamHead({
+  team,
+  color,
+  side,
+}: {
+  team: any;
+  color: string;
+  side: "left" | "right";
+}) {
+  return (
+    <div
+      className={`flex items-end gap-5 ${side === "right" ? "flex-row-reverse text-right" : ""}`}
+    >
+      <span
+        className="mb-1.5 h-10 w-1.5 shrink-0 rounded-full"
+        style={{ background: color, boxShadow: `0 0 18px ${color}` }}
+      />
+      <p
+        className="min-w-0 flex-1 truncate text-4xl font-black text-white"
+        style={{ textShadow: `0 0 28px ${color}66` }}
+      >
+        <TeamName team={team} />
+      </p>
+      {team?.balanceTotal != null && (
+        <div className="shrink-0">
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white/35">
+            Team Score
+          </p>
+          <p className="text-4xl font-black tabular-nums" style={{ color }}>
+            {Number(team.balanceTotal).toFixed(1)}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FaceOffCard({
+  member,
+  team,
+  color,
+  side,
+  swapped,
+}: {
+  member: any;
+  team: any;
+  color: string;
+  side: "left" | "right";
+  swapped: boolean;
+}) {
+  const inward = side === "left" ? "90deg" : "270deg";
+  if (!member) {
+    return (
+      <div className="flex items-center justify-center rounded-2xl border border-dashed border-white/15 text-lg font-black text-white/25">
+        비어 있음
+      </div>
+    );
+  }
+  const role = normalizeRole(member.assignedRole);
+  // 배정 라인 티어가 있으면 그것, 없으면 솔로랭크
+  const roleTier = (member.roleTiers ?? []).find(
+    (entry: any) => normalizeRole(entry.role) === role,
+  );
+  const badge = roleTier
+    ? tierBadge(roleTier.tier, roleTier.rank, null)
+    : tierBadge(member.tier, member.rank, null);
+  const champions: string[] = (member.championPreferences ?? [])
+    .filter((entry: any) => normalizeRole(entry.role) === role)
+    .sort((a: any, b: any) => a.order - b.order)
+    .slice(0, 3)
+    .map((entry: any) => entry.championId);
+  const isCaptain = member.userId === team?.captainId;
+
+  return (
+    <div
+      className={`relative flex min-h-0 items-center gap-5 overflow-hidden rounded-2xl border px-6 ${
+        side === "right" ? "flex-row-reverse text-right" : ""
+      }`}
+      style={{
+        borderColor: `${color}55`,
+        // 바깥쪽이 진하고 가운데(맞대결 축)로 갈수록 옅어진다
+        background: `linear-gradient(${inward}, ${color}40, ${color}0f 70%, rgba(11,13,17,0.6))`,
+        ...(swapped
+          ? {
+              animation: "bc-lane-swap 2.4s ease-out",
+              ["--bc-swap" as string]: `${color}88`,
+            }
+          : null),
+      }}
+    >
+      {/* 바깥 가장자리 팀 컬러 띠 */}
+      <span
+        className={`absolute inset-y-0 w-1.5 ${side === "left" ? "left-0" : "right-0"}`}
+        style={{ background: color }}
+      />
+      <div
+        className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-full bg-white/10"
+        style={{ boxShadow: `0 0 0 3px ${color}aa` }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={member.avatar || "/images/placeholders/non-avatar-64.png"}
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 leading-tight">
+        <p
+          className={`flex min-w-0 items-center gap-2 ${side === "right" ? "flex-row-reverse" : ""}`}
+        >
+          <span className="truncate text-[28px] font-black text-white">
+            <PlayerName player={member} />
+          </span>
+          {isCaptain && (
+            <span
+              className="shrink-0 rounded px-1.5 py-0.5 text-xs font-black text-black"
+              style={{ background: color }}
+            >
+              C
+            </span>
+          )}
+        </p>
+        <div
+          className={`flex items-center gap-3 ${side === "right" ? "flex-row-reverse" : ""}`}
+        >
+          <span
+            className={`flex items-center gap-1.5 text-base font-black ${side === "right" ? "flex-row-reverse" : ""}`}
+            style={{ color: badge.color }}
+          >
+            {badge.icon && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={badge.icon} alt="" width={22} height={22} />
+            )}
+            {badge.text}
+          </span>
+          {champions.length > 0 && (
+            <span
+              className={`flex items-center gap-1 ${side === "right" ? "flex-row-reverse" : ""}`}
+            >
+              {champions.map((championId) => {
+                const url = getChampionIconUrl(championId);
+                return url ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    key={championId}
+                    src={url}
+                    alt={championId}
+                    className="h-8 w-8 rounded-md border border-white/15 object-cover"
+                  />
+                ) : null;
+              })}
+            </span>
+          )}
+        </div>
+      </div>
+      {member.lineScore != null && (
+        <div className="shrink-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">
+            Line Score
+          </p>
+          <p className="text-[34px] font-black tabular-nums text-white">
+            {Number(member.lineScore).toFixed(1)}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * 팀 공개(reveal) 장면 — 팀 확정(DRAFT_COMPLETED) 시점의 최종 로스터 소개.
  * 자동배정/수동편성 모드에서는 드래프트 과정이 없어 이 장면이 유일한 팀 소개다.
  * 경매 방이면 낙찰가를 함께 표시한다.
@@ -2646,6 +2916,17 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
     return () => clearTimeout(timer);
   }, [slotSignature]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 2팀 롤 자동 밸런스는 라인 맞대결 화면으로 보여준다.
+  // 3팀 이상은 마주 볼 상대가 없어 기존 팀 칸 배치(라인 순 정렬)를 쓴다.
+  const faceOff =
+    laneLayout &&
+    teams.length === 2 &&
+    teams.every((team) =>
+      (team.members ?? []).every((member: any) =>
+        ROLE_ORDER.includes(normalizeRole(member.assignedRole) ?? ""),
+      ),
+    );
+
   // 팀마다 인원이 달라도 행 높이를 맞추기 위해 최대 인원 기준으로 트랙을 잡는다.
   // (1fr 트랙이라 남는 세로 공간 없이 패널을 꽉 채운다)
   const maxMembers = Math.max(
@@ -2694,7 +2975,7 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
                   </p>
                 </div>
               )}
-              {scoreGap !== null && (
+              {scoreGap !== null && !faceOff && (
                 <div>
                   <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white/35">
                     Score Gap
@@ -2717,113 +2998,121 @@ export function TeamRevealScene({ snapshot }: { snapshot: any }) {
 
         <HudRule color={accent} />
 
-        <div
-          className="grid min-h-0 flex-1 gap-x-14 gap-y-10"
-          style={{
-            gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
-          }}
-        >
-          {teams.map((team) => {
-            const teamColor = team.color || accent;
-            // 소개 순서: 팀장 → 라인 순(탑·정글·미드·원딜·서포) → 역할 미정
-            // 기존에는 DB가 돌려주는 순서(경매 낙찰 순 등)를 그대로 써서
-            // orderBy 가 없는 만큼 조회마다 순서가 달라질 수 있었다.
-            const roleRank = (member: any) => {
-              const index = ROLE_ORDER.indexOf(member.assignedRole);
-              return index === -1 ? ROLE_ORDER.length : index;
-            };
-            const members = [...(team.members ?? [])].sort((a, b) => {
-              // 자동 밸런스는 라인 줄을 맞추려고 팀장 우선을 쓰지 않는다
-              if (!laneLayout) {
-                const aCaptain = a.userId === team.captainId ? 0 : 1;
-                const bCaptain = b.userId === team.captainId ? 0 : 1;
-                if (aCaptain !== bCaptain) return aCaptain - bCaptain;
-              }
+        {faceOff ? (
+          <LaneFaceOff
+            teams={teams}
+            accent={accent}
+            swappedSlots={swappedSlots}
+          />
+        ) : (
+          <div
+            className="grid min-h-0 flex-1 gap-x-14 gap-y-10"
+            style={{
+              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+            }}
+          >
+            {teams.map((team) => {
+              const teamColor = team.color || accent;
+              // 소개 순서: 팀장 → 라인 순(탑·정글·미드·원딜·서포) → 역할 미정
+              // 기존에는 DB가 돌려주는 순서(경매 낙찰 순 등)를 그대로 써서
+              // orderBy 가 없는 만큼 조회마다 순서가 달라질 수 있었다.
+              const roleRank = (member: any) => {
+                const index = ROLE_ORDER.indexOf(member.assignedRole);
+                return index === -1 ? ROLE_ORDER.length : index;
+              };
+              const members = [...(team.members ?? [])].sort((a, b) => {
+                // 자동 밸런스는 라인 줄을 맞추려고 팀장 우선을 쓰지 않는다
+                if (!laneLayout) {
+                  const aCaptain = a.userId === team.captainId ? 0 : 1;
+                  const bCaptain = b.userId === team.captainId ? 0 : 1;
+                  if (aCaptain !== bCaptain) return aCaptain - bCaptain;
+                }
 
-              const byRole = roleRank(a) - roleRank(b);
-              if (byRole !== 0) return byRole;
+                const byRole = roleRank(a) - roleRank(b);
+                if (byRole !== 0) return byRole;
 
-              // 라인까지 같으면 닉네임으로 고정해 순서가 흔들리지 않게 한다
-              return String(a.username ?? "").localeCompare(
-                String(b.username ?? ""),
-                "ko",
-              );
-            });
-            return (
-              <div key={team.id} className="min-w-0 overflow-hidden">
-                {/* 축소 레이어: 실제 칸보다 1/scale 만큼 크게 그린 뒤 통째로 줄인다.
+                // 라인까지 같으면 닉네임으로 고정해 순서가 흔들리지 않게 한다
+                return String(a.username ?? "").localeCompare(
+                  String(b.username ?? ""),
+                  "ko",
+                );
+              });
+              return (
+                <div key={team.id} className="min-w-0 overflow-hidden">
+                  {/* 축소 레이어: 실제 칸보다 1/scale 만큼 크게 그린 뒤 통째로 줄인다.
                     폰트·아바타·여백·테두리가 같은 비율로 작아진다. */}
-                <div
-                  className="flex"
-                  style={{
-                    width: `${100 / panelScale}%`,
-                    height: `${100 / panelScale}%`,
-                    transform: `scale(${panelScale})`,
-                    transformOrigin: "top left",
-                  }}
-                >
-                  {/* 색 면·스파인이 로스터보다 넓으면 오른쪽이 비어 보인다.
-                      축소율과 무관하게 화면상 폭이 일정하도록 상한을 보정한다. */}
                   <div
-                    className="relative flex w-full min-w-0 flex-col py-2 pl-6 pr-5"
-                    style={{ maxWidth: `${Math.round(520 / panelScale)}px` }}
+                    className="flex"
+                    style={{
+                      width: `${100 / panelScale}%`,
+                      height: `${100 / panelScale}%`,
+                      transform: `scale(${panelScale})`,
+                      transformOrigin: "top left",
+                    }}
                   >
-                    {/* 팀 스파인: 블록의 세로 범위를 팀 컬러로 잡아준다.
-                        테두리 대신 이 한 줄이 "여기부터 여기까지 한 팀"을 말한다. */}
-                    <span
-                      className="absolute inset-y-0 left-0 w-[3px]"
-                      style={{
-                        background: `linear-gradient(180deg, ${teamColor}, ${teamColor}33)`,
-                      }}
-                    />
-                    {/* 팀명을 로스터와 같은 좌측 정렬선에 붙여 제목이 뜨지 않게 한다 */}
-                    <div className="flex items-end justify-between gap-4">
-                      <p
-                        className="min-w-0 truncate text-3xl font-black tracking-wide text-white"
-                        style={{ textShadow: `0 0 24px ${teamColor}55` }}
-                      >
-                        <TeamName team={team} />
-                      </p>
-                      {team.balanceTotal != null && (
-                        <div className="shrink-0 text-right">
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">
-                            Team Score
-                          </p>
-                          <p
-                            className="text-2xl font-black tabular-nums"
-                            style={{ color: teamColor }}
-                          >
-                            {Number(team.balanceTotal).toFixed(1)}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    {/* 색 면·스파인이 로스터보다 넓으면 오른쪽이 비어 보인다.
+                      축소율과 무관하게 화면상 폭이 일정하도록 상한을 보정한다. */}
                     <div
-                      // 행이 덩어리로 읽히므로 1fr 로 세로를 꽉 채운다
-                      className="mt-4 grid min-h-0 flex-1 gap-3"
-                      style={{
-                        gridTemplateRows: `repeat(${maxMembers}, minmax(0, 1fr))`,
-                      }}
+                      className="relative flex w-full min-w-0 flex-col py-2 pl-6 pr-5"
+                      style={{ maxWidth: `${Math.round(520 / panelScale)}px` }}
                     >
-                      {members.map((member) => (
-                        <RevealMemberRow
-                          key={member.userId}
-                          member={member}
-                          teamColor={teamColor}
-                          isCaptain={member.userId === team.captainId}
-                          justSwapped={swappedSlots.has(
-                            `${team.id}:${member.assignedRole}`,
-                          )}
-                        />
-                      ))}
+                      {/* 팀 스파인: 블록의 세로 범위를 팀 컬러로 잡아준다.
+                        테두리 대신 이 한 줄이 "여기부터 여기까지 한 팀"을 말한다. */}
+                      <span
+                        className="absolute inset-y-0 left-0 w-[3px]"
+                        style={{
+                          background: `linear-gradient(180deg, ${teamColor}, ${teamColor}33)`,
+                        }}
+                      />
+                      {/* 팀명을 로스터와 같은 좌측 정렬선에 붙여 제목이 뜨지 않게 한다 */}
+                      <div className="flex items-end justify-between gap-4">
+                        <p
+                          className="min-w-0 truncate text-3xl font-black tracking-wide text-white"
+                          style={{ textShadow: `0 0 24px ${teamColor}55` }}
+                        >
+                          <TeamName team={team} />
+                        </p>
+                        {team.balanceTotal != null && (
+                          <div className="shrink-0 text-right">
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">
+                              Team Score
+                            </p>
+                            <p
+                              className="text-2xl font-black tabular-nums"
+                              style={{ color: teamColor }}
+                            >
+                              {Number(team.balanceTotal).toFixed(1)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <div
+                        // 행이 덩어리로 읽히므로 1fr 로 세로를 꽉 채운다
+                        className="mt-4 grid min-h-0 flex-1 gap-3"
+                        style={{
+                          gridTemplateRows: `repeat(${maxMembers}, minmax(0, 1fr))`,
+                        }}
+                      >
+                        {members.map((member) => (
+                          <RevealMemberRow
+                            key={member.userId}
+                            member={member}
+                            teamColor={teamColor}
+                            isCaptain={member.userId === team.captainId}
+                            justSwapped={swappedSlots.has(
+                              `${team.id}:${member.assignedRole}`,
+                            )}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </StageFrame>
   );
