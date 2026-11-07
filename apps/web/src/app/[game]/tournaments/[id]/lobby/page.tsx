@@ -873,6 +873,21 @@ export default function TournamentLobbyPage() {
               (participant?.riotAccount as any)?.roleTiers ??
               []
             ).map((entry: any) => entry.role),
+            // 유저 칸 카드 표시용 — 사진·티어·선호 챔피언
+            avatar: member.user?.avatar ?? participant?.avatar ?? null,
+            roleTiers:
+              member.user?.riotAccounts?.[0]?.roleTiers ??
+              (participant?.riotAccount as any)?.roleTiers ??
+              [],
+            soloTier: (() => {
+              const riot =
+                member.user?.riotAccounts?.[0] ?? participant?.riotAccount;
+              return riot?.tier ? { tier: riot.tier, rank: riot.rank } : null;
+            })(),
+            championPreferences:
+              member.user?.riotAccounts?.[0]?.championPreferences ??
+              (participant?.riotAccount as any)?.championPreferences ??
+              [],
           };
         }),
       }))}

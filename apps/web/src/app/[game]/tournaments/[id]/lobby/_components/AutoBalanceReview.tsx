@@ -9,7 +9,8 @@ import {
   ArrowLeftRight,
   RotateCcw,
 } from "lucide-react";
-import { PositionIcon, POSITION_LABELS } from "./icons";
+import { ChampionIcon, PositionIcon, POSITION_LABELS } from "./icons";
+import { TierBadge } from "@/components/domain/TierBadge";
 import { GAME_SFX, playSfx } from "@/lib/sfx";
 
 interface ReviewMember {
@@ -26,6 +27,14 @@ interface ReviewMember {
   subRole: string | null;
   /** 라인별 티어를 등록해 둔 라인들 — 주·부라인 다음가는 약한 선호 */
   registeredRoles: string[];
+  /** 프로필 사진 */
+  avatar?: string | null;
+  /** 라인별 티어 (없으면 솔로랭크 티어를 대신 보인다) */
+  roleTiers?: { role: string; tier: string; rank?: string }[];
+  /** 솔로랭크 티어 */
+  soloTier?: { tier: string; rank?: string } | null;
+  /** 라인별 선호 챔피언 (order 순) */
+  championPreferences?: { role: string; championId: string; order: number }[];
 }
 
 interface ReviewTeam {
@@ -61,6 +70,67 @@ function rolePenalty(member: ReviewMember, role: string | null): number {
   if (member.registeredRoles.includes(role)) return 1.25;
   if (!member.mainRole && !member.subRole) return 1.5;
   return 4;
+}
+
+/**
+ * 배정된 라인이 그 사람에게 어떤 라인인지 — 유저 칸의 배지.
+ * 판정 기준은 rolePenalty 와 같다(주 < 부 < 티어 등록 < 비선호).
+ * 주·부라인을 아예 등록하지 않은 사람은 선호를 알 수 없으니 배지를 달지 않는다.
+ */
+function rolePreferenceBadge(
+  member: ReviewMember,
+): { label: string; className: string; title: string } | null {
+  const role = member.assignedRole;
+  if (!role) return null;
+  if (member.mainRole === role) {
+    return {
+      label: "주라인",
+      className: "bg-accent-success/15 text-accent-success",
+      title: "등록한 주라인에 배정됐습니다",
+    };
+  }
+  if (member.subRole === role) {
+    return {
+      label: "부라인",
+      className: "bg-accent-primary/15 text-accent-primary",
+      title: "등록한 부라인에 배정됐습니다",
+    };
+  }
+  if (member.registeredRoles.includes(role)) {
+    return {
+      label: "가능",
+      className: "bg-bg-tertiary text-text-secondary",
+      title: "주·부라인은 아니지만 이 라인 티어를 등록해 둔 라인입니다",
+    };
+  }
+  if (!member.mainRole && !member.subRole) return null;
+  return {
+    label: "비선호",
+    className: "bg-accent-warning/15 text-accent-warning",
+    title: "주·부라인도, 티어를 등록한 라인도 아닙니다",
+  };
+}
+
+/** 칸에 보일 티어 — 배정 라인의 라인 티어가 있으면 그것, 없으면 솔로랭크 */
+function displayTier(member: ReviewMember) {
+  const roleTier = member.assignedRole
+    ? member.roleTiers?.find((entry) => entry.role === member.assignedRole)
+    : undefined;
+  if (roleTier) return { ...roleTier, source: "role" as const };
+  if (member.soloTier?.tier) {
+    return { ...member.soloTier, source: "solo" as const };
+  }
+  return null;
+}
+
+/** 배정 라인의 선호 챔피언 최대 3개 */
+function roleChampions(member: ReviewMember): string[] {
+  if (!member.assignedRole) return [];
+  return (member.championPreferences ?? [])
+    .filter((entry) => entry.role === member.assignedRole)
+    .sort((a, b) => a.order - b.order)
+    .slice(0, 3)
+    .map((entry) => entry.championId);
 }
 
 /** 특정 라인으로 옮겼을 때 해당 인원의 예상 점수 */
@@ -478,7 +548,8 @@ export function AutoBalanceReview({
   // 팀 카드는 폭에 맞춰 자동으로 열을 만든다 — 2팀이면 2열로 넓게, 8팀이면
   // 4열 × 2행으로 접혀서 팀이 늘어도 세로로만 길어지지 않는다.
   const teamGridStyle = {
-    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 16rem), 1fr))",
+    // 유저 칸이 카드형(사진·티어·챔피언)이라 한 팀 칸의 최소 폭을 넓혔다
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 19rem), 1fr))",
   };
 
   // 언마운트 시 대기 중인 집기 타이머를 정리한다.
@@ -666,33 +737,101 @@ export function AutoBalanceReview({
                     >
                       {/* 라인은 롤에만 있는 개념이다. 배그에서는 빈 칸도 두지 않는다. */}
                       {showRoles && (
-                        <>
+                        <span className="flex w-9 flex-shrink-0 flex-col items-center gap-0.5">
                           {member.assignedRole ? (
                             <PositionIcon
                               position={member.assignedRole}
-                              className="!h-5 !w-5 flex-shrink-0"
+                              className="!h-5 !w-5"
                             />
                           ) : (
-                            <span className="h-5 w-5 flex-shrink-0" />
+                            <span className="h-5 w-5" />
                           )}
-                          <span className="w-9 flex-shrink-0 text-xs text-text-tertiary">
+                          <span className="text-[10px] leading-none text-text-tertiary">
                             {member.assignedRole
                               ? (POSITION_LABELS[member.assignedRole] ??
                                 member.assignedRole)
                               : "-"}
                           </span>
-                        </>
-                      )}
-                      {isHost ? (
-                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">
-                          {member.username}
-                        </span>
-                      ) : (
-                        <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
-                          {member.username}
                         </span>
                       )}
-                      <span className="w-14 flex-shrink-0 text-right text-sm font-bold tabular-nums text-text-secondary">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={
+                          member.avatar ||
+                          "/images/placeholders/non-avatar-128.png"
+                        }
+                        alt=""
+                        draggable={false}
+                        className="h-10 w-10 flex-shrink-0 rounded-full bg-bg-elevated object-cover"
+                      />
+                      <span className="flex min-w-0 flex-1 flex-col gap-1">
+                        {/* 1줄: 닉네임 + 배정 라인 선호 배지 */}
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span
+                            className={`min-w-0 truncate text-sm text-text-primary ${
+                              isHost ? "font-semibold" : ""
+                            }`}
+                          >
+                            {member.username}
+                          </span>
+                          {showRoles &&
+                            (() => {
+                              const badge = rolePreferenceBadge(member);
+                              return badge ? (
+                                <span
+                                  title={badge.title}
+                                  className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none ${badge.className}`}
+                                >
+                                  {badge.label}
+                                </span>
+                              ) : null;
+                            })()}
+                        </span>
+                        {/* 2줄: 배정 라인 티어 + 그 라인 선호 챔피언 */}
+                        {showRoles && (
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            {(() => {
+                              const tier = displayTier(member);
+                              return tier ? (
+                                <span
+                                  className="flex-shrink-0"
+                                  title={
+                                    tier.source === "role"
+                                      ? "배정 라인 티어"
+                                      : "솔로랭크 티어 (이 라인 티어 미등록)"
+                                  }
+                                >
+                                  <TierBadge
+                                    tier={tier.tier}
+                                    rank={tier.rank || undefined}
+                                    size="sm"
+                                    showIcon={false}
+                                  />
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-text-muted">
+                                  티어 없음
+                                </span>
+                              );
+                            })()}
+                            {roleChampions(member).length > 0 && (
+                              <span
+                                className="flex flex-shrink-0 items-center gap-0.5"
+                                title="이 라인 선호 챔피언"
+                              >
+                                {roleChampions(member).map((championId) => (
+                                  <ChampionIcon
+                                    key={championId}
+                                    championId={championId}
+                                    size={20}
+                                  />
+                                ))}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </span>
+                      <span className="w-12 flex-shrink-0 text-right text-base font-black tabular-nums text-text-secondary">
                         {member.score !== null ? member.score.toFixed(1) : "–"}
                       </span>
                       {isHost && (
