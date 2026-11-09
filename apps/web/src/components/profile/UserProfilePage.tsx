@@ -473,10 +473,10 @@ export default function UserProfilePage() {
       <div className="container mx-auto max-w-6xl">
         {/* Profile Hero Section
             배경 이미지 칸 — 예전 112/144px 은 띠처럼 얇아 올린 이미지가 거의 안 보였다.
-            넓은 화면 기준 약 4:1(256px)로 키웠다. */}
+            넓은 화면 기준 약 3:1(360px)로 키웠다. */}
         <Card className="mb-4 overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
           <div
-            className="relative h-40 w-full bg-bg-tertiary sm:h-52 md:h-64"
+            className="relative h-52 w-full bg-bg-tertiary sm:h-64 md:h-80 lg:h-[360px]"
             style={
               profile.profileBanner
                 ? undefined
