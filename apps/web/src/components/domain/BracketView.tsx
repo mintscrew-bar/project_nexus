@@ -82,7 +82,9 @@ type Density = "compact" | "detailed";
 
 /** 밀도별 카드 치수 — 트리 정렬 여백 계산이 이 값에 묶여 있다. */
 const DENSITY = {
-  detailed: { card: "w-[320px] md:w-[400px]", slotGap: 420, minColumn: 430 },
+  // 상세 카드 높이는 약 200px(세트 진행 줄이 붙으면 210px). 칸 높이를 카드보다
+  // 조금만 크게 잡아야 위아래로 흩어지지 않는다 — 예전 420px 은 카드 사이가 240px 씩 비었다.
+  detailed: { card: "w-[320px] md:w-[400px]", slotGap: 232, minColumn: 240 },
   compact: { card: "w-[208px] md:w-[232px]", slotGap: 104, minColumn: 120 },
 } as const;
 
@@ -490,7 +492,7 @@ function getRoundHeight(matchCount: number, density: Density): number {
   return Math.max(
     minColumn,
     matchCount * slotGap +
-      Math.max(0, matchCount - 1) * (density === "compact" ? 8 : 36),
+      Math.max(0, matchCount - 1) * (density === "compact" ? 8 : 16),
   );
 }
 
