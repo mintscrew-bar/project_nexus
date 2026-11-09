@@ -20,7 +20,7 @@ import {
   BracketHeader,
   getStageInfo,
 } from "@/components/domain";
-import { LoadingSpinner, Button, ConfirmModal } from "@/components/ui";
+import { LoadingSpinner, Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { Trophy } from "lucide-react";
 import { TeamModeHelp, type TeamMode } from "@/components/rooms/TeamModeHelp";
@@ -53,7 +53,6 @@ export default function BracketPage() {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
-  const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
 
   // host 여부·방 이름 — 브래킷 세션 중 변경되지 않으므로 1회만 조회
   const { data: roomInfo } = useQuery({
@@ -135,10 +134,8 @@ export default function BracketPage() {
     }
   };
 
-  const handleAbortToLobby = () => setIsAbortConfirmOpen(true);
-
+  // 내전 종료 — 머리글의 "길게 눌러 종료" 버튼이 확인 창을 대신한다
   const handleAbortConfirm = async () => {
-    setIsAbortConfirmOpen(false);
     setIsAborting(true);
     try {
       await roomApi.abortToLobby(roomId);
@@ -369,17 +366,6 @@ export default function BracketPage() {
 
   return (
     <div className="h-full p-4 md:p-8 overflow-y-auto">
-      <ConfirmModal
-        isOpen={isAbortConfirmOpen}
-        onClose={() => setIsAbortConfirmOpen(false)}
-        onConfirm={handleAbortConfirm}
-        title="내전 종료"
-        message="현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다."
-        confirmText="종료"
-        cancelText="취소"
-        variant="danger"
-        isLoading={isAborting}
-      />
       <div className="mx-auto w-full max-w-none">
         {/* 머리글 — 라벨 + 방 이름 제목, 오른쪽에 진행률 막대·새로고침·내전 종료 */}
         <BracketHeader
@@ -397,7 +383,7 @@ export default function BracketPage() {
           onRefresh={handleRefresh}
           isHost={isHost}
           isAborting={isAborting}
-          onAbort={handleAbortToLobby}
+          onAbort={handleAbortConfirm}
         />
 
         {/* Tournament Winner Banner */}

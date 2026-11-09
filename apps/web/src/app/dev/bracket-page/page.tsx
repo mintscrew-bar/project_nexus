@@ -78,7 +78,8 @@ export default function BracketPagePreview() {
         onRefresh={() => {}}
         isHost={viewer === "host"}
         isAborting={false}
-        onAbort={() => {}}
+        // 길게 누르기가 끝나면 한 번 불린다 — 확인용 로그
+        onAbort={() => console.log("bracket-abort")}
       />
       <BracketStage
         stage={getStageInfo(matches, 2)}
