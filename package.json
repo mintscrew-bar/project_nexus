@@ -1,6 +1,6 @@
 {
   "name": "nexus",
-  "version": "1.89.0",
+  "version": "1.90.0",
   "private": true,
   "workspaces": [
     "apps/*",
