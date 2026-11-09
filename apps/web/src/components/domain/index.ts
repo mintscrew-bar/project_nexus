@@ -7,6 +7,8 @@ export * from './ParticipantList';
 export * from './AuctionBoard';
 export * from './DraftBoard';
 export * from './BracketView';
+export * from './BracketStage';
+export * from './BracketHeader';
 export * from './MatchDetailModal';
 export * from './MatchRpsFlow';
 export * from './VictoryScreen';

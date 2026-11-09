@@ -1007,3 +1007,39 @@ body.scroll-locked {
   /* 움직임을 줄인 환경에서는 WIN 을 띄우지 않는다 */
   .bracket-win-flash { opacity: 0; }
 }
+
+/* 대진표 판 배경 (BracketStage) — 끊김 없이 흐르는 사선 띠와 숨 쉬는 위쪽 빛.
+   띠 무늬는 108도(18도 기울기)라 줄무늬 주기 456.5px = 가로 480px.
+   층을 양옆으로 480px 씩 넓혀 두고 480px 만큼 옮기면 처음 모습과 같아진다. */
+@keyframes bracket-band-loop {
+  from { transform: translateX(0); }
+  to { transform: translateX(480px); }
+}
+@keyframes bracket-glow-breathe {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+.bracket-stage-bands {
+  background-image: repeating-linear-gradient(
+    108deg,
+    transparent 0 40px,
+    rgb(var(--color-accent-primary) / 0.05) 40px 116px,
+    transparent 116px 170px,
+    rgb(var(--color-accent-primary) / 0.045) 170px 181px,
+    transparent 181px 262px,
+    rgb(var(--color-accent-primary) / 0.035) 262px 382px,
+    transparent 382px 420px,
+    rgb(var(--color-accent-primary) / 0.05) 420px 432px,
+    transparent 432px 456.5px
+  );
+  animation: bracket-band-loop 24s linear infinite;
+}
+.bracket-stage-glow {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 30% 0%, rgb(var(--color-accent-primary) / 0.16), transparent 70%),
+    linear-gradient(to bottom, transparent 60%, rgb(0 0 0 / 0.25));
+  animation: bracket-glow-breathe 6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bracket-stage-bands, .bracket-stage-glow { animation: none; }
+}

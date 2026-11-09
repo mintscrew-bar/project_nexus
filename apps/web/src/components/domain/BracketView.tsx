@@ -14,6 +14,8 @@ import {
 
 interface TeamMember {
   id: string;
+  /** 회원 id — "내 경기" 판별용 (id 는 팀원 행 id 라 회원과 다르다) */
+  userId?: string;
   username: string;
   assignedRole?: string | null;
   championPreferences?: Array<{
@@ -371,6 +373,18 @@ function MatchCard({
 function MatchStatusBadge({ match }: { match: Match }) {
   const base =
     "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold";
+  // 다전제 세트 사이 — 시리즈는 진행 중이지만 다음 세트가 아직 시작 전
+  if (
+    match.status === "IN_PROGRESS" &&
+    match.currentGameStatus === "PENDING" &&
+    (match.bestOf ?? 1) > 1
+  ) {
+    return (
+      <span className={cn(base, "bg-accent-warning/20 text-accent-warning")}>
+        {match.currentGameNumber ?? 1}세트 대기
+      </span>
+    );
+  }
   if (match.status === "IN_PROGRESS") {
     return (
       <span className={cn(base, "bg-accent-primary/20 text-accent-primary")}>

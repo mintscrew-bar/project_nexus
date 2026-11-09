@@ -15,11 +15,14 @@ import {
   VictoryScreen,
   GameChatPanel,
   getTeamDisplayName,
+  BracketStage,
+  BracketLiveBar,
+  BracketHeader,
+  getStageInfo,
 } from "@/components/domain";
-import { LoadingSpinner, Badge, Button, ConfirmModal } from "@/components/ui";
+import { LoadingSpinner, Button, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { ArrowLeft, RefreshCw, Trophy } from "lucide-react";
-import Link from "next/link";
+import { Trophy } from "lucide-react";
 import { TeamModeHelp, type TeamMode } from "@/components/rooms/TeamModeHelp";
 
 export default function BracketPage() {
@@ -213,6 +216,8 @@ export default function BracketPage() {
       const membersOf = (team: typeof first.teamA) =>
         team?.members?.map((member) => ({
           id: member.id,
+          // "내 경기" 판별용 — id 는 팀원 행 id 라 회원 id 를 따로 싣는다
+          userId: member.user.id,
           username: member.user.username,
           assignedRole: member.assignedRole,
           championPreferences:
@@ -308,6 +313,38 @@ export default function BracketPage() {
   const tournamentWinner =
     finalMatch?.status === "COMPLETED" ? finalMatch.winner : null;
 
+  // 판 워터마크 — 지금 단계("SEMI FINAL" 등)와 대회 정보 한 줄
+  const stage = getStageInfo(bracketMatches, rounds);
+  const teamCount = new Set(
+    bracketMatches.flatMap((m) => [m.team1?.id, m.team2?.id].filter(Boolean)),
+  ).size;
+  const maxBestOf = Math.max(1, ...bracketMatches.map((m) => m.bestOf ?? 1));
+  const today = new Date();
+  const infoLine = [
+    teamCount > 0 ? `${teamCount} Teams` : null,
+    maxBestOf > 1 ? `Bo${maxBestOf}` : "Single game",
+    `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, "0")}.${String(today.getDate()).padStart(2, "0")}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  // 경기 바에 쓰는 경기 이름 — 카드의 라운드 머리글과 같은 말
+  const matchLabel = (m: Match) => {
+    if (isDE) return `${m.bracketSection ?? ""} ${m.matchNumber}`.trim();
+    if (rounds === 1) return `리그 ${m.matchNumber}`;
+    const fromEnd = rounds - m.round;
+    const base =
+      fromEnd === 0
+        ? "결승"
+        : fromEnd === 1
+          ? "준결승"
+          : fromEnd === 2
+            ? "8강"
+            : `${m.round}라운드`;
+    const sameRound = bracketMatches.filter((x) => x.round === m.round).length;
+    return sameRound > 1 ? `${base} ${m.matchNumber}` : base;
+  };
+
   if (isLoading && roomMatches.length === 0) {
     return (
       <div className="flex-grow flex items-center justify-center">
@@ -344,116 +381,59 @@ export default function BracketPage() {
         isLoading={isAborting}
       />
       <div className="mx-auto w-full max-w-none">
-        {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <Link
-              href={`${gamePrefix}/tournaments/${roomId}/lobby`}
-              className="shrink-0 rounded-lg p-2 transition-colors hover:bg-bg-tertiary"
-              aria-label="로비로 돌아가기"
-              title="로비로 돌아가기"
-            >
-              <ArrowLeft className="h-5 w-5 text-text-secondary" />
-            </Link>
-            <div className="min-w-0">
-              <h1 className="flex items-center gap-2 text-2xl font-bold text-text-primary md:text-3xl">
-                <Trophy className="h-6 w-6 md:h-8 md:w-8 text-accent-gold" />
-                대진표
-                {roomInfo?.teamMode && (
-                  <TeamModeHelp mode={roomInfo.teamMode} compact />
-                )}
-              </h1>
-              {/* 방 ID는 사용자에게 의미가 없다 — 방 이름을 보여준다 */}
-              <p className="mt-1 truncate text-text-secondary">
-                {roomInfo?.name ?? `방 #${roomId.slice(0, 4)}`}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            {/* 종료 버튼은 전원에게 보인다. 실행 권한(assertHost)은 서버가 판단한다. */}
-            <Button
-              variant="danger"
-              size="sm"
-              isLoading={isAborting}
-              onClick={handleAbortToLobby}
-              title="이 판을 종료하고 대기실로 돌아갑니다 (전적에 반영되지 않음, 방장만 가능)"
-            >
-              내전 종료
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={handleRefresh}
-              disabled={isLoading}
-              title="대진표를 다시 불러옵니다"
-            >
-              <RefreshCw
-                className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
-              />
-              새로고침
-            </Button>
-          </div>
-        </div>
+        {/* 머리글 — 라벨 + 방 이름 제목, 오른쪽에 진행률 막대·새로고침·내전 종료 */}
+        <BracketHeader
+          backHref={`${gamePrefix}/tournaments/${roomId}/lobby`}
+          title={roomInfo?.name ?? `방 #${roomId.slice(0, 4)}`}
+          modeHelp={
+            roomInfo?.teamMode && (
+              <TeamModeHelp mode={roomInfo.teamMode} compact />
+            )
+          }
+          completed={completedMatches}
+          inProgress={inProgressMatches}
+          total={totalMatches}
+          isLoading={isLoading}
+          onRefresh={handleRefresh}
+          isHost={isHost}
+          isAborting={isAborting}
+          onAbort={handleAbortToLobby}
+        />
 
         {/* Tournament Winner Banner */}
         {tournamentWinner && (
-          <div className="bg-gradient-to-r from-accent-gold/20 to-accent-gold/5 border border-accent-gold/30 rounded-xl p-6 mb-6 text-center">
-            <Trophy className="h-12 w-12 text-accent-gold mx-auto mb-3" />
-            <h2 className="text-xl md:text-2xl font-bold text-accent-gold mb-1">
-              우승
-            </h2>
+          <div className="mb-5 rounded-2xl border border-accent-primary/40 bg-accent-primary/10 p-6 text-center">
+            <Trophy className="mx-auto mb-3 h-10 w-10 text-accent-primary" />
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-accent-primary">
+              Champion
+            </p>
             <p className="text-2xl md:text-3xl font-bold text-text-primary">
               {getTeamDisplayName(tournamentWinner)}
             </p>
           </div>
         )}
 
-        {/* Bracket View */}
+        {/* 대진 판 — 흐르는 사선 띠·단계 워터마크 배경, 아래쪽에 입장별 경기 바 */}
         {bracketMatches.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
-            <div className="border-b border-bg-tertiary bg-bg-tertiary/30 px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                <div className="flex items-center gap-2 text-sm font-bold text-text-primary">
-                  <Trophy className="h-4 w-4 text-accent-gold" />
-                  토너먼트 브래킷
-                </div>
-                {/* 경기 수가 적은 내전에서 카드 4장은 과하다 — 헤더 한 줄로 요약 */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-secondary">
-                  <span>
-                    완료{" "}
-                    <strong className="tabular-nums text-accent-success">
-                      {completedMatches}
-                    </strong>
-                    <span className="text-text-tertiary">/{totalMatches}</span>
-                  </span>
-                  {inProgressMatches > 0 && (
-                    <span>
-                      진행 중{" "}
-                      <strong className="tabular-nums text-accent-primary">
-                        {inProgressMatches}
-                      </strong>
-                    </span>
-                  )}
-                  <span>
-                    진행률{" "}
-                    <strong className="tabular-nums text-accent-gold">
-                      {totalMatches > 0
-                        ? Math.round((completedMatches / totalMatches) * 100)
-                        : 0}
-                      %
-                    </strong>
-                  </span>
-                </div>
+          <BracketStage stage={stage} infoLine={infoLine}>
+            <BracketView
+              matches={bracketMatches}
+              rounds={rounds}
+              onMatchClick={handleMatchClick}
+            />
+            {/* 판 아래쪽에 붙어 스크롤해도 따라온다 — 보여줄 경기가 없으면 사라진다 */}
+            {!tournamentWinner && (
+              <div className="pointer-events-none sticky bottom-3 mt-3 [&>*]:pointer-events-auto">
+                <BracketLiveBar
+                  matches={bracketMatches}
+                  userId={user?.id}
+                  isHost={isHost}
+                  getLabel={matchLabel}
+                  onOpen={handleMatchClick}
+                />
               </div>
-            </div>
-            <div className="bg-[linear-gradient(to_right,rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:28px_28px] p-3 md:p-4">
-              <BracketView
-                matches={bracketMatches}
-                rounds={rounds}
-                onMatchClick={handleMatchClick}
-              />
-            </div>
-          </div>
+            )}
+          </BracketStage>
         ) : (
           <div className="bg-bg-secondary border border-bg-tertiary rounded-xl p-12 text-center">
             <Trophy className="h-16 w-16 text-text-tertiary mx-auto mb-4" />
