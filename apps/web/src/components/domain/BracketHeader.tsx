@@ -97,14 +97,13 @@ export function BracketHeader({
           <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
         </button>
         {/* 내전 종료 — 방장만 할 수 있어 방장에게만 보인다(서버도 assertHost 로 막는다).
-            평소엔 조용한 버튼이고 마우스를 올려야 빨개진다 — 실수로 누르기 쉬운 자리라 덜 눈에 띄게 둔다.
-            누르면 확인 창이 한 번 더 뜬다. */}
+            찾기 쉽게 처음부터 빨간 버튼으로 둔다. 실수 방지는 누른 뒤 뜨는 확인 창이 맡는다. */}
         {isHost && (
           <button
             type="button"
             onClick={onAbort}
             disabled={isAborting}
-            className="flex h-10 items-center gap-1.5 rounded-xl border border-bg-elevated/40 bg-bg-secondary px-3.5 text-sm font-semibold text-text-secondary transition-colors hover:border-accent-danger/50 hover:bg-accent-danger/10 hover:text-accent-danger disabled:opacity-50"
+            className="flex h-10 items-center gap-1.5 rounded-xl border border-accent-danger/60 bg-accent-danger/15 px-3.5 text-sm font-bold text-accent-danger transition-colors hover:border-accent-danger hover:bg-accent-danger hover:text-white disabled:opacity-50"
             title="이 판을 종료하고 대기실로 돌아갑니다 (전적에 반영되지 않음)"
           >
             <Power className="h-4 w-4" />
