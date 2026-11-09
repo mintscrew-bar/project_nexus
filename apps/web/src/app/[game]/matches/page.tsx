@@ -1,5 +1,6 @@
 "use client";
 
+import { userProfilePath } from "@/lib/profile-routes";
 import { Suspense, useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
@@ -217,7 +218,7 @@ function LolMatchesPage() {
       timestamp: Date.now(),
     });
     setShowDropdown(false);
-    router.push(`${gamePrefix}/matches/user/${user.id}`);
+    router.push(userProfilePath(user.id, "LOL"));
   };
 
   const handleRecentSearchClick = (search: RecentSearch) => {
@@ -226,7 +227,7 @@ function LolMatchesPage() {
         `${gamePrefix}/matches/summoner/${encodeURIComponent(search.gameName)}/${encodeURIComponent(search.tagLine)}`,
       );
     } else if (search.type === "user" && search.userId) {
-      router.push(`${gamePrefix}/matches/user/${search.userId}`);
+      router.push(userProfilePath(search.userId, "LOL"));
     }
   };
 

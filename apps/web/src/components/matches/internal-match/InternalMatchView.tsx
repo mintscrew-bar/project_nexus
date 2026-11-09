@@ -1,5 +1,6 @@
 "use client";
 
+import { userProfilePath } from "@/lib/profile-routes";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -120,7 +121,7 @@ function ParticipantNameLink({
   const name = participantName(participant);
   const [gameName, tagLine] = participant.riotIdSnapshot?.split("#") ?? [];
   const href = participant.user
-    ? `${gamePrefix}/matches/user/${participant.user.id}`
+    ? userProfilePath(participant.user.id, "LOL")
     : gameName && tagLine
       ? `${gamePrefix}/matches/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`
       : null;

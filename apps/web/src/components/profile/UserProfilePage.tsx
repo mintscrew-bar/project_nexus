@@ -1,5 +1,6 @@
 "use client";
 
+import { NexusRecordsSection } from "./NexusRecordsSection";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -9,7 +10,6 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useDdragonStore } from "@/stores/ddragon-store";
 import {
   userApi,
-  matchApi,
   friendApi,
   statsApi,
   presenceApi,
@@ -21,7 +21,7 @@ import {
   PositionIcon,
   POSITION_LABELS,
 } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
-import { getChampionIcon } from "@/components/matches/match-utils";
+
 import {
   LoadingSpinner,
   Card,
@@ -30,21 +30,11 @@ import {
   CardContent,
   Badge,
   Button,
-  Skeleton,
-  EmptyState,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
 } from "@/components/ui";
 import { AdSlotCard } from "@/components/ads/AdSlot";
 import {
-  Shield,
   Trophy,
-  TrendingUp,
   Target,
-  History,
-  Clock,
   Calendar,
   User,
   UserPlus,
@@ -52,11 +42,8 @@ import {
   UserX,
   MessageSquare,
   Loader2,
-  BarChart3,
-  Swords,
   Star,
   Gavel,
-  Activity,
   ExternalLink,
   ThumbsUp,
 } from "lucide-react";
@@ -65,18 +52,9 @@ import { TierBadge } from "@/components/domain/TierBadge";
 import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 import { StreamerPlatformBadge } from "@/components/domain/StreamerPlatformBadge";
-import {
-  ReputationSummary,
-  SummaryChip,
-  WinRateSparkline,
-  getCombinedProfileMetrics,
-} from "@/components/domain/ProfileStats";
-import {
-  PreferredChampionPanel,
-  RankedChampionPanel,
-} from "@/components/domain/ProfileChampionPanels";
+
 import { useToast } from "@/components/ui/Toast";
-import { getChampionKoreanName, searchChampionsByQuery } from "@nexus/types";
+import { getChampionKoreanName } from "@nexus/types";
 import { useGamePrefix, useNavigationGame } from "@/hooks/useCurrentGame";
 import {
   DEFAULT_GAME,
@@ -104,16 +82,6 @@ const ROLE_LABELS: Record<string, string> = {
 const PROFILE_ACCENT = "#667EEA";
 
 // ─── 헬퍼 함수 ───────────────────────────────────────────────
-
-function formatTimeAgo(value?: string) {
-  if (!value) return "";
-  const diff = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(0, Math.floor(diff / 60_000));
-  if (minutes < 60) return `${minutes}분 전`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 전`;
-  return `${Math.floor(hours / 24)}일 전`;
-}
 
 interface ProfileUser {
   id: string;
@@ -227,13 +195,6 @@ export default function UserProfilePage() {
     useState<FriendshipStatus>("none");
   const [friendshipId, setFriendshipId] = useState<string | null>(null);
   const [friendActionLoading, setFriendActionLoading] = useState(false);
-  const [recentMatches, setRecentMatches] = useState<any[]>([]);
-  const [matchesLoading, setMatchesLoading] = useState(false);
-  const [championStats, setChampionStats] = useState<any[]>([]);
-  const [rankedChampStats, setRankedChampStats] = useState<any[]>([]);
-  const [positionStats, setPositionStats] = useState<any[]>([]);
-  // 챔피언 검색 필터 (한글/영문 모두 지원)
-  const [championFilter, setChampionFilter] = useState("");
   const [auctionStats, setAuctionStats] = useState<any>(null);
   const [onlineStatus, setOnlineStatus] = useState<string | null>(null);
   const [rep, setRep] = useState<any>(null);
@@ -285,11 +246,12 @@ export default function UserProfilePage() {
       const data = await userApi.getProfile(userId);
       setProfile(data);
     } catch {
-      addToast("프로필을 불러올 수 없습니다.", "error");
+      // 로그아웃 상태면 화면이 로그인 안내를 띄우므로 오류 알림은 생략
+      if (isAuthenticated) addToast("프로필을 불러올 수 없습니다.", "error");
     } finally {
       setIsLoading(false);
     }
-  }, [userId, addToast]);
+  }, [userId, addToast, isAuthenticated]);
 
   const fetchFriendshipStatus = useCallback(async () => {
     if (!isAuthenticated || isOwnProfile) return;
@@ -315,64 +277,6 @@ export default function UserProfilePage() {
       // Not critical
     }
   }, [userId, isAuthenticated, isOwnProfile]);
-
-  const fetchMatches = useCallback(async () => {
-    setMatchesLoading(true);
-    try {
-      const data = await matchApi.getUserMatchHistory(userId, 5, 0);
-      const flattened = (data || []).map((item: any) => ({
-        id: item.matchId || item.match?.id,
-        status: item.match?.status,
-        createdAt: item.match?.createdAt,
-        teamA: item.match?.teamA,
-        teamB: item.match?.teamB,
-        winner: item.match?.winner,
-        myTeamId: item.team?.id,
-        participant: item.participant,
-      }));
-      setRecentMatches(flattened);
-    } catch {
-      // Not critical
-    } finally {
-      setMatchesLoading(false);
-    }
-  }, [userId]);
-
-  const fetchChampionStats = useCallback(async () => {
-    try {
-      const data = await statsApi.getUserChampionStats(userId);
-      setChampionStats(data.slice(0, 5));
-    } catch {
-      // Not critical
-    }
-  }, [userId]);
-
-  const fetchRankedChampStats = useCallback(async () => {
-    if (!profile?.riotAccounts) return;
-    // Respect privacy setting
-    if (profile.settings?.showChampionStats === false) return;
-    const primary =
-      profile.riotAccounts.find((a) => a.isPrimary) || profile.riotAccounts[0];
-    if (!primary?.gameName || !primary?.tagLine) return;
-    try {
-      const data = await statsApi.getRankedChampionStats(
-        primary.gameName,
-        primary.tagLine,
-      );
-      setRankedChampStats(data || []);
-    } catch {
-      // Not critical
-    }
-  }, [profile?.riotAccounts, profile?.settings?.showChampionStats]);
-
-  const fetchPositionStats = useCallback(async () => {
-    try {
-      const data = await statsApi.getUserPositionStats(userId);
-      setPositionStats(data || []);
-    } catch {
-      // Not critical
-    }
-  }, [userId]);
 
   const fetchAuctionStats = useCallback(async () => {
     try {
@@ -405,31 +309,18 @@ export default function UserProfilePage() {
   useEffect(() => {
     fetchProfile();
     fetchFriendshipStatus();
-    fetchMatches();
     fetchChampions();
-    fetchChampionStats();
-    fetchPositionStats();
     fetchAuctionStats();
     fetchOnlineStatus();
     fetchReputation();
   }, [
     fetchProfile,
     fetchFriendshipStatus,
-    fetchMatches,
     fetchChampions,
-    fetchChampionStats,
-    fetchPositionStats,
     fetchAuctionStats,
     fetchOnlineStatus,
     fetchReputation,
   ]);
-
-  // Fetch data that depends on profile (riotAccounts)
-  useEffect(() => {
-    if (profile?.riotAccounts?.length) {
-      fetchRankedChampStats();
-    }
-  }, [profile?.riotAccounts, fetchRankedChampStats]);
 
   const handleFriendAction = async () => {
     if (!isAuthenticated) {
@@ -484,39 +375,6 @@ export default function UserProfilePage() {
     return champ?.id || championId;
   };
 
-  const getPreferredChampionsByRole = () => {
-    if (!profile?.riotAccounts) return [];
-
-    const primary =
-      profile.riotAccounts.find((a) => a.isPrimary) || profile.riotAccounts[0];
-    if (!primary?.championPreferences?.length) return [];
-
-    const grouped: Record<string, { championId: string; order: number }[]> = {};
-    for (const pref of primary.championPreferences) {
-      if (!grouped[pref.role]) grouped[pref.role] = [];
-      grouped[pref.role].push({
-        championId: pref.championId,
-        order: pref.order,
-      });
-    }
-
-    for (const role of Object.keys(grouped)) {
-      grouped[role].sort((a, b) => a.order - b.order);
-    }
-
-    const roleOrder: string[] = [];
-    if (primary.mainRole) roleOrder.push(primary.mainRole);
-    if (primary.subRole && primary.subRole !== primary.mainRole)
-      roleOrder.push(primary.subRole);
-    for (const role of Object.keys(grouped)) {
-      if (!roleOrder.includes(role)) roleOrder.push(role);
-    }
-
-    return roleOrder
-      .filter((role) => grouped[role]?.length)
-      .map((role) => ({ role, champions: grouped[role] }));
-  };
-
   const getFriendButtonConfig = () => {
     switch (friendshipStatus) {
       case "none":
@@ -563,6 +421,25 @@ export default function UserProfilePage() {
     );
   }
 
+  // 프로필 API(/users/:id)는 로그인한 사람에게만 열려 있다.
+  // 로그아웃 상태에서 "찾을 수 없습니다"라고 하면 계정이 없는 것처럼 보여서 로그인 안내로 바꾼다.
+  if (!profile && !isAuthenticated) {
+    return (
+      <div className="flex-grow flex items-center justify-center">
+        <div className="text-center">
+          <User className="h-16 w-16 mx-auto mb-4 text-text-tertiary" />
+          <h2 className="text-xl font-bold text-text-primary mb-2">
+            로그인하면 프로필을 볼 수 있습니다
+          </h2>
+          <p className="text-text-secondary mb-4">
+            넥서스 유저의 프로필과 내전 기록은 로그인한 회원에게 보입니다.
+          </p>
+          <Button onClick={() => router.push("/auth/login")}>로그인</Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!profile) {
     return (
       <div className="flex-grow flex items-center justify-center">
@@ -585,17 +462,11 @@ export default function UserProfilePage() {
   const clan = profile.clanMemberships?.find(
     (membership) => membership.clan.gameTitle === activeGame,
   )?.clan;
-  const preferredChampions = getPreferredChampionsByRole();
   const friendBtn = getFriendButtonConfig();
   const settings = profile.settings;
   const showRiot = settings?.showRiotAccounts !== false;
   const showChampStats = settings?.showChampionStats !== false;
   const highlightChampionId = settings?.highlightChampionId;
-  const combined = getCombinedProfileMetrics({
-    stats: profile.stats,
-    recentMatches,
-    rankedChampStats,
-  });
 
   return (
     <div className="flex-grow p-4 md:p-8">
@@ -816,12 +687,25 @@ export default function UserProfilePage() {
 
                     {/* 아래: 게임명 · 최고 티어 · 평판 · 가입일 */}
                     <div className="flex flex-wrap items-center gap-2 text-xs text-text-tertiary">
-                      {primary && (
+                      {primary && showRiot && (
                         <>
-                          <span className="font-medium text-text-secondary">
+                          {/* Riot 계정 카드 대신 — 대표 계정을 누르면 소환사 전적으로 */}
+                          <Link
+                            href={`${gamePrefix}/matches/summoner/${encodeURIComponent(primary.gameName)}/${encodeURIComponent(primary.tagLine)}`}
+                            className="inline-flex items-center gap-1 font-medium text-text-secondary transition-colors hover:text-accent-primary"
+                            title="소환사 전적 보기"
+                          >
                             {primary.gameName}
-                          </span>
-                          <span>#{primary.tagLine}</span>
+                            <span className="text-text-tertiary">
+                              #{primary.tagLine}
+                            </span>
+                            <ExternalLink className="h-3 w-3" />
+                          </Link>
+                          {(profile.riotAccounts?.length ?? 0) > 1 && (
+                            <span title="연동한 Riot 계정 수">
+                              외 {(profile.riotAccounts?.length ?? 1) - 1}개
+                            </span>
+                          )}
                           <span>·</span>
                           {primary.peakTier && (
                             <>
@@ -972,202 +856,21 @@ export default function UserProfilePage() {
           />
         ) : (
           <>
-            {/* ── 요약 스탯 칩 (전적/승률/KDA) ── */}
-            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <SummaryChip
-                icon={Swords}
-                label="통합 전적"
-                value={`${combined.wins}승 ${combined.losses}패`}
-                detail={`내전 ${combined.customGames} · 랭크 ${combined.rankedGames}`}
-              />
-              <SummaryChip
-                icon={TrendingUp}
-                label="통합 승률"
-                value={combined.games > 0 ? `${combined.winRate}%` : "-"}
-                detail={
-                  combined.games > 0
-                    ? `${combined.games}게임 기준`
-                    : "전적 없음"
-                }
-                side={
-                  recentMatches.length > 0 ? (
-                    <WinRateSparkline matches={recentMatches} />
-                  ) : undefined
-                }
-                valueClassName={
-                  combined.winRate >= 50
-                    ? "text-accent-success"
-                    : "text-accent-danger"
-                }
-              />
-              <SummaryChip
-                icon={Activity}
-                label="통합 KDA"
-                value={combined.kdaGames > 0 ? combined.avgKda.toFixed(2) : "-"}
-                detail={
-                  combined.kdaGames > 0
-                    ? `${combined.avgKills.toFixed(1)} / ${combined.avgDeaths.toFixed(1)} / ${combined.avgAssists.toFixed(1)}`
-                    : "기록 없음"
-                }
-              />
-            </div>
+            {/*
+              롤 내전 기록 — 2026-11 유저 검색 결과(/lol/matches/user/:id)와 합쳤다.
+              통합 전적 칩·챔피언 탭·포지션별 통계·신뢰도·최근 활동·Riot 계정 카드는
+              내전 지표·내전 챔피언·내전 기록 목록·머리 영역 링크와 겹쳐 뺐다.
+            */}
+            <NexusRecordsSection
+              userId={userId}
+              showChampions={showChampStats}
+            />
 
-            {/* Champions Tabbed Section */}
-            {showChampStats &&
-              (preferredChampions.length > 0 ||
-                championStats.length > 0 ||
-                rankedChampStats.length > 0) && (
-                <Card className="mb-6 p-0">
-                  <CardContent className="p-6 md:p-8">
-                    <Tabs
-                      defaultValue={
-                        championStats.length > 0
-                          ? "auto-stats"
-                          : preferredChampions.length > 0
-                            ? "preferred"
-                            : "ranked"
-                      }
-                    >
-                      <TabsList className="mb-6 flex-wrap">
-                        {championStats.length > 0 && (
-                          <TabsTrigger value="auto-stats">
-                            <BarChart3 className="h-4 w-4 mr-2" />
-                            내전 모스트
-                          </TabsTrigger>
-                        )}
-                        {preferredChampions.length > 0 && (
-                          <TabsTrigger value="preferred">
-                            <Target className="h-4 w-4 mr-2" />
-                            선호 포지션
-                          </TabsTrigger>
-                        )}
-                        {rankedChampStats.length > 0 && (
-                          <TabsTrigger value="ranked">
-                            <Trophy className="h-4 w-4 mr-2" />
-                            랭크 모스트
-                          </TabsTrigger>
-                        )}
-                      </TabsList>
-
-                      {/* 내전 모스트 탭 */}
-                      {championStats.length > 0 && (
-                        <TabsContent value="auto-stats" className="space-y-4">
-                          {/* 챔피언 검색 필터 입력창 */}
-                          <input
-                            type="text"
-                            placeholder="챔피언 검색 (한글/영문)"
-                            value={championFilter}
-                            onChange={(e) => setChampionFilter(e.target.value)}
-                            className="w-full max-w-xs px-3 py-1.5 text-sm rounded-md bg-bg-secondary border border-border-default text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
-                          />
-                          {/* 필터 결과가 없을 경우 안내 메시지 */}
-                          {championFilter.trim() &&
-                            searchChampionsByQuery(championFilter).length ===
-                              0 && (
-                              <p className="text-sm text-text-tertiary">
-                                검색 결과가 없습니다.
-                              </p>
-                            )}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                            {(championFilter.trim()
-                              ? championStats.filter((s) =>
-                                  searchChampionsByQuery(
-                                    championFilter,
-                                  ).includes(s.championName),
-                                )
-                              : championStats
-                            ).map((champ: any, idx: number) => {
-                              const winRate =
-                                champ.games > 0
-                                  ? ((champ.wins / champ.games) * 100).toFixed(
-                                      0,
-                                    )
-                                  : "0";
-                              const kda =
-                                champ.deaths > 0
-                                  ? (
-                                      (champ.kills + champ.assists) /
-                                      champ.deaths
-                                    ).toFixed(2)
-                                  : "Perfect";
-                              return (
-                                <div
-                                  key={champ.championId}
-                                  className="flex items-center gap-3 bg-bg-tertiary border border-bg-elevated rounded-lg p-3"
-                                >
-                                  <div className="relative">
-                                    <ChampionImage
-                                      championKey={
-                                        champ.championName ||
-                                        getChampionKey(String(champ.championId))
-                                      }
-                                      size={40}
-                                      className="rounded-md"
-                                    />
-                                    {idx === 0 && (
-                                      <div className="absolute -top-1 -right-1 bg-accent-gold text-bg-primary text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                                        1
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium text-text-primary truncate">
-                                      {getChampionKoreanName(
-                                        champ.championName ||
-                                          getChampionName(
-                                            String(champ.championId),
-                                          ),
-                                      )}
-                                    </p>
-                                    <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                                      <span>{champ.games}게임</span>
-                                      <span
-                                        className={
-                                          Number(winRate) >= 50
-                                            ? "text-accent-success"
-                                            : "text-accent-danger"
-                                        }
-                                      >
-                                        {winRate}%
-                                      </span>
-                                      <span>{kda} KDA</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </TabsContent>
-                      )}
-
-                      {/* 선호 포지션 탭 */}
-                      {preferredChampions.length > 0 && (
-                        <TabsContent value="preferred" className="space-y-4">
-                          <PreferredChampionPanel
-                            groups={preferredChampions}
-                            getChampionKey={getChampionKey}
-                            getChampionName={getChampionName}
-                          />
-                        </TabsContent>
-                      )}
-
-                      {/* 랭크 모스트 탭 */}
-                      {rankedChampStats.length > 0 && (
-                        <TabsContent value="ranked" className="space-y-4">
-                          <RankedChampionPanel champions={rankedChampStats} />
-                        </TabsContent>
-                      )}
-                    </Tabs>
-                  </CardContent>
-                </Card>
-              )}
-
-            {/* Season Tier History */}
             {/* Auction Stats */}
             {auctionStats &&
               (auctionStats.captainCount > 0 ||
                 auctionStats.totalAuctions > 0) && (
-                <Card className="mb-6">
+                <Card className="mt-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Gavel className="h-5 w-5 text-accent-warning" />
@@ -1241,328 +944,9 @@ export default function UserProfilePage() {
                 </Card>
               )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Riot Accounts (view only) */}
-              {showRiot && profile.riotAccounts?.length > 0 && (
-                <div className="lg:col-span-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Shield className="h-5 w-5 text-accent-primary" />
-                        Riot 계정
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {profile.riotAccounts.map((account) => (
-                          <div
-                            key={account.id}
-                            className="p-4 rounded-lg border-2 border-bg-tertiary bg-bg-tertiary"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-text-primary">
-                                    {account.gameName}
-                                  </span>
-                                  <span className="text-text-tertiary">
-                                    #{account.tagLine}
-                                  </span>
-                                  {account.isPrimary && (
-                                    <Badge variant="primary" size="sm">
-                                      대표
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <TierBadge tier={account.tier} size="sm" />
-                                  <span className="text-sm text-text-secondary">
-                                    {account.rank} • {account.lp} LP
-                                  </span>
-                                  {account.peakTier && (
-                                    <span className="text-xs text-text-tertiary ml-1">
-                                      (최고{" "}
-                                      <span className="text-accent-gold">
-                                        {account.peakTier}{" "}
-                                        {account.peakRank || ""}
-                                      </span>
-                                      )
-                                    </span>
-                                  )}
-                                  {account.mainRole && (
-                                    <span className="text-sm text-text-tertiary ml-2">
-                                      {ROLE_LABELS[account.mainRole] ??
-                                        account.mainRole}
-                                      {account.subRole &&
-                                        ` / ${ROLE_LABELS[account.subRole] ?? account.subRole}`}
-                                    </span>
-                                  )}
-                                </div>
-                                <RoleTierBadges
-                                  roleTiers={account.roleTiers}
-                                  className="mt-2"
-                                  compact
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Stats Section — 포지션별 통계 + 신뢰도 */}
-              <div
-                className={`${showRiot && profile.riotAccounts?.length > 0 ? "lg:col-span-1" : "lg:col-span-3"} space-y-6`}
-              >
-                {/* 포지션별 통계 */}
-                {positionStats.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Swords className="h-5 w-5 text-accent-primary" />
-                        포지션별 통계
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {positionStats.map((pos: any) => {
-                        const wr =
-                          pos.games > 0
-                            ? ((pos.wins / pos.games) * 100).toFixed(0)
-                            : "0";
-                        const kda =
-                          pos.deaths > 0
-                            ? ((pos.kills + pos.assists) / pos.deaths).toFixed(
-                                2,
-                              )
-                            : "Perfect";
-                        return (
-                          <div
-                            key={pos.position}
-                            className="flex items-center justify-between p-2.5 bg-bg-tertiary border border-bg-elevated rounded-lg"
-                          >
-                            <div className="flex items-center gap-2">
-                              <PositionIcon
-                                position={pos.position}
-                                className="!h-4 !w-4"
-                              />
-                              <span className="text-xs font-semibold text-text-primary">
-                                {POSITION_LABELS[pos.position] ??
-                                  ROLE_LABELS[pos.position] ??
-                                  pos.position}
-                              </span>
-                              <span className="text-xs text-text-tertiary">
-                                {pos.games}게임
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3 text-xs">
-                              <span
-                                className={
-                                  Number(wr) >= 50
-                                    ? "text-accent-success font-medium"
-                                    : "text-accent-danger font-medium"
-                                }
-                              >
-                                {wr}%
-                              </span>
-                              <span className="text-text-secondary">
-                                {kda} KDA
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* 신뢰도 */}
-                {rep && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Star
-                          className="h-5 w-5 text-accent-gold"
-                          fill="currentColor"
-                        />
-                        신뢰도
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ReputationSummary stats={rep} />
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
-
-            {/* Recent Activity Section */}
+            {/* 페이지 하단 광고 — 콘텐츠를 다 보고 난 뒤 노출 (UX 침해 최소) */}
             <div className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <History className="h-5 w-5 text-accent-primary" />
-                    최근 활동
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {matchesLoading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-16 w-full" />
-                      ))}
-                    </div>
-                  ) : recentMatches.length > 0 ? (
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {recentMatches.map((match: any) => {
-                        const isWin =
-                          match.status === "COMPLETED" &&
-                          match.myTeamId &&
-                          match.winner?.id === match.myTeamId;
-                        const isLoss =
-                          match.status === "COMPLETED" &&
-                          match.myTeamId &&
-                          match.winner &&
-                          match.winner.id !== match.myTeamId;
-                        const p = match.participant || {};
-                        const hasParticipant =
-                          p.kills != null || p.championName;
-
-                        return (
-                          <div
-                            key={match.id}
-                            className="rounded-xl bg-bg-tertiary border border-bg-elevated p-3 hover:bg-bg-elevated transition-colors cursor-pointer"
-                            onClick={() =>
-                              router.push(
-                                `${gamePrefix}/matches/match/${match.id}`,
-                              )
-                            }
-                          >
-                            <div className="flex items-center gap-3">
-                              {/* 챔피언 아이콘 or 색상 바 */}
-                              {hasParticipant && p.championName ? (
-                                <Image
-                                  src={getChampionIcon(p.championName)}
-                                  alt={p.championName}
-                                  width={36}
-                                  height={36}
-                                  className="h-9 w-9 rounded-full flex-shrink-0"
-                                  unoptimized
-                                />
-                              ) : (
-                                <div
-                                  className={`w-1 h-10 rounded-full flex-shrink-0 ${isWin ? "bg-accent-success" : isLoss ? "bg-accent-danger" : "bg-text-tertiary"}`}
-                                />
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-bold text-text-primary">
-                                  {hasParticipant && p.kills != null
-                                    ? `${p.kills}/${p.deaths ?? 0}/${p.assists ?? 0} · ${p.championNameKorean || p.championName || "챔피언"}`
-                                    : `${match.teamA?.name ?? "Team A"} vs ${match.teamB?.name ?? "Team B"}`}
-                                </p>
-                                <p className="text-xs text-text-tertiary flex items-center gap-1 mt-0.5">
-                                  <Clock className="h-3 w-3 flex-shrink-0" />
-                                  {formatTimeAgo(
-                                    match.completedAt || match.createdAt,
-                                  )}
-                                  {p.position && (
-                                    <span className="flex items-center gap-0.5 ml-1">
-                                      ·{" "}
-                                      <PositionIcon
-                                        position={p.position}
-                                        className="!h-3 !w-3"
-                                      />
-                                    </span>
-                                  )}
-                                </p>
-                              </div>
-                              {match.status === "COMPLETED" &&
-                                match.myTeamId && (
-                                  <span
-                                    className={`flex-shrink-0 rounded-md px-2 py-1 text-xs font-black ${isWin ? "bg-accent-success/10 text-accent-success" : "bg-accent-danger/10 text-accent-danger"}`}
-                                  >
-                                    {isWin ? "승" : "패"}
-                                  </span>
-                                )}
-                              {match.status !== "COMPLETED" && (
-                                <Badge
-                                  variant={
-                                    match.status === "IN_PROGRESS"
-                                      ? "primary"
-                                      : "default"
-                                  }
-                                  size="sm"
-                                >
-                                  {match.status === "IN_PROGRESS"
-                                    ? "진행 중"
-                                    : "대기"}
-                                </Badge>
-                              )}
-                            </div>
-                            {/* K/D/A 서브 그리드 */}
-                            {hasParticipant && p.kills != null && (
-                              <div className="mt-2.5 grid grid-cols-3 gap-1.5 text-center">
-                                {[
-                                  {
-                                    label: "KDA",
-                                    value:
-                                      p.deaths > 0
-                                        ? (
-                                            (p.kills + p.assists) /
-                                            p.deaths
-                                          ).toFixed(2)
-                                        : "Perfect",
-                                  },
-                                  {
-                                    label: "피해량",
-                                    value: p.damage
-                                      ? p.damage >= 1000
-                                        ? `${Math.round(p.damage / 100) / 10}k`
-                                        : `${p.damage}`
-                                      : "-",
-                                  },
-                                  {
-                                    label: "상대",
-                                    value:
-                                      match.match?.teamA?.id === match.myTeamId
-                                        ? (match.match?.teamB?.name ?? "-")
-                                        : (match.match?.teamA?.name ?? "-"),
-                                  },
-                                ].map(({ label, value }) => (
-                                  <div
-                                    key={label}
-                                    className="rounded-lg bg-bg-secondary border border-bg-elevated px-2 py-1.5"
-                                  >
-                                    <p className="text-[10px] text-text-tertiary">
-                                      {label}
-                                    </p>
-                                    <p className="truncate text-xs font-black text-text-primary">
-                                      {value}
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      icon={History}
-                      title="활동 내역이 없습니다"
-                      description="아직 내전에 참여한 기록이 없습니다."
-                    />
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* 페이지 하단 광고 — 콘텐츠를 다 보고 난 뒤 노출 (UX 침해 최소) */}
-              <div className="mt-6">
-                <AdSlotCard slotKey="profile" minHeight={100} />
-              </div>
+              <AdSlotCard slotKey="profile" minHeight={100} />
             </div>
           </>
         )}

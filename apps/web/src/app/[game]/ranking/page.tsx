@@ -1,5 +1,6 @@
 "use client";
 
+import { userProfilePath } from "@/lib/profile-routes";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -249,7 +250,7 @@ function LolRankingPage() {
                     <LolRankingRow
                       key={entry.id}
                       entry={entry}
-                      href={`${gamePrefix}/matches/user/${entry.userId}`}
+                      href={userProfilePath(entry.userId, "LOL")}
                     />
                   ))}
                 </div>

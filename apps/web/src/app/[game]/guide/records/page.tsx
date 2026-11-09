@@ -79,8 +79,8 @@ function LolRecordsGuidePage() {
       </GuideSection>
 
       <GuideSection
-        title="넥서스 유저 전적"
-        description="넥서스 유저를 검색하면 그 사람의 내전 기록만 모아서 보여줍니다. 다음 내전에서 팀을 짜거나 경매에서 선수를 고를 때 참고하기 좋습니다."
+        title="넥서스 유저 프로필"
+        description="넥서스 유저를 검색하거나 랭킹·내전 기록에서 이름을 누르면 그 사람의 프로필이 열립니다. 롤 탭에 내전 지표·내전 챔피언·내전 기록이 모여 있어, 다음 내전에서 팀을 짜거나 경매에서 선수를 고를 때 참고하기 좋습니다."
       >
         <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_300px]">
           <BulletList>
@@ -91,7 +91,7 @@ function LolRecordsGuidePage() {
           </BulletList>
           <GuideFigure
             src="/images/guide/user-champions.webp"
-            alt="넥서스 유저 전적의 내전 챔피언 카드. 주력 챔피언 징크스가 크게 나오고 아래에 챔피언별 승률 링·승패·KDA·분당 CS 목록이 있다"
+            alt="넥서스 유저 프로필의 내전 챔피언 카드. 주력 챔피언 징크스가 크게 나오고 아래에 챔피언별 승률 링·승패·KDA·분당 CS 목록이 있다"
             width={760}
             height={1064}
           />

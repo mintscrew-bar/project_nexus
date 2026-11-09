@@ -1,5 +1,6 @@
 "use client";
 
+import { userProfilePath } from "@/lib/profile-routes";
 import { useParams, useRouter } from "next/navigation";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { useRequireGame } from "@/components/games/RequireGame";
@@ -741,7 +742,7 @@ export default function SummonerStatsPage() {
                 </h1>
                 {nexusUserId && (
                   <Link
-                    href={`${gamePrefix}/matches/user/${nexusUserId}`}
+                    href={userProfilePath(nexusUserId, "LOL")}
                     className="text-sm text-accent-primary hover:text-accent-hover flex items-center gap-1"
                   >
                     <ExternalLink className="h-4 w-4" />

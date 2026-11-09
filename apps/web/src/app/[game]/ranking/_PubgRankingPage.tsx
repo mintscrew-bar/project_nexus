@@ -1,5 +1,6 @@
 "use client";
 
+import { userProfilePath } from "@/lib/profile-routes";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
@@ -158,7 +159,7 @@ export function PubgRankingPage() {
                 return (
                   <Link
                     key={entry.userId}
-                    href={`${gamePrefix}/matches/user/${entry.userId}`}
+                    href={userProfilePath(entry.userId, "PUBG")}
                     className="flex items-center gap-4 rounded-xl border border-bg-tertiary bg-bg-secondary p-4 transition-colors hover:bg-bg-tertiary/50"
                   >
                     {rankBadge(entry.rank)}
