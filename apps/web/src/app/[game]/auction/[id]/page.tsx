@@ -24,6 +24,7 @@ import {
   CardContent,
   ConfirmModal,
   Avatar,
+  HoldToEndButton,
 } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
@@ -111,7 +112,6 @@ export default function AuctionRoomPage() {
   const [isAborting, setIsAborting] = useState(false);
   const [isVotingItemSkip, setIsVotingItemSkip] = useState(false);
   const [isFoldConfirmOpen, setIsFoldConfirmOpen] = useState(false);
-  const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
   // 모바일 탭: "auction" | "players" | "log" | "chat"
   const [mobileTab, setMobileTab] = useState<
     "auction" | "players" | "log" | "chat"
@@ -300,10 +300,8 @@ export default function AuctionRoomPage() {
     [teams],
   );
 
-  const handleAbortToLobby = () => setIsAbortConfirmOpen(true);
-
+  // 내전 종료 — 머리글의 "길게 눌러 종료" 버튼이 확인 창을 대신한다
   const handleAbortConfirm = async () => {
-    setIsAbortConfirmOpen(false);
     setIsAborting(true);
     try {
       await roomApi.abortToLobby(auctionId);
@@ -982,18 +980,6 @@ export default function AuctionRoomPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden p-4">
       <ConfirmModal
-        isOpen={isAbortConfirmOpen}
-        onClose={() => setIsAbortConfirmOpen(false)}
-        onConfirm={handleAbortConfirm}
-        title="내전 종료"
-        message="현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다."
-        confirmText="종료"
-        cancelText="취소"
-        variant="danger"
-        isLoading={isAborting}
-      />
-
-      <ConfirmModal
         isOpen={isFoldConfirmOpen}
         onClose={() => setIsFoldConfirmOpen(false)}
         onConfirm={handleFoldConfirm}
@@ -1036,16 +1022,13 @@ export default function AuctionRoomPage() {
               {isConnected ? "● 연결됨" : "● 연결 끊김"}
             </Badge>
             {/* 매물 스킵 투표는 입찰 패널 안에 있다 (데스크톱: AuctionBoard, 모바일: 하단 패널) */}
-            <Button
-              variant="danger"
+            <HoldToEndButton
               size="sm"
-              isLoading={isAborting}
-              onClick={handleAbortToLobby}
-              title="경매를 종료하고 대기실로 돌아갑니다 (진행 중인 입찰이 모두 취소됨, 방장만 가능)"
-            >
-              <span className="hidden sm:inline">내전 종료</span>
-              <span className="sm:hidden">종료</span>
-            </Button>
+              isBusy={isAborting}
+              onConfirm={handleAbortConfirm}
+              shortLabel="종료"
+              title="1초 동안 누르고 있으면 경매를 종료하고 대기실로 돌아갑니다 (진행 중인 입찰이 모두 취소됨, 방장만 가능)"
+            />
           </div>
         </div>
 

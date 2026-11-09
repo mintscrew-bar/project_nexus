@@ -22,7 +22,7 @@ import {
   Badge,
   Avatar,
   Button,
-  ConfirmModal,
+  HoldToEndButton,
 } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { Clock, Check, CheckCircle2, TimerReset } from "lucide-react";
@@ -72,7 +72,6 @@ export default function RoleSelectionPage() {
   );
   const [isAborting, setIsAborting] = useState(false);
   const [isMarkingReady, setIsMarkingReady] = useState(false);
-  const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
   const [hoveredMember, setHoveredMember] = useState<{
     userId: string;
     rect: DOMRect;
@@ -237,10 +236,8 @@ export default function RoleSelectionPage() {
     gamePrefix,
   ]);
 
-  const handleAbortToLobby = () => setIsAbortConfirmOpen(true);
-
+  // 내전 종료 — 머리글의 "길게 눌러 종료" 버튼이 확인 창을 대신한다
   const handleAbortConfirm = async () => {
-    setIsAbortConfirmOpen(false);
     setIsAborting(true);
     try {
       await roomApi.abortToLobby(roomId);
@@ -350,17 +347,6 @@ export default function RoleSelectionPage() {
     // 페이지가 자체 스크롤을 가져야 한다. flex-grow만 두면 팀이 많을 때
     // (20명 4팀 이상) 아래 카드가 뷰포트 밖으로 잘린다. 대진표와 같은 방식.
     <div className="h-full overflow-y-auto p-4 md:p-6">
-      <ConfirmModal
-        isOpen={isAbortConfirmOpen}
-        onClose={() => setIsAbortConfirmOpen(false)}
-        onConfirm={handleAbortConfirm}
-        title="내전 종료"
-        message="현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다."
-        confirmText="종료"
-        cancelText="취소"
-        variant="danger"
-        isLoading={isAborting}
-      />
       <div className="container mx-auto max-w-5xl">
         {/* Header */}
         <div className="flex flex-col gap-4 mb-5 lg:flex-row lg:items-start lg:justify-between">
@@ -375,14 +361,11 @@ export default function RoleSelectionPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            <Button
-              variant="danger"
+            <HoldToEndButton
               size="sm"
-              isLoading={isAborting}
-              onClick={handleAbortToLobby}
-            >
-              내전 종료
-            </Button>
+              isBusy={isAborting}
+              onConfirm={handleAbortConfirm}
+            />
             <Badge variant={isConnected ? "success" : "danger"}>
               {isConnected ? "● 연결됨" : "● 연결 끊김"}
             </Badge>

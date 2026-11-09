@@ -10,7 +10,12 @@ import { roomApi } from "@/lib/api-client";
 import { DraftBoard } from "@/components/domain/DraftBoard";
 import { LadderDrawBoard } from "@/components/domain/LadderDrawBoard";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
-import { LoadingSpinner, Badge, Button, ConfirmModal } from "@/components/ui";
+import {
+  LoadingSpinner,
+  Badge,
+  Button,
+  HoldToEndButton,
+} from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { TeamModeHelp } from "@/components/rooms/TeamModeHelp";
 
@@ -27,7 +32,6 @@ export default function SnakeDraftPage() {
   // 화면 상태로만 들고 있는다.
   const [showLadder, setShowLadder] = useState(true);
   const ladderDoneRef = useRef(false);
-  const [isAbortConfirmOpen, setIsAbortConfirmOpen] = useState(false);
 
   const { user } = useAuthStore();
   const {
@@ -123,10 +127,8 @@ export default function SnakeDraftPage() {
     gamePrefix,
   ]);
 
-  const handleAbortToLobby = () => setIsAbortConfirmOpen(true);
-
+  // 내전 종료 — 머리글의 "길게 눌러 종료" 버튼이 확인 창을 대신한다
   const handleAbortConfirm = async () => {
-    setIsAbortConfirmOpen(false);
     setIsAborting(true);
     try {
       await roomApi.abortToLobby(draftId);
@@ -205,17 +207,6 @@ export default function SnakeDraftPage() {
     // 역할 선택과 같은 이유로 자체 스크롤이 필요하다.
     // AppShell이 대시보드 라우트를 overflow-hidden으로 가둔다.
     <div className="h-full overflow-y-auto p-4 md:p-6">
-      <ConfirmModal
-        isOpen={isAbortConfirmOpen}
-        onClose={() => setIsAbortConfirmOpen(false)}
-        onConfirm={handleAbortConfirm}
-        title="내전 종료"
-        message="현재 판을 종료하고 대기실로 돌아가시겠습니까? 이 판은 전적에 반영되지 않습니다."
-        confirmText="종료"
-        cancelText="취소"
-        variant="danger"
-        isLoading={isAborting}
-      />
       <div className="container mx-auto max-w-6xl">
         <div className="mb-5 flex flex-col gap-4 animate-fade-in sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -231,14 +222,11 @@ export default function SnakeDraftPage() {
             <Badge variant={isConnected ? "success" : "danger"}>
               {isConnected ? "● 연결됨" : "● 연결 끊김"}
             </Badge>
-            <Button
-              variant="danger"
+            <HoldToEndButton
               size="sm"
-              isLoading={isAborting}
-              onClick={handleAbortToLobby}
-            >
-              내전 종료
-            </Button>
+              isBusy={isAborting}
+              onConfirm={handleAbortConfirm}
+            />
           </div>
         </div>
 

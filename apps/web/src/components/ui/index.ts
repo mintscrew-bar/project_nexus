@@ -18,3 +18,4 @@ export * from './StatusIndicator';
 export * from './StatusSelector';
 export * from './Dropdown';
 export * from './ErrorBoundary';
+export * from './HoldToEndButton';

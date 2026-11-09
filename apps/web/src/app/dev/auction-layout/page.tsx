@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AuctionBoard } from "@/components/domain";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, HoldToEndButton } from "@/components/ui";
 import {
   AuctionDesktopLayout,
   RemainingPlayersPanel,
@@ -201,9 +201,11 @@ export default function AuctionLayoutPreviewPage() {
           </h1>
           <div className="flex items-center gap-2">
             <Badge variant="success">● 연결됨</Badge>
-            <Button variant="danger" size="sm">
-              내전 종료
-            </Button>
+            <HoldToEndButton
+              size="sm"
+              shortLabel="종료"
+              onConfirm={() => console.log("auction-abort")}
+            />
           </div>
         </div>
 
