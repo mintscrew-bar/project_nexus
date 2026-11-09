@@ -82,9 +82,9 @@ type Density = "compact" | "detailed";
 
 /** 밀도별 카드 치수 — 트리 정렬 여백 계산이 이 값에 묶여 있다. */
 const DENSITY = {
-  // 상세 카드 높이는 약 200px(세트 진행 줄이 붙으면 210px). 칸 높이를 카드보다
-  // 조금만 크게 잡아야 위아래로 흩어지지 않는다 — 예전 420px 은 카드 사이가 240px 씩 비었다.
-  detailed: { card: "w-[320px] md:w-[400px]", slotGap: 232, minColumn: 240 },
+  // 상세 카드(타일형) 높이는 약 150~170px. 칸 높이를 카드보다 조금만 크게 잡아야
+  // 위아래로 흩어지지 않는다 — 예전 420px 은 카드 사이가 240px 씩 비었다.
+  detailed: { card: "w-[320px] md:w-[400px]", slotGap: 184, minColumn: 200 },
   compact: { card: "w-[208px] md:w-[232px]", slotGap: 104, minColumn: 120 },
 } as const;
 
@@ -186,7 +186,7 @@ function TeamSlot({
         "rounded-md border transition-colors",
         compact ? "px-2 py-1" : "px-3 py-3",
         isWinner
-          ? "border-accent-gold/60 bg-accent-gold/10"
+          ? "border-accent-primary/50 bg-accent-primary/10"
           : team
             ? "border-bg-tertiary bg-bg-tertiary/70"
             : "border-dashed border-bg-tertiary bg-bg-tertiary/30",
@@ -198,7 +198,7 @@ function TeamSlot({
             className={cn(
               "h-2.5 w-2.5 shrink-0 rounded-full",
               isWinner
-                ? "bg-accent-gold"
+                ? "bg-accent-primary"
                 : team
                   ? "bg-accent-primary/70"
                   : "bg-text-tertiary/50",
@@ -226,14 +226,6 @@ function TeamSlot({
               {team.score}
             </span>
           )}
-          {isWinner && (
-            <Trophy
-              className={cn(
-                "text-accent-gold",
-                compact ? "h-3 w-3" : "h-4 w-4",
-              )}
-            />
-          )}
         </div>
       </div>
     </div>
@@ -257,6 +249,20 @@ function MatchCard({
   const compact = density === "compact";
   // 끝난 대진엔 진영을 안 보인다 — 마지막 세트 진영만 남아 있어 오해를 부른다.
   const sideBlueId = match.status === "COMPLETED" ? null : match.blueSideTeamId;
+
+  // 이긴 팀이 정해진 뒤에만 진 팀을 흐리게 한다
+  const winnerId = match.winner?.id;
+
+  // 승리 효과는 "보고 있는 중에 승자가 정해진 순간"에만 재생한다.
+  // 페이지를 새로 열 때 끝난 경기들이 한꺼번에 반짝이지 않게, 이전 렌더의
+  // 승자를 기억해 두고 없음 → 있음으로 바뀔 때만 켠다 (렌더 중 상태 갱신 패턴).
+  // 훅이라 컴팩트 분기보다 먼저 부른다.
+  const [prevWinnerId, setPrevWinnerId] = React.useState(winnerId);
+  const [celebrate, setCelebrate] = React.useState(false);
+  if (prevWinnerId !== winnerId) {
+    setPrevWinnerId(winnerId);
+    setCelebrate(!prevWinnerId && !!winnerId);
+  }
 
   // 컴팩트는 한 줄 머리글 + 팀 두 줄만 남긴다. 나머지 정보(섹션명·세트 진행·
   // 예정 시각)는 카드를 열면 볼 수 있으므로 여기서는 접는다.
@@ -307,71 +313,164 @@ function MatchCard({
       ref={innerRef}
       type="button"
       className={cn(
-        "group relative shrink-0 rounded-lg border bg-bg-secondary/95 p-3 text-left shadow-lg shadow-black/10 transition-all hover:-translate-y-0.5 hover:border-accent-primary/70 hover:shadow-xl",
+        "group relative shrink-0 rounded-xl border bg-bg-secondary p-3 text-left transition-colors hover:border-accent-primary/70",
         DENSITY.detailed.card,
-        status.cardClassName,
+        match.status === "IN_PROGRESS"
+          ? "border-accent-primary/50"
+          : "border-bg-elevated/40",
       )}
       onClick={() => onMatchClick(match)}
       title="클릭해 매치 상세 열기 (라인업·진영 결정·결과 보고)"
     >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
-            Match {match.matchNumber}
-            {/* 다전제면 시리즈 길이를 함께 보여준다 */}
-            {(match.bestOf ?? 1) > 1 && (
-              <span className="ml-1.5 text-accent-primary">
-                BO{match.bestOf}
-              </span>
-            )}
-          </p>
-          {match.bracketSection && (
-            <p className="mt-0.5 truncate text-xs text-text-secondary">
-              {SECTION_LABELS[match.bracketSection] || match.bracketSection}
-            </p>
-          )}
-          {(match.bestOf ?? 1) > 1 && match.status !== "COMPLETED" && (
-            <p className="mt-0.5 text-xs text-text-secondary">
-              {match.currentGameNumber ?? 1}세트 진행
-            </p>
-          )}
-        </div>
-        <span
-          className={cn(
-            "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold",
-            status.className,
-          )}
-        >
-          {status.icon}
-          {status.label}
+      {/* 머리글 한 줄 — 경기 번호·다전제 길이·상태 알약 */}
+      <div className="mb-2.5 flex items-center gap-2 px-0.5">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-text-tertiary">
+          Match {match.matchNumber}
+        </span>
+        {(match.bestOf ?? 1) > 1 && (
+          <span className="text-[10px] font-semibold text-accent-primary">
+            BO{match.bestOf}
+          </span>
+        )}
+        <span className="ml-auto">
+          <MatchStatusBadge match={match} />
         </span>
       </div>
 
-      <div className="space-y-2">
-        <TeamSlot
+      <div className="space-y-1.5">
+        <TeamTile
           team={match.team1}
-          isWinner={!!match.winner && match.winner.id === match.team1?.id}
+          isWinner={!!winnerId && winnerId === match.team1?.id}
+          isLoser={!!winnerId && winnerId !== match.team1?.id}
+          celebrate={celebrate}
           side={getTeamSide(sideBlueId, match.team1)}
         />
-        <div className="flex items-center gap-2 px-1">
-          <div className="h-px flex-1 bg-bg-tertiary" />
-          <span className="text-[10px] font-bold text-text-tertiary">VS</span>
-          <div className="h-px flex-1 bg-bg-tertiary" />
-        </div>
-        <TeamSlot
+        <TeamTile
           team={match.team2}
-          isWinner={!!match.winner && match.winner.id === match.team2?.id}
+          isWinner={!!winnerId && winnerId === match.team2?.id}
+          isLoser={!!winnerId && winnerId !== match.team2?.id}
+          celebrate={celebrate}
           side={getTeamSide(sideBlueId, match.team2)}
         />
       </div>
 
       {match.scheduledTime && match.status === "PENDING" && (
-        <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-text-secondary">
+        <div className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-text-secondary">
           <Clock3 className="h-3.5 w-3.5" />
           {new Date(match.scheduledTime).toLocaleString("ko-KR")}
         </div>
       )}
     </button>
+  );
+}
+
+/**
+ * 상세 카드의 상태 알약 — 사이트 공용 Badge 와 같은 모양.
+ * 진행 중인 다전제는 몇 세트째인지 알약 안에 함께 쓴다.
+ */
+function MatchStatusBadge({ match }: { match: Match }) {
+  const base =
+    "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold";
+  if (match.status === "IN_PROGRESS") {
+    return (
+      <span className={cn(base, "bg-accent-primary/20 text-accent-primary")}>
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent-primary" />
+        {(match.bestOf ?? 1) > 1
+          ? `${match.currentGameNumber ?? 1}세트 진행 중`
+          : "진행 중"}
+      </span>
+    );
+  }
+  if (match.status === "COMPLETED") {
+    return (
+      <span className={cn(base, "bg-accent-success/20 text-accent-success")}>
+        완료
+      </span>
+    );
+  }
+  return (
+    <span className={cn(base, "bg-bg-elevated text-text-secondary")}>대기</span>
+  );
+}
+
+/**
+ * 상세 카드의 팀 한 줄 — 방 카드 안쪽 정보 칸처럼 둥근 타일 두 개(팀 · 점수).
+ * 이긴 팀은 사이트 메인색(점수 칸을 꽉 채움), 진 팀은 글자를 흐리게, 빈 자리(TBD)는 점선.
+ *
+ * celebrate 가 켜지면(보는 중에 승자가 정해진 순간) 이긴 팀 타일에 빛이 한 번
+ * 쓸고 지나가고, 점수 칸이 튀어 오르며, "WIN" 글자가 잠깐 떴다 사라진다.
+ * 트로피 아이콘은 두지 않는다. 키프레임은 globals.css.
+ */
+function TeamTile({
+  team,
+  isWinner,
+  isLoser,
+  celebrate = false,
+  side,
+}: {
+  team?: Team;
+  isWinner: boolean;
+  isLoser: boolean;
+  celebrate?: boolean;
+  side: "blue" | "red" | null;
+}) {
+  const memberCount = team?.members?.length ?? 0;
+  const dim = !team || isLoser;
+  const play = celebrate && isWinner;
+  return (
+    <div className="flex items-stretch gap-1.5">
+      <div
+        className={cn(
+          "relative flex min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-lg border px-3 py-2 transition-colors duration-500",
+          isWinner
+            ? "border-accent-primary/50 bg-accent-primary/10"
+            : team
+              ? "border-bg-elevated/30 bg-bg-elevated/20"
+              : "border-dashed border-bg-elevated/40",
+        )}
+      >
+        {/* 승리 순간 한 번 쓸고 지나가는 빛 */}
+        {play && (
+          <span className="bracket-win-shine pointer-events-none absolute inset-y-0 -left-1/2 w-1/2" />
+        )}
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              "truncate text-sm font-bold tracking-[-0.02em] transition-colors duration-500",
+              dim ? "text-text-tertiary" : "text-text-primary",
+            )}
+          >
+            {getTeamDisplayName(team)}
+          </p>
+          {/* 팀 이름이 이미 "팀장 팀"이라 팀장 대신 인원수를 붙인다 */}
+          {memberCount > 0 && (
+            <p className="truncate text-[10px] text-text-tertiary">
+              {memberCount}명
+            </p>
+          )}
+        </div>
+        <SideTag side={side} />
+        {/* 승리 순간 잠깐 떴다 사라지는 WIN 글자 — 평소엔 점수 칸 색만으로 승리를 보인다 */}
+        {play && (
+          <span className="bracket-win-flash pointer-events-none absolute right-3 top-1/2 text-base font-black italic tracking-[0.12em] text-accent-primary">
+            WIN
+          </span>
+        )}
+      </div>
+      {/* 점수 타일 — 아직 점수가 없으면 대시 */}
+      <div
+        className={cn(
+          "flex w-11 shrink-0 items-center justify-center rounded-lg border text-lg font-black tabular-nums transition-colors duration-500",
+          isWinner
+            ? "border-accent-primary bg-accent-primary text-accent-on"
+            : "border-bg-elevated/30 bg-bg-elevated/20",
+          !isWinner && (dim ? "text-text-tertiary" : "text-text-primary"),
+          play && "bracket-win-pop",
+        )}
+      >
+        {team?.score ?? <span className="text-sm text-text-tertiary">–</span>}
+      </div>
+    </div>
   );
 }
 
