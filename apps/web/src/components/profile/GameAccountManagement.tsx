@@ -1,5 +1,6 @@
 "use client";
 
+import { myProfilePath } from "@/lib/profile-routes";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { ElementType, ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -10,17 +11,13 @@ import { useRiotStore } from "@/stores/riot-store";
 import { useDdragonStore } from "@/stores/ddragon-store";
 import {
   userApi,
-  matchApi,
-  statsApi,
-  reputationApi,
   type StreamerPlatform,
   type StreamerProfile,
   type StreamerLink,
   pubgApi,
   type PubgPlayerLookupResult,
-  type PubgHistoryResponse,
 } from "@/lib/api-client";
-import { PubgMatchHistory } from "@/components/pubg/PubgMatchHistory";
+
 import { AddAccountModal } from "@/components/domain/AddAccountModal";
 import { EditAccountModal } from "@/components/domain/EditAccountModal";
 import { getApiErrorMessage } from "@/lib/utils";
@@ -29,7 +26,7 @@ import {
   PositionIcon,
   POSITION_LABELS,
 } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
-import { getChampionIcon } from "@/components/matches/match-utils";
+
 import {
   LoadingSpinner,
   Card,
@@ -43,58 +40,38 @@ import {
   ConfirmModal,
   Modal,
   StatusSelector,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
   Dropdown,
 } from "@/components/ui";
 import {
   Star,
-  ThumbsUp,
   Plus,
   RefreshCw,
   Shield,
-  TrendingUp,
   Loader2,
-  History,
-  Clock,
   Settings,
   User,
-  BarChart3,
   Pencil,
   Trash2,
   Gamepad2,
-  CheckCircle2,
-  Swords,
-  Gavel,
   Camera,
   Check,
   X,
   MoreVertical,
-  Activity,
   Calendar,
-  Trophy,
   Target,
   Radio,
   ShieldCheck,
   ExternalLink,
 } from "lucide-react";
 import { TierBadge } from "@/components/domain/TierBadge";
-import { commendationTagLabel } from "@/lib/commendation";
+
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 import { ChannelVerifyModal } from "@/components/domain/ChannelVerifyModal";
-import {
-  WinRateSparkline,
-  getCombinedProfileMetrics,
-} from "@/components/domain/ProfileStats";
-import {
-  PreferredChampionPanel,
-  RankedChampionPanel,
-} from "@/components/domain/ProfileChampionPanels";
+
+import { PreferredChampionPanel } from "@/components/domain/ProfileChampionPanels";
 import { useToast } from "@/components/ui/Toast";
 import { usePresence } from "@/hooks/usePresence";
-import { getChampionKoreanName, searchChampionsByQuery } from "@nexus/types";
+import { getChampionKoreanName } from "@nexus/types";
 
 const ROLE_LABELS: Record<string, string> = {
   TOP: "탑",
@@ -751,50 +728,6 @@ function StreamerLinksCard({
 
 // ─── 헬퍼 함수 ───────────────────────────────────────────────
 
-function formatTimeAgo(value?: string) {
-  if (!value) return "";
-  const diff = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(0, Math.floor(diff / 60_000));
-  if (minutes < 60) return `${minutes}분 전`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 전`;
-  return `${Math.floor(hours / 24)}일 전`;
-}
-
-function ProfileOverviewStat({
-  icon: Icon,
-  label,
-  value,
-  detail,
-  valueClassName = "text-text-primary",
-  side,
-}: {
-  icon: ElementType;
-  label: string;
-  value: string;
-  detail: string;
-  valueClassName?: string;
-  side?: ReactNode;
-}) {
-  return (
-    <div className="rounded-lg border border-bg-tertiary bg-bg-primary/70 px-4 py-3">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-text-tertiary">
-          <Icon className="h-3.5 w-3.5" />
-          {label}
-        </div>
-        {side && <div className="shrink-0">{side}</div>}
-      </div>
-      <p className={`text-2xl font-black leading-none ${valueClassName}`}>
-        {value}
-      </p>
-      <p className="mt-2 truncate text-xs font-semibold text-text-tertiary">
-        {detail}
-      </p>
-    </div>
-  );
-}
-
 function PubgProfilePage() {
   const router = useRouter();
   const gamePrefix = useGamePrefix();
@@ -842,8 +775,6 @@ function PubgProfilePage() {
             : "5";
 
   // 전적은 계정 목록과 따로 받는다. 전적을 못 받아도 계정 카드는 떠야 한다.
-  const [history, setHistory] = useState<PubgHistoryResponse | null>(null);
-  const [historyLoading, setHistoryLoading] = useState(true);
   const [editUsername, setEditUsername] = useState("");
   const [editBio, setEditBio] = useState("");
   const [profileDirty, setProfileDirty] = useState(false);
@@ -926,25 +857,6 @@ function PubgProfilePage() {
     }
     if (isAuthenticated) void loadAccounts();
   }, [authLoading, isAuthenticated, loadAccounts, router]);
-
-  // 전적 조회. 계정이 없어도 부른다 — 계정을 지운 뒤에도 지난 내전 기록은 남는다.
-  useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const data = await pubgApi.getHistory(user.id);
-        if (!cancelled) setHistory(data);
-      } catch {
-        // 전적을 못 불러와도 계정 카드는 그대로 보여준다.
-      } finally {
-        if (!cancelled) setHistoryLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, user?.id]);
 
   const handleLookup = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -1120,7 +1032,9 @@ function PubgProfilePage() {
             />
           </div>
           <CardContent className="p-5">
-            <div className="-mt-16 flex flex-col gap-4 sm:flex-row sm:items-end">
+            {/* 아바타만 배경에 걸치고 닉네임·소개는 배경 아래에서 시작한다.
+                예전엔 아래 정렬이라 닉네임이 배경 이미지 위에 올라가 밝은 배경에서 안 보였다. */}
+            <div className="-mt-16 flex flex-col gap-4 sm:flex-row sm:items-start">
               <button
                 type="button"
                 className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-full border-4 border-bg-secondary bg-bg-tertiary"
@@ -1152,7 +1066,7 @@ function PubgProfilePage() {
                   e.currentTarget.value = "";
                 }}
               />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 sm:mt-[72px]">
                 <input
                   value={editUsername}
                   onChange={(e) => {
@@ -1179,6 +1093,15 @@ function PubgProfilePage() {
                   />
                 </div>
               </div>
+              {/* 전적·통계는 통합 프로필 배그 탭에서 본다 */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="sm:mt-[72px]"
+                onClick={() => router.push(myProfilePath("PUBG"))}
+              >
+                내 프로필 보기 →
+              </Button>
               {profileDirty && (
                 <Button
                   size="sm"
@@ -1387,33 +1310,7 @@ function PubgProfilePage() {
           </CardContent>
         </Card>
 
-        {/*
-          전적을 프로필에서 볼 수 있게 붙인다. 롤 프로필은 "포지션별 통계 ·
-          최근 활동"을 여기서 보여주는데 배그는 계정 등록 폼만 있어서,
-          같은 프로필인데 한쪽에만 기록이 없었다.
-          `PubgMatchHistory` 가 요약 타일과 경기 목록을 함께 그린다.
-        */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5 text-accent-primary" />
-              내전 전적
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {historyLoading ? (
-              <Skeleton className="h-40 w-full" />
-            ) : history ? (
-              <PubgMatchHistory history={history} />
-            ) : (
-              <EmptyState
-                icon={Trophy}
-                title="배그 내전 기록이 없습니다"
-                description="배틀로얄 스크림이나 킬내기에 참가하면 여기에 기록이 쌓입니다."
-              />
-            )}
-          </CardContent>
-        </Card>
+        {/* 내전 전적은 통합 프로필(/me) 배그 탭에서 본다 — 이 화면은 계정 관리만 한다 */}
       </div>
       <Modal
         isOpen={!!scoreAccount}
@@ -1536,15 +1433,6 @@ function LolProfilePage() {
   const { addToast } = useToast();
   const [profileData, setProfileData] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
-  const [positionStats, setPositionStats] = useState<any[]>([]);
-  const [recentMatches, setRecentMatches] = useState<any[]>([]);
-  const [matchesLoading, setMatchesLoading] = useState(false);
-  const [championStats, setChampionStats] = useState<any[]>([]);
-  const [rankedChampStats, setRankedChampStats] = useState<any[]>([]);
-  // 챔피언 검색 필터 (한글/영문 모두 지원)
-  const [championFilter, setChampionFilter] = useState("");
-  const [auctionStats, setAuctionStats] = useState<any>(null);
-  const [rep, setRep] = useState<any>(null);
 
   // 프로필 인라인 편집
   const [editUsername, setEditUsername] = useState("");
@@ -1692,75 +1580,6 @@ function LolProfilePage() {
     }
   };
 
-  const fetchPositionStats = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const data = await statsApi.getUserPositionStats(user.id);
-      setPositionStats(data || []);
-    } catch {
-      // Not critical
-    }
-  }, [user?.id]);
-
-  const fetchRecentMatches = useCallback(async () => {
-    setMatchesLoading(true);
-    try {
-      const data = await matchApi.getUserMatches({ limit: 5 });
-      setRecentMatches(data);
-    } catch {
-      addToast("최근 내전 기록을 불러오지 못했습니다.", "error");
-    } finally {
-      setMatchesLoading(false);
-    }
-  }, [addToast]);
-
-  const fetchChampionStats = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const data = await statsApi.getUserChampionStats(user.id);
-      setChampionStats(data.slice(0, 5));
-    } catch {
-      // Not critical
-    }
-  }, [user?.id]);
-
-  const fetchRankedChampStats = useCallback(async () => {
-    if (!profileData?.riotAccounts) return;
-    const primary =
-      profileData.riotAccounts.find((a: any) => a.isPrimary) ||
-      profileData.riotAccounts[0];
-    if (!primary?.gameName || !primary?.tagLine) return;
-    try {
-      const data = await statsApi.getRankedChampionStats(
-        primary.gameName,
-        primary.tagLine,
-      );
-      setRankedChampStats(data || []);
-    } catch {
-      // Not critical
-    }
-  }, [profileData?.riotAccounts]);
-
-  const fetchAuctionStats = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const data = await statsApi.getUserAuctionStats(user.id);
-      setAuctionStats(data);
-    } catch {
-      // Not critical
-    }
-  }, [user?.id]);
-
-  const fetchReputation = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const data = await reputationApi.getUserStats(user.id);
-      setRep(data);
-    } catch {
-      // Not critical
-    }
-  }, [user?.id]);
-
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push("/auth/login");
@@ -1770,33 +1589,16 @@ function LolProfilePage() {
     if (isAuthenticated) {
       fetchAccounts();
       fetchProfile();
-      fetchPositionStats();
-      fetchRecentMatches();
       fetchChampions();
-      fetchChampionStats();
-      fetchAuctionStats();
-      fetchReputation();
     }
   }, [
     isAuthenticated,
     authLoading,
     fetchAccounts,
     fetchProfile,
-    fetchPositionStats,
-    fetchRecentMatches,
     fetchChampions,
-    fetchChampionStats,
-    fetchAuctionStats,
-    fetchReputation,
     router,
   ]);
-
-  // Fetch data that depends on profileData (riotAccounts)
-  useEffect(() => {
-    if (profileData?.riotAccounts?.length) {
-      fetchRankedChampStats();
-    }
-  }, [profileData?.riotAccounts, fetchRankedChampStats]);
 
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
 
@@ -1977,21 +1779,12 @@ function LolProfilePage() {
   const streamerLinks: StreamerLink[] = profileData?.streamerLinks ?? [];
   const profileBanner =
     bannerPreview || profileData?.profileBanner || user?.profileBanner || null;
-  const combined = getCombinedProfileMetrics({
-    stats,
-    recentMatches,
-    rankedChampStats,
-  });
-  // 평판 = 받은 칭찬. 별점은 아무도 남기지 않아(2026-11 실측 0건) 칭찬으로 바뀌었다.
-  const commendationTotal: number = rep?.commendations?.total ?? 0;
-  const commendationTags: { tag: string; count: number }[] = (
-    rep?.commendations?.topTags ?? []
-  ).slice(0, 3);
 
   return (
     <div className="flex-grow p-4 md:p-8">
       <div className="container mx-auto max-w-6xl">
-        <section className="mb-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-stretch">
+        {/* 머리 영역 — 오른쪽 "프로필 요약"(통합 전적·승률·KDA·칭찬)은 통합 프로필(/me)과 겹쳐 뺐다 */}
+        <section className="mb-6">
           <Card className="overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
             <div
               className="relative h-40 w-full bg-bg-tertiary md:h-60"
@@ -2238,9 +2031,9 @@ function LolProfilePage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => router.push(`/users/${user.id}`)}
+                          onClick={() => router.push(myProfilePath("LOL"))}
                         >
-                          내 공개 프로필 →
+                          내 프로필 보기 →
                         </Button>
                       )}
                       <Button
@@ -2295,106 +2088,6 @@ function LolProfilePage() {
               )}
             </CardContent>
           </Card>
-
-          <Card className="overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
-            <CardContent className="p-5 md:p-6">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-black text-text-primary">
-                    프로필 요약
-                  </h2>
-                  <p className="mt-1 text-xs text-text-tertiary">
-                    내전+랭크 합산 지표
-                  </p>
-                </div>
-                {commendationTotal > 0 && (
-                  <span className="inline-flex items-center gap-1 text-sm font-bold text-accent-primary">
-                    <ThumbsUp className="h-4 w-4" />
-                    {commendationTotal}
-                  </span>
-                )}
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                <ProfileOverviewStat
-                  icon={Swords}
-                  label="통합 전적"
-                  value={`${combined.wins}승 ${combined.losses}패`}
-                  detail={`내전 ${combined.customGames} · 랭크 ${combined.rankedGames}`}
-                />
-                <ProfileOverviewStat
-                  icon={TrendingUp}
-                  label="통합 승률"
-                  value={combined.games > 0 ? `${combined.winRate}%` : "-"}
-                  detail={
-                    combined.games > 0
-                      ? `${combined.games}게임 기준`
-                      : "전적 없음"
-                  }
-                  side={
-                    recentMatches.length > 0 ? (
-                      <WinRateSparkline matches={recentMatches} />
-                    ) : undefined
-                  }
-                  valueClassName={
-                    combined.winRate >= 50
-                      ? "text-accent-success"
-                      : "text-accent-danger"
-                  }
-                />
-                <ProfileOverviewStat
-                  icon={Activity}
-                  label="통합 KDA"
-                  value={
-                    combined.kdaGames > 0 ? combined.avgKda.toFixed(2) : "-"
-                  }
-                  detail={
-                    combined.kdaGames > 0
-                      ? `${combined.avgKills.toFixed(1)} / ${combined.avgDeaths.toFixed(1)} / ${combined.avgAssists.toFixed(1)}`
-                      : "기록 없음"
-                  }
-                />
-              </div>
-
-              <div className="mt-4 rounded-lg border border-bg-tertiary bg-bg-primary/70 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-text-tertiary">
-                    <ThumbsUp className="h-3.5 w-3.5 text-accent-primary" />
-                    받은 칭찬
-                  </div>
-                  <span className="text-xs font-semibold text-text-tertiary">
-                    경기 뒤 함께 뛴 사람들이 남긴 칭찬
-                  </span>
-                </div>
-                <div className="mt-3 flex items-end justify-between gap-3">
-                  <p className="text-2xl font-black leading-none text-text-primary">
-                    {commendationTotal}
-                    <span className="ml-1 text-xs font-semibold text-text-tertiary">
-                      회
-                    </span>
-                  </p>
-                  {commendationTags.length > 0 ? (
-                    <div className="flex flex-wrap justify-end gap-1">
-                      {commendationTags.map(({ tag, count }) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-accent-primary/15 px-2 py-0.5 text-[11px] font-semibold text-accent-primary"
-                        >
-                          {commendationTagLabel(tag)} {count}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs font-semibold text-text-tertiary">
-                      {commendationTotal > 0
-                        ? "태그 없이 받은 칭찬만 있습니다"
-                        : "아직 받은 칭찬이 없습니다"}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </section>
 
         <Card className="mb-6 border-accent-primary/20 bg-accent-primary/5 p-0">
@@ -2419,228 +2112,29 @@ function LolProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Champions Tabbed Section */}
-        {(preferredChampions.length > 0 ||
-          championStats.length > 0 ||
-          rankedChampStats.length > 0) && (
-          <Card className="mb-6 p-0">
-            <CardContent className="p-6 md:p-8">
-              <Tabs
-                defaultValue={
-                  championStats.length > 0
-                    ? "auto-stats"
-                    : preferredChampions.length > 0
-                      ? "preferred"
-                      : "ranked"
-                }
-              >
-                <TabsList className="mb-6 flex-wrap">
-                  {championStats.length > 0 && (
-                    <TabsTrigger value="auto-stats">
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      내전 모스트
-                    </TabsTrigger>
-                  )}
-                  {preferredChampions.length > 0 && (
-                    <TabsTrigger value="preferred">
-                      <Target className="h-4 w-4 mr-2" />
-                      선호 포지션
-                    </TabsTrigger>
-                  )}
-                  {rankedChampStats.length > 0 && (
-                    <TabsTrigger value="ranked">
-                      <Trophy className="h-4 w-4 mr-2" />
-                      랭크 모스트
-                    </TabsTrigger>
-                  )}
-                </TabsList>
-
-                {/* 내전 모스트 탭 */}
-                {championStats.length > 0 && (
-                  <TabsContent value="auto-stats" className="space-y-4">
-                    {/* 챔피언 검색 필터 입력창 */}
-                    <input
-                      type="text"
-                      placeholder="챔피언 검색 (한글/영문)"
-                      value={championFilter}
-                      onChange={(e) => setChampionFilter(e.target.value)}
-                      className="w-full max-w-xs px-3 py-1.5 text-sm rounded-md bg-bg-secondary border border-border-default text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
-                    />
-                    {/* 필터 결과가 없을 경우 안내 메시지 */}
-                    {championFilter.trim() &&
-                      searchChampionsByQuery(championFilter).length === 0 && (
-                        <p className="text-sm text-text-tertiary">
-                          검색 결과가 없습니다.
-                        </p>
-                      )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                      {(championFilter.trim()
-                        ? championStats.filter((s) =>
-                            searchChampionsByQuery(championFilter).includes(
-                              s.championName,
-                            ),
-                          )
-                        : championStats
-                      ).map((champ: any, idx: number) => {
-                        const winRate =
-                          champ.games > 0
-                            ? ((champ.wins / champ.games) * 100).toFixed(0)
-                            : "0";
-                        const kda =
-                          champ.deaths > 0
-                            ? (
-                                (champ.kills + champ.assists) /
-                                champ.deaths
-                              ).toFixed(2)
-                            : "Perfect";
-                        return (
-                          <div
-                            key={champ.championId}
-                            className="flex items-center gap-3 bg-bg-tertiary border border-bg-elevated rounded-lg p-3"
-                          >
-                            <div className="relative">
-                              <ChampionImage
-                                championKey={
-                                  champ.championName ||
-                                  getChampionKey(String(champ.championId))
-                                }
-                                size={40}
-                                className="rounded-md"
-                              />
-                              {idx === 0 && (
-                                <div className="absolute -top-1 -right-1 bg-accent-gold text-bg-primary text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                                  1
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-text-primary truncate">
-                                {getChampionKoreanName(
-                                  champ.championName ||
-                                    getChampionName(String(champ.championId)),
-                                )}
-                              </p>
-                              <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                                <span>{champ.games}게임</span>
-                                <span
-                                  className={
-                                    Number(winRate) >= 50
-                                      ? "text-accent-success"
-                                      : "text-accent-danger"
-                                  }
-                                >
-                                  {winRate}%
-                                </span>
-                                <span>{kda} KDA</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </TabsContent>
-                )}
-
-                {/* 선호 포지션 탭 */}
-                {preferredChampions.length > 0 && (
-                  <TabsContent value="preferred" className="space-y-4">
-                    <PreferredChampionPanel
-                      groups={preferredChampions}
-                      getChampionKey={getChampionKey}
-                      getChampionName={getChampionName}
-                    />
-                  </TabsContent>
-                )}
-
-                {/* 랭크 모스트 탭 */}
-                {rankedChampStats.length > 0 && (
-                  <TabsContent value="ranked" className="space-y-4">
-                    <RankedChampionPanel champions={rankedChampStats} />
-                  </TabsContent>
-                )}
-              </Tabs>
+        {/* 선호 포지션 챔피언 — 계정에 등록한 라인별 선호 챔피언.
+            내전 모스트·랭크 모스트 탭은 통합 프로필(/me)과 겹쳐 뺐다. */}
+        {preferredChampions.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-accent-primary" />
+                선호 포지션 챔피언
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PreferredChampionPanel
+                groups={preferredChampions}
+                getChampionKey={getChampionKey}
+                getChampionName={getChampionName}
+              />
             </CardContent>
           </Card>
         )}
 
-        {/* Auction Stats */}
-        {auctionStats &&
-          (auctionStats.captainCount > 0 || auctionStats.totalAuctions > 0) && (
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Gavel className="h-5 w-5 text-accent-warning" />
-                  내전 경매 기록
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                  <div className="bg-bg-tertiary rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-accent-primary">
-                      {auctionStats.captainCount}
-                    </p>
-                    <p className="text-xs text-text-tertiary mt-1">팀장 횟수</p>
-                  </div>
-                  <div className="bg-bg-tertiary rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-text-primary">
-                      {auctionStats.totalAuctions}
-                    </p>
-                    <p className="text-xs text-text-tertiary mt-1">경매 등장</p>
-                  </div>
-                  <div className="bg-bg-tertiary rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-accent-success">
-                      {auctionStats.avgSoldPrice > 0
-                        ? auctionStats.avgSoldPrice
-                        : "-"}
-                    </p>
-                    <p className="text-xs text-text-tertiary mt-1">
-                      평균 낙찰가
-                    </p>
-                  </div>
-                  <div className="bg-bg-tertiary rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-accent-warning">
-                      {auctionStats.maxSoldPrice > 0
-                        ? auctionStats.maxSoldPrice
-                        : "-"}
-                    </p>
-                    <p className="text-xs text-text-tertiary mt-1">
-                      최고 낙찰가
-                    </p>
-                  </div>
-                </div>
-                {auctionStats.titles.length > 0 && (
-                  <div>
-                    <p className="text-xs text-text-tertiary mb-2 font-medium uppercase tracking-wide">
-                      획득 칭호
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {auctionStats.titles.map((t: any) => (
-                        <span
-                          key={t.key}
-                          title={t.description}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-accent-warning/10 text-accent-warning border border-accent-warning/30 cursor-default"
-                        >
-                          <Star className="h-3 w-3" />
-                          {t.label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {auctionStats.yuchalCount > 0 && (
-                  <p className="text-xs text-text-tertiary mt-3">
-                    유찰 {auctionStats.yuchalCount}회
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-        <div
-          className={`grid grid-cols-1 gap-6 ${positionStats.length > 0 ? "lg:grid-cols-3" : "lg:grid-cols-1"}`}
-        >
-          {/* Riot Accounts Section */}
-          <div className={positionStats.length > 0 ? "lg:col-span-2" : ""}>
+        <div>
+          {/* Riot Accounts Section — 포지션별 통계는 통합 프로필의 라인별 승률과 겹쳐 뺐다 */}
+          <div>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -2884,213 +2378,6 @@ function LolProfilePage() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Stats Section */}
-          {positionStats.length > 0 && (
-            <div className="lg:col-span-1">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Swords className="h-5 w-5 text-accent-primary" />
-                    포지션별 통계
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {positionStats.map((pos: any) => {
-                    const wr =
-                      pos.games > 0
-                        ? ((pos.wins / pos.games) * 100).toFixed(0)
-                        : "0";
-                    const kda =
-                      pos.deaths > 0
-                        ? ((pos.kills + pos.assists) / pos.deaths).toFixed(2)
-                        : "Perfect";
-                    return (
-                      <div
-                        key={pos.position}
-                        className="flex items-center justify-between p-2.5 bg-bg-tertiary rounded-lg border border-bg-elevated"
-                      >
-                        <div className="flex items-center gap-2">
-                          <PositionIcon
-                            position={pos.position}
-                            className="!h-4 !w-4"
-                          />
-                          <div>
-                            <span className="text-xs font-bold text-text-primary">
-                              {POSITION_LABELS[pos.position] ?? pos.position}
-                            </span>
-                            <span className="ml-1.5 text-[10px] text-text-tertiary">
-                              {pos.games}게임
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs">
-                          <span
-                            className={
-                              Number(wr) >= 50
-                                ? "text-accent-success font-medium"
-                                : "text-accent-danger font-medium"
-                            }
-                          >
-                            {wr}%
-                          </span>
-                          <span className="text-text-secondary">{kda} KDA</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
-
-        {/* Recent Activity Section */}
-        <div className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5 text-accent-primary" />
-                최근 활동
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {matchesLoading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
-                </div>
-              ) : recentMatches.length > 0 ? (
-                <div className="space-y-3">
-                  {recentMatches.map((match: any) => {
-                    const myTeam = match.teamA?.members?.find(
-                      (m: any) => m.userId === user?.id,
-                    )
-                      ? match.teamA
-                      : match.teamB?.members?.find(
-                            (m: any) => m.userId === user?.id,
-                          )
-                        ? match.teamB
-                        : null;
-                    const isWin =
-                      match.status === "COMPLETED" &&
-                      myTeam &&
-                      match.winner?.id === myTeam.id;
-                    const isLoss =
-                      match.status === "COMPLETED" &&
-                      myTeam &&
-                      match.winner &&
-                      match.winner.id !== myTeam.id;
-                    const champKey =
-                      match.participant?.championName ??
-                      match.participant?.champion;
-                    const champIcon = champKey
-                      ? getChampionIcon(champKey)
-                      : null;
-                    const k = match.participant?.kills ?? null;
-                    const d = match.participant?.deaths ?? null;
-                    const a = match.participant?.assists ?? null;
-                    const hasKda = k !== null && d !== null && a !== null;
-
-                    return (
-                      <div
-                        key={match.id}
-                        className="flex items-center gap-3 p-3 bg-bg-tertiary border border-bg-elevated rounded-lg hover:bg-bg-elevated transition-colors cursor-pointer"
-                        onClick={() =>
-                          router.push(`${gamePrefix}/matches/match/${match.id}`)
-                        }
-                      >
-                        {/* 승/패 인디케이터 */}
-                        {match.status === "COMPLETED" && (
-                          <div
-                            className={`w-1 self-stretch rounded-full shrink-0 ${isWin ? "bg-accent-success" : isLoss ? "bg-accent-danger" : "bg-text-tertiary"}`}
-                          />
-                        )}
-                        {/* 챔피언 아이콘 */}
-                        {champIcon ? (
-                          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 border-bg-elevated">
-                            <Image
-                              src={champIcon}
-                              alt={champKey ?? ""}
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
-                          </div>
-                        ) : (
-                          <div className="h-10 w-10 shrink-0 rounded-full bg-bg-elevated flex items-center justify-center">
-                            <Swords className="h-4 w-4 text-text-tertiary" />
-                          </div>
-                        )}
-                        {/* 메인 정보 */}
-                        <div className="flex flex-1 flex-col gap-0.5 min-w-0">
-                          <p className="text-sm font-semibold text-text-primary truncate">
-                            {match.teamA?.name ?? "Team A"} vs{" "}
-                            {match.teamB?.name ?? "Team B"}
-                          </p>
-                          <p className="text-xs text-text-tertiary flex items-center gap-1">
-                            <Clock className="h-3 w-3 shrink-0" />
-                            {formatTimeAgo(match.createdAt)}
-                          </p>
-                        </div>
-                        {/* K/D/A + 뱃지 */}
-                        <div className="flex flex-col items-end gap-1 shrink-0">
-                          {match.status === "COMPLETED" && myTeam && (
-                            <Badge
-                              variant={isWin ? "success" : "danger"}
-                              size="sm"
-                            >
-                              {isWin ? "승리" : "패배"}
-                            </Badge>
-                          )}
-                          {match.status !== "COMPLETED" && (
-                            <Badge
-                              variant={
-                                match.status === "IN_PROGRESS"
-                                  ? "primary"
-                                  : "default"
-                              }
-                              size="sm"
-                            >
-                              {match.status === "IN_PROGRESS"
-                                ? "진행 중"
-                                : "대기"}
-                            </Badge>
-                          )}
-                          {hasKda && (
-                            <div className="flex items-center gap-0.5 text-[11px] font-mono">
-                              <span className="text-accent-success font-bold">
-                                {k}
-                              </span>
-                              <span className="text-text-tertiary">/</span>
-                              <span className="text-accent-danger font-bold">
-                                {d}
-                              </span>
-                              <span className="text-text-tertiary">/</span>
-                              <span className="text-accent-info font-bold">
-                                {a}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={History}
-                  title="아직 활동 내역이 없습니다"
-                  description="내전에 참여하면 여기에 활동 내역이 표시됩니다"
-                  action={{
-                    label: "내전 참여하기",
-                    onClick: () => router.push(`${gamePrefix}/tournaments`),
-                  }}
-                />
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
 
