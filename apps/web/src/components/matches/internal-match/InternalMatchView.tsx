@@ -9,7 +9,6 @@ import { matchApi, statsApi } from "@/lib/api-client";
 import { TeamGoldChart } from "./TeamGoldChart";
 import { Button, Badge, Skeleton } from "@/components/ui";
 import {
-  Trophy,
   Clock,
   Loader2,
   Eye,
@@ -868,9 +867,6 @@ function TeamSection({
           style={{ backgroundColor: teamColor }}
         />
         <h3 className="text-base font-bold text-text-primary">{teamName}</h3>
-        {isWinner && (
-          <Trophy className="h-4 w-4 text-amber-400 flex-shrink-0" />
-        )}
         {/* 승패는 둥근 배지 대신 굵은 글자로 */}
         <span
           className={`text-sm font-black flex-shrink-0 ${
@@ -1298,10 +1294,7 @@ function DraftTeamColumn({
           <span className="font-bold text-text-primary truncate">{title}</span>
         </div>
         {isWinner && (
-          <span className="flex items-center gap-1 text-sm font-black text-accent-success">
-            <Trophy className="h-3.5 w-3.5" />
-            승리
-          </span>
+          <span className="text-sm font-black text-accent-success">승리</span>
         )}
       </div>
 
@@ -1584,21 +1577,19 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
               >
                 {isTeamAWinner ? "승리" : "패배"}
               </div>
-              <div className="flex items-center justify-center gap-2">
-                {isTeamAWinner && <Trophy className="h-5 w-5 text-amber-400" />}
-                <h2
-                  className={`text-xl font-bold ${isTeamAWinner ? "text-text-primary" : "text-text-secondary"}`}
-                >
-                  {match.teamA.name}
-                </h2>
-              </div>
+              <h2
+                className={`text-xl font-bold ${isTeamAWinner ? "text-text-primary" : "text-text-tertiary"}`}
+              >
+                {match.teamA.name}
+              </h2>
             </div>
 
             {/* Score */}
             <div className="flex-shrink-0 px-4 md:px-8 text-center">
               <div className="flex items-center gap-3">
+                {/* 트로피 대신 진 쪽 점수·팀 이름을 흐리게 해 이긴 쪽이 앞으로 나와 보이게 */}
                 <span
-                  className="text-3xl md:text-4xl font-black"
+                  className={`text-3xl md:text-4xl font-black ${isTeamAWinner ? "" : "opacity-40"}`}
                   style={{ color: TEAM_A_COLOR }}
                 >
                   {aggA.kills}
@@ -1607,7 +1598,7 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
                   -
                 </span>
                 <span
-                  className="text-3xl md:text-4xl font-black"
+                  className={`text-3xl md:text-4xl font-black ${!isTeamAWinner ? "" : "opacity-40"}`}
                   style={{ color: TEAM_B_COLOR }}
                 >
                   {aggB.kills}
@@ -1624,16 +1615,11 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
               >
                 {!isTeamAWinner ? "승리" : "패배"}
               </div>
-              <div className="flex items-center justify-center gap-2">
-                <h2
-                  className={`text-xl font-bold ${!isTeamAWinner ? "text-text-primary" : "text-text-secondary"}`}
-                >
-                  {match.teamB.name}
-                </h2>
-                {!isTeamAWinner && (
-                  <Trophy className="h-5 w-5 text-amber-400" />
-                )}
-              </div>
+              <h2
+                className={`text-xl font-bold ${!isTeamAWinner ? "text-text-primary" : "text-text-tertiary"}`}
+              >
+                {match.teamB.name}
+              </h2>
             </div>
           </div>
 
