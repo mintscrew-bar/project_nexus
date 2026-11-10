@@ -1576,7 +1576,15 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
           <div className="flex items-center justify-between">
             {/* Team A */}
             <div className="flex-1 text-center">
-              <div className="flex items-center justify-center gap-2 mb-1">
+              {/* 승패는 둥근 배지 대신 굵고 큰 글자로, 팀 이름 위에 */}
+              <div
+                className={`text-lg font-black tracking-wide mb-1 ${
+                  isTeamAWinner ? "text-accent-success" : "text-accent-danger"
+                }`}
+              >
+                {isTeamAWinner ? "승리" : "패배"}
+              </div>
+              <div className="flex items-center justify-center gap-2">
                 {isTeamAWinner && <Trophy className="h-5 w-5 text-amber-400" />}
                 <h2
                   className={`text-xl font-bold ${isTeamAWinner ? "text-text-primary" : "text-text-secondary"}`}
@@ -1584,14 +1592,6 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
                   {match.teamA.name}
                 </h2>
               </div>
-              {/* 승패는 둥근 배지 대신 굵고 큰 글자로 */}
-              <span
-                className={`text-lg font-black tracking-wide ${
-                  isTeamAWinner ? "text-accent-success" : "text-accent-danger"
-                }`}
-              >
-                {isTeamAWinner ? "승리" : "패배"}
-              </span>
             </div>
 
             {/* Score */}
@@ -1617,7 +1617,14 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
 
             {/* Team B */}
             <div className="flex-1 text-center">
-              <div className="flex items-center justify-center gap-2 mb-1">
+              <div
+                className={`text-lg font-black tracking-wide mb-1 ${
+                  !isTeamAWinner ? "text-accent-success" : "text-accent-danger"
+                }`}
+              >
+                {!isTeamAWinner ? "승리" : "패배"}
+              </div>
+              <div className="flex items-center justify-center gap-2">
                 <h2
                   className={`text-xl font-bold ${!isTeamAWinner ? "text-text-primary" : "text-text-secondary"}`}
                 >
@@ -1627,13 +1634,6 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
                   <Trophy className="h-5 w-5 text-amber-400" />
                 )}
               </div>
-              <span
-                className={`text-lg font-black tracking-wide ${
-                  !isTeamAWinner ? "text-accent-success" : "text-accent-danger"
-                }`}
-              >
-                {!isTeamAWinner ? "승리" : "패배"}
-              </span>
             </div>
           </div>
 
