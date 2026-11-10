@@ -57,14 +57,21 @@ export function InternalMatchHistoryRow({
 
   return (
     <div
-      className={`overflow-hidden transition-all ${
+      // 줄마다 떨어진 둥근 칸 + 왼쪽 승패 막대 — 테두리 없이도 판과 판이 갈라져 보이게
+      className={`relative overflow-hidden rounded-xl transition-all ${
         expanded
-          ? "bg-bg-secondary/60"
+          ? "bg-bg-tertiary/40"
           : p.win
-            ? "bg-accent-success/[0.06]"
-            : "bg-accent-danger/[0.06]"
+            ? "bg-accent-success/[0.07]"
+            : "bg-accent-danger/[0.07]"
       }`}
     >
+      <span
+        aria-hidden
+        className={`absolute inset-y-0 left-0 w-1 ${
+          p.win ? "bg-accent-success/70" : "bg-accent-danger/70"
+        }`}
+      />
       <button
         type="button"
         onClick={() => {

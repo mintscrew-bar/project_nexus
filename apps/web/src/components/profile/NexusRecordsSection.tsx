@@ -113,7 +113,7 @@ export function NexusRecordsSection({
         ) : (
           <div className="space-y-3">
             {/* 일반 전적과 같은 행 — 누르면 그 자리에서 내전 상세가 펼쳐진다 */}
-            <div className="divide-y divide-bg-tertiary/40 overflow-hidden rounded-lg">
+            <div className="space-y-1.5">
               {matches.map((match) => (
                 <InternalMatchHistoryRow key={match.matchId} match={match} />
               ))}
