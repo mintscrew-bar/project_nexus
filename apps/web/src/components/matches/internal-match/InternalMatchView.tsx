@@ -871,12 +871,14 @@ function TeamSection({
         {isWinner && (
           <Trophy className="h-4 w-4 text-amber-400 flex-shrink-0" />
         )}
-        <Badge
-          variant={isWinner ? "success" : "danger"}
-          className="text-[10px] flex-shrink-0"
+        {/* 승패는 둥근 배지 대신 굵은 글자로 */}
+        <span
+          className={`text-sm font-black flex-shrink-0 ${
+            isWinner ? "text-accent-success" : "text-accent-danger"
+          }`}
         >
           {isWinner ? "승리" : "패배"}
-        </Badge>
+        </span>
         <span className="text-xs text-text-tertiary ml-2">
           {agg.kills}/{agg.deaths}/{agg.assists} · {participants.length}명
         </span>
@@ -1296,10 +1298,10 @@ function DraftTeamColumn({
           <span className="font-bold text-text-primary truncate">{title}</span>
         </div>
         {isWinner && (
-          <Badge variant="success" size="sm">
-            <Trophy className="h-3 w-3 mr-1" />
+          <span className="flex items-center gap-1 text-sm font-black text-accent-success">
+            <Trophy className="h-3.5 w-3.5" />
             승리
-          </Badge>
+          </span>
         )}
       </div>
 
@@ -1582,12 +1584,14 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
                   {match.teamA.name}
                 </h2>
               </div>
-              <Badge
-                variant={isTeamAWinner ? "success" : "danger"}
-                className="text-xs"
+              {/* 승패는 둥근 배지 대신 굵고 큰 글자로 */}
+              <span
+                className={`text-lg font-black tracking-wide ${
+                  isTeamAWinner ? "text-accent-success" : "text-accent-danger"
+                }`}
               >
                 {isTeamAWinner ? "승리" : "패배"}
-              </Badge>
+              </span>
             </div>
 
             {/* Score */}
@@ -1623,12 +1627,13 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
                   <Trophy className="h-5 w-5 text-amber-400" />
                 )}
               </div>
-              <Badge
-                variant={!isTeamAWinner ? "success" : "danger"}
-                className="text-xs"
+              <span
+                className={`text-lg font-black tracking-wide ${
+                  !isTeamAWinner ? "text-accent-success" : "text-accent-danger"
+                }`}
               >
                 {!isTeamAWinner ? "승리" : "패배"}
-              </Badge>
+              </span>
             </div>
           </div>
 
