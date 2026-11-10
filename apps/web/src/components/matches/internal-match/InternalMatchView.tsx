@@ -513,12 +513,10 @@ function PlayerRow({
 
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-2 rounded-lg border-l-[3px] transition-colors hover:bg-bg-elevated/50 ${
-        isWinner
-          ? "bg-emerald-500/[0.04] border-l-emerald-500/60"
-          : "bg-red-500/[0.04] border-l-red-500/60"
+      // 왼쪽 색 막대 대신 승패 색을 옅게 깐 둥근 칸 + 줄 간격으로 구분한다 (내전 기록 줄과 같은 방식)
+      className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-colors hover:bg-bg-elevated/50 ${
+        isWinner ? "bg-accent-success/[0.07]" : "bg-accent-danger/[0.07]"
       }`}
-      style={{ borderLeftColor: teamColor + "80" }}
     >
       {/* Champion + Level */}
       <div className="relative flex-shrink-0">
@@ -709,12 +707,10 @@ function CompactPlayerRow({
 
   return (
     <div
-      className={`flex items-center gap-1.5 px-2 py-1.5 rounded border-l-2 transition-colors hover:bg-bg-elevated/50 ${
-        isWinner
-          ? "bg-emerald-500/[0.04] border-l-emerald-500/60"
-          : "bg-red-500/[0.04] border-l-red-500/60"
+      // 왼쪽 색 막대 대신 승패 색을 옅게 깐 둥근 칸으로 구분한다
+      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors hover:bg-bg-elevated/50 ${
+        isWinner ? "bg-accent-success/[0.07]" : "bg-accent-danger/[0.07]"
       }`}
-      style={{ borderLeftColor: teamColor + "80" }}
     >
       {/* Champion */}
       <Image

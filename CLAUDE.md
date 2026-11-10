@@ -117,4 +117,5 @@ The project targets Korean users. UI text, commit messages, and communication ar
   - [ ] Task 11: 클랜 상세 페이지 탭 구조
   - [x] Task 10: 클랜 브라우저 카드 리디자인
   ```
+- **왼쪽 강조 보더 금지**: 카드·행·목록 항목의 왼쪽에 색 막대(`border-l-2`·`border-l-4`·`borderLeftColor` 등)를 넣어 구분·강조하지 않는다. 사용자가 여러 번 "의미 없는 장식"이라고 지적했다. 구분은 옅은 바탕색(승패·팀 색 tint), 둥근 칸 사이 간격, 배지·글자색, 아이콘으로 한다.
 - **TODO 완료 표시**: Task 작업 완료 후 반드시 해당 docs TODO 파일의 항목을 `[x]`로 업데이트하고 커밋한다.
