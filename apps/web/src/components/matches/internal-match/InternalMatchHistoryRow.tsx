@@ -28,6 +28,18 @@ import { InternalMatchExpand } from "./InternalMatchExpand";
  * 누르면 그 자리에서 펼쳐지고, 펼친 내용은 내전 상세 페이지와 같은 화면이다.
  * (예전에는 카드 모양이 달랐고 누르면 상세 페이지로 넘어갔다)
  */
+/** Riot 라인 표기 → 한글 */
+const POSITION_KO: Record<string, string> = {
+  TOP: "탑",
+  JUNGLE: "정글",
+  MIDDLE: "미드",
+  MID: "미드",
+  BOTTOM: "원딜",
+  ADC: "원딜",
+  UTILITY: "서포터",
+  SUPPORT: "서포터",
+};
+
 export function InternalMatchHistoryRow({
   match,
 }: {
@@ -57,30 +69,24 @@ export function InternalMatchHistoryRow({
 
   return (
     <div
-      // 줄마다 떨어진 둥근 칸 + 왼쪽 승패 막대 — 테두리 없이도 판과 판이 갈라져 보이게
-      className={`relative overflow-hidden rounded-xl transition-all ${
+      // 줄마다 떨어진 둥근 칸 — 테두리·막대 없이 승패 색을 옅게 깐 바탕과 간격으로 구분
+      className={`overflow-hidden rounded-xl transition-colors ${
         expanded
           ? "bg-bg-tertiary/40"
           : p.win
-            ? "bg-accent-success/[0.07]"
-            : "bg-accent-danger/[0.07]"
+            ? "bg-accent-success/[0.08]"
+            : "bg-accent-danger/[0.08]"
       }`}
     >
-      <span
-        aria-hidden
-        className={`absolute inset-y-0 left-0 w-1 ${
-          p.win ? "bg-accent-success/70" : "bg-accent-danger/70"
-        }`}
-      />
       <button
         type="button"
         onClick={() => {
           setMounted(true);
           setExpanded((v) => !v);
         }}
-        className="w-full px-3 sm:px-6 py-3 sm:py-4 text-left hover:bg-bg-tertiary/30 transition-colors"
+        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left hover:bg-bg-tertiary/30 transition-colors"
       >
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Image
             src={getChampionIcon(p.championName)}
             alt={p.championName}
@@ -91,8 +97,9 @@ export function InternalMatchHistoryRow({
               e.currentTarget.style.display = "none";
             }}
           />
-          <div className="min-w-[128px] flex-1 whitespace-nowrap">
-            <div className="flex items-center gap-1.5 mb-0.5">
+          <div className="min-w-[150px] flex-1 whitespace-nowrap">
+            {/* 1줄 — 승패 · 내전 · 라인 · 경기 시간 · 언제 */}
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-text-tertiary">
               <span
                 className={`font-bold text-xs sm:text-sm ${
                   p.win ? "text-accent-success" : "text-accent-danger"
@@ -100,33 +107,33 @@ export function InternalMatchHistoryRow({
               >
                 {p.win ? "승리" : "패배"}
               </span>
-              <span className="text-[10px] sm:text-xs text-text-secondary">
-                내전
-              </span>
+              <span className="text-text-secondary">내전</span>
               {p.position && (
-                <span className="text-[10px] sm:text-xs text-text-tertiary">
-                  · {p.position}
-                </span>
+                <span>· {POSITION_KO[p.position] ?? p.position}</span>
               )}
+              {durationLabel && <span>· {durationLabel}</span>}
+              {timeAgo && <span className="truncate">· {timeAgo}</span>}
             </div>
-            <div className="text-[10px] sm:text-xs text-text-tertiary truncate">
-              {durationLabel && `${durationLabel} · `}
-              {getChampionKoreanName(p.championName)}
-              {p.champLevel ? ` Lv.${p.champLevel}` : ""}
-              {timeAgo && ` · ${timeAgo}`}
-            </div>
-            {/* 소환사 주문 + 핵심 룬 — 일반 전적 줄과 같은 자리 */}
-            {(p.summoner1Id || p.keystone) && (
-              <div className="hidden sm:flex gap-0.5 items-center mt-1">
+            {/* 2줄 — 챔피언 이름·레벨, 이어서 소환사 주문 2개 + 핵심 룬 (한 줄) */}
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className="truncate text-xs sm:text-sm font-semibold text-text-primary">
+                {getChampionKoreanName(p.championName)}
+              </span>
+              {p.champLevel ? (
+                <span className="text-[10px] sm:text-xs text-text-tertiary">
+                  Lv.{p.champLevel}
+                </span>
+              ) : null}
+              <span className="hidden sm:flex items-center gap-0.5">
                 {[p.summoner1Id, p.summoner2Id].map((id, i) =>
                   id ? (
                     <Image
                       key={i}
                       src={getSummonerSpellIcon(id)}
                       alt="소환사 주문"
-                      width={14}
-                      height={14}
-                      className="w-3.5 h-3.5 rounded"
+                      width={18}
+                      height={18}
+                      className="w-[18px] h-[18px] rounded"
                       onError={(e) => {
                         e.currentTarget.style.opacity = "0.3";
                       }}
@@ -139,17 +146,17 @@ export function InternalMatchHistoryRow({
                       src={runeIconUrl({ runeId: p.keystone })}
                       unoptimized
                       alt="핵심 룬"
-                      width={14}
-                      height={14}
-                      className="w-3.5 h-3.5 rounded-full bg-bg-tertiary"
+                      width={18}
+                      height={18}
+                      className="w-[18px] h-[18px] rounded-full bg-bg-tertiary"
                       onError={(e) => {
                         e.currentTarget.style.display = "none";
                       }}
                     />
                   </RuneTooltip>
                 )}
-              </div>
-            )}
+              </span>
+            </div>
           </div>
           <div className="text-center flex-shrink-0">
             <div className="text-xs sm:text-sm font-bold text-text-primary">
