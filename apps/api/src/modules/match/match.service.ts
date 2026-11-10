@@ -1583,6 +1583,21 @@ export class MatchService {
       skip: offset,
     });
 
+    // 킬관여 분모 — 경기별·승패(=팀)별 킬 합. 팀이 삭제돼 teamId 가 비어도
+    // 승패 플래그로 같은 편을 묶을 수 있어 win 으로 나눈다. 한 번의 묶음 조회로 끝낸다.
+    const matchIds = [...new Set(matches.map((m) => m.matchId))];
+    const teamKillRows = matchIds.length
+      ? await this.prisma.matchParticipant.groupBy({
+          by: ["matchId", "win"],
+          where: { matchId: { in: matchIds } },
+          _sum: { kills: true },
+        })
+      : [];
+    const teamKills = new Map<string, number>();
+    for (const row of teamKillRows ?? []) {
+      teamKills.set(`${row.matchId}:${row.win}`, row._sum?.kills ?? 0);
+    }
+
     return matches.map((participant: (typeof matches)[number]) => ({
       matchId: participant.matchId,
       match: {
@@ -1629,6 +1644,39 @@ export class MatchService {
         win: participant.win,
         // 내전 딜량 데이터 포함 — 프론트 딜량 추세 차트 활성화용 (#23)
         damage: participant.totalDamageDealtToChampions,
+        // 일반 전적 줄과 같은 정보를 그리기 위한 값들 — 스펠·룬·아이템·레벨·CS·골드·시야·킬관여
+        summoner1Id: participant.summoner1Id,
+        summoner2Id: participant.summoner2Id,
+        // 룬은 핵심 룬과 보조 계열만 (전체 perks JSON 은 크다)
+        keystone:
+          (participant.perks as any)?.styles?.[0]?.selections?.[0]?.perk ??
+          null,
+        subStyle: (participant.perks as any)?.styles?.[1]?.style ?? null,
+        items: [
+          participant.item0,
+          participant.item1,
+          participant.item2,
+          participant.item3,
+          participant.item4,
+          participant.item5,
+        ].map((item) => item ?? 0),
+        trinket: participant.item6 ?? 0,
+        champLevel: participant.champLevel ?? null,
+        cs:
+          (participant.totalMinionsKilled ?? 0) +
+          (participant.neutralMinionsKilled ?? 0),
+        gold: participant.goldEarned ?? null,
+        vision: participant.visionScore ?? null,
+        killParticipation: (() => {
+          const total = teamKills.get(
+            `${participant.matchId}:${participant.win}`,
+          );
+          return total
+            ? Math.round(
+                ((participant.kills + participant.assists) / total) * 100,
+              )
+            : null;
+        })(),
         kda:
           participant.deaths === 0
             ? participant.kills + participant.assists

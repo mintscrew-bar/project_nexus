@@ -91,6 +91,8 @@ export interface NexusMatchHistory {
     teamB: { id: string; name: string } | null;
     winner: { id: string; name: string } | null;
     completedAt: string;
+    /** 경기 시간(초). 수집 전이면 null */
+    gameDuration?: number | null;
   };
   participant: {
     championId: number;
@@ -102,6 +104,18 @@ export interface NexusMatchHistory {
     win: boolean;
     kda: number;
     damage?: number;  // 내전 딜량 — 백엔드 totalDamageDealtToChampions (#23)
+    // 일반 전적 줄과 같은 정보 (2026-11 추가 — 옛 응답에는 없을 수 있다)
+    summoner1Id?: number;
+    summoner2Id?: number;
+    keystone?: number | null;
+    subStyle?: number | null;
+    items?: number[];
+    trinket?: number;
+    champLevel?: number | null;
+    cs?: number;
+    gold?: number | null;
+    vision?: number | null;
+    killParticipation?: number | null;
   };
   // 참가자의 팀이 미배정(teamId=null)인 경우 null 가능
   team: {

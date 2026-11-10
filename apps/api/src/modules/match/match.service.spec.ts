@@ -31,6 +31,8 @@ describe("MatchService", () => {
       },
       matchParticipant: {
         findMany: jest.fn(),
+        // 킬관여 분모(경기·팀별 킬 합) 조회
+        groupBy: jest.fn().mockResolvedValue([]),
       },
       matchRosterSnapshot: {
         deleteMany: jest.fn(),
@@ -472,6 +474,55 @@ describe("MatchService", () => {
 
   describe("getUserMatchHistory", () => {
     const userId = "user-1";
+
+    it("아이템·스펠·룬·CS·킬관여를 일반 전적 줄과 같은 형태로 싣는다", async () => {
+      prisma.matchParticipant.findMany.mockResolvedValue([
+        {
+          matchId: "match-9",
+          championId: 64,
+          championName: "LeeSin",
+          summoner1Id: 4,
+          summoner2Id: 11,
+          position: "JUNGLE",
+          kills: 6,
+          deaths: 2,
+          assists: 9,
+          win: true,
+          totalDamageDealtToChampions: 21000,
+          totalMinionsKilled: 40,
+          neutralMinionsKilled: 120,
+          goldEarned: 12000,
+          visionScore: 30,
+          champLevel: 15,
+          item0: 6692, item1: 3047, item2: 0, item3: 0, item4: 0, item5: 0, item6: 3364,
+          perks: { styles: [{ selections: [{ perk: 8010 }] }, { style: 8400 }] },
+          createdAt: new Date(),
+          match: { teamA: null, teamB: null, winner: null },
+          team: null,
+        },
+      ]);
+      // 이긴 팀 킬 합 30 → (6+9)/30 = 50%
+      prisma.matchParticipant.groupBy.mockResolvedValue([
+        { matchId: "match-9", win: true, _sum: { kills: 30 } },
+        { matchId: "match-9", win: false, _sum: { kills: 18 } },
+      ]);
+
+      const [row] = await service.getUserMatchHistory(userId);
+
+      expect(row.participant).toMatchObject({
+        summoner1Id: 4,
+        summoner2Id: 11,
+        keystone: 8010,
+        subStyle: 8400,
+        items: [6692, 3047, 0, 0, 0, 0],
+        trinket: 3364,
+        champLevel: 15,
+        cs: 160,
+        gold: 12000,
+        vision: 30,
+        killParticipation: 50,
+      });
+    });
 
     it("응답의 participant에 championNameKorean 필드가 포함된다", async () => {
       // 아리를 사용한 매치 기록 mock
