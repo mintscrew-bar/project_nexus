@@ -481,7 +481,9 @@ export default function UserProfilePage() {
 
   return (
     <div className="flex-grow p-4 md:p-8">
-      <div className="container mx-auto max-w-6xl">
+      {/* 폭은 내전 전적·메인 화면과 같은 1480px — 예전 6xl(1152px)은 넓은 화면에서
+          좌우가 많이 비고, 펼친 내전 기록 표가 옆 칸에 눌려 좁았다 */}
+      <div className="container mx-auto max-w-[1480px]">
         {/* Profile Hero Section
             배경 이미지 칸 — 예전 112/144px 은 띠처럼 얇아 올린 이미지가 거의 안 보였다.
             넓은 화면 기준 약 3:1(360px)로 키웠다. */}
