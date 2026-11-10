@@ -8,6 +8,7 @@
  * - 넥서스 내전 기록 목록 — 행을 누르면 그 자리에서 상세가 펼쳐진다, 20개씩 더 보기
  */
 
+import type React from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Target, Trophy } from "lucide-react";
 import { matchApi, rankingApi, statsApi } from "@/lib/api-client";
@@ -26,8 +27,11 @@ const PAGE = 20;
 export function NexusRecordsSection({
   userId,
   showChampions = true,
+  between,
 }: {
   userId: string;
+  /** 내전 지표 줄과 내전 기록 목록 사이에 끼울 내용 (프로필의 선호 챔피언·Riot 계정) */
+  between?: React.ReactNode;
   /** 공개 설정 "챔피언 통계 공개" — 끄면 내전 챔피언 카드를 숨긴다 */
   showChampions?: boolean;
 }) {
@@ -80,6 +84,8 @@ export function NexusRecordsSection({
           </div>
         )}
       </div>
+
+      {between}
 
       {/* 넥서스 내전 기록 */}
       <div className="rounded-xl border border-bg-tertiary bg-bg-secondary p-6">

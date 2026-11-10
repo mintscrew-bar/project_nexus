@@ -52,10 +52,13 @@ export function PreferredChampionPanel({
   groups,
   getChampionKey,
   getChampionName,
+  narrow = false,
 }: {
   groups: PreferredChampionGroup[];
   getChampionKey: (championId: string) => string;
   getChampionName: (championId: string) => string;
+  /** 좁은 칸(프로필의 2:1 줄 등)에 놓일 때 — 챔피언을 한 줄에 2개까지만 둬 이름이 잘리지 않게 */
+  narrow?: boolean;
 }) {
   return (
     <div className="grid gap-3 lg:grid-cols-2">
@@ -84,7 +87,7 @@ export function PreferredChampionPanel({
             )}
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <div className={cn("grid gap-2 sm:grid-cols-2", !narrow && "xl:grid-cols-3")}>
             {champions.map(({ championId }, index) => (
               <div
                 key={championId}
