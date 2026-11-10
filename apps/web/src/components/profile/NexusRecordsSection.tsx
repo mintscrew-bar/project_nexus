@@ -27,11 +27,11 @@ const PAGE = 20;
 export function NexusRecordsSection({
   userId,
   showChampions = true,
-  between,
+  side,
 }: {
   userId: string;
-  /** 내전 지표 줄과 내전 기록 목록 사이에 끼울 내용 (프로필의 선호 챔피언·Riot 계정) */
-  between?: React.ReactNode;
+  /** 내전 기록 목록 오른쪽 칸 (프로필의 연동된 계정·라인별 선호 챔피언) */
+  side?: React.ReactNode;
   /** 공개 설정 "챔피언 통계 공개" — 끄면 내전 챔피언 카드를 숨긴다 */
   showChampions?: boolean;
 }) {
@@ -85,52 +85,64 @@ export function NexusRecordsSection({
         )}
       </div>
 
-      {between}
+      {/* 아래 — 넥서스 내전 기록 | 오른쪽 칸(계정·선호 챔피언). 오른쪽 칸은 스크롤해도 따라온다 */}
+      <div
+        className={
+          side
+            ? "grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]"
+            : ""
+        }
+      >
+        {/* 넥서스 내전 기록 */}
+        <div className="min-w-0 self-start rounded-xl border border-bg-tertiary bg-bg-secondary p-6">
+          <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-text-primary">
+            <Trophy className="h-5 w-5 text-accent-primary" />
+            넥서스 내전 기록
+          </h2>
 
-      {/* 넥서스 내전 기록 */}
-      <div className="rounded-xl border border-bg-tertiary bg-bg-secondary p-6">
-        <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-text-primary">
-          <Trophy className="h-5 w-5 text-accent-primary" />
-          넥서스 내전 기록
-        </h2>
-
-        {history.isLoading ? (
-          <div className="space-y-2">
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
-        ) : matches.length === 0 ? (
-          <div className="py-16 text-center">
-            <Target className="mx-auto mb-4 h-16 w-16 text-text-tertiary opacity-50" />
-            <h3 className="mb-2 text-lg font-semibold text-text-primary">
-              내전 기록이 없습니다
-            </h3>
-            <p className="text-text-secondary">
-              내전에 참가하면 여기에 기록이 쌓입니다.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {/* 일반 전적과 같은 행 — 누르면 그 자리에서 내전 상세가 펼쳐진다 */}
-            <div className="space-y-1.5">
-              {matches.map((match) => (
-                <InternalMatchHistoryRow key={match.matchId} match={match} />
+          {history.isLoading ? (
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-            {history.hasNextPage && (
-              <div className="pt-2 text-center">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => history.fetchNextPage()}
-                  disabled={history.isFetchingNextPage}
-                >
-                  {history.isFetchingNextPage ? "불러오는 중..." : "더 보기"}
-                </Button>
+          ) : matches.length === 0 ? (
+            <div className="py-16 text-center">
+              <Target className="mx-auto mb-4 h-16 w-16 text-text-tertiary opacity-50" />
+              <h3 className="mb-2 text-lg font-semibold text-text-primary">
+                내전 기록이 없습니다
+              </h3>
+              <p className="text-text-secondary">
+                내전에 참가하면 여기에 기록이 쌓입니다.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* 일반 전적과 같은 행 — 누르면 그 자리에서 내전 상세가 펼쳐진다 */}
+              <div className="space-y-1.5">
+                {matches.map((match) => (
+                  <InternalMatchHistoryRow key={match.matchId} match={match} />
+                ))}
               </div>
-            )}
-          </div>
+              {history.hasNextPage && (
+                <div className="pt-2 text-center">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => history.fetchNextPage()}
+                    disabled={history.isFetchingNextPage}
+                  >
+                    {history.isFetchingNextPage ? "불러오는 중..." : "더 보기"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {side && (
+          <aside className="space-y-6 self-start lg:sticky lg:top-20">
+            {side}
+          </aside>
         )}
       </div>
     </>

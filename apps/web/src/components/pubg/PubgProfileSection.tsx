@@ -64,9 +64,12 @@ function tierFootnote(account: PubgAccountSummary): string | null {
 export function PubgProfileSection({
   userId,
   accounts,
+  hideAccounts = false,
 }: {
   userId: string;
   accounts: PubgAccountSummary[];
+  /** 내 프로필은 위에 관리 카드가 같은 목록을 보여줘서 이 카드를 숨긴다 */
+  hideAccounts?: boolean;
 }) {
   const [history, setHistory] = useState<PubgHistoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,57 +96,59 @@ export function PubgProfileSection({
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>PUBG 계정</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {accounts.length === 0 ? (
-            <p className="text-sm text-text-tertiary">
-              등록된 계정이 없습니다.
-            </p>
-          ) : (
-            accounts.map((account) => (
-              <div
-                key={account.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-bg-tertiary/50 px-3 py-2.5"
-              >
-                <span className="flex items-center gap-2 font-semibold text-text-primary">
-                  <Gamepad2 className="h-4 w-4 text-accent-primary" />
-                  {account.playerName}
-                  {account.isPrimary && (
-                    <Badge variant="secondary">대표</Badge>
-                  )}
-                </span>
-                <span className="flex items-center gap-2 text-xs text-text-secondary">
-                  <span>
-                    {account.lastMatchShard
-                      ? PUBG_PLATFORM_LABELS[account.lastMatchShard].short
-                      : "플랫폼 미확인"}
+      {!hideAccounts && (
+        <Card>
+          <CardHeader>
+            <CardTitle>PUBG 계정</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {accounts.length === 0 ? (
+              <p className="text-sm text-text-tertiary">
+                등록된 계정이 없습니다.
+              </p>
+            ) : (
+              accounts.map((account) => (
+                <div
+                  key={account.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-bg-tertiary/50 px-3 py-2.5"
+                >
+                  <span className="flex items-center gap-2 font-semibold text-text-primary">
+                    <Gamepad2 className="h-4 w-4 text-accent-primary" />
+                    {account.playerName}
+                    {account.isPrimary && (
+                      <Badge variant="secondary">대표</Badge>
+                    )}
                   </span>
-                  {/* 공식 랭크와 NEXUS 편성 등급은 다른 값이다. 라벨을 갈라 적는다. */}
-                  {account.pubgTier && (
-                    <Badge variant="secondary">공식 {account.pubgTier}</Badge>
+                  <span className="flex items-center gap-2 text-xs text-text-secondary">
+                    <span>
+                      {account.lastMatchShard
+                        ? PUBG_PLATFORM_LABELS[account.lastMatchShard].short
+                        : "플랫폼 미확인"}
+                    </span>
+                    {/* 공식 랭크와 NEXUS 편성 등급은 다른 값이다. 라벨을 갈라 적는다. */}
+                    {account.pubgTier && (
+                      <Badge variant="secondary">공식 {account.pubgTier}</Badge>
+                    )}
+                    {account.nexusTier ? (
+                      <Badge variant="primary">
+                        NEXUS {account.nexusTier}티어
+                      </Badge>
+                    ) : (
+                      // 등급 없음과 최하위 등급은 다르다. 그대로 적는다.
+                      <Badge variant="secondary">등급 산정 전</Badge>
+                    )}
+                  </span>
+                  {tierFootnote(account) && (
+                    <p className="w-full text-[11px] text-text-tertiary">
+                      {tierFootnote(account)}
+                    </p>
                   )}
-                  {account.nexusTier ? (
-                    <Badge variant="primary">
-                      NEXUS {account.nexusTier}티어
-                    </Badge>
-                  ) : (
-                    // 등급 없음과 최하위 등급은 다르다. 그대로 적는다.
-                    <Badge variant="secondary">등급 산정 전</Badge>
-                  )}
-                </span>
-                {tierFootnote(account) && (
-                  <p className="w-full text-[11px] text-text-tertiary">
-                    {tierFootnote(account)}
-                  </p>
-                )}
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {loading ? (
         <Skeleton className="h-40 w-full" />

@@ -17,7 +17,11 @@ export function userProfilePath(
   return `/users/${encodeURIComponent(userId)}${gameQuery(game)}`;
 }
 
-/** 프로필 표시와 분리된 게임 계정 등록·수정 화면. */
+/**
+ * 게임 계정 등록·수정 자리.
+ * 2026-11 게임 계정 관리 화면을 내 프로필로 합쳐, 내 프로필의 그 게임 탭이 곧 관리 화면이다.
+ * 옛 주소(/settings/game-accounts/:game)도 여기로 넘긴다.
+ */
 export function gameAccountSettingsPath(game: GameTitle): string {
-  return `/settings/game-accounts/${GAMES[game].slug}`;
+  return myProfilePath(game);
 }

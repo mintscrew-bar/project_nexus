@@ -1,6 +1,9 @@
 "use client";
 
 import { NexusRecordsSection } from "./NexusRecordsSection";
+import { LolAccountsSide } from "./LolAccountsSide";
+import { ProfileEditModal } from "./ProfileEditModal";
+import { PubgAccountsManager } from "./PubgAccountsManager";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -50,7 +53,6 @@ import {
 } from "lucide-react";
 import { commendationTagLabel } from "@/lib/commendation";
 import { TierBadge } from "@/components/domain/TierBadge";
-import { PreferredChampionPanel } from "@/components/domain/ProfileChampionPanels";
 import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 import { StreamerPlatformBadge } from "@/components/domain/StreamerPlatformBadge";
@@ -67,11 +69,7 @@ import {
 } from "@nexus/types";
 import { PubgProfileSection } from "@/components/pubg/PubgProfileSection";
 import { useProfileTarget } from "@/components/profile/ProfileTargetContext";
-import {
-  gameAccountSettingsPath,
-  myProfilePath,
-  userProfilePath,
-} from "@/lib/profile-routes";
+import { myProfilePath, userProfilePath } from "@/lib/profile-routes";
 
 const ROLE_LABELS: Record<string, string> = {
   TOP: "탑",
@@ -168,33 +166,6 @@ interface ProfileUser {
   }[];
 }
 
-/** 대표 Riot 계정의 선호 챔피언을 라인별로 묶는다. 주 라인 → 부 라인 → 나머지 순. */
-function groupPreferredChampions(
-  account?: ProfileUser["riotAccounts"][number],
-) {
-  if (!account?.championPreferences?.length) return [];
-  const grouped: Record<string, { championId: string; order: number }[]> = {};
-  for (const pref of account.championPreferences) {
-    (grouped[pref.role] ??= []).push({
-      championId: pref.championId,
-      order: pref.order,
-    });
-  }
-  for (const role of Object.keys(grouped)) {
-    grouped[role].sort((a, b) => a.order - b.order);
-  }
-  const order: string[] = [];
-  if (account.mainRole) order.push(account.mainRole);
-  if (account.subRole && account.subRole !== account.mainRole)
-    order.push(account.subRole);
-  for (const role of Object.keys(grouped)) {
-    if (!order.includes(role)) order.push(role);
-  }
-  return order
-    .filter((role) => grouped[role]?.length)
-    .map((role) => ({ role, champions: grouped[role] }));
-}
-
 type FriendshipStatus =
   "none" | "friends" | "pending_sent" | "pending_received" | "blocked";
 
@@ -227,6 +198,8 @@ export default function UserProfilePage() {
   const [auctionStats, setAuctionStats] = useState<any>(null);
   const [onlineStatus, setOnlineStatus] = useState<string | null>(null);
   const [rep, setRep] = useState<any>(null);
+  // 내 프로필 편집 창
+  const [editOpen, setEditOpen] = useState(false);
   const searchParams = useSearchParams();
   /**
    * 프로필에 띄울 게임 탭.
@@ -281,6 +254,15 @@ export default function UserProfilePage() {
       setIsLoading(false);
     }
   }, [userId, addToast, isAuthenticated]);
+
+  // 편집·계정 변경 뒤 다시 불러오기 — 로딩 화면 없이 조용히 (창이 닫히지 않게)
+  const refreshProfile = useCallback(async () => {
+    try {
+      setProfile(await userApi.getProfile(userId));
+    } catch {
+      // 다음 새로고침에 맞춰진다
+    }
+  }, [userId]);
 
   const fetchFriendshipStatus = useCallback(async () => {
     if (!isAuthenticated || isOwnProfile) return;
@@ -794,14 +776,13 @@ export default function UserProfilePage() {
               {/* Social Buttons */}
               {isOwnProfile && (
                 <div className="flex w-full flex-shrink-0 flex-wrap gap-2 sm:w-auto lg:justify-end">
+                  {/* 닉네임·소개·사진·배경 — 예전 게임 계정 관리 화면 대신 창으로 */}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      router.push(gameAccountSettingsPath(activeGame))
-                    }
+                    onClick={() => setEditOpen(true)}
                   >
-                    게임 계정 관리
+                    프로필 편집
                   </Button>
                   <Button
                     variant="ghost"
@@ -881,31 +862,41 @@ export default function UserProfilePage() {
         )}
 
         {activeGame === "PUBG" ? (
-          <PubgProfileSection
-            userId={userId}
-            accounts={profile.pubgAccounts ?? []}
-          />
+          <>
+            {/* 내 프로필이면 계정 등록·관리 (예전 설정 → 게임 계정 → 배그) */}
+            {isOwnProfile && (
+              <div className="mb-6">
+                <PubgAccountsManager />
+              </div>
+            )}
+            <PubgProfileSection
+              userId={userId}
+              accounts={profile.pubgAccounts ?? []}
+              hideAccounts={isOwnProfile}
+            />
+          </>
         ) : (
           <>
             {/*
               롤 내전 기록 — 2026-11 유저 검색 결과(/lol/matches/user/:id)와 합쳤다.
               통합 전적 칩·내전/랭크 모스트 탭·포지션별 통계·신뢰도·최근 활동은
               내전 지표·내전 챔피언·내전 기록 목록과 겹쳐 뺐다.
-              라인별 선호 챔피언과 연동된 Riot 계정은 지표와 기록 사이에 보기 전용으로 둔다
-              (고치는 건 설정 → 게임 계정).
+              연동된 Riot 계정과 라인별 선호 챔피언은 내전 기록 오른쪽 칸에 둔다
+              (내 프로필이면 같은 칸에서 추가·대표 지정·수정·연동 해제).
             */}
             <NexusRecordsSection
               userId={userId}
               showChampions={showChampStats}
-              between={
-                <ProfileLolAccountsRow
-                  accounts={showRiot ? (profile.riotAccounts ?? []) : []}
-                  preferred={
-                    showChampStats ? groupPreferredChampions(primary) : []
-                  }
+              side={
+                <LolAccountsSide
+                  accounts={profile.riotAccounts ?? []}
+                  own={isOwnProfile}
+                  showAccounts={showRiot}
+                  showPreferred={showChampStats}
                   gamePrefix={gamePrefix}
                   getChampionKey={getChampionKey}
                   getChampionName={getChampionName}
+                  onChanged={refreshProfile}
                 />
               }
             />
@@ -995,115 +986,13 @@ export default function UserProfilePage() {
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-/**
- * 프로필 롤 탭의 "라인별 선호 챔피언 + 연동된 Riot 계정" 줄 — 보기 전용.
- * 둘 다 있으면 2:1, 하나만 있으면 한 칸 전체. 공개 설정으로 숨긴 건 빈 배열로 들어온다.
- */
-function ProfileLolAccountsRow({
-  accounts,
-  preferred,
-  gamePrefix,
-  getChampionKey,
-  getChampionName,
-}: {
-  accounts: ProfileUser["riotAccounts"];
-  preferred: ReturnType<typeof groupPreferredChampions>;
-  gamePrefix: string;
-  getChampionKey: (championId: string) => string;
-  getChampionName: (championId: string) => string;
-}) {
-  if (accounts.length === 0 && preferred.length === 0) return null;
-  const both = accounts.length > 0 && preferred.length > 0;
-  // 대표 계정이 먼저
-  const sorted = [...accounts].sort(
-    (a, b) => Number(b.isPrimary) - Number(a.isPrimary),
-  );
-  return (
-    <div
-      className={
-        both
-          ? "mb-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]"
-          : "mb-6"
-      }
-    >
-      {preferred.length > 0 && (
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-accent-primary" />
-              라인별 선호 챔피언
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PreferredChampionPanel
-              narrow={accounts.length > 0}
-              groups={preferred}
-              getChampionKey={getChampionKey}
-              getChampionName={getChampionName}
-            />
-          </CardContent>
-        </Card>
-      )}
-      {accounts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-accent-primary" />
-              연동된 Riot 계정
-              <span className="text-sm font-normal text-text-tertiary">
-                {accounts.length}
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {sorted.map((account) => (
-              <Link
-                key={account.id}
-                href={`${gamePrefix}/matches/summoner/${encodeURIComponent(account.gameName)}/${encodeURIComponent(account.tagLine)}`}
-                className={`block rounded-lg border p-3 transition-colors hover:border-accent-primary/50 ${
-                  account.isPrimary
-                    ? "border-accent-primary/40 bg-accent-primary/5"
-                    : "border-bg-tertiary bg-bg-tertiary/40"
-                }`}
-                title="소환사 전적 보기"
-              >
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate text-sm font-bold text-text-primary">
-                    {account.gameName}
-                  </span>
-                  <span className="shrink-0 text-xs text-text-tertiary">
-                    #{account.tagLine}
-                  </span>
-                  {account.isPrimary && (
-                    <span className="shrink-0 rounded bg-accent-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-accent-primary">
-                      대표
-                    </span>
-                  )}
-                  <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 text-text-tertiary" />
-                </div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-text-secondary">
-                  <TierBadge
-                    tier={account.tier}
-                    rank={account.rank}
-                    size="sm"
-                  />
-                  {account.tier && <span>{account.lp} LP</span>}
-                  {account.mainRole && (
-                    <span className="text-text-tertiary">
-                      · {ROLE_LABELS[account.mainRole] ?? account.mainRole}
-                      {account.subRole &&
-                        ` / ${ROLE_LABELS[account.subRole] ?? account.subRole}`}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
+      {isOwnProfile && (
+        <ProfileEditModal
+          isOpen={editOpen}
+          onClose={() => setEditOpen(false)}
+          banner={profile.profileBanner}
+          onSaved={refreshProfile}
+        />
       )}
     </div>
   );
