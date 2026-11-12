@@ -17,6 +17,8 @@ import {
   Scale,
   ArrowLeftRight,
   Eye,
+  EyeOff,
+  DoorOpen,
 } from "lucide-react";
 import Link from "next/link";
 import { discordApi } from "@/lib/api-client";
@@ -563,7 +565,7 @@ export function RoomCreationForm({
 
           {/* 더블 일리미네이션 옵션 (4/8팀 전용) */}
           {selectedPlayerOption?.supportsDE && (
-            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+            <div className="px-4 py-3 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <GitBranch className="w-5 h-5 text-accent-primary" />
@@ -894,21 +896,22 @@ export function RoomCreationForm({
           {/* 상세 설정 */}
           <div
             data-tour="room-create-options"
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6"
+            // 오른쪽 칸 폭에서 두 칸으로 나누면 설명이 서너 줄로 접힌다 — 한 줄에 하나씩
+            className="grid grid-cols-1 gap-2.5"
           >
             {/* 비공개 설정 */}
-            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+            <div className="px-4 py-3 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
               <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3">
                   {isPrivate ? (
-                    <Lock className="w-5 h-5 text-accent-gold" />
+                    <Lock className="w-5 h-5 shrink-0 text-accent-gold" />
                   ) : (
-                    <Unlock className="w-5 h-5 text-text-secondary" />
+                    <Unlock className="w-5 h-5 shrink-0 text-text-secondary" />
                   )}
                   <div>
                     <div
                       id="private-room-label"
-                      className="text-text-primary font-medium"
+                      className="whitespace-nowrap text-text-primary font-medium"
                     >
                       비공개 방
                     </div>
@@ -946,17 +949,26 @@ export function RoomCreationForm({
               )}
             </div>
             {/* 관전 허용 설정 */}
-            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+            <div className="px-4 py-3 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+              {/* 이름·설명을 세로로 쌓는다 — 예전엔 가로로 나란히 놓여 좁은 칸에서
+                  "관전 허용"이 한 글자씩 세로로 밀렸다 */}
               <div className="flex h-full items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    id="allow-spectators-label"
-                    className="text-text-primary font-medium"
-                  >
-                    관전 허용
-                  </div>
-                  <div className="text-text-secondary text-xs">
-                    다른 유저가 관전자로 입장할 수 있습니다
+                <div className="flex min-w-0 items-center gap-3">
+                  {allowSpectators ? (
+                    <Eye className="w-5 h-5 shrink-0 text-accent-success" />
+                  ) : (
+                    <EyeOff className="w-5 h-5 shrink-0 text-text-secondary" />
+                  )}
+                  <div className="min-w-0">
+                    <div
+                      id="allow-spectators-label"
+                      className="whitespace-nowrap text-text-primary font-medium"
+                    >
+                      관전 허용
+                    </div>
+                    <div className="text-text-secondary text-xs">
+                      다른 유저가 관전자로 입장할 수 있습니다
+                    </div>
                   </div>
                 </div>
                 <Switch
@@ -967,17 +979,26 @@ export function RoomCreationForm({
               </div>
             </div>
             {/* 방장 퇴장 시 해산 설정 */}
-            <div className="p-4 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
+            <div className="px-4 py-3 bg-bg-tertiary/50 rounded-lg border border-bg-elevated">
               <div className="flex h-full items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    id="close-on-host-leave-label"
-                    className="text-text-primary font-medium"
-                  >
-                    방장 퇴장 시 해산
-                  </div>
-                  <div className="text-text-secondary text-xs">
-                    대기실에서 방장이 나가면 방이 사라집니다
+                <div className="flex min-w-0 items-center gap-3">
+                  <DoorOpen
+                    className={`w-5 h-5 shrink-0 ${
+                      closeOnHostLeave
+                        ? "text-accent-warning"
+                        : "text-text-secondary"
+                    }`}
+                  />
+                  <div className="min-w-0">
+                    <div
+                      id="close-on-host-leave-label"
+                      className="whitespace-nowrap text-text-primary font-medium"
+                    >
+                      방장 퇴장 시 해산
+                    </div>
+                    <div className="text-text-secondary text-xs">
+                      대기실에서 방장이 나가면 방이 사라집니다
+                    </div>
                   </div>
                 </div>
                 <Switch
