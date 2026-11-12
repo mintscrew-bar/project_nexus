@@ -13,6 +13,7 @@ import {
 import { TierBadge } from "@/components/domain/TierBadge";
 import { getRoleTier } from "@/lib/role-tier";
 import { cn } from "@/lib/utils";
+import { findCosmetic } from "@/components/cosmetics/catalog";
 import { PositionIcon } from "./icons";
 
 /**
@@ -91,6 +92,8 @@ export function PortraitParticipantCard({
   cancelHoverClose,
   handleAddFriend,
   setKickTarget,
+  frameCode,
+  nameColorCode,
 }: {
   p: any;
   size: PortraitCardSize;
@@ -106,7 +109,13 @@ export function PortraitParticipantCard({
   cancelHoverClose: () => void;
   handleAddFriend: (userId: string) => void;
   setKickTarget: (value: { id: string; username: string } | null) => void;
+  /** 장착한 카드 테두리 상품 코드 (components/cosmetics/catalog.ts). 없으면 테두리 없음 */
+  frameCode?: string | null;
+  /** 장착한 닉네임 색 상품 코드 */
+  nameColorCode?: string | null;
 }) {
+  const frame = findCosmetic(frameCode);
+  const nameColor = findCosmetic(nameColorCode);
   const cardRef = useRef<HTMLDivElement>(null);
   const riot = p.riotAccount;
   const pubg = p.pubgAccount;
@@ -188,7 +197,8 @@ export function PortraitParticipantCard({
       )}
       <span
         className={cn(
-          "truncate font-black text-text-primary",
+          "truncate font-black",
+          nameColor?.className ?? "text-text-primary",
           size === "lg" ? "text-sm" : "text-xs",
         )}
       >
@@ -250,7 +260,7 @@ export function PortraitParticipantCard({
   }
 
   /* ─── lg·md·sm: 초상화 카드 ─── */
-  return (
+  const card = (
     <div
       ref={cardRef}
       onMouseEnter={handleMouseEnter}
@@ -357,6 +367,15 @@ export function PortraitParticipantCard({
             ? "대기 중"
             : "대기"}
       </div>
+    </div>
+  );
+
+  // 장착한 테두리가 있으면 2px 바깥 틀로 감싼다 — 둘레 전체를 두르는 모양만 쓴다
+  if (!frame) return card;
+  return (
+    <div className={cn("rounded-[14px] p-[2px]", frame.className)}>
+      {/* 카드 바탕이 반투명이라 틀 색이 비치지 않게 불투명한 바탕을 한 겹 깐다 */}
+      <div className="rounded-xl bg-bg-secondary">{card}</div>
     </div>
   );
 }
