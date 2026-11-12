@@ -15,6 +15,7 @@ import {
   findCosmetic,
   type CosmeticItem,
 } from "@/components/cosmetics/catalog";
+import { LOADOUT_QUERY_KEY } from "@/components/cosmetics/useCosmeticLoadouts";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
@@ -81,6 +82,8 @@ export default function ShopPage() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["shop"] });
     queryClient.invalidateQueries({ queryKey: ["medals"] });
+    // 로비 카드·프로필이 들고 있는 장착 상태도 새로 읽게
+    queryClient.invalidateQueries({ queryKey: [LOADOUT_QUERY_KEY] });
   };
 
   const purchase = useMutation({

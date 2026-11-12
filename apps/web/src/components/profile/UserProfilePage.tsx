@@ -1,5 +1,6 @@
 "use client";
 
+import { UserAvatarDecoration } from "@/components/cosmetics/UserAvatarDecoration";
 import { NexusRecordsSection } from "./NexusRecordsSection";
 import { LolAccountsSide } from "./LolAccountsSide";
 import { ProfileEditModal } from "./ProfileEditModal";
@@ -514,22 +515,25 @@ export default function UserProfilePage() {
               <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
                 {/* Avatar */}
                 <div className="flex-shrink-0 relative">
-                  <div
-                    className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-bg-tertiary md:h-24 md:w-24"
-                    style={{ border: `2px solid ${PROFILE_ACCENT}88` }}
-                  >
-                    {profile.avatar ? (
-                      <Image
-                        src={profile.avatar}
-                        alt={profile.username}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <User className="h-12 w-12 text-text-tertiary" />
-                    )}
-                  </div>
+                  {/* 장착한 아바타 장식 (메달 상점) */}
+                  <UserAvatarDecoration userId={profile.id} size={96}>
+                    <div
+                      className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-bg-tertiary md:h-24 md:w-24"
+                      style={{ border: `2px solid ${PROFILE_ACCENT}88` }}
+                    >
+                      {profile.avatar ? (
+                        <Image
+                          src={profile.avatar}
+                          alt={profile.username}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <User className="h-12 w-12 text-text-tertiary" />
+                      )}
+                    </div>
+                  </UserAvatarDecoration>
                   {/* Online Status */}
                   {onlineStatus && (
                     <div

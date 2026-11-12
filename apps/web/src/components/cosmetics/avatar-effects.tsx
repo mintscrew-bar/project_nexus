@@ -441,7 +441,11 @@ export function AvatarDecoration({
       className={cn("cfx-root relative isolate flex-shrink-0", className)}
       style={{ width: size, height: size }}
     >
-      <div className="relative h-full w-full" style={{ zIndex: 10 }}>
+      {/* 아바타가 상자보다 작아도(모바일 80px 등) 가운데에 놓는다 */}
+      <div
+        className="relative flex h-full w-full items-center justify-center"
+        style={{ zIndex: 10 }}
+      >
         {children}
       </div>
       <div aria-hidden className="pointer-events-none">
