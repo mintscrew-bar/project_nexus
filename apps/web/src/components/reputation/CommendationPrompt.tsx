@@ -112,6 +112,8 @@ function CommendationModal({
         addToast(`${selected.size}명에게 칭찬을 보냈습니다`, "success");
       }
       queryClient.invalidateQueries({ queryKey: ["pendingCommendation"] });
+      // 칭찬 창까지 끝나면 그 경기 메달이 다 들어와 있다 — 헤더 칩이 「+N」을 띄운다
+      queryClient.invalidateQueries({ queryKey: ["medals"] });
     },
     onError: (err: any) => {
       // 이미 끝낸 경기면(다른 탭에서 제출 등) 조용히 닫는다

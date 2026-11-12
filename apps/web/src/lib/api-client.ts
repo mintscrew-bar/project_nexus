@@ -769,7 +769,11 @@ export const broadcastApi = {
   uploadTransition: async (file: File): Promise<{ url: string }> => {
     const formData = new FormData();
     formData.append("transition", file);
-    const response = await apiClient.post("/broadcast/settings/transition", formData, { headers: { "Content-Type": "multipart/form-data" } });
+    const response = await apiClient.post(
+      "/broadcast/settings/transition",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
     return response.data;
   },
   // OBS 브라우저 소스용 읽기전용 스냅샷
@@ -2393,6 +2397,34 @@ export type PopupNotice = {
   message: string;
   link: string | null;
   createdAt: string;
+};
+
+/** 메달 원장 한 줄 (서버 MedalLedger) */
+export interface MedalHistoryItem {
+  id: string;
+  amount: number;
+  balanceAfter: number;
+  reason: string;
+  createdAt: string;
+  sourceId: string | null;
+  retro: boolean;
+  metadata: Record<string, unknown> | null;
+}
+
+/** 메달 — 잔액과 내역 (리텐션 기획서 7절) */
+export const medalApi = {
+  getMine: async (): Promise<{ balance: number }> => {
+    const response = await apiClient.get("/medals/me");
+    return response.data;
+  },
+
+  /** 최신순 내역. cursor 는 직전 응답의 nextCursor */
+  getHistory: async (
+    params: { cursor?: string; limit?: number } = {},
+  ): Promise<{ items: MedalHistoryItem[]; nextCursor: string | null }> => {
+    const response = await apiClient.get("/medals/me/history", { params });
+    return response.data;
+  },
 };
 
 export const notificationApi = {

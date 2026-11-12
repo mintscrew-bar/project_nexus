@@ -16,6 +16,7 @@ import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
 import { GameSwitcher } from "@/components/layout/GameSwitcher";
 import { BgmToggle } from "@/components/bgm/BgmToggle";
 import { NotificationBell } from "@/components/NotificationBell";
+import { MedalChip } from "@/components/cosmetics/MedalChip";
 import { gamePath, useNavigationGame } from "@/hooks/useCurrentGame";
 import { scopedSectionPath } from "@/lib/scoped-section-routes";
 
@@ -197,6 +198,8 @@ export function Header() {
           친구·클랜 관련은 친구창이 맡는다(운영자 결정, 2026-09-22).
           마운트 후에만 그려 배지 hydration 불일치를 막는다.
         */}
+        {/* 가진 메달 — 늘 보이게. 새로 받으면 「+N」이 떠오른다 */}
+        {clientIsAuthenticated && <MedalChip />}
         {clientIsAuthenticated && <NotificationBell />}
         {/* 테마 토글: 좁은 데스크톱까지는 햄버거 메뉴로 이동 → 넓은 데스크톱에서만 노출 */}
         <div className="hidden nav:block">
