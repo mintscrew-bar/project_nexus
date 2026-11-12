@@ -26,6 +26,7 @@ import { BroadcastModule } from "./modules/broadcast/broadcast.module";
 import { CommunityModule } from "./modules/community/community.module";
 import { BoardModule } from "./modules/board/board.module";
 import { ReputationModule } from "./modules/reputation/reputation.module";
+import { MedalModule } from "./modules/medal/medal.module";
 import { FriendModule } from "./modules/friend/friend.module";
 import { PresenceModule } from "./modules/presence/presence.module";
 import { RoleSelectionModule } from "./modules/role-selection/role-selection.module";
@@ -110,6 +111,7 @@ const projectRoot = resolve(apiRoot, "../..");
     CommunityModule,
     BoardModule,
     ReputationModule,
+    MedalModule,
     FriendModule,
     PresenceModule,
     NotificationModule,

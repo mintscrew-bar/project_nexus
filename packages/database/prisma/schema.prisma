@@ -120,6 +120,8 @@ model User {
   mvpMatches                     Match[]               @relation("MatchMVP")
   aceMatches                     Match[]               @relation("MatchACE")
   discordGuildLinks              DiscordGuildLink[]    @relation("DiscordGuildLinkOwner")
+  medalWallet                    MedalWallet?
+  medalLedger                    MedalLedger[]
 
   @@index([email])
   @@index([reputation])
@@ -1940,6 +1942,7 @@ enum AdminAction {
   SCRIM_CANCEL
   MATCH_COLLECT_RETRY
   BOT_CLEANUP
+  MEDAL_ADJUST
 }
 
 enum VoteType {
@@ -2220,4 +2223,58 @@ model AdminDailyStat {
   @@unique([date, scope])
   @@index([scope, date])
   @@map("admin_daily_stats")
+}
+
+// ─── 메달 (리텐션 기획서 7·11절) ───
+
+/// 메달이 오가는 이유. 화면 이름(「메달」)과 무관한 중립 코드다.
+enum MedalReason {
+  MATCH_COMPLETE // 경기 정상 완주
+  MATCH_WIN // 경기 승리
+  RIOT_VERIFIED // Riot 기록 확인된 경기
+  MATCH_MVP // Riot 기록으로 판정된 MVP
+  MATCH_ACE // 같은 방식의 ACE
+  COMMEND_RECEIVED // 칭찬 받음 (회당)
+  COMMEND_SESSION // 칭찬 창 완료 (경기당)
+  HOST_COMPLETE // 방장 완주 보너스 (방 세션당)
+  FIRST_MATCH // 첫 내전 (계정당 1회)
+  MATCH_VOID // 결과 정정·무효로 회수
+  PURCHASE // 상점 구매
+  REFUND // 구매 환불
+  ADMIN_ADJUST // 관리자 지급·회수
+}
+
+/// 메달 잔액. 원장(MedalLedger)과 같은 트랜잭션에서만 바뀐다.
+/// 잔액을 직접 고치지 않는다 — 언제나 원장 한 줄과 함께 움직인다.
+model MedalWallet {
+  userId    String   @id
+  balance   Int      @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("medal_wallets")
+}
+
+/// 메달 원장 — 지급·차감 한 건이 한 줄. 지우거나 고치지 않고 추가만 한다.
+/// - idempotencyKey: 같은 지급이 두 번 들어와도 한 번만 반영 (예: "match:<id>:complete:<userId>")
+/// - amount 0 줄: 하루 상한에 걸려 지급하지 않은 기록 (분석·이상 활동 탐지용)
+/// - retro: 메달 출시 전 경기에 대한 소급 지급
+/// - 사용자 탈퇴 후에도 경제 집계가 맞도록 userId 는 SetNull 로 남긴다
+model MedalLedger {
+  id             String      @id @default(cuid())
+  userId         String?
+  amount         Int
+  balanceAfter   Int
+  reason         MedalReason
+  sourceId       String?
+  idempotencyKey String      @unique
+  retro          Boolean     @default(false)
+  metadata       Json?
+  createdAt      DateTime    @default(now())
+  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([reason, createdAt])
+  @@index([sourceId])
+  @@map("medal_ledger")
 }

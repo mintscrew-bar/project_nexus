@@ -751,7 +751,10 @@ v0.2는 출시 전 2주 shadow economy를 두었지만, 지금은 활동 사용�
 
 ```text
 MedalLedger
-  userId, amount, balanceAfter, reasonType, sourceId, idempotencyKey, metadata, createdAt
+  userId, amount, balanceAfter, reason, sourceId, idempotencyKey, retro, metadata, createdAt
+
+MedalWallet
+  userId, balance, updatedAt   -- 원장과 같은 트랜잭션에서만 바뀐다
 
 MissionTemplate
   code, version, status, cadence, gameScope, conditionType, targetValue, rewardMedal,
@@ -1186,7 +1189,7 @@ PATCH  /admin/retention/abuse-cases/:id
 
 - [ ] Task 1: 경매 낙찰 건별 스냅샷, `Match` 방장 스냅샷 검증과 보상 대상 경기 이벤트 계약 확정
 - [ ] Task 2: NexusSeason, 로컬 랭킹, SeasonAward와 메달 없는 배지 구현
-- [ ] Task 3: MedalLedger, 잔액 조회, 관리자 조정과 멱등 지급 구현
+- [x] Task 3: MedalLedger, 잔액 조회, 관리자 조정과 멱등 지급 구현
 - [ ] Task 4: shadow economy 및 운영자 지급량 대시보드 구현
 - [ ] Task 5: 출석 체크와 일일·주간·월간 기간 계산 구현
 - [ ] Task 6: 미션 템플릿, 사용자 할당, 진척, 자동 보상과 메달 교체 구현
@@ -1220,7 +1223,7 @@ PATCH  /admin/retention/abuse-cases/:id
 7. MODERATOR에게 리텐션 현황과 이상 활동 읽기 권한을 언제 열지
 8. 소급 업적 메달을 전액·상한·기간 분할 중 어떤 방식으로 지급할지
 9. 결과창의 자동 이동 카운트다운을 상호작용 시 멈출지, 시간을 늘릴지
-10. ~~메달 출시 전에 끝난 기존 경기에도 7절 규칙대로 메달을 소급 지급할지~~ → 2026-11-12: **소급 지급한다.** 7절 지급표·보상 대상 조건을 그대로 적용하고, 하루 상한은 경기가 끝난 날(KST) 기준으로 계산한다. 출시 첫날 한 번에 지급하고 원장 사유는 `RETRO_*`로 구분한다.
+10. ~~메달 출시 전에 끝난 기존 경기에도 7절 규칙대로 메달을 소급 지급할지~~ → 2026-11-12: **소급 지급한다.** 7절 지급표·보상 대상 조건을 그대로 적용하고, 하루 상한은 경기가 끝난 날(KST) 기준으로 계산한다. 출시 첫날 한 번에 지급하고 원장은 같은 사유를 쓰고 `retro` 표시로 구분한다(사유별 집계가 소급분과 섞이지 않게 걸러낼 수 있다).
 
 ## 17. v0.6 범위 밖
 
