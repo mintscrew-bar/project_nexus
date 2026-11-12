@@ -370,10 +370,26 @@ export function PortraitParticipantCard({
     </div>
   );
 
-  // 장착한 테두리가 있으면 2px 바깥 틀로 감싼다 — 둘레 전체를 두르는 모양만 쓴다
+  // 장착한 테두리가 있으면 3px 바깥 틀로 감싼다 — 둘레 전체를 두르는 모양만 쓴다.
+  // 틀 안에는 움직이는 층(layerClassName)을 카드 뒤에 깔아서, 카드가 덮지 않은
+  // 테두리 띠에서만 빛이 돌거나 스쳐 지나가게 한다.
   if (!frame) return card;
   return (
-    <div className={cn("rounded-[14px] p-[2px]", frame.className)}>
+    <div
+      className={cn(
+        "relative isolate overflow-hidden rounded-[15px] p-[3px]",
+        frame.className,
+      )}
+    >
+      {frame.layerClassName && (
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute -z-10",
+            frame.layerClassName,
+          )}
+        />
+      )}
       {/* 카드 바탕이 반투명이라 틀 색이 비치지 않게 불투명한 바탕을 한 겹 깐다 */}
       <div className="rounded-xl bg-bg-secondary">{card}</div>
     </div>

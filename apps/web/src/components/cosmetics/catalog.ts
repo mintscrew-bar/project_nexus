@@ -28,10 +28,15 @@ export interface CosmeticItem {
   price: number;
   rarity: CosmeticRarity;
   /**
-   * CARD_FRAME: 카드를 감싸는 바깥 틀의 배경(2px 여백으로 테두리처럼 보인다)
+   * CARD_FRAME: 카드를 감싸는 바깥 틀(3px)의 바탕
    * NAME_COLOR: 닉네임 글자에 붙는 클래스
    */
   className: string;
+  /**
+   * CARD_FRAME 전용 — 틀 안, 카드 뒤에 깔리는 움직이는 층. 카드가 위를 덮으므로
+   * 테두리 3px 띠에서만 보인다(회전하는 빛, 지나가는 반짝임 등).
+   */
+  layerClassName?: string;
 }
 
 export const RARITY_LABEL: Record<CosmeticRarity, string> = {
@@ -40,62 +45,69 @@ export const RARITY_LABEL: Record<CosmeticRarity, string> = {
   PREMIUM: "고급",
 };
 
+/**
+ * 상품 원칙 (2026-11-12): **모든 상품은 움직인다.** 정적인 색 바꾸기는 살 이유가
+ * 약하다는 판단. 대신 움직임은 느리고 차분하게 — 로비에서 10장이 동시에 움직여도
+ * 산만하지 않아야 한다. 애니메이션 정의는 globals.css 의 `.cosmetic-*`.
+ */
 export const COSMETICS: CosmeticItem[] = [
   {
     code: "FRAME_SILVER",
     slot: "CARD_FRAME",
-    name: "은빛 테두리",
-    description: "로비 참가자 카드를 차분한 은색으로 감싼다",
+    name: "은빛 반짝임",
+    description: "은색 테두리 위로 빛줄기가 몇 초마다 스쳐 지나간다",
     price: 250,
     rarity: "STARTER",
-    className: "bg-slate-300/70",
+    className: "bg-slate-400/80",
+    layerClassName: "cosmetic-sheen",
   },
   {
     code: "NAME_SKY",
     slot: "NAME_COLOR",
-    name: "하늘색 닉네임",
-    description: "로비·채팅·대진표의 닉네임을 하늘색으로",
+    name: "물결 닉네임",
+    description: "하늘색 닉네임 위로 밝은 물결이 흐른다",
     price: 250,
     rarity: "STARTER",
-    className: "text-sky-300",
+    className: "cosmetic-name-sky",
   },
   {
     code: "FRAME_INDIGO",
     slot: "CARD_FRAME",
-    name: "넥서스 인디고",
-    description: "로고 색 인디고에서 보라로 이어지는 테두리",
+    name: "넥서스 맥동",
+    description: "로고 색 인디고 테두리가 숨 쉬듯 밝아졌다 어두워진다",
     price: 450,
     rarity: "COMMON",
-    className: "bg-gradient-to-br from-[#667EEA] to-violet-500",
+    className: "bg-[#3f4aa8]",
+    layerClassName: "cosmetic-pulse",
   },
   {
     code: "FRAME_GOLD",
     slot: "CARD_FRAME",
-    name: "금빛 테두리",
-    description: "빛을 받은 금속처럼 결이 있는 금색 테두리",
+    name: "금빛 궤도",
+    description: "금색 테두리를 따라 빛이 한 바퀴씩 돈다",
     price: 500,
     rarity: "COMMON",
-    className:
-      "bg-[linear-gradient(135deg,#f3d58a_0%,#b8862b_45%,#f3d58a_70%,#9a6d1f_100%)]",
+    className: "bg-[#7a561a]",
+    layerClassName: "cosmetic-orbit-gold",
   },
   {
     code: "NAME_SUNSET",
     slot: "NAME_COLOR",
     name: "노을 닉네임",
-    description: "주황에서 분홍으로 물드는 닉네임",
+    description: "주황·분홍·보라로 천천히 물드는 닉네임",
     price: 550,
     rarity: "COMMON",
-    className:
-      "bg-gradient-to-r from-amber-300 to-rose-400 bg-clip-text text-transparent",
+    className: "cosmetic-name-sunset",
   },
   {
     code: "FRAME_AURORA",
     slot: "CARD_FRAME",
     name: "오로라",
-    description: "청록·인디고·분홍이 천천히 흐르는 테두리",
+    description: "청록·인디고·분홍 빛이 테두리를 돌며 섞인다",
     price: 1000,
     rarity: "PREMIUM",
-    className: "cosmetic-aurora",
+    className: "bg-[#24304f]",
+    layerClassName: "cosmetic-orbit-aurora",
   },
 ];
 
