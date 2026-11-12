@@ -1,14 +1,16 @@
 import { Module } from "@nestjs/common";
 import { MedalController } from "./medal.controller";
 import { MedalService } from "./medal.service";
+import { ShopController } from "./shop.controller";
+import { ShopService } from "./shop.service";
 
 /**
- * 메달 — 원장·잔액·관리자 조정 (리텐션 기획서 Task 3).
+ * 메달 — 원장·잔액·관리자 조정(Task 3)과 꾸미기 상점 구매·장착(Task 8·9).
  * 경기 메달 지급(Task 21)·상점 구매(Task 8)는 MedalService 를 가져다 쓴다.
  */
 @Module({
-  controllers: [MedalController],
-  providers: [MedalService],
-  exports: [MedalService],
+  controllers: [MedalController, ShopController],
+  providers: [MedalService, ShopService],
+  exports: [MedalService, ShopService],
 })
 export class MedalModule {}

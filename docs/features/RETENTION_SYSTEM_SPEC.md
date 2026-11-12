@@ -780,11 +780,14 @@ ShopItem
   code, status, name, category, equipSlot, price, rarity, assetConfig,
   requiredAchievementCode, requiredAchievementTier, saleFrom, saleUntil
 
-UserInventory
-  userId, shopItemId, acquiredAt, acquisitionType
+UserCosmetic        -- (구현 이름) 보유
+  userId, itemCode, source, ledgerId, acquiredAt
 
-UserLoadout
-  userId, equipSlot, shopItemId, updatedAt
+UserCosmeticLoadout -- (구현 이름) 장착, 자리마다 하나
+  userId, slot, itemCode, updatedAt
+
+-- 1단계 상품 정의(가격·자리·판매)는 DB 대신 @nexus/types 의 COSMETIC_SHOP_ITEMS 한 곳에 둔다.
+-- 서버(구매 가격 검증)와 웹(진열)이 같은 원본을 읽는다. 관리자 상품 편집(Task 16) 때 ShopItem 테이블로 옮긴다.
 
 RetentionAbuseCase
   status, userId, detectorType, severity, evidence, assignedAdminId,
@@ -1194,7 +1197,7 @@ PATCH  /admin/retention/abuse-cases/:id
 - [ ] Task 5: 출석 체크와 일일·주간·월간 기간 계산 구현
 - [ ] Task 6: 미션 템플릿, 사용자 할당, 진척, 자동 보상과 메달 교체 구현
 - [ ] Task 7: 성장형 업적 카운터, 단계 승급과 기존 전적 소급 구현
-- [ ] Task 8: 상점 카탈로그, 인벤토리, 구매 트랜잭션 구현
+- [x] Task 8: 상점 카탈로그, 인벤토리, 구매 트랜잭션 구현
 - [ ] Task 9: 장착 슬롯과 프로필·호버·룸 노출 구현
 - [ ] Task 10: 사이트 테마와 모션 접근성 설정 구현
 - [ ] Task 11: 리텐션 퍼널, 경제 지표와 어뷰징 모니터링 구현

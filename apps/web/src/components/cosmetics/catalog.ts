@@ -14,6 +14,7 @@
  * - 움직이는 상품은 `prefers-reduced-motion` 에서 멈춘다(globals.css).
  */
 
+import { findCosmeticShopItem } from "@nexus/types";
 import type { AvatarEffectCode } from "./avatar-effects";
 import type { CosmeticEffectCode } from "./effects";
 
@@ -73,7 +74,8 @@ export const RARITY_LABEL: Record<CosmeticRarity, string> = {
  * - 장식은 초상화 칸 안에서만 움직여 이름·티어·준비 띠는 가리지 않는다.
  * 그림·움직임 정의는 effects.tsx 와 globals.css 의 `.cfx-*`.
  */
-export const COSMETICS: CosmeticItem[] = [
+/** 그림·이름·설명 정의 — 가격·등급은 아래에서 @nexus/types 원본으로 덮어쓴다 */
+const COSMETIC_DEFS: CosmeticItem[] = [
   // ── 카드 장식 (로비) ──
   {
     code: "FX_SLIME",
@@ -241,6 +243,15 @@ export const COSMETICS: CosmeticItem[] = [
     avatarEffect: "dragon_orbit",
   },
 ];
+
+/**
+ * 진열에 쓰는 최종 목록. 가격·등급은 서버와 같은 원본(@nexus/types)을 따른다 —
+ * 화면에 보인 가격과 실제로 깎이는 가격이 어긋나지 않게.
+ */
+export const COSMETICS: CosmeticItem[] = COSMETIC_DEFS.map((def) => {
+  const shared = findCosmeticShopItem(def.code);
+  return shared ? { ...def, price: shared.price, rarity: shared.rarity } : def;
+});
 
 export function findCosmetic(code?: string | null): CosmeticItem | undefined {
   if (!code) return undefined;

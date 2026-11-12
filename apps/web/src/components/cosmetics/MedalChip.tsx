@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { Medal } from "lucide-react";
@@ -243,8 +244,15 @@ export function MedalChip() {
               {balance.toLocaleString()}
             </div>
             <p className="mt-1 text-xs text-text-tertiary">
-              내전을 끝까지 하면 받아요. 꾸미기 상점은 곧 열려요.
+              내전을 끝까지 하면 받아요.
             </p>
+            <Link
+              href="/shop"
+              onClick={() => setOpen(false)}
+              className="mt-3 flex h-9 items-center justify-center rounded-lg bg-accent-primary text-sm font-black text-accent-on transition hover:brightness-110"
+            >
+              {MEDAL_LABEL} 상점 가기
+            </Link>
 
             <div className="mt-3 space-y-1">
               {history.isLoading && (

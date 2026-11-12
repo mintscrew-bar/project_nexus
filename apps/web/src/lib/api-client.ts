@@ -2411,6 +2411,62 @@ export interface MedalHistoryItem {
   metadata: Record<string, unknown> | null;
 }
 
+/** 상점 진열 한 칸 — 상품 정의(@nexus/types) + 내 보유·장착 */
+export interface ShopItemState {
+  code: string;
+  slot: "CARD_FRAME" | "AVATAR_FRAME";
+  price: number;
+  rarity: "STARTER" | "COMMON" | "PREMIUM" | "RARE";
+  onSale: boolean;
+  owned: boolean;
+  equipped: boolean;
+}
+
+export type CosmeticLoadoutState = Partial<
+  Record<"CARD_FRAME" | "AVATAR_FRAME", string>
+>;
+
+/** 메달 상점 — 진열·구매·장착 */
+export const shopApi = {
+  getShop: async (): Promise<{
+    balance: number;
+    loadout: CosmeticLoadoutState;
+    items: ShopItemState[];
+  }> => {
+    const response = await apiClient.get("/shop");
+    return response.data;
+  },
+
+  /** 구매 — 기본으로 산 즉시 장착 */
+  purchase: async (
+    code: string,
+    equip = true,
+  ): Promise<{ balance: number; itemCode: string; equipped: boolean }> => {
+    const response = await apiClient.post("/shop/purchase", { code, equip });
+    return response.data;
+  },
+
+  /** 장착·해제 (code 가 null 이면 해제) */
+  equip: async (
+    slot: "CARD_FRAME" | "AVATAR_FRAME",
+    code: string | null,
+  ): Promise<CosmeticLoadoutState> => {
+    const response = await apiClient.put("/shop/loadout", { slot, code });
+    return response.data;
+  },
+
+  /** 여러 사람의 장착 상태 (로비 카드·프로필) */
+  getLoadouts: async (
+    userIds: string[],
+  ): Promise<Record<string, CosmeticLoadoutState>> => {
+    if (userIds.length === 0) return {};
+    const response = await apiClient.get("/shop/loadouts", {
+      params: { userIds: userIds.join(",") },
+    });
+    return response.data;
+  },
+};
+
 /** 메달 — 잔액과 내역 (리텐션 기획서 7절) */
 export const medalApi = {
   getMine: async (): Promise<{ balance: number }> => {
