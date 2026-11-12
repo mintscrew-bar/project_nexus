@@ -1157,27 +1157,37 @@ export default function TournamentLobbyPage() {
   const desktopActions = (
     <div data-tour="lobby-ready-action" className="flex flex-col gap-2">
       {room.status !== "DRAFT_COMPLETED" && !currentUserIsSpectator && (
-        <button
-          className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-black transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
-            currentUserIsReady
-              ? "border border-bg-elevated bg-bg-tertiary text-text-primary hover:bg-bg-elevated"
-              : "bg-accent-primary text-accent-on hover:bg-accent-hover"
-          }`}
-          disabled={needsManualTeamSelection}
-          title={
-            needsManualTeamSelection ? "먼저 팀을 선택해주세요." : undefined
-          }
-          onClick={handleReadyToggle}
-        >
-          {!needsManualTeamSelection && !currentUserIsReady && (
-            <Check className="h-5 w-5" strokeWidth={3} />
+        <>
+          {/* 준비한 뒤엔 상태를 초록 글자로 먼저 알려주고, 취소 버튼은 빨간 테두리로
+              분명하게 — 회색 버튼은 "눌린 건지 아닌지" 안 보인다는 피드백(2026-11-12) */}
+          {currentUserIsReady && !needsManualTeamSelection && (
+            <p className="flex items-center justify-center gap-1.5 text-sm font-black text-accent-success">
+              <CheckCircle2 className="h-4 w-4" /> 준비 완료 — 시작을 기다리는
+              중
+            </p>
           )}
-          {needsManualTeamSelection
-            ? "팀 선택 필요"
-            : currentUserIsReady
-              ? "준비 취소"
-              : "준비 완료하기"}
-        </button>
+          <button
+            className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-black transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+              currentUserIsReady
+                ? "border-2 border-accent-danger/60 bg-accent-danger/10 text-accent-danger hover:bg-accent-danger/20"
+                : "bg-accent-primary text-accent-on hover:bg-accent-hover"
+            }`}
+            disabled={needsManualTeamSelection}
+            title={
+              needsManualTeamSelection ? "먼저 팀을 선택해주세요." : undefined
+            }
+            onClick={handleReadyToggle}
+          >
+            {!needsManualTeamSelection && !currentUserIsReady && (
+              <Check className="h-5 w-5" strokeWidth={3} />
+            )}
+            {needsManualTeamSelection
+              ? "팀 선택 필요"
+              : currentUserIsReady
+                ? "준비 취소"
+                : "준비 완료하기"}
+          </button>
+        </>
       )}
       {room.status !== "DRAFT_COMPLETED" &&
         currentUserIsSpectator &&
@@ -1674,10 +1684,11 @@ export default function TournamentLobbyPage() {
                     </div>
                     <button
                       onClick={requestLeaveLobby}
-                      className="inline-flex flex-shrink-0 items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300"
+                      // 작고 옅으면 안 보인다는 피드백(2026-11-12) — 글자·테두리를 키우고 진하게
+                      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-red-500/70 bg-red-500/15 px-3 py-2 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/25 hover:text-red-300"
                       title="방 나가기"
                     >
-                      <LogOut className="h-3.5 w-3.5" />
+                      <LogOut className="h-4 w-4" />
                       나가기
                     </button>
                   </div>
