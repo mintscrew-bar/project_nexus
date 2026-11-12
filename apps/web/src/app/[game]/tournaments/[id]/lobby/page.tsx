@@ -47,6 +47,7 @@ import {
   Check,
   Crown,
   Eye,
+  X,
 } from "lucide-react";
 import { Dropdown } from "@/components/ui/Dropdown";
 import Link from "next/link";
@@ -1157,38 +1158,53 @@ export default function TournamentLobbyPage() {
   const desktopActions = (
     <div data-tour="lobby-ready-action" className="flex flex-col gap-2">
       {room.status !== "DRAFT_COMPLETED" && !currentUserIsSpectator && (
-        <>
-          {/* 준비한 뒤엔 상태를 초록 글자로 먼저 알려주고, 취소 버튼은 옅은 빨강으로 채워
-              분명하게 — 회색 버튼은 "눌린 건지 아닌지" 안 보인다는 피드백(2026-11-12).
-              로비 오른쪽 버튼은 전부 테두리 없이 채운 모양으로 맞춘다. */}
-          {currentUserIsReady && !needsManualTeamSelection && (
-            <p className="flex items-center justify-center gap-1.5 text-sm font-black text-accent-success">
-              <CheckCircle2 className="h-4 w-4" /> 준비 완료 — 시작을 기다리는
-              중
-            </p>
-          )}
-          <button
-            className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-black transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
-              currentUserIsReady
-                ? "bg-accent-danger/15 text-accent-danger hover:bg-accent-danger/25"
-                : "bg-accent-primary text-accent-on hover:bg-accent-hover"
-            }`}
-            disabled={needsManualTeamSelection}
-            title={
-              needsManualTeamSelection ? "먼저 팀을 선택해주세요." : undefined
-            }
-            onClick={handleReadyToggle}
-          >
-            {!needsManualTeamSelection && !currentUserIsReady && (
-              <Check className="h-5 w-5" strokeWidth={3} />
-            )}
-            {needsManualTeamSelection
-              ? "팀 선택 필요"
+        /* 준비 버튼은 상태를 그대로 보여주는 꽉 찬 버튼이다.
+           - 준비 전: 인디고 「준비 완료하기」
+           - 준비 후: 초록 「✓ 준비 완료」 + 작은 「누르면 취소」. 마우스를 올리면
+             사이트 위험색으로 바뀌며 「준비 취소」가 된다.
+           옅은 색·회색 취소 버튼은 "잘 안 보인다"는 피드백이 반복됐다(2026-11-12).
+           로비 오른쪽 버튼은 전부 테두리 없이 채운 모양으로 맞춘다. */
+        <button
+          className={`group/ready inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-black transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+            currentUserIsReady
+              ? "bg-accent-success text-white hover:bg-accent-danger"
+              : "bg-accent-primary text-accent-on hover:bg-accent-hover"
+          }`}
+          disabled={needsManualTeamSelection}
+          title={
+            needsManualTeamSelection
+              ? "먼저 팀을 선택해주세요."
               : currentUserIsReady
-                ? "준비 취소"
-                : "준비 완료하기"}
-          </button>
-        </>
+                ? "누르면 준비가 취소됩니다"
+                : undefined
+          }
+          onClick={handleReadyToggle}
+        >
+          {needsManualTeamSelection ? (
+            "팀 선택 필요"
+          ) : currentUserIsReady ? (
+            <>
+              {/* 평소 */}
+              <span className="inline-flex items-center gap-2 group-hover/ready:hidden">
+                <Check className="h-5 w-5" strokeWidth={3} />
+                준비 완료
+                <span className="text-xs font-semibold text-white/75">
+                  · 누르면 취소
+                </span>
+              </span>
+              {/* 마우스를 올렸을 때 */}
+              <span className="hidden items-center gap-2 group-hover/ready:inline-flex">
+                <X className="h-5 w-5" strokeWidth={3} />
+                준비 취소
+              </span>
+            </>
+          ) : (
+            <>
+              <Check className="h-5 w-5" strokeWidth={3} />
+              준비 완료하기
+            </>
+          )}
+        </button>
       )}
       {room.status !== "DRAFT_COMPLETED" &&
         currentUserIsSpectator &&
@@ -1685,8 +1701,8 @@ export default function TournamentLobbyPage() {
                     </div>
                     <button
                       onClick={requestLeaveLobby}
-                      // 작고 옅으면 안 보인다는 피드백(2026-11-12) — 글자를 키우고, 다른 버튼처럼 테두리 없이 채운다
-                      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-red-500/15 px-3 py-2 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/25 hover:text-red-300"
+                      // 작고 옅으면 안 보인다는 피드백(2026-11-12) — 사이트 위험 버튼(Button danger)과 같은 꽉 찬 빨강
+                      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-accent-danger px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-accent-danger/90"
                       title="방 나가기"
                     >
                       <LogOut className="h-4 w-4" />
