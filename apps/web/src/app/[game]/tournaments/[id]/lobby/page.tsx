@@ -44,6 +44,9 @@ import {
   Headphones,
   Radio,
   MoreHorizontal,
+  Check,
+  Crown,
+  Eye,
 } from "lucide-react";
 import { Dropdown } from "@/components/ui/Dropdown";
 import Link from "next/link";
@@ -61,6 +64,7 @@ import {
   type ServerStartBlock,
 } from "./_components/StartBlockedModal";
 import { LobbyParticipantsList } from "./_components/LobbyParticipantsList";
+import { LobbySpectatorStrip } from "./_components/LobbySpectatorStrip";
 import { AutoBalanceReview } from "./_components/AutoBalanceReview";
 import { LobbyErrorState } from "./_components/LobbyErrorState";
 import { BroadcastLinkModal } from "./_components/BroadcastLinkModal";
@@ -980,6 +984,32 @@ export default function TournamentLobbyPage() {
     />
   );
 
+  // 데스크톱 초상화 카드 배치 — 전환 버튼·관전자는 LobbySpectatorStrip 이 맡는다
+  const participantsCards = (
+    <LobbyParticipantsList
+      room={room}
+      currentUser={currentUser}
+      currentUserParticipant={currentUserParticipant}
+      currentUserIsSpectator={currentUserIsSpectator}
+      players={players}
+      spectators={spectators}
+      emptySlots={emptySlots}
+      isCurrentUserHost={isCurrentUserHost}
+      friendUserIds={friendUserIds}
+      sentFriendIds={sentFriendIds}
+      addingFriend={addingFriend}
+      setHoveredPlayer={scheduleHoverOpen}
+      scheduleHoverClose={scheduleHoverClose}
+      cancelHoverClose={cancelHoverClose}
+      handleAddFriend={handleAddFriend}
+      setKickTarget={setKickTarget}
+      toggleSpectator={toggleSpectator}
+      selectTeam={selectTeam}
+      addToast={addToast}
+      layout="cards"
+    />
+  );
+
   /*
    * ─── 준비·시작 버튼 묶음 ───
    * 예전엔 화면 폭 하단 바의 양 끝(준비는 왼쪽 아래, 시작은 오른쪽 아래)에 떨어져 있어
@@ -987,6 +1017,32 @@ export default function TournamentLobbyPage() {
    * 남은 조건과 버튼이 한눈에 들어오게 하고, 모바일만 하단 고정 바에 같은 묶음을 쓴다.
    * 조건 안내 문구는 준비 현황 줄의 칩·한 줄 설명이 대신하므로 여기엔 두지 않는다.
    */
+  // 내전 시작 — 조건이 안 맞으면 남은 조건 모달, 서버가 막으면 그 사유를 모달로
+  const handleStartClick = () => {
+    if (!canStart) {
+      setServerStartBlock(null);
+      setStartBlockOpen(true);
+      return;
+    }
+    startGame((err) => {
+      // 서버가 사유 코드를 주면 로비에서 풀어야 하는 조건이다
+      // (화면은 통과로 봤지만 서버가 실제로 확인해 막은 경우).
+      // 코드가 없으면 진짜 오류라 토스트로 알린다.
+      if (err.reason) {
+        setServerStartBlock({
+          reason: err.reason,
+          message: err.message,
+          missingUsers: err.missingUsers ?? err.missingVoiceUsers ?? [],
+        });
+        setStartBlockOpen(true);
+      } else {
+        addToast(err.message, "error", 8000, {
+          actionable: true,
+        });
+      }
+    });
+  };
+
   const lobbyActions = (
     <>
       {room.status !== "DRAFT_COMPLETED" && !currentUserIsSpectator && (
@@ -1053,30 +1109,7 @@ export default function TournamentLobbyPage() {
           // 방장이 "왜 안 되지"를 알 방법이 없다. 조건이 안 맞으면
           // 누른 순간 모달로 남은 항목과 호출 버튼을 보여준다.
           aria-disabled={!canStart}
-          onClick={() => {
-            if (!canStart) {
-              setServerStartBlock(null);
-              setStartBlockOpen(true);
-              return;
-            }
-            startGame((err) => {
-              // 서버가 사유 코드를 주면 로비에서 풀어야 하는 조건이다
-              // (화면은 통과로 봤지만 서버가 실제로 확인해 막은 경우).
-              // 코드가 없으면 진짜 오류라 토스트로 알린다.
-              if (err.reason) {
-                setServerStartBlock({
-                  reason: err.reason,
-                  message: err.message,
-                  missingUsers: err.missingUsers ?? err.missingVoiceUsers ?? [],
-                });
-                setStartBlockOpen(true);
-              } else {
-                addToast(err.message, "error", 8000, {
-                  actionable: true,
-                });
-              }
-            });
-          }}
+          onClick={handleStartClick}
           title={startBlockedMessage}
         >
           내전 시작
@@ -1084,6 +1117,154 @@ export default function TournamentLobbyPage() {
       )}
     </>
   );
+
+  // Discord 음성 대기실 안내 — 모바일은 준비 현황 줄 안, 데스크톱은 참가자 칸 위에 같은 걸 쓴다
+  const voiceWarning = hasDiscordVoice &&
+    !currentUserIsSpectator &&
+    currentUserParticipant?.inVoice === false && (
+      <div className="flex items-start gap-3 rounded-xl border border-accent-warning/30 bg-accent-warning/10 px-4 py-3">
+        <Headphones className="mt-0.5 h-5 w-5 flex-none text-accent-warning" />
+        <div>
+          <p className="text-sm font-bold text-text-primary">
+            Discord 음성 대기실에 먼저 들어가세요
+          </p>
+          <p className="mt-0.5 text-xs leading-5 text-text-secondary">
+            방 생성 때 선택한 Discord 서버에서 「『
+            {pubgRoomTitle(
+              room.name,
+              room.gameTitle === "PUBG" ? room.pubgPlatform : null,
+            )}
+            』 → ── 대기실 ──」로 입장하세요. 전원이 준비하고 대기실에 있어야
+            시작되며, 팀 확정 후 봇이 팀 채널로 자동 이동시킵니다.
+          </p>
+        </div>
+      </div>
+    );
+
+  /*
+   * ─── 데스크톱 행동 버튼 (오른쪽 방 정보 칸) ───
+   * 2026-11-12 로비 개편: 버튼을 방 정보 바로 아래 큰 버튼으로 모았다.
+   * - 선수(방장 포함): 큰 「준비 완료하기」 — 선수로 뛰는 방장도 준비해야 시작된다
+   * - 방장: 그 아래 「내전 시작」 (+ 어드민은 봇 채우기)
+   * - 관전자·운영자: 준비 버튼 대신 상태 안내
+   * 동작(핸들러·조건)은 모바일 하단 바의 lobbyActions 와 같다. 모양만 다르다.
+   */
+  const startButtonClass = `inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-base font-black transition-all ${
+    canStart
+      ? "bg-accent-success text-white hover:bg-accent-success/90 animate-glow-success"
+      : "border border-accent-success/50 bg-accent-success/10 text-accent-success hover:bg-accent-success/20"
+  }`;
+  const desktopActions = (
+    <div data-tour="lobby-ready-action" className="flex flex-col gap-2">
+      {room.status !== "DRAFT_COMPLETED" && !currentUserIsSpectator && (
+        <button
+          className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-black transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+            currentUserIsReady
+              ? "border border-bg-elevated bg-bg-tertiary text-text-primary hover:bg-bg-elevated"
+              : "bg-accent-primary text-accent-on hover:bg-accent-hover"
+          }`}
+          disabled={needsManualTeamSelection}
+          title={
+            needsManualTeamSelection ? "먼저 팀을 선택해주세요." : undefined
+          }
+          onClick={handleReadyToggle}
+        >
+          {!needsManualTeamSelection && !currentUserIsReady && (
+            <Check className="h-5 w-5" strokeWidth={3} />
+          )}
+          {needsManualTeamSelection
+            ? "팀 선택 필요"
+            : currentUserIsReady
+              ? "준비 취소"
+              : "준비 완료하기"}
+        </button>
+      )}
+      {room.status !== "DRAFT_COMPLETED" &&
+        currentUserIsSpectator &&
+        !isCurrentUserHost && (
+          <p className="flex h-12 items-center justify-center gap-1.5 rounded-xl bg-bg-tertiary/50 text-sm text-text-tertiary">
+            <Eye className="h-4 w-4" /> 관전 중이에요. 시작은 방장이 해요
+          </p>
+        )}
+      {room.status === "DRAFT_COMPLETED" &&
+        room.teamMode !== "AUTO_BALANCE" && (
+          <Link
+            href={`${gamePrefix}/tournaments/${room.id}/bracket`}
+            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-accent-success text-base font-black text-white transition-colors hover:bg-accent-success/90"
+          >
+            대진표 보기
+          </Link>
+        )}
+      {((isCurrentUserHost && room.status === "WAITING") ||
+        (currentUser?.role === "ADMIN" &&
+          room.status === "WAITING" &&
+          totalPlayers < room.maxParticipants)) && (
+        <div className="flex gap-2">
+          {isCurrentUserHost && room.status === "WAITING" && (
+            <button
+              className={startButtonClass}
+              // 비활성으로 두지 않는다 — 누르면 남은 조건을 모달로 보여준다 (모바일과 같음)
+              aria-disabled={!canStart}
+              onClick={handleStartClick}
+              title={startBlockedMessage}
+            >
+              {currentUserIsSpectator && <Crown className="h-4 w-4" />}
+              내전 시작
+            </button>
+          )}
+          {currentUser?.role === "ADMIN" &&
+            room.status === "WAITING" &&
+            totalPlayers < room.maxParticipants && (
+              <button
+                onClick={handleAddBot}
+                disabled={isAddingBot}
+                className="inline-flex h-12 items-center justify-center rounded-xl border border-bg-elevated px-3 text-sm text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-50"
+                title="남은 자리를 봇으로 모두 채움 (어드민 전용)"
+              >
+                {isAddingBot
+                  ? "추가 중..."
+                  : `봇 채우기 (${room.maxParticipants - totalPlayers})`}
+              </button>
+            )}
+        </div>
+      )}
+    </div>
+  );
+
+  // 오른쪽 방 정보 칸에 펼쳐 보일 설정 값 — 모드에 따라 의미 있는 것만
+  const roomInfoItems: { label: string; value: React.ReactNode }[] = [
+    {
+      label: "팀 구성",
+      value: (
+        <span className="inline-flex items-center gap-0.5">
+          {teamModeLabel}
+          <TeamModeHelp mode={room.teamMode as TeamMode} compact />
+        </span>
+      ),
+    },
+    {
+      label: "인원",
+      value: `${totalPlayers}/${room.maxParticipants}명`,
+    },
+    { label: "경기 방식", value: bracketLabel },
+    ...(room.teamMode === "AUCTION"
+      ? [
+          {
+            label: "시작 포인트",
+            value: `${(room.startingPoints ?? 0).toLocaleString()}P`,
+          },
+          { label: "입찰 시간", value: `${room.bidTimeLimit ?? 0}초` },
+        ]
+      : room.teamMode === "SNAKE_DRAFT"
+        ? [{ label: "픽 시간", value: `${room.pickTimeLimit ?? 0}초` }]
+        : []),
+    {
+      label: "공개",
+      value: `${room.isPrivate ? "비공개" : "공개"} · 관전 ${
+        room.allowSpectators ? "허용" : "막음"
+      }`,
+    },
+  ];
 
   /* ─── Chat Panel ─── */
   const chatPanel = (
@@ -1137,7 +1318,12 @@ export default function TournamentLobbyPage() {
       */}
       <div className="flex h-full min-h-0 w-full flex-1 flex-col">
         {/* ═══ Room Header ═══ */}
-        <header className="bg-bg-secondary border-b border-bg-tertiary px-4 py-3 lg:px-6">
+        {/* 데스크톱에선 오른쪽 방 정보 칸이 제목·나가기·설정을 맡는다 (편성 확인 단계 제외) */}
+        <header
+          className={`bg-bg-secondary border-b border-bg-tertiary px-4 py-3 lg:px-6 ${
+            isAutoBalanceReviewStage ? "" : "lg:hidden"
+          }`}
+        >
           <div className="container mx-auto flex items-center justify-between gap-4">
             {/* Left: back + room info */}
             <div className="flex items-center gap-3 min-w-0">
@@ -1282,7 +1468,7 @@ export default function TournamentLobbyPage() {
         {!isAutoBalanceReviewStage && (
           <div
             data-tour="lobby-ready-status"
-            className={`border-b px-4 py-2 lg:px-6 ${
+            className={`border-b px-4 py-2 lg:hidden ${
               canStart
                 ? "border-accent-success/30 bg-accent-success/10"
                 : "border-bg-tertiary bg-bg-secondary/90"
@@ -1344,28 +1530,7 @@ export default function TournamentLobbyPage() {
                   {lobbyActions}
                 </div>
               </div>
-              {hasDiscordVoice &&
-                !currentUserIsSpectator &&
-                currentUserParticipant?.inVoice === false && (
-                  <div className="flex items-start gap-3 rounded-xl border border-accent-warning/30 bg-accent-warning/10 px-4 py-3">
-                    <Headphones className="mt-0.5 h-5 w-5 flex-none text-accent-warning" />
-                    <div>
-                      <p className="text-sm font-bold text-text-primary">
-                        Discord 음성 대기실에 먼저 들어가세요
-                      </p>
-                      <p className="mt-0.5 text-xs leading-5 text-text-secondary">
-                        방 생성 때 선택한 Discord 서버에서 「『
-                        {pubgRoomTitle(
-                          room.name,
-                          room.gameTitle === "PUBG" ? room.pubgPlatform : null,
-                        )}
-                        』 → ── 대기실 ──」로 입장하세요. 전원이 준비하고
-                        대기실에 있어야 시작되며, 팀 확정 후 봇이 팀 채널로 자동
-                        이동시킵니다.
-                      </p>
-                    </div>
-                  </div>
-                )}
+              {voiceWarning}
             </div>
           </div>
         )}
@@ -1398,42 +1563,189 @@ export default function TournamentLobbyPage() {
               </aside>
             </div>
           ) : (
-            /* Desktop layout (lg+) */
+            /* ═══ 데스크톱 로비 (lg+) — 2026-11-12 개편 ═══
+               왼쪽: 참가자 초상화 카드 + 운영·관전 띠 (한 화면에 들어오게 정원별로 카드 크기 조절)
+               오른쪽: 방 정보(제목·나가기·설정 값) + 준비·시작 버튼 + 방장 버튼 + 채팅
+               예전 위쪽 제목 줄·준비 현황 줄이 세로를 먹던 걸 오른쪽 칸으로 옮겼다. */
             <div className="container mx-auto hidden min-h-0 min-w-0 flex-1 gap-4 overflow-hidden px-6 py-4 lg:flex">
-              {/* Participants: 2/3 */}
               <section
                 data-tour="lobby-participants"
-                className="flex min-h-0 min-w-0 flex-[2] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
+                className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
               >
-                <div className="px-5 py-3 border-b border-bg-tertiary flex items-center justify-between">
-                  <h2 className="font-bold text-text-primary flex items-center gap-2">
-                    <Users className="h-5 w-5 text-text-secondary" />
+                {/* 머리줄: 인원 + 시작 조건 칩 + 막힌 이유 한 줄 */}
+                <div
+                  data-tour="lobby-ready-status"
+                  aria-label="내전 시작 조건"
+                  aria-live="polite"
+                  className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-bg-tertiary px-4 py-3"
+                >
+                  <h2 className="flex flex-none items-center gap-2 text-sm font-bold text-text-primary">
+                    <Users className="h-4 w-4 text-text-secondary" />
                     {room.teamMode === "MANUAL_TEAM" ? "팀 편성" : "참가자"}
-                    <span className="text-sm font-normal text-text-tertiary">
+                    <span className="font-normal text-text-tertiary">
                       {totalPlayers}/{room.maxParticipants}
                     </span>
                   </h2>
+                  <span
+                    className={`inline-flex flex-none items-center gap-1.5 text-sm font-bold ${
+                      canStart ? "text-accent-success" : "text-text-primary"
+                    }`}
+                  >
+                    {canStart ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <Clock3 className="h-4 w-4 text-accent-primary" />
+                    )}
+                    {readyBarStatus}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {startRequirements.map((requirement) => (
+                      <span
+                        key={requirement.id}
+                        title={requirement.detail}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                          requirement.complete
+                            ? "border-accent-success/30 bg-accent-success/10 text-accent-success"
+                            : "border-accent-warning/30 bg-accent-warning/10 text-accent-warning"
+                        }`}
+                      >
+                        {requirement.complete ? (
+                          <CheckCircle2 className="h-3 w-3 flex-none" />
+                        ) : (
+                          <Clock3 className="h-3 w-3 flex-none" />
+                        )}
+                        {requirement.label}
+                        <span className="font-bold">{requirement.value}</span>
+                      </span>
+                    ))}
+                  </div>
+                  <span
+                    className="min-w-0 flex-1 truncate text-xs text-text-secondary"
+                    title={firstBlockingRequirement?.detail}
+                  >
+                    {firstBlockingRequirement?.detail}
+                  </span>
                 </div>
-                <div className="min-h-0 flex-1 basis-0 space-y-4 overflow-y-auto p-4">
-                  {participantsList}
+                {voiceWarning && (
+                  <div className="px-4 pt-4">{voiceWarning}</div>
+                )}
+                {/* 카드 — 큰 방에서 넘치면 이 칸만 스크롤 */}
+                <div className="min-h-0 flex-1 basis-0 overflow-y-auto overscroll-contain p-4">
+                  {participantsCards}
+                </div>
+                {/* 운영·관전 띠 — 늘 아래에 붙어 있다 */}
+                <div className="flex-shrink-0 px-4 pb-4">
+                  <LobbySpectatorStrip
+                    room={room}
+                    spectators={spectators}
+                    currentUser={currentUser}
+                    currentUserParticipant={currentUserParticipant}
+                    currentUserIsSpectator={currentUserIsSpectator}
+                    isCurrentUserHost={isCurrentUserHost}
+                    emptySlots={emptySlots}
+                    toggleSpectator={toggleSpectator}
+                    addToast={addToast}
+                  />
                 </div>
               </section>
 
-              {/* Chat: 1/3 */}
-              <section
-                data-tour="lobby-chat"
-                className="flex min-h-0 min-w-0 flex-[1] flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
-              >
-                <div className="px-5 py-3 border-b border-bg-tertiary">
-                  <h2 className="font-bold text-text-primary flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5 text-text-secondary" />
-                    채팅
-                  </h2>
-                </div>
-                <div className="flex min-h-0 flex-1 basis-0 overflow-hidden">
-                  {chatPanel}
-                </div>
-              </section>
+              <div className="flex min-h-0 w-80 flex-shrink-0 flex-col gap-4 2xl:w-96">
+                {/* 방 정보 — 제목·나가기·설정 값·행동 버튼·방장 버튼 */}
+                <section className="flex-shrink-0 rounded-xl border border-bg-tertiary bg-bg-secondary p-4">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h1
+                        className="truncate text-lg font-bold text-text-primary"
+                        title={room.name}
+                      >
+                        {room.name}
+                      </h1>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-accent-primary">
+                          #{room.id.slice(0, 4)}
+                        </span>
+                        {room.isPrivate && (
+                          <span className="flex items-center gap-1 rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-semibold text-text-secondary">
+                            <Shield className="h-3 w-3" />
+                            비공개
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={requestLeaveLobby}
+                      className="inline-flex flex-shrink-0 items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300"
+                      title="방 나가기"
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      나가기
+                    </button>
+                  </div>
+                  <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5 border-t border-bg-tertiary pt-4 text-sm">
+                    {roomInfoItems.map((item) => (
+                      <div key={item.label} className="min-w-0">
+                        <dt className="text-[11px] text-text-tertiary">
+                          {item.label}
+                        </dt>
+                        <dd className="truncate font-semibold text-text-primary">
+                          {item.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <div className="mt-4 border-t border-bg-tertiary pt-4">
+                    {desktopActions}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-text-secondary">
+                    {isCurrentUserHost && (
+                      <button
+                        onClick={() => setIsSettingsModalOpen(true)}
+                        className="flex items-center justify-center gap-1.5 rounded-lg bg-bg-tertiary/60 px-3 py-2 transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+                      >
+                        <Settings className="h-4 w-4" /> 방 설정
+                      </button>
+                    )}
+                    <button
+                      onClick={handleShare}
+                      className="flex items-center justify-center gap-1.5 rounded-lg bg-bg-tertiary/60 px-3 py-2 transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+                      title="내전 방 링크 공유"
+                    >
+                      <Share2 className="h-4 w-4" /> 링크 공유
+                    </button>
+                    {isCurrentUserHost && (
+                      <button
+                        onClick={() => setIsBroadcastModalOpen(true)}
+                        className="flex items-center justify-center gap-1.5 rounded-lg bg-bg-tertiary/60 px-3 py-2 transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+                        title="방송용 오버레이 링크"
+                      >
+                        <Radio className="h-4 w-4" /> 방송 링크
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setIsUserSettingsModalOpen(true)}
+                      className="flex items-center justify-center gap-1.5 rounded-lg bg-bg-tertiary/60 px-3 py-2 transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+                    >
+                      <UserCog className="h-4 w-4" /> 내 설정
+                    </button>
+                  </div>
+                </section>
+
+                {/* 채팅 — 남는 높이를 다 쓴다 */}
+                <section
+                  data-tour="lobby-chat"
+                  className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary"
+                >
+                  <div className="border-b border-bg-tertiary px-4 py-2.5">
+                    <h2 className="flex items-center gap-2 text-sm font-bold text-text-primary">
+                      <MessageSquare className="h-4 w-4 text-text-secondary" />
+                      채팅
+                    </h2>
+                  </div>
+                  <div className="flex min-h-0 flex-1 basis-0 overflow-hidden">
+                    {chatPanel}
+                  </div>
+                </section>
+              </div>
             </div>
           )}
 

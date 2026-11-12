@@ -5,6 +5,12 @@ import { Crown, Users } from "lucide-react";
 import { useState } from "react";
 import { teamSizeForRoom } from "@nexus/types";
 import { CompactParticipantCard } from "./CompactParticipantCard";
+import {
+  EmptyPortraitSlot,
+  PORTRAIT_GRID_COLS,
+  PortraitParticipantCard,
+  portraitCardSize,
+} from "./PortraitParticipantCard";
 
 /**
  * 대기석에 한 번에 그리는 인원.
@@ -43,6 +49,11 @@ interface LobbyParticipantsListProps {
     message: string,
     type: "success" | "error" | "info" | "warning",
   ) => void;
+  /**
+   * list: 예전 2열 목록 (모바일). 맨 위 전환 버튼·맨 아래 관전자 목록 포함.
+   * cards: 데스크톱 초상화 카드. 전환 버튼·관전자는 LobbySpectatorStrip 이 맡아서 여기선 뺀다.
+   */
+  layout?: "list" | "cards";
 }
 
 export function LobbyParticipantsList({
@@ -65,7 +76,10 @@ export function LobbyParticipantsList({
   toggleSpectator,
   selectTeam,
   addToast,
+  layout = "list",
 }: LobbyParticipantsListProps) {
+  const isCards = layout === "cards";
+  const cardSize = portraitCardSize(room.maxParticipants);
   const [expandedWaiting, setExpandedWaiting] = useState(false);
   // 팀이 많으면(배그 16팀) 카드가 세로로 끝없이 늘어난다. 접었다 펼 수 있게 둔다.
   const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(
@@ -111,8 +125,9 @@ export function LobbyParticipantsList({
 
   return (
     <div>
-      {/* 관전자 전환 버튼 */}
-      {(room.allowSpectators || isCurrentUserHost) &&
+      {/* 관전자 전환 버튼 — 카드 배치에선 운영·관전 띠에 있다 */}
+      {!isCards &&
+        (room.allowSpectators || isCurrentUserHost) &&
         room.status === "WAITING" &&
         currentUserParticipant && (
           <button
@@ -273,13 +288,50 @@ export function LobbyParticipantsList({
         </div>
       )}
 
+      {/* 데스크톱 초상화 카드 — 팀 선택 모드는 팀 박스 구조라 아래 목록을 그대로 쓴다 */}
+      {isCards && !isManualTeamMode && (
+        <div className={`grid gap-3 ${PORTRAIT_GRID_COLS[cardSize]}`}>
+          {(expandedWaiting
+            ? waitingPlayers
+            : waitingPlayers.slice(0, WAITING_LIST_CHUNK)
+          ).map((participant: any) => (
+            <PortraitParticipantCard
+              key={participant.id}
+              p={participant}
+              size={cardSize}
+              isCurrentUserHost={isCurrentUserHost}
+              isSelf={participant.userId === currentUser?.id}
+              isFriend={friendUserIds.has(participant.userId)}
+              isSent={sentFriendIds.has(participant.userId)}
+              addingFriend={addingFriend}
+              setHoveredPlayer={setHoveredPlayer}
+              scheduleHoverClose={scheduleHoverClose}
+              cancelHoverClose={cancelHoverClose}
+              handleAddFriend={handleAddFriend}
+              setKickTarget={setKickTarget}
+            />
+          ))}
+          {/* 빈 자리도 칸으로 — 단, 큰 방(xs)은 수십 칸이 되니 아래 한 줄로만 */}
+          {cardSize !== "xs" &&
+            Array.from({ length: emptySlots }, (_, i) => (
+              <EmptyPortraitSlot
+                key={`empty-${i}`}
+                size={cardSize}
+                index={waitingPlayers.length + i + 1}
+              />
+            ))}
+        </div>
+      )}
+
       {/* 플레이어 목록 또는 자유 팀 편성 대기석 */}
-      <div className="grid grid-cols-2 gap-1.5">
-        {(expandedWaiting
-          ? waitingPlayers
-          : waitingPlayers.slice(0, WAITING_LIST_CHUNK)
-        ).map(participantCard)}
-      </div>
+      {(!isCards || isManualTeamMode) && (
+        <div className="grid grid-cols-2 gap-1.5">
+          {(expandedWaiting
+            ? waitingPlayers
+            : waitingPlayers.slice(0, WAITING_LIST_CHUNK)
+          ).map(participantCard)}
+        </div>
+      )}
       {!expandedWaiting && waitingPlayers.length > WAITING_LIST_CHUNK && (
         <button
           type="button"
@@ -294,15 +346,17 @@ export function LobbyParticipantsList({
           대기석이 비어 있습니다
         </div>
       )}
-      {!isManualTeamMode && emptySlots > 0 && (
-        <div className="mt-2 text-center py-2 rounded-lg border border-dashed border-bg-elevated/60 text-sm text-text-muted">
-          <Users className="h-4 w-4 inline mr-1.5 opacity-50" />
-          {emptySlots}자리 남음
-        </div>
-      )}
+      {!isManualTeamMode &&
+        emptySlots > 0 &&
+        (!isCards || cardSize === "xs") && (
+          <div className="mt-2 text-center py-2 rounded-lg border border-dashed border-bg-elevated/60 text-sm text-text-muted">
+            <Users className="h-4 w-4 inline mr-1.5 opacity-50" />
+            {emptySlots}자리 남음
+          </div>
+        )}
 
-      {/* 관전자 섹션 */}
-      {spectators.length > 0 && (
+      {/* 관전자 섹션 — 카드 배치에선 운영·관전 띠에 있다 */}
+      {!isCards && spectators.length > 0 && (
         <div className="mt-4">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">
