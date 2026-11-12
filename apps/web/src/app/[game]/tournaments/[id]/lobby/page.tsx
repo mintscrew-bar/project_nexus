@@ -21,6 +21,7 @@ import { ChatBox } from "@/components/domain/ChatBox";
 import { RoomSettingsModal } from "@/components/domain/RoomSettingsModal";
 import { UserSettingsModal } from "@/components/domain/UserSettingsModal";
 import {
+  Button,
   ConfirmModal,
   Tabs,
   TabsList,
@@ -1355,15 +1356,18 @@ export default function TournamentLobbyPage() {
           <div className="container mx-auto flex items-center justify-between gap-4">
             {/* Left: back + room info */}
             <div className="flex items-center gap-3 min-w-0">
-              <button
+              {/* 나가기 — 사이트 공용 leave 모양. 좁은 화면에선 아이콘만 */}
+              <Button
+                variant="leave"
+                size="sm"
                 onClick={requestLeaveLobby}
-                className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-2 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300"
+                className="min-h-11 flex-shrink-0 gap-1.5 px-2.5 sm:px-3"
                 title="방 나가기"
                 aria-label="방 나가기"
               >
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">방 나가기</span>
-              </button>
+              </Button>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-lg font-bold text-text-primary truncate">
@@ -1700,15 +1704,17 @@ export default function TournamentLobbyPage() {
                         )}
                       </div>
                     </div>
-                    <button
+                    {/* 나가기 — 사이트 공용 leave 모양 (Button variant="leave") */}
+                    <Button
+                      variant="leave"
+                      size="sm"
                       onClick={requestLeaveLobby}
-                      // 작고 옅으면 안 보이고(2026-11-12), 원색 그대로면 형광이라 눈이 아프다 — 위험색을 65%로 깔아 원색과 짙은 색 사이로
-                      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-accent-danger/65 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-accent-danger/80"
+                      className="flex-shrink-0 gap-1.5"
                       title="방 나가기"
                     >
                       <LogOut className="h-4 w-4" />
                       나가기
-                    </button>
+                    </Button>
                   </div>
                   <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5 border-t border-bg-tertiary pt-4 text-sm">
                     {roomInfoItems.map((item) => (

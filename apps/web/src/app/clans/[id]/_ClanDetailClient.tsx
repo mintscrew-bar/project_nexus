@@ -822,7 +822,7 @@ export default function ClanDetailClient({
                       )}
                       {!isOwner && (
                         <Button
-                          variant="ghost"
+                          variant="leave"
                           onClick={() => setShowLeaveConfirm(true)}
                         >
                           <LogOut className="h-4 w-4 mr-2" />

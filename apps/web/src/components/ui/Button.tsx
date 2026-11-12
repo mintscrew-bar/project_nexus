@@ -14,6 +14,10 @@ const buttonVariants = cva(
           'bg-bg-tertiary text-text-primary border border-text-tertiary hover:bg-bg-elevated focus:ring-accent-primary',
         danger:
           'bg-accent-danger text-white hover:bg-accent-danger/90 active:bg-accent-danger/80 focus:ring-accent-danger',
+        // 나가기·탈퇴 전용 — 위험색을 65% 로 깐다. 원색(danger)은 형광처럼 눈이 아프고
+        // 옅은 색은 안 보인다는 피드백(2026-11-12 로비)으로 정한 톤. 나가는 버튼은 전부 이걸 쓴다.
+        leave:
+          'bg-accent-danger/65 text-white font-bold hover:bg-accent-danger/80 active:bg-accent-danger/90 focus:ring-accent-danger',
         success:
           'bg-accent-success text-white hover:bg-accent-success/90 active:bg-accent-success/80 focus:ring-accent-success',
         ghost:

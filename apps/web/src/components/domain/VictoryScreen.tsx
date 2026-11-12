@@ -439,7 +439,7 @@ export function VictoryScreen({
                 로비로 돌아가기
                 {!isReturning && <ArrowRight className="h-4 w-4" />}
               </Button>
-              <Button onClick={handleExit} variant="ghost" size="md" className="shrink-0 gap-1.5 text-white/40 hover:text-white/70">
+              <Button onClick={handleExit} variant="leave" size="md" className="shrink-0 gap-1.5">
                 <LogOut className="h-4 w-4" />
                 나가기
               </Button>
