@@ -337,8 +337,9 @@ export function PortraitParticipantCard({
         className={cn(
           "flex flex-shrink-0 items-center justify-center gap-1 font-black",
           size === "lg" ? "h-7 text-xs" : "h-5 text-[10px]",
+          // 원색 초록은 형광처럼 눈이 아파서(2026-11-12) 35% 로 깔아 짙은 초록으로
           p.isReady
-            ? "bg-accent-success text-white"
+            ? "bg-accent-success/35 text-white"
             : "bg-bg-elevated/60 text-text-tertiary",
         )}
       >
