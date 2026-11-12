@@ -1152,14 +1152,15 @@ export default function TournamentLobbyPage() {
   const startButtonClass = `inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-base font-black transition-all ${
     canStart
       ? "bg-accent-success text-white hover:bg-accent-success/90 animate-glow-success"
-      : "border border-accent-success/50 bg-accent-success/10 text-accent-success hover:bg-accent-success/20"
+      : "bg-accent-success/15 text-accent-success hover:bg-accent-success/25"
   }`;
   const desktopActions = (
     <div data-tour="lobby-ready-action" className="flex flex-col gap-2">
       {room.status !== "DRAFT_COMPLETED" && !currentUserIsSpectator && (
         <>
-          {/* 준비한 뒤엔 상태를 초록 글자로 먼저 알려주고, 취소 버튼은 빨간 테두리로
-              분명하게 — 회색 버튼은 "눌린 건지 아닌지" 안 보인다는 피드백(2026-11-12) */}
+          {/* 준비한 뒤엔 상태를 초록 글자로 먼저 알려주고, 취소 버튼은 옅은 빨강으로 채워
+              분명하게 — 회색 버튼은 "눌린 건지 아닌지" 안 보인다는 피드백(2026-11-12).
+              로비 오른쪽 버튼은 전부 테두리 없이 채운 모양으로 맞춘다. */}
           {currentUserIsReady && !needsManualTeamSelection && (
             <p className="flex items-center justify-center gap-1.5 text-sm font-black text-accent-success">
               <CheckCircle2 className="h-4 w-4" /> 준비 완료 — 시작을 기다리는
@@ -1169,7 +1170,7 @@ export default function TournamentLobbyPage() {
           <button
             className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-black transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
               currentUserIsReady
-                ? "border-2 border-accent-danger/60 bg-accent-danger/10 text-accent-danger hover:bg-accent-danger/20"
+                ? "bg-accent-danger/15 text-accent-danger hover:bg-accent-danger/25"
                 : "bg-accent-primary text-accent-on hover:bg-accent-hover"
             }`}
             disabled={needsManualTeamSelection}
@@ -1228,7 +1229,7 @@ export default function TournamentLobbyPage() {
               <button
                 onClick={handleAddBot}
                 disabled={isAddingBot}
-                className="inline-flex h-12 items-center justify-center rounded-xl border border-bg-elevated px-3 text-sm text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-50"
+                className="inline-flex h-12 items-center justify-center rounded-xl bg-bg-tertiary/60 px-3 text-sm text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:opacity-50"
                 title="남은 자리를 봇으로 모두 채움 (어드민 전용)"
               >
                 {isAddingBot
@@ -1684,8 +1685,8 @@ export default function TournamentLobbyPage() {
                     </div>
                     <button
                       onClick={requestLeaveLobby}
-                      // 작고 옅으면 안 보인다는 피드백(2026-11-12) — 글자·테두리를 키우고 진하게
-                      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-red-500/70 bg-red-500/15 px-3 py-2 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/25 hover:text-red-300"
+                      // 작고 옅으면 안 보인다는 피드백(2026-11-12) — 글자를 키우고, 다른 버튼처럼 테두리 없이 채운다
+                      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-red-500/15 px-3 py-2 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/25 hover:text-red-300"
                       title="방 나가기"
                     >
                       <LogOut className="h-4 w-4" />
