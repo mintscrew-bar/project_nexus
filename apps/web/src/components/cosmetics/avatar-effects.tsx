@@ -13,22 +13,24 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { Burst, Frames, outline, PixelArt, SPARK } from "./effects";
 import {
-  Burst,
-  outline,
-  BREATH,
-  BREATH_PAL,
-  DRAGON,
-  DRAGON_PAL,
+  CROWN,
+  CROWN_PAL,
+  EAR,
+  EAR_PAL,
   FLAME,
   FLAME_PAL,
-  Frames,
-  PixelArt,
-  SPARK,
+  INK_DRAGON_AVATAR,
+  INK_DRAGON_PAL,
+  MOON,
+  MOON_PAL,
   SWORD,
   SWORD_PAL,
-  type Palette,
-} from "./effects";
+  TAIL,
+  WING,
+  WING_PAL,
+} from "./sprites";
 
 export type AvatarEffectCode =
   | "cat_ears"
@@ -47,32 +49,11 @@ const FRONT: CSSProperties = { zIndex: 20 };
 
 /* ───────── 고양이 귀 ───────── */
 
-const EAR = [
-  "...o...",
-  "..ofo..",
-  "..oPo..",
-  ".ofPfo.",
-  ".oPPPo.",
-  "ofPPPfo",
-  "ofPPPfo",
-];
 // 어두운 사이트 바탕에 묻히지 않게 밝은 치즈 고양이 색
-const EAR_PAL: Palette = { o: "#5a3418", f: "#f0a65a", P: "#f7b9c8" };
-
-const TAIL = [
-  "....oo",
-  "...off",
-  "..off.",
-  "..of..",
-  ".off..",
-  ".of...",
-  "off...",
-  "of....",
-];
 
 /** 머리 위 양쪽 귀가 쫑긋거리고, 아래쪽에서 꼬리가 살랑인다 */
 function CatEarsFx({ px, size }: FxProps) {
-  const ep = px * 2.4;
+  const ep = px * 1.9;
   return (
     <>
       <div
@@ -114,17 +95,6 @@ function CatEarsFx({ px, size }: FxProps) {
 
 /* ───────── 공전하는 달 ───────── */
 
-const MOON = [
-  "..ooo..",
-  ".oyyo..",
-  "oyyo...",
-  "oyy....",
-  "oyyo...",
-  ".oyyo..",
-  "..ooo..",
-];
-const MOON_PAL: Palette = { o: "#b39a4e", y: "#f6e7a6" };
-
 /** 초승달과 별이 아바타 둘레를 천천히 돈다 */
 function MoonFx({ px }: FxProps) {
   const pad = px * 7;
@@ -137,7 +107,7 @@ function MoonFx({ px }: FxProps) {
         className="absolute left-1/2 top-0 -translate-x-1/2"
         style={{ filter: outline("rgba(246,231,166,0.95)") }}
       >
-        <PixelArt art={MOON} palette={MOON_PAL} px={px * 2} />
+        <PixelArt art={MOON} palette={MOON_PAL} px={px * 1.6} />
       </div>
       {[
         "bottom-0 left-1/2 -translate-x-1/2",
@@ -162,26 +132,9 @@ function MoonFx({ px }: FxProps) {
 
 /* ───────── 반짝 왕관 ───────── */
 
-const CROWN = [
-  "o....o....o",
-  "yo..oyo..oy",
-  "yyo.oyo.oyy",
-  "yyyoyyyoyyy",
-  "yRyyyByyyRy",
-  "yyyyyyyyyyy",
-  "ddddddddddd",
-];
-const CROWN_PAL: Palette = {
-  o: "#f9de7a",
-  y: "#f0c03a",
-  d: "#a87a16",
-  R: "#e0475f",
-  B: "#5aa9ff",
-};
-
 /** 머리 위에 비스듬히 얹혀 둥실거리고, 보석이 가끔 반짝인다 */
 function CrownFx({ px, size }: FxProps) {
-  const cp = px * 2;
+  const cp = px * 1.45;
   return (
     <div
       className="absolute"
@@ -193,7 +146,7 @@ function CrownFx({ px, size }: FxProps) {
       >
         <PixelArt art={CROWN} palette={CROWN_PAL} px={cp} />
         {/* 보석 셋이 번갈아 반짝 */}
-        {[0, 4, 8].map((x, i) => (
+        {[2, 6, 10].map((x, i) => (
           <PixelArt
             key={x}
             art={SPARK}
@@ -202,7 +155,7 @@ function CrownFx({ px, size }: FxProps) {
             className="cfx-twinkle absolute"
             style={{
               left: x * cp,
-              top: 3 * cp,
+              top: 6 * cp,
               animationDuration: "1.5s",
               animationDelay: `${-i * 0.5}s`,
             }}
@@ -293,12 +246,12 @@ function FireRingFx({ px, size }: FxProps) {
           >
             <div
               className="absolute bottom-0"
-              style={{ left: -3.5 * px * (i % 2 ? 1.4 : 1.9) }}
+              style={{ left: -4.5 * px * (i % 2 ? 1 : 1.35) }}
             >
               <Frames
                 frames={FLAME}
                 palette={FLAME_PAL}
-                px={px * (i % 2 ? 1.4 : 1.9)}
+                px={px * (i % 2 ? 1 : 1.35)}
                 duration={0.34}
                 delay={-(i % 3) * 0.14}
               />
@@ -312,25 +265,13 @@ function FireRingFx({ px, size }: FxProps) {
 
 /* ───────── 박쥐 날개 ───────── */
 
-const WING = [
-  ".............o",
-  "..........ooxo",
-  ".......ooxxxxo",
-  "....ooxxxmxxo.",
-  "..oxxxxmxxxxo.",
-  ".oxxxmxxxxxo..",
-  "oxx.xx.xxxo...",
-  "ox..x..xxo....",
-  "o...o..oo.....",
-];
-const WING_PAL: Palette = { o: "#0f0a16", x: "#3a2a55", m: "#7a55a8" };
 /** 어두운 바탕에서도 날개 윤곽이 보이게 보랏빛 테두리 */
 const WING_GLOW = "drop-shadow(0 0 3px rgba(170,120,255,0.75))";
 
 /** 아바타 뒤 양쪽으로 펼친 박쥐 날개가 천천히 퍼덕인다 */
 function BatWingsFx({ px, size }: FxProps) {
-  const wp = px * 3;
-  const wingW = 14 * wp;
+  const wp = px * 2.3;
+  const wingW = 18 * wp;
   return (
     <>
       <div
@@ -364,9 +305,9 @@ function BatWingsFx({ px, size }: FxProps) {
 
 /** 아바타 뒤에서 두 검이 엇갈려 있다가, 몇 초마다 맞부딪치며 빛이 번진다 */
 function TwinSwordsFx({ px, size }: FxProps) {
-  const sp = px * 4.4;
-  const w = 9 * sp;
-  const h = 16 * sp;
+  const sp = px * 2;
+  const w = 15 * sp;
+  const h = 35 * sp;
   const common: CSSProperties = {
     ...BACK,
     left: size / 2 - w / 2,
@@ -403,40 +344,66 @@ function TwinSwordsFx({ px, size }: FxProps) {
 
 /* ───────── 휘감는 용 ───────── */
 
-/** 픽셀 용이 아바타 둘레를 돌며 날갯짓하고, 한 바퀴에 한 번 불을 뿜는다 */
-function DragonOrbitFx({ px }: FxProps) {
-  const dp = px * 2;
-  const pad = 9 * dp;
+/**
+ * 수묵 흑룡이 아바타 둘레를 휘감는다. 몸은 6프레임으로 물결치고,
+ * 감은 고리 전체가 천천히 돈다. 격자 가운데가 아바타 중심이다.
+ */
+function DragonOrbitFx({ size }: FxProps) {
+  // 격자(92칸)에서 아바타 반지름은 약 30칸 — 아바타 지름에 맞춰 한 칸 크기를 정한다
+  const cell = size / 60;
+  const box = 92 * cell;
+  const ring = box * 0.98;
   return (
-    <div
-      className="cfx-spin-rev absolute"
-      style={{ ...FRONT, inset: -pad, animationDuration: "4.5s" }}
-    >
+    <>
+      {/* 아바타 뒤 한지 고리 — 먹빛 용이 어두운 화면에서도 수묵화처럼 보이게 */}
       <div
-        className="absolute left-1/2 top-0 -translate-x-1/2"
-        style={{ filter: outline("rgba(255,180,120,0.9)") }}
+        className="absolute rounded-full"
+        style={{
+          ...BACK,
+          left: size / 2 - ring / 2,
+          top: size / 2 - ring / 2,
+          width: ring,
+          height: ring,
+          background:
+            "radial-gradient(circle, rgba(238,234,224,0.95) 52%, rgba(238,234,224,0.7) 62%, rgba(238,234,224,0) 72%)",
+        }}
+      />
+      <div
+        className="cfx-spin-rev absolute"
+        style={{
+          ...FRONT,
+          left: size / 2 - box / 2,
+          top: size / 2 - box / 2,
+          width: box,
+          height: box,
+          animationDuration: "18s",
+        }}
       >
-        <div className="relative">
-          <div
-            className="cfx-breath absolute"
-            style={{
-              right: "100%",
-              top: 1.3 * dp,
-              marginRight: -px,
-              animationDuration: "4.5s",
-            }}
-          >
-            <Frames
-              frames={BREATH}
-              palette={BREATH_PAL}
-              px={dp * 1.3}
-              duration={0.2}
-            />
-          </div>
-          <Frames frames={DRAGON} palette={DRAGON_PAL} px={dp} duration={0.5} />
-        </div>
+        <Frames
+          frames={INK_DRAGON_AVATAR}
+          palette={INK_DRAGON_PAL}
+          px={cell}
+          duration={0.9}
+        />
       </div>
-    </div>
+      {/* 낙관 — 붉은 도장 */}
+      <div
+        className="absolute flex items-center justify-center rounded-[3px] font-black text-[#f6e9e4]"
+        style={{
+          ...FRONT,
+          right: -size * 0.12,
+          bottom: -size * 0.06,
+          width: size * 0.17,
+          height: size * 0.17,
+          fontSize: size * 0.12,
+          lineHeight: 1,
+          background: "#b3121b",
+          boxShadow: "0 0 0 1px rgba(80,0,0,0.6)",
+        }}
+      >
+        龍
+      </div>
+    </>
   );
 }
 

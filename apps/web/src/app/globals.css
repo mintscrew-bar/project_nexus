@@ -1366,10 +1366,10 @@ body.scroll-locked {
 
 /* 용의 숨결 — 오른쪽에서 날아와 가운데서 불을 뿜고 왼쪽으로 빠진다 */
 @keyframes cfx-dragon-fly {
-  0% { left: 110%; top: 14%; }
-  22% { left: 40%; top: 20%; }
-  58% { left: 36%; top: 14%; }
-  80%, 100% { left: -75%; top: 6%; }
+  0% { left: 105%; top: 4%; }
+  30% { left: 12%; top: 10%; }
+  55% { left: 4%; top: 2%; }
+  85%, 100% { left: -115%; top: 6%; }
 }
 .cfx-dragon-fly { animation: cfx-dragon-fly 8s ease-in-out infinite; }
 /* 불을 뿜는 동안 초상화가 주황으로 달아오른다 */
@@ -1500,3 +1500,22 @@ body.scroll-locked {
   100% { opacity: 0; }
 }
 .cfx-clash-burst { opacity: 0; animation: cfx-clash-burst 2.4s ease-out infinite; }
+
+/* 6프레임 넘김 (수묵 용) — 프레임마다 지연을 줘서 차례로 켠다 */
+@keyframes cfx-f6 {
+  0%, 16.6% { opacity: 1; }
+  16.7%, 100% { opacity: 0; }
+}
+.cfx-f6 { opacity: 0; animation: cfx-f6 0.9s infinite; }
+
+/* 흑룡이 지나가는 동안 초상화 위에 한지 바탕이 번져 나온다 */
+@keyframes cfx-ink-veil {
+  0%, 8%, 82%, 100% { opacity: 0; }
+  25%, 62% { opacity: 1; }
+}
+.cfx-ink-veil {
+  /* 한지 바탕 — 먹빛 용이 사진 위에서도 수묵화처럼 또렷하게 */
+  background: radial-gradient(ellipse at 50% 45%, rgba(238, 234, 224, 0.92) 30%, rgba(238, 234, 224, 0.55) 60%, transparent 80%);
+  opacity: 0;
+  animation: cfx-ink-veil 7s ease-in-out infinite;
+}

@@ -13,6 +13,18 @@
 
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
+import {
+  BAT,
+  BAT_PAL,
+  FLAME,
+  FLAME_PAL,
+  INK_DRAGON_CARD,
+  INK_DRAGON_PAL,
+  SLIME,
+  SLIME_PAL,
+  SWORD,
+  SWORD_PAL,
+} from "./sprites";
 
 export type CosmeticEffectCode =
   | "slime"
@@ -43,28 +55,20 @@ export function PixelArt({
 }) {
   const w = Math.max(...art.map((row) => row.length));
   const h = art.length;
-  const rects: React.ReactNode[] = [];
+  // 같은 색을 path 하나에 모은다. 가로로 이어진 칸은 사각형 하나로 합친다.
+  // 점묘가 많은 그림(수묵 용)도 DOM 노드가 색 수만큼만 생긴다.
+  const paths: Record<string, string> = {};
   art.forEach((row, y) => {
     let x = 0;
     while (x < row.length) {
       const c = row[x];
-      const fill = palette[c];
-      if (!fill) {
+      if (!palette[c]) {
         x++;
         continue;
       }
       let run = 1;
       while (row[x + run] === c) run++;
-      rects.push(
-        <rect
-          key={`${x}-${y}`}
-          x={x}
-          y={y}
-          width={run}
-          height={1}
-          fill={fill}
-        />,
-      );
+      paths[c] = (paths[c] ?? "") + `M${x} ${y}h${run}v1h-${run}z`;
       x += run;
     }
   });
@@ -77,7 +81,9 @@ export function PixelArt({
       className={cn("block", className)}
       style={style}
     >
-      {rects}
+      {Object.entries(paths).map(([c, d]) => (
+        <path key={c} d={d} fill={palette[c]} />
+      ))}
     </svg>
   );
 }
@@ -96,10 +102,14 @@ export function Frames({
   duration: number;
   delay?: number;
 }) {
+  const n = frames.length;
+  // 2·3프레임은 전용 클래스, 그보다 많으면 공용 6프레임 클래스에 지연을 줘서 순서대로 켠다
   const cls =
-    frames.length === 2
+    n === 2
       ? ["cfx-flap-a", "cfx-flap-b"]
-      : ["cfx-f3-1", "cfx-f3-2", "cfx-f3-3"];
+      : n === 3
+        ? ["cfx-f3-1", "cfx-f3-2", "cfx-f3-3"]
+        : frames.map(() => "cfx-f6");
   return (
     <div className="relative">
       {frames.map((art, i) => (
@@ -111,7 +121,8 @@ export function Frames({
           className={cn(cls[i], i > 0 && "absolute left-0 top-0")}
           style={{
             animationDuration: `${duration}s`,
-            animationDelay: `${delay}s`,
+            animationDelay:
+              n > 3 ? `${delay - ((n - i) / n) * duration}s` : `${delay}s`,
           }}
         />
       ))}
@@ -177,32 +188,12 @@ export function Burst({
 
 /* ───────── 슬라임 ───────── */
 
-const SLIME = [
-  "....oooo....",
-  "..oolllloo..",
-  ".oHlllllllo.",
-  "oHlllllllllo",
-  "olllellelllo",
-  "olllellelldo",
-  "ollllllllldo",
-  "odlllllllddo",
-  ".oddddddddo.",
-  "..oooooooo..",
-];
-const SLIME_PAL: Palette = {
-  o: "#1d4428",
-  l: "#5cc46a",
-  d: "#3a9150",
-  H: "#d3f7c9",
-  e: "#10131c",
-};
-
 /**
  * 큰 슬라임이 높이 뛰어 철퍽 착지하면 물방울이 튄다. 새끼 슬라임이 뒤를 쫓는다.
  * 착지(58%)와 물방울 박자는 1.1초로 맞춘다.
  */
 function SlimeFx({ px }: { px: number }) {
-  const big = px * 1.25;
+  const big = px * 0.95;
   return (
     <>
       <div className="cfx-slime-walk absolute bottom-0">
@@ -221,7 +212,7 @@ function SlimeFx({ px }: { px: number }) {
               dist={big * 7}
               duration={1.1}
               className="cfx-splash"
-              style={{ left: 6 * big, bottom: big }}
+              style={{ left: 8 * big, bottom: big }}
             />
           </div>
         </div>
@@ -239,7 +230,7 @@ function SlimeFx({ px }: { px: number }) {
               filter: outline("rgba(120,230,140,0.6)"),
             }}
           >
-            <PixelArt art={SLIME} palette={SLIME_PAL} px={px * 0.6} />
+            <PixelArt art={SLIME} palette={SLIME_PAL} px={px * 0.45} />
           </div>
         </div>
       </div>
@@ -347,58 +338,14 @@ function SakuraFx({ px }: { px: number }) {
 
 /* ───────── 픽셀 화염 ───────── */
 
-export const FLAME = [
-  [
-    "...r...",
-    "...r...",
-    "..rRr..",
-    "..rRr..",
-    ".rRyRr.",
-    ".rRyRr.",
-    "rRyYyRr",
-    "rRyYyRr",
-    "rRyYyRr",
-    ".rRyRr.",
-  ],
-  [
-    "....r..",
-    "...rr..",
-    "..rRr..",
-    "..rRRr.",
-    ".rRyRr.",
-    ".rRyyRr",
-    "rRyYyRr",
-    "rRyYYRr",
-    "rRyYyRr",
-    ".rRyRr.",
-  ],
-  [
-    "..r....",
-    "..rr...",
-    ".rRr...",
-    ".rRRr..",
-    ".rRyRr.",
-    "rRyyRr.",
-    "rRyYyRr",
-    "rRYYyRr",
-    "rRyYyRr",
-    ".rRyRr.",
-  ],
-];
-export const FLAME_PAL: Palette = {
-  r: "#c2410c",
-  R: "#f06a1e",
-  y: "#ffae2e",
-  Y: "#fff1b8",
-};
 const FLAMES = [
-  { left: -6, scale: 1.7, delay: 0 },
-  { left: 9, scale: 2.3, delay: -0.15 },
-  { left: 27, scale: 1.5, delay: -0.3 },
-  { left: 40, scale: 2.1, delay: -0.1 },
-  { left: 57, scale: 1.6, delay: -0.25 },
-  { left: 70, scale: 2.4, delay: -0.05 },
-  { left: 87, scale: 1.8, delay: -0.2 },
+  { left: -6, scale: 1.27, delay: 0 },
+  { left: 9, scale: 1.72, delay: -0.15 },
+  { left: 27, scale: 1.12, delay: -0.3 },
+  { left: 40, scale: 1.58, delay: -0.1 },
+  { left: 57, scale: 1.2, delay: -0.25 },
+  { left: 70, scale: 1.8, delay: -0.05 },
+  { left: 87, scale: 1.35, delay: -0.2 },
 ];
 const EMBERS = Array.from({ length: 10 }, (_, i) => ({
   left: 4 + i * 10,
@@ -448,18 +395,13 @@ function FireFx({ px }: { px: number }) {
 
 /* ───────── 박쥐 떼 ───────── */
 
-const BAT = [
-  ["x.........x", "xx..x.x..xx", "xxxxexexxxx", "..xxxxxxx..", "....x.x...."],
-  ["....x.x....", "...xxxxx...", "..xxexexx..", ".xxx.x.xxx.", "xx.......xx"],
-];
-export const BAT_PAL: Palette = { x: "#22183a", e: "#ff4f74" };
 const BATS = [
-  { top: 16, dur: 3.6, delay: 0, flap: 0.22, scale: 1.6, rev: false },
-  { top: 44, dur: 4.4, delay: -1.4, flap: 0.26, scale: 1.2, rev: true },
-  { top: 6, dur: 5.2, delay: -3.1, flap: 0.2, scale: 1.35, rev: false },
-  { top: 30, dur: 4, delay: -2.2, flap: 0.24, scale: 1, rev: true },
-  { top: 52, dur: 3.2, delay: -0.6, flap: 0.18, scale: 1.4, rev: false },
-  { top: 24, dur: 5.8, delay: -4.4, flap: 0.28, scale: 0.9, rev: true },
+  { top: 16, dur: 3.6, delay: 0, flap: 0.22, scale: 1.2, rev: false },
+  { top: 44, dur: 4.4, delay: -1.4, flap: 0.26, scale: 0.9, rev: true },
+  { top: 6, dur: 5.2, delay: -3.1, flap: 0.2, scale: 1.01, rev: false },
+  { top: 30, dur: 4, delay: -2.2, flap: 0.24, scale: 0.75, rev: true },
+  { top: 52, dur: 3.2, delay: -0.6, flap: 0.18, scale: 1.05, rev: false },
+  { top: 24, dur: 5.8, delay: -4.4, flap: 0.28, scale: 0.68, rev: true },
 ];
 
 /** 박쥐 6마리가 양쪽에서 출렁이며 쏟아지듯 날아다닌다 */
@@ -502,33 +444,6 @@ function BatsFx({ px }: { px: number }) {
 
 /* ───────── 전설의 검 ───────── */
 
-export const SWORD = [
-  "....o....",
-  "...oWo...",
-  "...oWso..",
-  "...oWso..",
-  "...oWso..",
-  "...oWso..",
-  "...oWso..",
-  "...oWso..",
-  "...oWso..",
-  ".ooGgGoo.",
-  "oGgggggGo",
-  ".ooohooo.",
-  "...oho...",
-  "...oho...",
-  "...oPo...",
-  "....o....",
-];
-export const SWORD_PAL: Palette = {
-  o: "#141824",
-  W: "#eef3fb",
-  s: "#93a3bf",
-  g: "#e2b347",
-  G: "#9a7426",
-  h: "#6e4128",
-  P: "#4fb3e8",
-};
 export const SPARK = [".w.", "wWw", ".w."];
 
 /** 검 한 번 휘두르는 박자(초) — 검·궤적·충격·파편이 모두 이 박자를 따른다 */
@@ -539,10 +454,11 @@ const SWORD_BEAT = 3.2;
  * 화면이 번쩍이며 불꽃이 튄다. 한 바퀴 돌아 제자리로 와서 칼끝이 반짝인다.
  */
 function SwordFx({ px }: { px: number }) {
-  const sp = px * 1.35;
-  const pivotX = 4.5 * sp;
-  const pivotY = 11.5 * sp;
-  const slash = 40 * sp;
+  const sp = px * 0.62;
+  // 손잡이 가운데를 축으로 휘두른다. 베기 궤적 반지름은 축~칼끝 거리에 맞춘다
+  const pivotX = 7.5 * sp;
+  const pivotY = 30.5 * sp;
+  const slash = 30.5 * sp * (70 / 26);
   const beat = { animationDuration: `${SWORD_BEAT}s` };
   return (
     <>
@@ -598,7 +514,7 @@ function SwordFx({ px }: { px: number }) {
             palette={{ w: "#cfe6ff", W: "#ffffff" }}
             px={sp}
             className="cfx-glint absolute"
-            style={{ ...beat, left: 3 * sp, top: -1 * sp }}
+            style={{ ...beat, left: 6 * sp, top: -1 * sp }}
           />
         </div>
       </div>
@@ -668,120 +584,38 @@ function LightningFx({ px }: { px: number }) {
 
 /* ───────── 용의 숨결 ───────── */
 
-export const DRAGON = [
-  [
-    "..............oo",
-    "............oowwo",
-    "..........oowwwwo",
-    "...hh....owwwwwwo",
-    "..oRRo..owwwwwwwo",
-    ".oRRRRo.owwwwwwo",
-    "oReRRRRoowwwwwo",
-    "oRRRRRRRRowwwo....oo",
-    ".ooobRRRRRRRRRo..oRo",
-    "....obbRRRRRRRRooRRo",
-    ".....obbbRRRRRRRRRo",
-    "......obbRRoRRo.ooo",
-    "......oRRo.oRRo",
-    "......ooo..ooo",
-  ],
-  [
-    "",
-    "",
-    "",
-    "...hh",
-    "..oRRo",
-    ".oRRRRo",
-    "oReRRRRoooooo",
-    "oRRRRRRRRRRRRo....oo",
-    ".ooobRRRowwwwwo..oRo",
-    "....obbRowwwwwwooRRo",
-    ".....obbbowwwwwwRRo",
-    "......obbRowwwwo.ooo",
-    "......oRRo.owwo",
-    "......ooo...oo",
-  ],
-];
-export const DRAGON_PAL: Palette = {
-  o: "#2a0e12",
-  R: "#d0453c",
-  b: "#f5c780",
-  w: "#f09a5c",
-  e: "#fff07a",
-  h: "#ece6d8",
-};
-export const BREATH = [
-  [
-    "..yyR.........",
-    "yYYyyRRr......",
-    "YYYYYyyRRRrr..",
-    "yYYYyyyRRRrrrr",
-    "YYYYYyyRRRrr..",
-    "yYYyyRRr......",
-    "..yyR.........",
-  ],
-  [
-    ".yR...........",
-    ".yYyRRr.......",
-    "yYYYyyRRrr....",
-    "YYYYYyyyRRrrrr",
-    "yYYYyyRRrr....",
-    "..yYyRRr......",
-    "...yR.........",
-  ],
-];
-export const BREATH_PAL: Palette = {
-  r: "#c2410c",
-  R: "#f07a22",
-  y: "#ffb83a",
-  Y: "#fff3c4",
-};
+/** 흑룡이 지나가는 박자(초) */
+const DRAGON_BEAT = 7;
 
-/** 용이 날아오는 박자(초) — 비행·불길·화면 달아오름이 같은 박자 */
-const DRAGON_BEAT = 6;
-
-/** 큰 용이 날아와 초상화를 가로지르는 불길을 뿜어 화면이 달아오르고, 빠져나간다 */
+/**
+ * 수묵 흑룡 — 초상화 위에 한지 바탕이 번져 나오고, 그 위를 먹빛 용이 헤엄쳐
+ * 지나간다. 몸은 6프레임으로 물결친다. 먹빛이 사진에 묻히지 않게 한지를 깐다.
+ */
 function DragonFx({ px }: { px: number }) {
-  const dp = px * 1.6;
   const beat = { animationDuration: `${DRAGON_BEAT}s` };
   return (
     <>
-      <div className="cfx-travel cfx-scorch absolute inset-0" style={beat} />
+      <div className="cfx-travel cfx-ink-veil absolute inset-0" style={beat} />
       <div className="cfx-travel cfx-dragon-fly absolute" style={beat}>
         <div
-          className="cfx-bob relative"
-          style={{
-            animationDuration: "0.9s",
-            filter: outline("rgba(255,180,120,0.9)"),
-          }}
+          className="cfx-bob"
+          style={{ animationDuration: "1.6s", filter: INK_GLOW }}
         >
-          <div
-            className="cfx-breath absolute"
-            style={{
-              ...beat,
-              right: "100%",
-              top: 2.2 * dp,
-              marginRight: -dp,
-            }}
-          >
-            <Frames
-              frames={BREATH}
-              palette={BREATH_PAL}
-              px={dp * 1.5}
-              duration={0.2}
-            />
-          </div>
           <Frames
-            frames={DRAGON}
-            palette={DRAGON_PAL}
-            px={dp}
-            duration={0.36}
+            frames={INK_DRAGON_CARD}
+            palette={INK_DRAGON_PAL}
+            px={px * 0.9}
+            duration={0.9}
           />
         </div>
       </div>
     </>
   );
 }
+
+/** 먹빛 그림이 어두운 바탕에서도 보이게 두르는 흰 번짐 */
+export const INK_GLOW =
+  "drop-shadow(0 0 1px rgba(255,255,255,0.85)) drop-shadow(0 0 5px rgba(255,255,255,0.35))";
 
 const EFFECTS: Record<
   CosmeticEffectCode,

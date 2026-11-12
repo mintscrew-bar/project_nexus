@@ -151,9 +151,8 @@ export const COSMETICS: CosmeticItem[] = [
   {
     code: "FX_DRAGON",
     slot: "CARD_FRAME",
-    name: "용의 숨결",
-    description:
-      "큰 용이 날아와 초상화를 가로지르는 불길을 뿜어 화면이 달아오른다",
+    name: "흑룡",
+    description: "수묵화 흑룡이 한지 바탕을 번지며 초상화를 헤엄쳐 지나간다",
     price: 1800,
     rarity: "RARE",
     className: "bg-[#7a561a]",
@@ -234,8 +233,8 @@ export const COSMETICS: CosmeticItem[] = [
   {
     code: "AV_DRAGON",
     slot: "AVATAR_FRAME",
-    name: "휘감는 용",
-    description: "픽셀 용이 아바타 둘레를 돌며 불을 뿜는다",
+    name: "휘감는 흑룡",
+    description: "한지 고리 위로 수묵화 흑룡이 아바타를 휘감아 돈다",
     price: 1800,
     rarity: "RARE",
     className: "",
