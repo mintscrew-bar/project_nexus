@@ -347,6 +347,7 @@ function TwinSwordsFx({ px, size }: FxProps) {
 /**
  * 수묵 흑룡이 아바타 둘레를 휘감는다. 몸은 6프레임으로 물결치고,
  * 감은 고리 전체가 천천히 돈다. 격자 가운데가 아바타 중심이다.
+ * 그림의 머리가 시계 방향을 보므로 고리도 시계 방향으로 돌린다(머리가 앞장서게).
  */
 function DragonOrbitFx({ size }: FxProps) {
   // 격자(92칸)에서 아바타 반지름은 약 30칸 — 아바타 지름에 맞춰 한 칸 크기를 정한다
@@ -369,7 +370,7 @@ function DragonOrbitFx({ size }: FxProps) {
         }}
       />
       <div
-        className="cfx-spin-rev absolute"
+        className="cfx-spin absolute"
         style={{
           ...FRONT,
           left: size / 2 - box / 2,

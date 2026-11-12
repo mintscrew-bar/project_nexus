@@ -1136,33 +1136,11 @@ body.scroll-locked {
    초상화 위에서 움직이는 캐릭터·연출. 픽셀 그림의 프레임 넘김은 steps 없이
    opacity 를 끊어서 바꾼다(0~49.9% 보이고 50%부터 숨김). */
 
-/* 프레임 넘김 — 2프레임(날갯짓), 3프레임(불꽃) */
-@keyframes cfx-frame-a {
-  0%, 49.9% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+/* 프레임 넘김 — 그림띠를 한 칸씩 민다. 칸 수만큼 steps(n) 은 요소에 직접 준다 */
+@keyframes cfx-sheet {
+  to { transform: translateX(-100%); }
 }
-@keyframes cfx-frame-b {
-  0%, 49.9% { opacity: 0; }
-  50%, 100% { opacity: 1; }
-}
-.cfx-flap-a { animation: cfx-frame-a 0.36s infinite; }
-.cfx-flap-b { animation: cfx-frame-b 0.36s infinite; }
-@keyframes cfx-f3-1 {
-  0%, 33.2% { opacity: 1; }
-  33.3%, 100% { opacity: 0; }
-}
-@keyframes cfx-f3-2 {
-  0%, 33.2% { opacity: 0; }
-  33.3%, 66.5% { opacity: 1; }
-  66.6%, 100% { opacity: 0; }
-}
-@keyframes cfx-f3-3 {
-  0%, 66.5% { opacity: 0; }
-  66.6%, 100% { opacity: 1; }
-}
-.cfx-f3-1 { animation: cfx-f3-1 0.42s infinite; }
-.cfx-f3-2 { animation: cfx-f3-2 0.42s infinite; }
-.cfx-f3-3 { animation: cfx-f3-3 0.42s infinite; }
+.cfx-sheet { animation: cfx-sheet 0.4s infinite; }
 
 /* 위아래로 살짝 떠다니기 (박쥐·용) */
 @keyframes cfx-bob {
@@ -1500,13 +1478,6 @@ body.scroll-locked {
   100% { opacity: 0; }
 }
 .cfx-clash-burst { opacity: 0; animation: cfx-clash-burst 2.4s ease-out infinite; }
-
-/* 6프레임 넘김 (수묵 용) — 프레임마다 지연을 줘서 차례로 켠다 */
-@keyframes cfx-f6 {
-  0%, 16.6% { opacity: 1; }
-  16.7%, 100% { opacity: 0; }
-}
-.cfx-f6 { opacity: 0; animation: cfx-f6 0.9s infinite; }
 
 /* 흑룡이 지나가는 동안 초상화 위에 한지 바탕이 번져 나온다 */
 @keyframes cfx-ink-veil {

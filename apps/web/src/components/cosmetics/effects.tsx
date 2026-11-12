@@ -88,7 +88,13 @@ export function PixelArt({
   );
 }
 
-/** 여러 프레임을 겹쳐 두고 번갈아 보인다 (2프레임: flap, 3프레임: f3) */
+/**
+ * 여러 프레임을 한 장짜리 그림띠(스프라이트 시트)로 붙여 두고, 창 하나로 한 칸씩 넘겨 본다.
+ *
+ * 예전엔 프레임마다 따로 겹쳐 두고 투명도로 켜고 껐는데, 바뀌는 순간 어느 프레임도
+ * 켜지지 않은 틈이 생겨 깜빡였다(2026-11-12 「왤캐 깜빡거려」). 그림띠는 요소가 하나라
+ * 틈이 생길 수 없다.
+ */
 export function Frames({
   frames,
   palette,
@@ -103,29 +109,44 @@ export function Frames({
   delay?: number;
 }) {
   const n = frames.length;
-  // 2·3프레임은 전용 클래스, 그보다 많으면 공용 6프레임 클래스에 지연을 줘서 순서대로 켠다
-  const cls =
-    n === 2
-      ? ["cfx-flap-a", "cfx-flap-b"]
-      : n === 3
-        ? ["cfx-f3-1", "cfx-f3-2", "cfx-f3-3"]
-        : frames.map(() => "cfx-f6");
+  // 프레임마다 크기가 달라도(박쥐 날개 위·아래) 가장 큰 칸에 맞춰 왼쪽 위로 붙인다
+  const w = Math.max(...frames.flatMap((f) => f.map((row) => row.length)));
+  const h = Math.max(...frames.map((f) => f.length));
+  const paths: Record<string, string> = {};
+  frames.forEach((art, k) => {
+    art.forEach((row, y) => {
+      let x = 0;
+      while (x < row.length) {
+        const c = row[x];
+        if (!palette[c]) {
+          x++;
+          continue;
+        }
+        let run = 1;
+        while (row[x + run] === c) run++;
+        paths[c] = (paths[c] ?? "") + `M${x + k * w} ${y}h${run}v1h-${run}z`;
+        x += run;
+      }
+    });
+  });
   return (
-    <div className="relative">
-      {frames.map((art, i) => (
-        <PixelArt
-          key={i}
-          art={art}
-          palette={palette}
-          px={px}
-          className={cn(cls[i], i > 0 && "absolute left-0 top-0")}
-          style={{
-            animationDuration: `${duration}s`,
-            animationDelay:
-              n > 3 ? `${delay - ((n - i) / n) * duration}s` : `${delay}s`,
-          }}
-        />
-      ))}
+    <div style={{ width: w * px, height: h * px, overflow: "hidden" }}>
+      <svg
+        width={n * w * px}
+        height={h * px}
+        viewBox={`0 0 ${n * w} ${h}`}
+        shapeRendering="crispEdges"
+        className="cfx-sheet block"
+        style={{
+          animationDuration: `${duration}s`,
+          animationDelay: `${delay}s`,
+          animationTimingFunction: `steps(${n})`,
+        }}
+      >
+        {Object.entries(paths).map(([c, d]) => (
+          <path key={c} d={d} fill={palette[c]} />
+        ))}
+      </svg>
     </div>
   );
 }
