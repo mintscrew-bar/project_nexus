@@ -14,6 +14,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import {
+  Burst,
+  outline,
   BREATH,
   BREATH_PAL,
   DRAGON,
@@ -57,20 +59,52 @@ const EAR = [
 // 어두운 사이트 바탕에 묻히지 않게 밝은 치즈 고양이 색
 const EAR_PAL: Palette = { o: "#5a3418", f: "#f0a65a", P: "#f7b9c8" };
 
-/** 머리 위 양쪽 귀가 가끔 쫑긋 움직인다 */
+const TAIL = [
+  "....oo",
+  "...off",
+  "..off.",
+  "..of..",
+  ".off..",
+  ".of...",
+  "off...",
+  "of....",
+];
+
+/** 머리 위 양쪽 귀가 쫑긋거리고, 아래쪽에서 꼬리가 살랑인다 */
 function CatEarsFx({ px, size }: FxProps) {
   const ep = px * 2.4;
   return (
     <>
       <div
+        className="cfx-tail absolute"
+        style={{
+          ...BACK,
+          right: -size * 0.12,
+          bottom: size * 0.02,
+          filter: outline("rgba(240,166,90,0.6)"),
+        }}
+      >
+        <PixelArt art={TAIL} palette={EAR_PAL} px={ep} />
+      </div>
+      <div
         className="cfx-ear-l absolute"
-        style={{ ...BACK, left: size * 0.02, top: -size * 0.16 }}
+        style={{
+          ...BACK,
+          left: size * 0.02,
+          top: -size * 0.16,
+          filter: outline("rgba(240,166,90,0.6)"),
+        }}
       >
         <PixelArt art={EAR} palette={EAR_PAL} px={ep} />
       </div>
       <div
         className="cfx-ear-r absolute"
-        style={{ ...BACK, right: size * 0.02, top: -size * 0.16 }}
+        style={{
+          ...BACK,
+          right: size * 0.02,
+          top: -size * 0.16,
+          filter: outline("rgba(240,166,90,0.6)"),
+        }}
       >
         <PixelArt art={EAR} palette={EAR_PAL} px={ep} />
       </div>
@@ -97,21 +131,31 @@ function MoonFx({ px }: FxProps) {
   return (
     <div
       className="cfx-spin absolute"
-      style={{ ...FRONT, inset: -pad, animationDuration: "9s" }}
+      style={{ ...FRONT, inset: -pad, animationDuration: "5s" }}
     >
       <div
         className="absolute left-1/2 top-0 -translate-x-1/2"
-        style={{ filter: "drop-shadow(0 0 4px rgba(246,231,166,0.8))" }}
+        style={{ filter: outline("rgba(246,231,166,0.95)") }}
       >
         <PixelArt art={MOON} palette={MOON_PAL} px={px * 2} />
       </div>
-      <div className="cfx-twinkle absolute bottom-0 left-1/2 -translate-x-1/2">
-        <PixelArt
-          art={SPARK}
-          palette={{ w: "#cfe6ff", W: "#ffffff" }}
-          px={px * 1.3}
-        />
-      </div>
+      {[
+        "bottom-0 left-1/2 -translate-x-1/2",
+        "left-0 top-1/2 -translate-y-1/2",
+        "right-0 top-1/2 -translate-y-1/2",
+      ].map((pos, i) => (
+        <div
+          key={pos}
+          className={cn("cfx-twinkle absolute", pos)}
+          style={{ animationDuration: "1.4s", animationDelay: `${-i * 0.45}s` }}
+        >
+          <PixelArt
+            art={SPARK}
+            palette={{ w: "#cfe6ff", W: "#ffffff" }}
+            px={px * 1.6}
+          />
+        </div>
+      ))}
     </div>
   );
 }
@@ -145,16 +189,25 @@ function CrownFx({ px, size }: FxProps) {
     >
       <div
         className="cfx-crown-bob relative"
-        style={{ filter: "drop-shadow(0 1px 0 #5a3d06)" }}
+        style={{ filter: outline("rgba(255,214,90,0.9)") }}
       >
         <PixelArt art={CROWN} palette={CROWN_PAL} px={cp} />
-        <PixelArt
-          art={SPARK}
-          palette={{ w: "#fff3c4", W: "#ffffff" }}
-          px={cp}
-          className="cfx-twinkle absolute"
-          style={{ left: 4 * cp, top: 3 * cp }}
-        />
+        {/* 보석 셋이 번갈아 반짝 */}
+        {[0, 4, 8].map((x, i) => (
+          <PixelArt
+            key={x}
+            art={SPARK}
+            palette={{ w: "#fff3c4", W: "#ffffff" }}
+            px={cp}
+            className="cfx-twinkle absolute"
+            style={{
+              left: x * cp,
+              top: 3 * cp,
+              animationDuration: "1.5s",
+              animationDelay: `${-i * 0.5}s`,
+            }}
+          />
+        ))}
       </div>
     </div>
   );
@@ -194,7 +247,7 @@ function HaloFx({ px, size }: FxProps) {
           ry="10"
           fill="none"
           stroke="#ffe7a3"
-          strokeWidth="5"
+          strokeWidth="7"
         />
       </svg>
       {HALO_SPARKS.map((s, i) => (
@@ -202,13 +255,14 @@ function HaloFx({ px, size }: FxProps) {
           key={i}
           art={SPARK}
           palette={{ w: "#fff3c4", W: "#ffffff" }}
-          px={px}
+          px={px * 1.6}
           className="cfx-twinkle absolute"
           style={{
             ...FRONT,
             left: s.x * size,
             top: s.y * size,
-            animationDelay: `${s.delay}s`,
+            animationDuration: "1.6s",
+            animationDelay: `${s.delay / 2}s`,
           }}
         />
       ))}
@@ -229,7 +283,7 @@ function FireRingFx({ px, size }: FxProps) {
       />
       <div
         className="cfx-spin absolute inset-0"
-        style={{ ...BACK, animationDuration: "24s" }}
+        style={{ ...BACK, animationDuration: "10s" }}
       >
         {Array.from({ length: 12 }, (_, i) => (
           <div
@@ -239,13 +293,13 @@ function FireRingFx({ px, size }: FxProps) {
           >
             <div
               className="absolute bottom-0"
-              style={{ left: -3.5 * px * (i % 2 ? 0.9 : 1.2) }}
+              style={{ left: -3.5 * px * (i % 2 ? 1.4 : 1.9) }}
             >
               <Frames
                 frames={FLAME}
                 palette={FLAME_PAL}
-                px={px * (i % 2 ? 0.9 : 1.2)}
-                duration={0.42}
+                px={px * (i % 2 ? 1.4 : 1.9)}
+                duration={0.34}
                 delay={-(i % 3) * 0.14}
               />
             </div>
@@ -275,7 +329,7 @@ const WING_GLOW = "drop-shadow(0 0 3px rgba(170,120,255,0.75))";
 
 /** 아바타 뒤 양쪽으로 펼친 박쥐 날개가 천천히 퍼덕인다 */
 function BatWingsFx({ px, size }: FxProps) {
-  const wp = px * 2.6;
+  const wp = px * 3;
   const wingW = 14 * wp;
   return (
     <>
@@ -318,7 +372,7 @@ function TwinSwordsFx({ px, size }: FxProps) {
     left: size / 2 - w / 2,
     top: size / 2 - h / 2,
     transformOrigin: "50% 50%",
-    filter: "drop-shadow(0 0 3px rgba(120,190,255,0.7))",
+    filter: outline("rgba(120,190,255,0.9)"),
   };
   return (
     <>
@@ -328,6 +382,16 @@ function TwinSwordsFx({ px, size }: FxProps) {
       <div className="cfx-sword-r absolute" style={common}>
         <PixelArt art={SWORD} palette={SWORD_PAL} px={sp} />
       </div>
+      {/* 맞부딪칠 때 머리 위로 튀는 불꽃 */}
+      <Burst
+        count={10}
+        color="#e6f3ff"
+        size={px * 1.4}
+        dist={size * 0.32}
+        duration={2.4}
+        className="cfx-clash-burst"
+        style={{ ...FRONT, left: size / 2, top: -size * 0.02 }}
+      />
       {/* 맞부딪칠 때 아바타 둘레로 번지는 빛 */}
       <div
         className="cfx-clash-ring absolute inset-0 rounded-full"
@@ -341,32 +405,32 @@ function TwinSwordsFx({ px, size }: FxProps) {
 
 /** 픽셀 용이 아바타 둘레를 돌며 날갯짓하고, 한 바퀴에 한 번 불을 뿜는다 */
 function DragonOrbitFx({ px }: FxProps) {
-  const dp = px * 1.6;
+  const dp = px * 2;
   const pad = 9 * dp;
   return (
     <div
       className="cfx-spin-rev absolute"
-      style={{ ...FRONT, inset: -pad, animationDuration: "7s" }}
+      style={{ ...FRONT, inset: -pad, animationDuration: "4.5s" }}
     >
       <div
         className="absolute left-1/2 top-0 -translate-x-1/2"
-        style={{ filter: "drop-shadow(0 0 2px rgba(255,226,190,0.85))" }}
+        style={{ filter: outline("rgba(255,180,120,0.9)") }}
       >
         <div className="relative">
           <div
             className="cfx-breath absolute"
             style={{
               right: "100%",
-              top: 3.5 * dp,
+              top: 1.3 * dp,
               marginRight: -px,
-              animationDuration: "7s",
+              animationDuration: "4.5s",
             }}
           >
             <Frames
               frames={BREATH}
               palette={BREATH_PAL}
-              px={dp * 0.9}
-              duration={0.24}
+              px={dp * 1.3}
+              duration={0.2}
             />
           </div>
           <Frames frames={DRAGON} palette={DRAGON_PAL} px={dp} duration={0.5} />

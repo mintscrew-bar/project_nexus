@@ -1173,35 +1173,60 @@ body.scroll-locked {
 
 /* 슬라임 — 아래쪽을 좌우로 오가며 통통 튄다. 돌아올 땐 좌우를 뒤집는다 */
 @keyframes cfx-slime-walk {
-  0%, 100% { left: 4%; }
-  50% { left: 72%; }
+  0%, 100% { left: 2%; }
+  50% { left: 68%; }
 }
-.cfx-slime-walk { animation: cfx-slime-walk 10s ease-in-out infinite; }
+.cfx-slime-walk { animation: cfx-slime-walk 7s ease-in-out infinite; }
 @keyframes cfx-slime-face {
   0%, 49.9% { transform: scaleX(1); }
   50%, 100% { transform: scaleX(-1); }
 }
-.cfx-slime-face { animation: cfx-slime-face 10s infinite; }
+.cfx-slime-face { animation: cfx-slime-face 7s infinite; }
 @keyframes cfx-slime-hop {
-  0%, 100% { transform: translateY(0) scale(1.15, 0.85); }
-  15% { transform: translateY(0) scale(1, 1); }
-  38% { transform: translateY(-75%) scale(0.9, 1.12); }
-  58% { transform: translateY(0) scale(1.22, 0.8); }
-  72% { transform: translateY(0) scale(1, 1); }
+  0%, 100% { transform: translateY(0) scale(1.2, 0.8); }
+  12% { transform: translateY(0) scale(0.85, 1.2); }
+  34% { transform: translateY(-130%) scale(0.9, 1.15); }
+  56% { transform: translateY(0) scale(1.35, 0.65); }
+  70% { transform: translateY(0) scale(0.95, 1.05); }
 }
 .cfx-slime-hop {
   transform-origin: 50% 100%;
-  animation: cfx-slime-hop 1.5s ease-in-out infinite;
+  animation: cfx-slime-hop 1.1s ease-in-out infinite;
 }
+/* 착지 물방울 — 슬라임이 땅에 닿는 56% 에 맞춰 튄다 */
+@keyframes cfx-splash {
+  0%, 54% { transform: translate(0, 0); opacity: 0; }
+  57% { transform: translate(0, 0); opacity: 1; }
+  85% { transform: translate(var(--dx), calc(var(--dy) - 10px)); opacity: 0; }
+  100% { opacity: 0; }
+}
+.cfx-splash { opacity: 0; animation: cfx-splash 1.1s ease-out infinite; }
 
 /* 꼬마 유령 — 초상화를 천천히 돌아다니며 흐려졌다 또렷해진다. 가끔 눈을 깜빡 */
 @keyframes cfx-ghost-wander {
-  0%, 100% { left: 8%; top: 12%; opacity: 0.95; }
-  25% { left: 52%; top: 6%; opacity: 0.4; }
-  50% { left: 66%; top: 38%; opacity: 0.95; }
-  75% { left: 20%; top: 34%; opacity: 0.35; }
+  0%, 100% { left: 4%; top: 6%; opacity: 1; }
+  25% { left: 62%; top: 2%; opacity: 0.45; }
+  50% { left: 68%; top: 34%; opacity: 1; }
+  75% { left: 14%; top: 30%; opacity: 0.45; }
 }
-.cfx-ghost-wander { animation: cfx-ghost-wander 12s ease-in-out infinite; }
+.cfx-ghost-wander { animation: cfx-ghost-wander 8s ease-in-out infinite; }
+/* 놀래키기 — 화면 앞으로 확 커졌다 돌아간다. 입도 같이 벌린다 */
+@keyframes cfx-ghost-boo {
+  0%, 60%, 100% { transform: scale(1); }
+  68% { transform: scale(1.9) rotate(-6deg); }
+  78% { transform: scale(1.8) rotate(6deg); }
+  88% { transform: scale(1); }
+}
+.cfx-ghost-boo { transform-origin: 50% 60%; animation: cfx-ghost-boo 4s ease-in-out infinite; }
+@keyframes cfx-ghost-mouth {
+  0%, 60%, 92%, 100% { transform: scale(0.5, 0.25); }
+  68%, 82% { transform: scale(1, 1); }
+}
+.cfx-ghost-mouth {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cfx-ghost-mouth 4s ease-in-out infinite;
+}
 @keyframes cfx-ghost-bob {
   0%, 100% { transform: translateY(-3px) rotate(-4deg); }
   50% { transform: translateY(3px) rotate(4deg); }
@@ -1226,24 +1251,26 @@ body.scroll-locked {
 }
 .cfx-petal-fall { animation: cfx-petal-fall 6s linear infinite; }
 @keyframes cfx-petal-sway {
-  0%, 100% { transform: translateX(-7px) rotate(-30deg); }
-  50% { transform: translateX(7px) rotate(150deg); }
+  0%, 100% { transform: translateX(-16px) rotate(-40deg); }
+  50% { transform: translateX(16px) rotate(220deg); }
 }
 .cfx-petal-sway { animation: cfx-petal-sway 2.4s ease-in-out infinite; }
 
 /* 픽셀 화염 — 바닥 열기가 일렁이고 불씨가 올라간다 */
 @keyframes cfx-heat {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 0.9; }
+  0%, 100% { opacity: 0.6; }
+  30% { opacity: 1; }
+  55% { opacity: 0.7; }
+  75% { opacity: 0.95; }
 }
 .cfx-heat {
-  background: linear-gradient(to top, rgba(232, 105, 42, 0.45), transparent);
-  animation: cfx-heat 1.6s ease-in-out infinite;
+  background: linear-gradient(to top, rgba(240, 106, 30, 0.7), rgba(240, 106, 30, 0.2) 60%, transparent);
+  animation: cfx-heat 0.9s ease-in-out infinite;
 }
 @keyframes cfx-ember {
   0% { transform: translate(0, 0); opacity: 0; }
   15% { opacity: 1; }
-  100% { transform: translate(6px, -70px); opacity: 0; }
+  100% { transform: translate(10px, -110px); opacity: 0; }
 }
 .cfx-ember {
   background: #fbd38d;
@@ -1257,6 +1284,17 @@ body.scroll-locked {
   100% { left: 110%; }
 }
 .cfx-bat-path { animation: cfx-bat-path 7s linear infinite; }
+@keyframes cfx-bat-path-rev {
+  0% { left: 110%; }
+  100% { left: -20%; }
+}
+.cfx-bat-path-rev { animation: cfx-bat-path-rev 7s linear infinite; }
+/* 박쥐가 크게 출렁이며 몸을 기울인다 */
+@keyframes cfx-bat-swoop {
+  0%, 100% { transform: translateY(-12px) rotate(-10deg); }
+  50% { transform: translateY(12px) rotate(10deg); }
+}
+.cfx-bat-swoop { animation: cfx-bat-swoop 1.4s ease-in-out infinite; }
 
 /* 전설의 검 — 떠 있다가 → 뒤로 젖히고 → 크게 휘두르고 → 한 바퀴 돌아 제자리 */
 @keyframes cfx-sword {
@@ -1284,6 +1322,20 @@ body.scroll-locked {
   22% { transform: scale(1.3) rotate(45deg); }
 }
 .cfx-glint { animation: cfx-glint 4.5s ease-in-out infinite; }
+/* 베는 순간(60%) 초상화가 번쩍이고 불꽃이 튄다 */
+@keyframes cfx-impact {
+  0%, 58%, 100% { opacity: 0; }
+  61% { opacity: 0.5; }
+  72% { opacity: 0; }
+}
+.cfx-impact { opacity: 0; animation: cfx-impact 3.2s ease-out infinite; }
+@keyframes cfx-sword-burst {
+  0%, 59% { transform: translate(0, 0); opacity: 0; }
+  61% { transform: translate(0, 0); opacity: 1; }
+  80% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
+  100% { opacity: 0; }
+}
+.cfx-sword-burst { opacity: 0; animation: cfx-sword-burst 3.2s ease-out infinite; }
 
 /* 천둥번개 — 번쩍·잠깐 꺼짐·다시 번쩍. 두 줄기가 엇갈려 친다 */
 @keyframes cfx-bolt {
@@ -1293,15 +1345,24 @@ body.scroll-locked {
   6% { opacity: 1; }
   11% { opacity: 0; }
 }
-.cfx-bolt { opacity: 0; animation: cfx-bolt 3.8s infinite; }
+.cfx-bolt { opacity: 0; animation: cfx-bolt 2.6s infinite; }
+/* 폭풍 — 초상화가 푸르게 어두워졌다 풀린다 */
+@keyframes cfx-storm {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.15; }
+}
+.cfx-storm {
+  background: linear-gradient(to bottom, rgba(20, 30, 70, 0.9), rgba(20, 30, 70, 0.2));
+  animation: cfx-storm 2.6s ease-in-out infinite;
+}
 @keyframes cfx-flash {
   0%, 100% { opacity: 0; }
-  2% { opacity: 0.45; }
+  2% { opacity: 0.6; }
   4% { opacity: 0; }
-  6% { opacity: 0.32; }
+  6% { opacity: 0.45; }
   12% { opacity: 0; }
 }
-.cfx-flash { opacity: 0; animation: cfx-flash 3.8s infinite; }
+.cfx-flash { opacity: 0; animation: cfx-flash 2.6s infinite; }
 
 /* 용의 숨결 — 오른쪽에서 날아와 가운데서 불을 뿜고 왼쪽으로 빠진다 */
 @keyframes cfx-dragon-fly {
@@ -1311,6 +1372,16 @@ body.scroll-locked {
   80%, 100% { left: -75%; top: 6%; }
 }
 .cfx-dragon-fly { animation: cfx-dragon-fly 8s ease-in-out infinite; }
+/* 불을 뿜는 동안 초상화가 주황으로 달아오른다 */
+@keyframes cfx-scorch {
+  0%, 27%, 60%, 100% { opacity: 0; }
+  34%, 50% { opacity: 1; }
+}
+.cfx-scorch {
+  background: radial-gradient(ellipse at 30% 40%, rgba(255, 150, 50, 0.45), rgba(200, 60, 20, 0.25) 60%, transparent);
+  opacity: 0;
+  animation: cfx-scorch 8s ease-in-out infinite;
+}
 @keyframes cfx-breath {
   0%, 26% { opacity: 0; transform: scaleX(0.2); }
   30% { opacity: 1; transform: scaleX(1); }
@@ -1359,22 +1430,28 @@ body.scroll-locked {
   44% { transform: rotate(38deg); }
   50% { transform: rotate(22deg); }
 }
-.cfx-ear-l { transform-origin: 50% 100%; animation: cfx-ear-l 3.8s ease-in-out infinite; }
-.cfx-ear-r { transform-origin: 50% 100%; animation: cfx-ear-r 4.6s ease-in-out infinite; }
+.cfx-ear-l { transform-origin: 50% 100%; animation: cfx-ear-l 2.2s ease-in-out infinite; }
+.cfx-ear-r { transform-origin: 50% 100%; animation: cfx-ear-r 2.8s ease-in-out infinite; }
+/* 꼬리 — 아래 끝을 축으로 살랑 */
+@keyframes cfx-tail {
+  0%, 100% { transform: rotate(-18deg); }
+  50% { transform: rotate(22deg); }
+}
+.cfx-tail { transform-origin: 0% 100%; animation: cfx-tail 1.3s ease-in-out infinite; }
 
 /* 왕관 — 비스듬히 얹혀 둥실 */
 @keyframes cfx-crown-bob {
   0%, 100% { transform: rotate(18deg) translateY(0); }
-  50% { transform: rotate(14deg) translateY(-3px); }
+  50% { transform: rotate(8deg) translateY(-8px); }
 }
-.cfx-crown-bob { animation: cfx-crown-bob 2.4s ease-in-out infinite; }
+.cfx-crown-bob { animation: cfx-crown-bob 1.6s ease-in-out infinite; }
 
 /* 천사 고리 — 위아래로 떠다니며 빛이 숨 쉰다 */
 @keyframes cfx-halo-float {
   0%, 100% { transform: translateY(0); opacity: 0.85; }
-  50% { transform: translateY(-4px); opacity: 1; }
+  50% { transform: translateY(-9px); opacity: 1; }
 }
-.cfx-halo-float { animation: cfx-halo-float 2.8s ease-in-out infinite; }
+.cfx-halo-float { animation: cfx-halo-float 1.8s ease-in-out infinite; }
 
 /* 불꽃 고리 — 둘레 열기 */
 @keyframes cfx-ring-glow {
@@ -1386,14 +1463,14 @@ body.scroll-locked {
 /* 박쥐 날개 — 몸 쪽 아래 끝을 축으로 퍼덕 */
 @keyframes cfx-wing-r {
   0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(28deg) scaleY(0.85); }
+  50% { transform: rotate(42deg) scaleY(0.75); }
 }
 @keyframes cfx-wing-l {
   0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(-28deg) scaleY(0.85); }
+  50% { transform: rotate(-42deg) scaleY(0.75); }
 }
-.cfx-wing-r { transform-origin: 0% 100%; animation: cfx-wing-r 1.1s ease-in-out infinite; }
-.cfx-wing-l { transform-origin: 100% 100%; animation: cfx-wing-l 1.1s ease-in-out infinite; }
+.cfx-wing-r { transform-origin: 0% 100%; animation: cfx-wing-r 0.7s ease-in-out infinite; }
+.cfx-wing-l { transform-origin: 100% 100%; animation: cfx-wing-l 0.7s ease-in-out infinite; }
 
 /* 교차 검 — 엇갈려 있다가 벌어졌다 맞부딪친다 */
 @keyframes cfx-sword-l {
@@ -1408,11 +1485,18 @@ body.scroll-locked {
   78% { transform: rotate(28deg); }
   84% { transform: rotate(38deg); }
 }
-.cfx-sword-l { animation: cfx-sword-l 3.6s ease-in-out infinite; }
-.cfx-sword-r { animation: cfx-sword-r 3.6s ease-in-out infinite; }
+.cfx-sword-l { animation: cfx-sword-l 2.4s ease-in-out infinite; }
+.cfx-sword-r { animation: cfx-sword-r 2.4s ease-in-out infinite; }
 @keyframes cfx-clash-ring {
   0%, 76%, 100% { box-shadow: 0 0 0 0 rgba(200, 228, 255, 0); }
   79% { box-shadow: 0 0 0 3px rgba(235, 245, 255, 0.95), 0 0 18px 6px rgba(120, 190, 255, 0.7); }
   92% { box-shadow: 0 0 0 10px rgba(200, 228, 255, 0), 0 0 30px 10px rgba(120, 190, 255, 0); }
 }
-.cfx-clash-ring { animation: cfx-clash-ring 3.6s ease-out infinite; }
+.cfx-clash-ring { animation: cfx-clash-ring 2.4s ease-out infinite; }
+@keyframes cfx-clash-burst {
+  0%, 77% { transform: translate(0, 0); opacity: 0; }
+  79% { transform: translate(0, 0); opacity: 1; }
+  95% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
+  100% { opacity: 0; }
+}
+.cfx-clash-burst { opacity: 0; animation: cfx-clash-burst 2.4s ease-out infinite; }
