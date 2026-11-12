@@ -14,6 +14,7 @@ import { TierBadge } from "@/components/domain/TierBadge";
 import { getRoleTier } from "@/lib/role-tier";
 import { cn } from "@/lib/utils";
 import { findCosmetic } from "@/components/cosmetics/catalog";
+import { CosmeticEffect } from "@/components/cosmetics/effects";
 import { PositionIcon } from "./icons";
 
 /**
@@ -274,7 +275,7 @@ export function PortraitParticipantCard({
       )}
     >
       {/* 초상화 — 남는 높이를 다 쓴다. 준비 전에는 흑백으로 눌러 둔다 */}
-      <div className="relative min-h-0 flex-1 bg-bg-elevated">
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-bg-elevated">
         <Image
           src={avatarSrc}
           alt=""
@@ -286,6 +287,13 @@ export function PortraitParticipantCard({
             !p.isReady && "opacity-50 grayscale",
           )}
         />
+        {/* 장착한 꾸미기의 움직이는 장식 — 초상화 칸 안에서만 움직인다 */}
+        {frame?.effect && (
+          <CosmeticEffect
+            code={frame.effect}
+            px={size === "lg" ? 3 : size === "md" ? 2 : 1.5}
+          />
+        )}
         {/* 왼쪽 위: 음성 상태 / 오른쪽 위: 친구 추가·강퇴 */}
         {voiceBadge && (
           <span className="absolute left-1.5 top-1.5 rounded-md bg-black/55 p-1 backdrop-blur">

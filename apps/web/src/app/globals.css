@@ -1123,48 +1123,211 @@ body.scroll-locked {
   );
 }
 
-/* 닉네임 — 글자 안에서 그라데이션이 흐른다 */
-@keyframes cosmetic-name-flow {
-  to {
-    background-position: -200% 0;
-  }
-}
-.cosmetic-name-sky,
-.cosmetic-name-sunset {
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: cosmetic-name-flow 3s linear infinite;
-}
-.cosmetic-name-sky {
-  background-image: linear-gradient(
-    90deg,
-    #7dd3fc,
-    #7dd3fc 35%,
-    #f0f9ff 50%,
-    #7dd3fc 65%,
-    #7dd3fc
-  );
-}
-.cosmetic-name-sunset {
-  animation-duration: 6s;
-  background-image: linear-gradient(
-    90deg,
-    #fcd34d,
-    #fb7185,
-    #c084fc,
-    #fcd34d
-  );
-}
-
 @media (prefers-reduced-motion: reduce) {
   .cosmetic-sheen,
   .cosmetic-pulse,
   .cosmetic-orbit-gold,
-  .cosmetic-orbit-aurora,
-  .cosmetic-name-sky,
-  .cosmetic-name-sunset {
+  .cosmetic-orbit-aurora {
     animation: none;
+  }
+}
+
+/* ───────── 카드 장식 효과 (components/cosmetics/effects.tsx) ─────────
+   초상화 위에서 움직이는 캐릭터·연출. 픽셀 그림의 프레임 넘김은 steps 없이
+   opacity 를 끊어서 바꾼다(0~49.9% 보이고 50%부터 숨김). */
+
+/* 프레임 넘김 — 2프레임(날갯짓), 3프레임(불꽃) */
+@keyframes cfx-frame-a {
+  0%, 49.9% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes cfx-frame-b {
+  0%, 49.9% { opacity: 0; }
+  50%, 100% { opacity: 1; }
+}
+.cfx-flap-a { animation: cfx-frame-a 0.36s infinite; }
+.cfx-flap-b { animation: cfx-frame-b 0.36s infinite; }
+@keyframes cfx-f3-1 {
+  0%, 33.2% { opacity: 1; }
+  33.3%, 100% { opacity: 0; }
+}
+@keyframes cfx-f3-2 {
+  0%, 33.2% { opacity: 0; }
+  33.3%, 66.5% { opacity: 1; }
+  66.6%, 100% { opacity: 0; }
+}
+@keyframes cfx-f3-3 {
+  0%, 66.5% { opacity: 0; }
+  66.6%, 100% { opacity: 1; }
+}
+.cfx-f3-1 { animation: cfx-f3-1 0.42s infinite; }
+.cfx-f3-2 { animation: cfx-f3-2 0.42s infinite; }
+.cfx-f3-3 { animation: cfx-f3-3 0.42s infinite; }
+
+/* 위아래로 살짝 떠다니기 (박쥐·용) */
+@keyframes cfx-bob {
+  0%, 100% { transform: translateY(-2px); }
+  50% { transform: translateY(2px); }
+}
+.cfx-bob { animation: cfx-bob 1.2s ease-in-out infinite; }
+
+/* 슬라임 — 아래쪽을 좌우로 오가며 통통 튄다. 돌아올 땐 좌우를 뒤집는다 */
+@keyframes cfx-slime-walk {
+  0%, 100% { left: 4%; }
+  50% { left: 72%; }
+}
+.cfx-slime-walk { animation: cfx-slime-walk 10s ease-in-out infinite; }
+@keyframes cfx-slime-face {
+  0%, 49.9% { transform: scaleX(1); }
+  50%, 100% { transform: scaleX(-1); }
+}
+.cfx-slime-face { animation: cfx-slime-face 10s infinite; }
+@keyframes cfx-slime-hop {
+  0%, 100% { transform: translateY(0) scale(1.15, 0.85); }
+  15% { transform: translateY(0) scale(1, 1); }
+  38% { transform: translateY(-75%) scale(0.9, 1.12); }
+  58% { transform: translateY(0) scale(1.22, 0.8); }
+  72% { transform: translateY(0) scale(1, 1); }
+}
+.cfx-slime-hop {
+  transform-origin: 50% 100%;
+  animation: cfx-slime-hop 1.5s ease-in-out infinite;
+}
+
+/* 꼬마 유령 — 초상화를 천천히 돌아다니며 흐려졌다 또렷해진다. 가끔 눈을 깜빡 */
+@keyframes cfx-ghost-wander {
+  0%, 100% { left: 8%; top: 12%; opacity: 0.95; }
+  25% { left: 52%; top: 6%; opacity: 0.4; }
+  50% { left: 66%; top: 38%; opacity: 0.95; }
+  75% { left: 20%; top: 34%; opacity: 0.35; }
+}
+.cfx-ghost-wander { animation: cfx-ghost-wander 12s ease-in-out infinite; }
+@keyframes cfx-ghost-bob {
+  0%, 100% { transform: translateY(-3px) rotate(-4deg); }
+  50% { transform: translateY(3px) rotate(4deg); }
+}
+.cfx-ghost-bob { animation: cfx-ghost-bob 2.2s ease-in-out infinite; }
+@keyframes cfx-ghost-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+.cfx-ghost-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cfx-ghost-blink 3.4s infinite;
+}
+
+/* 벚꽃 — 위에서 떨어지며 좌우로 흔들리고 돈다 */
+@keyframes cfx-petal-fall {
+  0% { top: -12%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 104%; opacity: 0; }
+}
+.cfx-petal-fall { animation: cfx-petal-fall 6s linear infinite; }
+@keyframes cfx-petal-sway {
+  0%, 100% { transform: translateX(-7px) rotate(-30deg); }
+  50% { transform: translateX(7px) rotate(150deg); }
+}
+.cfx-petal-sway { animation: cfx-petal-sway 2.4s ease-in-out infinite; }
+
+/* 픽셀 화염 — 바닥 열기가 일렁이고 불씨가 올라간다 */
+@keyframes cfx-heat {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.9; }
+}
+.cfx-heat {
+  background: linear-gradient(to top, rgba(232, 105, 42, 0.45), transparent);
+  animation: cfx-heat 1.6s ease-in-out infinite;
+}
+@keyframes cfx-ember {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(6px, -70px); opacity: 0; }
+}
+.cfx-ember {
+  background: #fbd38d;
+  box-shadow: 0 0 4px #f59e0b;
+  animation: cfx-ember 2.4s ease-out infinite;
+}
+
+/* 박쥐 떼 — 왼쪽에서 오른쪽으로 가로지른다 (위아래 흔들림은 cfx-bob) */
+@keyframes cfx-bat-path {
+  0% { left: -20%; }
+  100% { left: 110%; }
+}
+.cfx-bat-path { animation: cfx-bat-path 7s linear infinite; }
+
+/* 전설의 검 — 떠 있다가 → 뒤로 젖히고 → 크게 휘두르고 → 한 바퀴 돌아 제자리 */
+@keyframes cfx-sword {
+  0% { transform: rotate(25deg) translateY(0); }
+  22% { transform: rotate(25deg) translateY(-4px); }
+  44% { transform: rotate(25deg) translateY(0); }
+  54% { transform: rotate(48deg) translateY(-2px); }
+  60% { transform: rotate(-200deg) translateY(0); }
+  68% { transform: rotate(-195deg) translateY(0); }
+  84%, 100% { transform: rotate(-335deg) translateY(0); }
+}
+.cfx-sword { animation: cfx-sword 4.5s ease-in-out infinite; }
+@keyframes cfx-slash {
+  0%, 54% { stroke-dashoffset: 100; opacity: 0; }
+  55% { opacity: 1; }
+  61% { stroke-dashoffset: 0; opacity: 1; }
+  74%, 100% { stroke-dashoffset: 0; opacity: 0; }
+}
+.cfx-slash path {
+  stroke-dasharray: 100;
+  animation: cfx-slash 4.5s ease-out infinite;
+}
+@keyframes cfx-glint {
+  0%, 16%, 30%, 100% { transform: scale(0) rotate(0); }
+  22% { transform: scale(1.3) rotate(45deg); }
+}
+.cfx-glint { animation: cfx-glint 4.5s ease-in-out infinite; }
+
+/* 천둥번개 — 번쩍·잠깐 꺼짐·다시 번쩍. 두 줄기가 엇갈려 친다 */
+@keyframes cfx-bolt {
+  0%, 100% { opacity: 0; }
+  2% { opacity: 1; }
+  4% { opacity: 0.15; }
+  6% { opacity: 1; }
+  11% { opacity: 0; }
+}
+.cfx-bolt { opacity: 0; animation: cfx-bolt 3.8s infinite; }
+@keyframes cfx-flash {
+  0%, 100% { opacity: 0; }
+  2% { opacity: 0.45; }
+  4% { opacity: 0; }
+  6% { opacity: 0.32; }
+  12% { opacity: 0; }
+}
+.cfx-flash { opacity: 0; animation: cfx-flash 3.8s infinite; }
+
+/* 용의 숨결 — 오른쪽에서 날아와 가운데서 불을 뿜고 왼쪽으로 빠진다 */
+@keyframes cfx-dragon-fly {
+  0% { left: 110%; top: 14%; }
+  22% { left: 40%; top: 20%; }
+  58% { left: 36%; top: 14%; }
+  80%, 100% { left: -75%; top: 6%; }
+}
+.cfx-dragon-fly { animation: cfx-dragon-fly 8s ease-in-out infinite; }
+@keyframes cfx-breath {
+  0%, 26% { opacity: 0; transform: scaleX(0.2); }
+  30% { opacity: 1; transform: scaleX(1); }
+  52% { opacity: 1; transform: scaleX(1.1); }
+  56%, 100% { opacity: 0; transform: scaleX(0.4); }
+}
+.cfx-breath {
+  transform-origin: 100% 50%;
+  animation: cfx-breath 8s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cfx-root,
+  .cfx-root * {
+    animation: none !important;
+  }
+  .cfx-travel {
+    visibility: hidden;
   }
 }

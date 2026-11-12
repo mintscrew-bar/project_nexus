@@ -14,11 +14,13 @@
  * - 움직이는 상품은 `prefers-reduced-motion` 에서 멈춘다(globals.css).
  */
 
+import type { CosmeticEffectCode } from "./effects";
+
 /** 화면에 보이는 재화 이름 — 이름을 바꾸면 여기 한 곳만 고친다 */
 export const MEDAL_LABEL = "메달";
 
 export type CosmeticSlot = "CARD_FRAME" | "NAME_COLOR";
-export type CosmeticRarity = "STARTER" | "COMMON" | "PREMIUM";
+export type CosmeticRarity = "STARTER" | "COMMON" | "PREMIUM" | "RARE";
 
 export interface CosmeticItem {
   code: string;
@@ -37,77 +39,108 @@ export interface CosmeticItem {
    * 테두리 3px 띠에서만 보인다(회전하는 빛, 지나가는 반짝임 등).
    */
   layerClassName?: string;
+  /** CARD_FRAME 전용 — 초상화 위에서 움직이는 장식 (effects.tsx) */
+  effect?: CosmeticEffectCode;
 }
 
 export const RARITY_LABEL: Record<CosmeticRarity, string> = {
   STARTER: "입문",
   COMMON: "일반",
   PREMIUM: "고급",
+  RARE: "희귀",
 };
 
 /**
- * 상품 원칙 (2026-11-12): **모든 상품은 움직인다.** 정적인 색 바꾸기는 살 이유가
- * 약하다는 판단. 대신 움직임은 느리고 차분하게 — 로비에서 10장이 동시에 움직여도
- * 산만하지 않아야 한다. 애니메이션 정의는 globals.css 의 `.cosmetic-*`.
+ * 상품 원칙 (2026-11-12)
+ * - **모든 상품은 움직인다.** 색만 바꾸는 상품은 살 이유가 약하다.
+ * - 테두리 색 바꾸기를 넘어, 카드 위에 **캐릭터·연출이 산다** — 픽셀 검이 휘두르고
+ *   박쥐가 날아다니는 식. 픽셀 그림과 벡터 그림을 섞어 종류를 다양하게 한다.
+ * - 장식은 초상화 칸 안에서만 움직여 이름·티어·준비 띠는 가리지 않는다.
+ * 그림·움직임 정의는 effects.tsx 와 globals.css 의 `.cfx-*`.
  */
 export const COSMETICS: CosmeticItem[] = [
   {
-    code: "FRAME_SILVER",
+    code: "FX_SLIME",
     slot: "CARD_FRAME",
-    name: "은빛 반짝임",
-    description: "은색 테두리 위로 빛줄기가 몇 초마다 스쳐 지나간다",
+    name: "통통 슬라임",
+    description: "픽셀 슬라임이 초상화 아래를 통통 튀며 오간다",
     price: 250,
     rarity: "STARTER",
-    className: "bg-slate-400/80",
-    layerClassName: "cosmetic-sheen",
+    className: "bg-[#2f6b3a]",
+    effect: "slime",
   },
   {
-    code: "NAME_SKY",
-    slot: "NAME_COLOR",
-    name: "물결 닉네임",
-    description: "하늘색 닉네임 위로 밝은 물결이 흐른다",
+    code: "FX_GHOST",
+    slot: "CARD_FRAME",
+    name: "꼬마 유령",
+    description: "유령이 초상화를 떠돌다 흐려지고, 가끔 눈을 깜빡인다",
     price: 250,
     rarity: "STARTER",
-    className: "cosmetic-name-sky",
+    className: "bg-[#5b6478]",
+    effect: "ghost",
   },
   {
-    code: "FRAME_INDIGO",
+    code: "FX_SAKURA",
     slot: "CARD_FRAME",
-    name: "넥서스 맥동",
-    description: "로고 색 인디고 테두리가 숨 쉬듯 밝아졌다 어두워진다",
+    name: "벚꽃 흩날림",
+    description: "벚꽃잎이 빙글빙글 돌며 흩날린다",
     price: 450,
     rarity: "COMMON",
-    className: "bg-[#3f4aa8]",
-    layerClassName: "cosmetic-pulse",
+    className: "bg-[#b56a86]",
+    effect: "sakura",
   },
   {
-    code: "FRAME_GOLD",
+    code: "FX_FIRE",
     slot: "CARD_FRAME",
-    name: "금빛 궤도",
-    description: "금색 테두리를 따라 빛이 한 바퀴씩 돈다",
+    name: "픽셀 화염",
+    description: "카드 아래에서 픽셀 불길이 일렁이고 불씨가 솟는다",
     price: 500,
     rarity: "COMMON",
-    className: "bg-[#7a561a]",
-    layerClassName: "cosmetic-orbit-gold",
+    className: "bg-[#7a2a12]",
+    effect: "fire",
   },
   {
-    code: "NAME_SUNSET",
-    slot: "NAME_COLOR",
-    name: "노을 닉네임",
-    description: "주황·분홍·보라로 천천히 물드는 닉네임",
-    price: 550,
-    rarity: "COMMON",
-    className: "cosmetic-name-sunset",
-  },
-  {
-    code: "FRAME_AURORA",
+    code: "FX_BATS",
     slot: "CARD_FRAME",
-    name: "오로라",
-    description: "청록·인디고·분홍 빛이 테두리를 돌며 섞인다",
+    name: "박쥐 떼",
+    description: "붉은 눈의 픽셀 박쥐들이 날갯짓하며 가로지른다",
+    price: 600,
+    rarity: "COMMON",
+    className: "bg-[#3b2a57]",
+    effect: "bats",
+  },
+  {
+    code: "FX_SWORD",
+    slot: "CARD_FRAME",
+    name: "전설의 검",
+    description: "떠 있던 픽셀 검이 크게 휘둘러 베고, 한 바퀴 돌아 제자리로",
+    price: 900,
+    rarity: "PREMIUM",
+    className: "bg-slate-400/80",
+    layerClassName: "cosmetic-sheen",
+    effect: "sword",
+  },
+  {
+    code: "FX_LIGHTNING",
+    slot: "CARD_FRAME",
+    name: "천둥번개",
+    description: "번개 두 줄기가 엇갈려 내리치며 초상화가 번쩍인다",
     price: 1000,
     rarity: "PREMIUM",
-    className: "bg-[#24304f]",
-    layerClassName: "cosmetic-orbit-aurora",
+    className: "bg-[#1e2f5c]",
+    layerClassName: "cosmetic-pulse",
+    effect: "lightning",
+  },
+  {
+    code: "FX_DRAGON",
+    slot: "CARD_FRAME",
+    name: "용의 숨결",
+    description: "픽셀 용이 날아와 불을 뿜고 지나간다",
+    price: 1800,
+    rarity: "RARE",
+    className: "bg-[#7a561a]",
+    layerClassName: "cosmetic-orbit-gold",
+    effect: "dragon",
   },
 ];
 
