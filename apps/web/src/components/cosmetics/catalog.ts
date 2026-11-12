@@ -14,12 +14,25 @@
  * - 움직이는 상품은 `prefers-reduced-motion` 에서 멈춘다(globals.css).
  */
 
+import type { AvatarEffectCode } from "./avatar-effects";
 import type { CosmeticEffectCode } from "./effects";
 
 /** 화면에 보이는 재화 이름 — 이름을 바꾸면 여기 한 곳만 고친다 */
 export const MEDAL_LABEL = "메달";
 
-export type CosmeticSlot = "CARD_FRAME" | "NAME_COLOR";
+/**
+ * 꾸미는 자리 — 자리마다 상품을 따로 판다(2026-11-12). 같은 자리에는 하나만 장착한다.
+ * - CARD_FRAME: 로비 참가자 카드 장식
+ * - AVATAR_FRAME: 프로필 아바타 장식
+ * - NAME_COLOR: 닉네임 색 (1단계 상품 없음)
+ */
+export type CosmeticSlot = "CARD_FRAME" | "AVATAR_FRAME" | "NAME_COLOR";
+
+export const SLOT_LABEL: Record<CosmeticSlot, string> = {
+  CARD_FRAME: "카드 장식",
+  AVATAR_FRAME: "아바타 장식",
+  NAME_COLOR: "닉네임 색",
+};
 export type CosmeticRarity = "STARTER" | "COMMON" | "PREMIUM" | "RARE";
 
 export interface CosmeticItem {
@@ -30,7 +43,7 @@ export interface CosmeticItem {
   price: number;
   rarity: CosmeticRarity;
   /**
-   * CARD_FRAME: 카드를 감싸는 바깥 틀(3px)의 바탕
+   * CARD_FRAME: 카드를 감싸는 바깥 틀(3px)의 바탕 (AVATAR_FRAME 은 비운다)
    * NAME_COLOR: 닉네임 글자에 붙는 클래스
    */
   className: string;
@@ -41,6 +54,8 @@ export interface CosmeticItem {
   layerClassName?: string;
   /** CARD_FRAME 전용 — 초상화 위에서 움직이는 장식 (effects.tsx) */
   effect?: CosmeticEffectCode;
+  /** AVATAR_FRAME 전용 — 아바타 둘레 장식 (avatar-effects.tsx) */
+  avatarEffect?: AvatarEffectCode;
 }
 
 export const RARITY_LABEL: Record<CosmeticRarity, string> = {
@@ -59,6 +74,7 @@ export const RARITY_LABEL: Record<CosmeticRarity, string> = {
  * 그림·움직임 정의는 effects.tsx 와 globals.css 의 `.cfx-*`.
  */
 export const COSMETICS: CosmeticItem[] = [
+  // ── 카드 장식 (로비) ──
   {
     code: "FX_SLIME",
     slot: "CARD_FRAME",
@@ -141,6 +157,87 @@ export const COSMETICS: CosmeticItem[] = [
     className: "bg-[#7a561a]",
     layerClassName: "cosmetic-orbit-gold",
     effect: "dragon",
+  },
+  // ── 아바타 장식 (프로필) ──
+  {
+    code: "AV_CAT_EARS",
+    slot: "AVATAR_FRAME",
+    name: "고양이 귀",
+    description: "머리 위 치즈 고양이 귀가 가끔 쫑긋 움직인다",
+    price: 300,
+    rarity: "STARTER",
+    className: "",
+    avatarEffect: "cat_ears",
+  },
+  {
+    code: "AV_MOON",
+    slot: "AVATAR_FRAME",
+    name: "공전하는 달",
+    description: "초승달과 별이 아바타 둘레를 천천히 돈다",
+    price: 300,
+    rarity: "STARTER",
+    className: "",
+    avatarEffect: "moon",
+  },
+  {
+    code: "AV_CROWN",
+    slot: "AVATAR_FRAME",
+    name: "반짝 왕관",
+    description: "비스듬히 얹힌 픽셀 왕관이 둥실거리고 보석이 반짝인다",
+    price: 450,
+    rarity: "COMMON",
+    className: "",
+    avatarEffect: "crown",
+  },
+  {
+    code: "AV_HALO",
+    slot: "AVATAR_FRAME",
+    name: "천사 고리",
+    description: "머리 위 금빛 고리가 떠다니고 둘레에 별빛이 깜빡인다",
+    price: 500,
+    rarity: "COMMON",
+    className: "",
+    avatarEffect: "halo",
+  },
+  {
+    code: "AV_FIRE_RING",
+    slot: "AVATAR_FRAME",
+    name: "불꽃 고리",
+    description: "아바타 둘레에서 픽셀 불꽃 12개가 일렁이며 돈다",
+    price: 600,
+    rarity: "COMMON",
+    className: "",
+    avatarEffect: "fire_ring",
+  },
+  {
+    code: "AV_BAT_WINGS",
+    slot: "AVATAR_FRAME",
+    name: "박쥐 날개",
+    description: "아바타 뒤로 펼친 박쥐 날개가 퍼덕인다",
+    price: 900,
+    rarity: "PREMIUM",
+    className: "",
+    avatarEffect: "bat_wings",
+  },
+  {
+    code: "AV_TWIN_SWORDS",
+    slot: "AVATAR_FRAME",
+    name: "교차 검",
+    description: "뒤에 엇갈린 두 검이 벌어졌다 맞부딪치며 빛이 번진다",
+    price: 1000,
+    rarity: "PREMIUM",
+    className: "",
+    avatarEffect: "twin_swords",
+  },
+  {
+    code: "AV_DRAGON",
+    slot: "AVATAR_FRAME",
+    name: "휘감는 용",
+    description: "픽셀 용이 아바타 둘레를 돌며 불을 뿜는다",
+    price: 1800,
+    rarity: "RARE",
+    className: "",
+    avatarEffect: "dragon_orbit",
   },
 ];
 

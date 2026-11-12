@@ -24,10 +24,10 @@ export type CosmeticEffectCode =
   | "lightning"
   | "dragon";
 
-type Palette = Record<string, string>;
+export type Palette = Record<string, string>;
 
 /** 문자열 격자 → 픽셀 SVG. 같은 색이 가로로 이어지면 사각형 하나로 합친다 */
-function PixelArt({
+export function PixelArt({
   art,
   palette,
   px,
@@ -83,7 +83,7 @@ function PixelArt({
 }
 
 /** 여러 프레임을 겹쳐 두고 번갈아 보인다 (2프레임: flap, 3프레임: f3) */
-function Frames({
+export function Frames({
   frames,
   palette,
   px,
@@ -238,7 +238,7 @@ function SakuraFx({ px }: { px: number }) {
 
 /* ───────── 픽셀 화염 ───────── */
 
-const FLAME = [
+export const FLAME = [
   [
     "...r...",
     "...r...",
@@ -276,7 +276,7 @@ const FLAME = [
     ".rRyRr.",
   ],
 ];
-const FLAME_PAL: Palette = {
+export const FLAME_PAL: Palette = {
   r: "#b8401a",
   R: "#e8692a",
   y: "#f2a33a",
@@ -341,7 +341,7 @@ const BAT = [
   ["x.........x", "xx..x.x..xx", "xxxxexexxxx", "..xxxxxxx..", "....x.x...."],
   ["....x.x....", "...xxxxx...", "..xxexexx..", ".xxx.x.xxx.", "xx.......xx"],
 ];
-const BAT_PAL: Palette = { x: "#1c1428", e: "#ef5d7a" };
+export const BAT_PAL: Palette = { x: "#1c1428", e: "#ef5d7a" };
 const BATS = [
   { top: 22, dur: 6.5, delay: 0, bob: 1.1, flap: 0.3, scale: 1 },
   { top: 42, dur: 8, delay: -3.2, bob: 1.4, flap: 0.36, scale: 0.8 },
@@ -383,7 +383,7 @@ function BatsFx({ px }: { px: number }) {
 
 /* ───────── 전설의 검 ───────── */
 
-const SWORD = [
+export const SWORD = [
   "....o....",
   "...oWo...",
   "...oWso..",
@@ -401,7 +401,7 @@ const SWORD = [
   "...oPo...",
   "....o....",
 ];
-const SWORD_PAL: Palette = {
+export const SWORD_PAL: Palette = {
   o: "#141824",
   W: "#eef3fb",
   s: "#93a3bf",
@@ -410,7 +410,7 @@ const SWORD_PAL: Palette = {
   h: "#6e4128",
   P: "#4fb3e8",
 };
-const SPARK = [".w.", "wWw", ".w."];
+export const SPARK = [".w.", "wWw", ".w."];
 
 /**
  * 초상화 오른쪽 위에 떠 있다가, 몇 초마다 왼쪽으로 크게 휘둘러 베기 궤적을 남기고
@@ -513,7 +513,7 @@ function LightningFx({ px }: { px: number }) {
 
 /* ───────── 용의 숨결 ───────── */
 
-const DRAGON = [
+export const DRAGON = [
   [
     "..............oo",
     "............oowwo",
@@ -547,7 +547,7 @@ const DRAGON = [
     "......ooo...oo",
   ],
 ];
-const DRAGON_PAL: Palette = {
+export const DRAGON_PAL: Palette = {
   o: "#2a0e12",
   R: "#c2453f",
   b: "#f0c27e",
@@ -555,7 +555,7 @@ const DRAGON_PAL: Palette = {
   e: "#fde68a",
   h: "#e7e2d6",
 };
-const BREATH = [
+export const BREATH = [
   [
     "..yyR.........",
     "yYYyyRRr......",
@@ -575,7 +575,7 @@ const BREATH = [
     "...yR.........",
   ],
 ];
-const BREATH_PAL: Palette = {
+export const BREATH_PAL: Palette = {
   r: "#c2410c",
   R: "#ea7a2a",
   y: "#f6b74a",

@@ -1,15 +1,19 @@
 "use client";
 
-// 개발용 시안 — 메달 상점 첫 상품 8개 미리보기 (실제 구매·DB 없음)
+// 개발용 시안 — 메달 상점 첫 상품 (카드 장식 8 + 아바타 장식 8) 미리보기 (실제 구매·DB 없음)
 // 접속: http://localhost:3010/dev/medal-shop
 
 import { Medal } from "lucide-react";
 import { PortraitParticipantCard } from "@/app/[game]/tournaments/[id]/lobby/_components/PortraitParticipantCard";
+import Image from "next/image";
+import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
 import {
   COSMETICS,
   MEDAL_LABEL,
   RARITY_LABEL,
+  SLOT_LABEL,
   type CosmeticItem,
+  type CosmeticSlot,
 } from "@/components/cosmetics/catalog";
 import { cn } from "@/lib/utils";
 
@@ -66,18 +70,66 @@ const LOBBY_ROW: { name: string; tier: string; frame?: string }[] = [
   { name: "준비중", tier: "SILVER" },
 ];
 
-/** 상점 칸 — 상품 하나를 실제 카드에 입혀 미리 보여준다 */
-function ShopTile({ item, index }: { item: CosmeticItem; index: number }) {
-  const isFrame = item.slot === "CARD_FRAME";
+/** 프로필의 둥근 아바타 (96px) — 실제 프로필 화면과 같은 모양 */
+function ProfileAvatar({
+  index,
+  code,
+}: {
+  index: number;
+  code?: CosmeticItem["avatarEffect"];
+}) {
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-bg-tertiary/40 p-4">
-      <div className="mx-auto w-[180px]">
-        <PortraitParticipantCard
-          {...cardProps}
-          p={player(index, "미리보기", "EMERALD")}
-          frameCode={isFrame ? item.code : null}
+    <AvatarDecoration code={code} size={96}>
+      <div className="relative h-24 w-24 overflow-hidden rounded-full bg-bg-tertiary ring-2 ring-accent-primary/50">
+        <Image
+          src={icon(index)}
+          alt=""
+          fill
+          unoptimized
+          className="object-cover"
         />
       </div>
+    </AvatarDecoration>
+  );
+}
+
+/** 프로필 첫 화면 축소판 — 배경 칸 아래에 장식한 아바타와 이름 */
+function ProfileHeroPreview() {
+  return (
+    <div className="rounded-xl bg-bg-secondary">
+      <div className="h-28 rounded-t-xl bg-gradient-to-br from-accent-primary/40 to-accent-primary/5" />
+      <div className="flex items-end gap-4 px-6 pb-8">
+        <div className="-mt-10">
+          <ProfileAvatar index={1} code="dragon_orbit" />
+        </div>
+        <div className="pb-1">
+          <div className="text-xl font-black text-text-primary">용사냥꾼</div>
+          <div className="text-sm text-text-tertiary">
+            아바타 장식 「휘감는 용」 장착
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 상점 칸 — 상품 하나를 실제 카드에 입혀 미리 보여준다 */
+function ShopTile({ item, index }: { item: CosmeticItem; index: number }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl bg-bg-tertiary/40 p-4">
+      {item.slot === "AVATAR_FRAME" ? (
+        <div className="flex h-[180px] items-center justify-center">
+          <ProfileAvatar index={index} code={item.avatarEffect} />
+        </div>
+      ) : (
+        <div className="mx-auto w-[180px]">
+          <PortraitParticipantCard
+            {...cardProps}
+            p={player(index, "미리보기", "EMERALD")}
+            frameCode={item.code}
+          />
+        </div>
+      )}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
@@ -112,6 +164,9 @@ function ShopTile({ item, index }: { item: CosmeticItem; index: number }) {
   );
 }
 
+/** 상점에 진열하는 자리 순서 */
+const SHOP_SLOTS: CosmeticSlot[] = ["CARD_FRAME", "AVATAR_FRAME"];
+
 export default function MedalShopPreview() {
   return (
     <div className="container mx-auto max-w-6xl space-y-8 px-6 py-6">
@@ -132,21 +187,31 @@ export default function MedalShopPreview() {
       </section>
 
       <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-text-secondary">
-            메달 상점 — 첫 상품 8개
-          </h2>
-          <span className="flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-3 py-1.5 text-sm font-black text-text-primary">
-            <Medal className="h-4 w-4 text-amber-300" />
-            320 {MEDAL_LABEL}
-          </span>
-        </div>
-        <div className="grid grid-cols-4 gap-4">
-          {COSMETICS.map((item, i) => (
-            <ShopTile key={item.code} item={item} index={i} />
-          ))}
-        </div>
+        <h2 className="mb-3 text-sm font-bold text-text-secondary">
+          프로필에서 장착한 모습
+        </h2>
+        <ProfileHeroPreview />
       </section>
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-black text-text-primary">메달 상점</h2>
+        <span className="flex items-center gap-1.5 rounded-lg bg-bg-tertiary px-3 py-1.5 text-sm font-black text-text-primary">
+          <Medal className="h-4 w-4 text-amber-300" />
+          320 {MEDAL_LABEL}
+        </span>
+      </div>
+      {SHOP_SLOTS.map((slot) => (
+        <section key={slot}>
+          <h3 className="mb-3 text-sm font-bold text-text-secondary">
+            {SLOT_LABEL[slot]}
+          </h3>
+          <div className="grid grid-cols-4 gap-4">
+            {COSMETICS.filter((item) => item.slot === slot).map((item, i) => (
+              <ShopTile key={item.code} item={item} index={i} />
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
