@@ -1163,12 +1163,12 @@ export default function TournamentLobbyPage() {
            - 준비 후: 초록 「✓ 준비 완료」 + 작은 「누르면 취소」. 마우스를 올리면
              사이트 위험색으로 바뀌며 「준비 취소」가 된다.
            옅은 색·회색 취소 버튼은 "잘 안 보인다", 원색은 "형광이라 눈 아프다"(2026-11-12).
-           → 토큰 색을 35~45% 로 깔아 어두운 바탕 위에서 짙은 색으로 보이게 한다.
+           → 토큰 색을 60~65% 로 깔아 원색보다 한 톤 차분하게 (35%는 너무 어두웠다).
            로비 오른쪽 버튼은 전부 테두리 없이 채운 모양으로 맞춘다. */
         <button
           className={`group/ready inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-black transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
             currentUserIsReady
-              ? "bg-accent-success/35 text-white hover:bg-accent-danger/45"
+              ? "bg-accent-success/60 text-white hover:bg-accent-danger/65"
               : "bg-accent-primary text-accent-on hover:bg-accent-hover"
           }`}
           disabled={needsManualTeamSelection}
@@ -1702,8 +1702,8 @@ export default function TournamentLobbyPage() {
                     </div>
                     <button
                       onClick={requestLeaveLobby}
-                      // 작고 옅으면 안 보이고(2026-11-12), 원색 그대로면 형광이라 눈이 아프다 — 위험색을 45%로 깔아 짙은 빨강으로
-                      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-accent-danger/45 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-accent-danger/60"
+                      // 작고 옅으면 안 보이고(2026-11-12), 원색 그대로면 형광이라 눈이 아프다 — 위험색을 65%로 깔아 원색과 짙은 색 사이로
+                      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-accent-danger/65 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-accent-danger/80"
                       title="방 나가기"
                     >
                       <LogOut className="h-4 w-4" />
