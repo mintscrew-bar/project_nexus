@@ -14,13 +14,12 @@
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Burst, Frames, outline, PixelArt, SPARK } from "./effects";
+import { PixelFire } from "./pixel-fire";
 import {
   CROWN,
   CROWN_PAL,
   EAR,
   EAR_PAL,
-  FLAME,
-  FLAME_PAL,
   INK_DRAGON_AVATAR,
   INK_DRAGON_PAL,
   MOON,
@@ -226,74 +225,33 @@ function HaloFx({ px, size }: FxProps) {
 /* ───────── 불꽃 고리 ───────── */
 
 /**
- * 아바타가 이글이글 불타오른다 — 둘레 곳곳에서 불길이 **위로** 솟는다(돌지 않는다).
- * 위쪽 불길이 더 크고 높아 머리 위로 불이 치솟는 모양이 된다. 불길마다 박자가 달라
- * 제멋대로 솟았다 주저앉고, 둘레 열기가 일렁이며 불티가 날아오른다.
+ * 아바타가 이글이글 불타오른다 — 아바타 둘레 원이 불씨가 되어 실시간 픽셀 불길이
+ * 위로 솟는다(pixel-fire.tsx). 아래쪽 불은 아바타 뒤에 가려지고, 옆과 머리 위로
+ * 불길이 치솟으며 불티가 흩날린다.
  */
-const FIRE_SPOTS = Array.from({ length: 14 }, (_, i) => {
-  const a = (i / 14) * Math.PI * 2 - Math.PI / 2; // 맨 위부터
-  const up = Math.max(0, -Math.sin(a)); // 위쪽일수록 1
-  return {
-    a,
-    scale: 0.72 + up * 0.45 + (i % 2) * 0.08,
-    delay: -((i * 7) % 10) / 10,
-  };
-});
-
 function FireRingFx({ px, size }: FxProps) {
-  const c = size / 2;
-  const r = size / 2 - px * 2;
+  const cell = px * 1.5;
+  const box = size * 1.8;
+  const n = Math.round(box / cell);
   return (
     <>
       <div
         className="cfx-ring-glow absolute inset-0 rounded-full"
         style={BACK}
       />
-      {FIRE_SPOTS.map((spot, i) => {
-        const fp = px * spot.scale;
-        return (
-          <div
-            key={i}
-            className="absolute"
-            style={{
-              ...BACK,
-              // 불길 밑동 가운데가 둘레 위의 그 점에 오게
-              left: c + r * Math.cos(spot.a) - 6.5 * fp,
-              top: c + r * Math.sin(spot.a) - 24 * fp,
-              filter: "drop-shadow(0 0 5px rgba(255,140,40,0.8))",
-            }}
-          >
-            <div
-              className="cfx-flicker"
-              style={{ animationDelay: `${spot.delay * 2}s` }}
-            >
-              <Frames
-                frames={FLAME}
-                palette={FLAME_PAL}
-                px={fp}
-                duration={0.6}
-                delay={spot.delay}
-              />
-            </div>
-          </div>
-        );
-      })}
-      {/* 머리 위로 날아오르는 불티 */}
-      {[0.3, 0.5, 0.7].map((x, i) => (
-        <span
-          key={x}
-          className="cfx-ember absolute"
-          style={{
-            ...FRONT,
-            left: size * x,
-            top: size * 0.05,
-            width: px,
-            height: px,
-            animationDuration: `${1.6 + i * 0.4}s`,
-            animationDelay: `${-i * 0.6}s`,
-          }}
-        />
-      ))}
+      <PixelFire
+        cols={n}
+        rows={n}
+        cell={cell}
+        source={{ kind: "ring", cx: n / 2, cy: n / 2, r: size / 2 / cell }}
+        reach={0.3}
+        className="absolute"
+        style={{
+          ...BACK,
+          left: size / 2 - (n * cell) / 2,
+          top: size / 2 - (n * cell) / 2,
+        }}
+      />
     </>
   );
 }

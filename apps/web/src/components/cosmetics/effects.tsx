@@ -13,11 +13,10 @@
 
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
+import { PixelFire } from "./pixel-fire";
 import {
   BAT,
   BAT_PAL,
-  FLAME,
-  FLAME_PAL,
   INK_DRAGON_CARD,
   INK_DRAGON_PAL,
   SLIME,
@@ -359,63 +358,23 @@ function SakuraFx({ px }: { px: number }) {
 
 /* ───────── 픽셀 화염 ───────── */
 
-const FLAMES = [
-  { left: -6, scale: 0.76, delay: 0 },
-  { left: 9, scale: 1.03, delay: -0.15 },
-  { left: 27, scale: 0.67, delay: -0.3 },
-  { left: 40, scale: 0.95, delay: -0.1 },
-  { left: 57, scale: 0.72, delay: -0.25 },
-  { left: 70, scale: 1.08, delay: -0.05 },
-  { left: 87, scale: 0.81, delay: -0.2 },
-];
-const EMBERS = Array.from({ length: 10 }, (_, i) => ({
-  left: 4 + i * 10,
-  delay: -((i * 7) % 20) / 10,
-  dur: 1.6 + ((i * 3) % 8) / 10,
-}));
-
-/** 초상화 아래 절반을 픽셀 불길이 집어삼키고, 불씨가 솟구치며 화면이 일렁인다 */
-function FireFx({ px }: { px: number }) {
+/**
+ * 초상화 아래 절반을 실시간 픽셀 불길이 집어삼킨다 (pixel-fire.tsx).
+ * 불길이 칸마다 이글이글 갈라지고 불티가 흩날린다.
+ */
+function FireFx() {
   return (
     <>
       <div className="cfx-heat absolute inset-x-0 bottom-0 h-3/4" />
-      {FLAMES.map((f, i) => (
-        <div
-          key={i}
-          className="absolute -bottom-[4px]"
-          style={{
-            left: `${f.left}%`,
-            filter: "drop-shadow(0 0 6px rgba(255,140,40,0.85))",
-          }}
-        >
-          {/* 불길마다 높이가 제멋대로 솟았다 주저앉는다 — 이글이글 */}
-          <div
-            className="cfx-flicker"
-            style={{ animationDelay: `${f.delay * 3}s` }}
-          >
-            <Frames
-              frames={FLAME}
-              palette={FLAME_PAL}
-              px={px * f.scale}
-              duration={0.6}
-              delay={f.delay}
-            />
-          </div>
-        </div>
-      ))}
-      {EMBERS.map((e, i) => (
-        <span
-          key={i}
-          className="cfx-travel cfx-ember absolute bottom-[20%]"
-          style={{
-            left: `${e.left}%`,
-            width: px * 1.3,
-            height: px * 1.3,
-            animationDuration: `${e.dur}s`,
-            animationDelay: `${e.delay}s`,
-          }}
-        />
-      ))}
+      <PixelFire
+        fill
+        cols={64}
+        rows={30}
+        cell={3}
+        source={{ kind: "bottom" }}
+        reach={0.5}
+        className="absolute inset-0"
+      />
     </>
   );
 }

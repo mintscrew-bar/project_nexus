@@ -1234,7 +1234,7 @@ body.scroll-locked {
 }
 .cfx-petal-sway { animation: cfx-petal-sway 2.4s ease-in-out infinite; }
 
-/* 픽셀 화염 — 바닥 열기가 일렁이고 불씨가 올라간다 */
+/* 픽셀 화염 — 바닥 열기가 일렁인다 (불길은 pixel-fire.tsx 캔버스) */
 @keyframes cfx-heat {
   0%, 100% { opacity: 0.6; }
   30% { opacity: 1; }
@@ -1244,16 +1244,6 @@ body.scroll-locked {
 .cfx-heat {
   background: linear-gradient(to top, rgba(240, 106, 30, 0.7), rgba(240, 106, 30, 0.2) 60%, transparent);
   animation: cfx-heat 0.9s ease-in-out infinite;
-}
-@keyframes cfx-ember {
-  0% { transform: translate(0, 0); opacity: 0; }
-  15% { opacity: 1; }
-  100% { transform: translate(10px, -110px); opacity: 0; }
-}
-.cfx-ember {
-  background: #fbd38d;
-  box-shadow: 0 0 4px #f59e0b;
-  animation: cfx-ember 2.4s ease-out infinite;
 }
 
 /* 박쥐 떼 — 왼쪽에서 오른쪽으로 가로지른다 (위아래 흔들림은 cfx-bob) */
@@ -1489,16 +1479,4 @@ body.scroll-locked {
   background: radial-gradient(ellipse at 50% 45%, rgba(238, 234, 224, 0.92) 30%, rgba(238, 234, 224, 0.55) 60%, transparent 80%);
   opacity: 0;
   animation: cfx-ink-veil 7s ease-in-out infinite;
-}
-
-/* 불길이 제멋대로 솟았다 주저앉는다 — 밑동을 축으로 키만 바뀐다 */
-@keyframes cfx-flicker {
-  0%, 100% { transform: scale(1, 1); }
-  20% { transform: scale(0.96, 1.12); }
-  45% { transform: scale(1.04, 0.9); }
-  70% { transform: scale(0.97, 1.08); }
-}
-.cfx-flicker {
-  transform-origin: 50% 100%;
-  animation: cfx-flicker 0.9s ease-in-out infinite;
 }
