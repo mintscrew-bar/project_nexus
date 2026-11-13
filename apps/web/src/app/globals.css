@@ -1490,3 +1490,15 @@ body.scroll-locked {
   opacity: 0;
   animation: cfx-ink-veil 7s ease-in-out infinite;
 }
+
+/* 불길이 제멋대로 솟았다 주저앉는다 — 밑동을 축으로 키만 바뀐다 */
+@keyframes cfx-flicker {
+  0%, 100% { transform: scale(1, 1); }
+  20% { transform: scale(0.96, 1.12); }
+  45% { transform: scale(1.04, 0.9); }
+  70% { transform: scale(0.97, 1.08); }
+}
+.cfx-flicker {
+  transform-origin: 50% 100%;
+  animation: cfx-flicker 0.9s ease-in-out infinite;
+}

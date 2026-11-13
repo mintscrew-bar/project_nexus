@@ -225,40 +225,75 @@ function HaloFx({ px, size }: FxProps) {
 
 /* ───────── 불꽃 고리 ───────── */
 
-/** 아바타 둘레에 바깥을 향한 픽셀 불꽃 12개가 일렁이며 천천히 돈다 */
+/**
+ * 아바타가 이글이글 불타오른다 — 둘레 곳곳에서 불길이 **위로** 솟는다(돌지 않는다).
+ * 위쪽 불길이 더 크고 높아 머리 위로 불이 치솟는 모양이 된다. 불길마다 박자가 달라
+ * 제멋대로 솟았다 주저앉고, 둘레 열기가 일렁이며 불티가 날아오른다.
+ */
+const FIRE_SPOTS = Array.from({ length: 14 }, (_, i) => {
+  const a = (i / 14) * Math.PI * 2 - Math.PI / 2; // 맨 위부터
+  const up = Math.max(0, -Math.sin(a)); // 위쪽일수록 1
+  return {
+    a,
+    scale: 0.72 + up * 0.45 + (i % 2) * 0.08,
+    delay: -((i * 7) % 10) / 10,
+  };
+});
+
 function FireRingFx({ px, size }: FxProps) {
-  const r = size / 2 - px;
+  const c = size / 2;
+  const r = size / 2 - px * 2;
   return (
     <>
       <div
         className="cfx-ring-glow absolute inset-0 rounded-full"
         style={BACK}
       />
-      <div
-        className="cfx-spin absolute inset-0"
-        style={{ ...BACK, animationDuration: "10s" }}
-      >
-        {Array.from({ length: 12 }, (_, i) => (
+      {FIRE_SPOTS.map((spot, i) => {
+        const fp = px * spot.scale;
+        return (
           <div
             key={i}
-            className="absolute left-1/2 top-1/2"
-            style={{ transform: `rotate(${i * 30}deg) translateY(${-r}px)` }}
+            className="absolute"
+            style={{
+              ...BACK,
+              // 불길 밑동 가운데가 둘레 위의 그 점에 오게
+              left: c + r * Math.cos(spot.a) - 6.5 * fp,
+              top: c + r * Math.sin(spot.a) - 24 * fp,
+              filter: "drop-shadow(0 0 5px rgba(255,140,40,0.8))",
+            }}
           >
             <div
-              className="absolute bottom-0"
-              style={{ left: -4.5 * px * (i % 2 ? 1 : 1.35) }}
+              className="cfx-flicker"
+              style={{ animationDelay: `${spot.delay * 2}s` }}
             >
               <Frames
                 frames={FLAME}
                 palette={FLAME_PAL}
-                px={px * (i % 2 ? 1 : 1.35)}
-                duration={0.34}
-                delay={-(i % 3) * 0.14}
+                px={fp}
+                duration={0.6}
+                delay={spot.delay}
               />
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
+      {/* 머리 위로 날아오르는 불티 */}
+      {[0.3, 0.5, 0.7].map((x, i) => (
+        <span
+          key={x}
+          className="cfx-ember absolute"
+          style={{
+            ...FRONT,
+            left: size * x,
+            top: size * 0.05,
+            width: px,
+            height: px,
+            animationDuration: `${1.6 + i * 0.4}s`,
+            animationDelay: `${-i * 0.6}s`,
+          }}
+        />
+      ))}
     </>
   );
 }

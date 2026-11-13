@@ -360,13 +360,13 @@ function SakuraFx({ px }: { px: number }) {
 /* ───────── 픽셀 화염 ───────── */
 
 const FLAMES = [
-  { left: -6, scale: 1.27, delay: 0 },
-  { left: 9, scale: 1.72, delay: -0.15 },
-  { left: 27, scale: 1.12, delay: -0.3 },
-  { left: 40, scale: 1.58, delay: -0.1 },
-  { left: 57, scale: 1.2, delay: -0.25 },
-  { left: 70, scale: 1.8, delay: -0.05 },
-  { left: 87, scale: 1.35, delay: -0.2 },
+  { left: -6, scale: 0.76, delay: 0 },
+  { left: 9, scale: 1.03, delay: -0.15 },
+  { left: 27, scale: 0.67, delay: -0.3 },
+  { left: 40, scale: 0.95, delay: -0.1 },
+  { left: 57, scale: 0.72, delay: -0.25 },
+  { left: 70, scale: 1.08, delay: -0.05 },
+  { left: 87, scale: 0.81, delay: -0.2 },
 ];
 const EMBERS = Array.from({ length: 10 }, (_, i) => ({
   left: 4 + i * 10,
@@ -388,13 +388,19 @@ function FireFx({ px }: { px: number }) {
             filter: "drop-shadow(0 0 6px rgba(255,140,40,0.85))",
           }}
         >
-          <Frames
-            frames={FLAME}
-            palette={FLAME_PAL}
-            px={px * f.scale}
-            duration={0.36}
-            delay={f.delay}
-          />
+          {/* 불길마다 높이가 제멋대로 솟았다 주저앉는다 — 이글이글 */}
+          <div
+            className="cfx-flicker"
+            style={{ animationDelay: `${f.delay * 3}s` }}
+          >
+            <Frames
+              frames={FLAME}
+              palette={FLAME_PAL}
+              px={px * f.scale}
+              duration={0.6}
+              delay={f.delay}
+            />
+          </div>
         </div>
       ))}
       {EMBERS.map((e, i) => (
