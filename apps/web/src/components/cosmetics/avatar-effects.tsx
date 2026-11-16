@@ -230,7 +230,7 @@ function HaloFx({ px, size }: FxProps) {
  * 불길이 치솟으며 불티가 흩날린다.
  */
 function FireRingFx({ px, size }: FxProps) {
-  const cell = px * 1.5;
+  const cell = px * 1.75;
   const box = size * 1.8;
   const n = Math.round(box / cell);
   return (

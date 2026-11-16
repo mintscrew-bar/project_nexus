@@ -368,8 +368,8 @@ function FireFx() {
       <div className="cfx-heat absolute inset-x-0 bottom-0 h-3/4" />
       <PixelFire
         fill
-        cols={64}
-        rows={30}
+        cols={54}
+        rows={26}
         cell={3}
         source={{ kind: "bottom" }}
         reach={0.5}

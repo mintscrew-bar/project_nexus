@@ -132,15 +132,15 @@ export function PixelFire({
           Math.sin(x * 0.23 - t * 0.045 + colSeed[x] * 0.5);
         // 0.3(높이 솟는 혀) ~ 1.9(금방 꺼지는 골) — 차이가 커야 색 경계가 가로로 줄 서지 않는다
         const k = wave * 0.25 + 0.5;
-        colCool[x] = 0.3 + 1.6 * k * k + Math.random() * 0.15;
+        colCool[x] = 0.4 + 1.3 * k * k + Math.random() * 0.15;
       }
       for (let y = 0; y < H - 1; y++) {
         const below = (y + 1) * W;
         for (let x = 0; x < W; x++) {
           const rnd = Math.random();
           // 거의 바로 아래 칸만 — 옆 칸을 자주 빌리면 이웃 칸이 같은 값을 베껴
-          // 가로로 같은 색 토막이 생긴다. 가끔(약 6%)만 옆으로 흔들린다
-          const off = rnd < 0.06 + wind ? 1 : rnd > 0.94 + wind ? -1 : 0;
+          // 가로로 같은 색 토막이 생긴다. 가끔(약 11%)만 옆으로 흔들린다 — 이웃끼리 조금 섞여 덩어리감이 산다
+          const off = rnd < 0.11 + wind ? 1 : rnd > 0.89 + wind ? -1 : 0;
           const sx = Math.min(W - 1, Math.max(0, x + off));
           const v = heat[below + sx] - cool * colCool[x] * (0.85 + rnd * 0.3);
           next[y * W + x] = v > 0 ? v : 0;
