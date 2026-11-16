@@ -134,6 +134,30 @@ export function checkEligibility(
 }
 
 /**
+ * 첫 내전 보너스의 원장 키.
+ * - 무효 처리되지 않은 경기에서 이미 받았으면 `null`(다시 주지 않는다).
+ * - 받은 적이 없으면 `first-match:<사람>`.
+ * - 받았던 경기가 전부 무효 처리됐으면 `first-match:<사람>:<회차>` — 실수로 무효 처리돼도
+ *   다음 정상 경기에서 다시 받는다. 회차는 무효로 회수된 횟수라 같은 회차는 한 번만 들어간다.
+ *
+ * @param priorSourceIds 이 사람이 지금까지 받은 첫 내전 보너스 원장들의 경기 id
+ * @param voidedMatchIds 그 경기들 가운데 무효 처리된 것
+ */
+export function firstMatchKey(
+  userId: string,
+  priorSourceIds: (string | null)[],
+  voidedMatchIds: Set<string>,
+): string | null {
+  const revoked = priorSourceIds.filter(
+    (id) => id !== null && voidedMatchIds.has(id),
+  ).length;
+  if (revoked < priorSourceIds.length) return null;
+  return revoked === 0
+    ? `first-match:${userId}`
+    : `first-match:${userId}:${revoked}`;
+}
+
+/**
  * 받을 메달 목록 (아직 줬는지는 모른다 — 원장 고유 키가 걸러낸다).
  * `isFinalMatch` 면 방장 완주 보너스, `firstMatchUserIds` 는 아직 첫 내전 보너스를
  * 안 받은 사람.
@@ -175,7 +199,8 @@ export function planMatchGrants(
         capped: true,
       });
     }
-    // 첫 내전 — 계정당 한 번, 상한 밖. 이미 받았으면 원장 키가 막는다
+    // 첫 내전 — 계정당 한 번, 상한 밖. 이미 받았으면 원장 키가 막는다.
+    // 무효 처리 뒤 다시 받는 회차 키는 정산 때 firstMatchKey 로 바꿔 끼운다
     grants.push({
       userId: h.userId,
       amount: MATCH_MEDAL.FIRST_MATCH,
@@ -270,13 +295,22 @@ export class MatchMedalService {
       hostIsBot: match.roomHostId ? ctx.botIds.has(match.roomHostId) : false,
     });
     const dayKey = kstDayKey(match.completedAt!);
+    const firstKeys = await this.resolveFirstMatchKeys(
+      check.humans.map((h) => h.userId),
+    );
     let granted = 0;
     for (const g of grants) {
+      let key = g.key;
+      if (g.reason === MedalReason.FIRST_MATCH) {
+        const k = firstKeys.get(g.userId);
+        if (!k) continue; // 이미 정상 경기에서 받았다
+        key = k;
+      }
       const base = {
         userId: g.userId,
         amount: g.amount,
         reason: g.reason,
-        idempotencyKey: g.key,
+        idempotencyKey: key,
         sourceId: match.id,
         retro: opts.retro ?? false,
         metadata: { matchId: match.id },
@@ -290,6 +324,39 @@ export class MatchMedalService {
       if (!res.duplicated) granted += res.entry.amount;
     }
     return { eligible: true, granted };
+  }
+
+  /**
+   * 사람마다 이번에 쓸 첫 내전 보너스 키 (`null` 이면 주지 않는다).
+   * 경기마다 사람 수만큼만 원장을 읽는다 — 첫 내전 줄은 사람당 많아야 몇 줄이다.
+   */
+  private async resolveFirstMatchKeys(
+    userIds: string[],
+  ): Promise<Map<string, string | null>> {
+    const rows = await this.prisma.medalLedger.findMany({
+      where: {
+        userId: { in: userIds },
+        reason: MedalReason.FIRST_MATCH,
+        amount: { gt: 0 },
+      },
+      select: { userId: true, sourceId: true },
+    });
+    const sourceIds = [
+      ...new Set(rows.map((r) => r.sourceId).filter((s): s is string => !!s)),
+    ];
+    const voided = sourceIds.length
+      ? await this.prisma.medalMatchVoid.findMany({
+          where: { matchId: { in: sourceIds } },
+          select: { matchId: true },
+        })
+      : [];
+    const voidedIds = new Set(voided.map((v) => v.matchId));
+    const keys = new Map<string, string | null>();
+    for (const u of userIds) {
+      const prior = rows.filter((r) => r.userId === u).map((r) => r.sourceId);
+      keys.set(u, firstMatchKey(u, prior, voidedIds));
+    }
+    return keys;
   }
 
   /** 경기 흐름 안에서 부를 때 — 메달 정산이 실패해도 결과 처리를 막지 않는다 */

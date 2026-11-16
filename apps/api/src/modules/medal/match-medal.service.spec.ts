@@ -3,6 +3,7 @@ import {
   CAPPED_REASONS,
   MEDAL_DAILY_CAP,
   checkEligibility,
+  firstMatchKey,
   kstDayKey,
   planMatchGrants,
   type MedalMatch,
@@ -267,5 +268,26 @@ describe("경기 메달 — 하루 상한", () => {
     );
     expect(nextDay.entry.amount).toBe(10);
     expect(db.balance("u1")).toBe(240);
+  });
+});
+
+describe("경기 메달 — 첫 내전 보너스와 무효 처리", () => {
+  it("받은 적 없으면 기본 키", () => {
+    expect(firstMatchKey("u1", [], new Set())).toBe("first-match:u1");
+  });
+
+  it("정상 경기에서 이미 받았으면 주지 않는다", () => {
+    expect(firstMatchKey("u1", ["m1"], new Set())).toBeNull();
+    // 무효 회차 뒤 다시 받았어도 그 경기가 정상이면 끝
+    expect(firstMatchKey("u1", ["m1", "m2"], new Set(["m1"]))).toBeNull();
+  });
+
+  it("받았던 경기가 무효 처리되면 다음 경기에서 회차 키로 다시 준다", () => {
+    expect(firstMatchKey("u1", ["m1"], new Set(["m1"]))).toBe(
+      "first-match:u1:1",
+    );
+    expect(firstMatchKey("u1", ["m1", "m2"], new Set(["m1", "m2"]))).toBe(
+      "first-match:u1:2",
+    );
   });
 });
