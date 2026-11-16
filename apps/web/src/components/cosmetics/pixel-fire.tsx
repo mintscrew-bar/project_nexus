@@ -20,13 +20,13 @@ import { useEffect, useRef } from "react";
  */
 
 /** 열 → 색 (아래 값부터). 0 은 투명 */
+// 5색만 — 단계가 많으면 이웃 칸이 서로 다른 색이 돼 자글자글해 보인다
 const STOPS: [number, [number, number, number]][] = [
-  [0.15, [96, 12, 10]],
-  [0.22, [168, 22, 16]],
-  [0.36, [222, 52, 20]],
-  [0.52, [255, 128, 24]],
-  [0.7, [255, 204, 40]],
-  [0.88, [255, 240, 150]],
+  [0.17, [122, 16, 10]],
+  [0.3, [204, 34, 18]],
+  [0.46, [244, 104, 22]],
+  [0.64, [255, 196, 40]],
+  [0.84, [255, 240, 140]],
 ];
 
 function colorOf(h: number): [number, number, number, number] {
@@ -173,8 +173,17 @@ export function PixelFire({
       // 그리기
       const d = img.data;
       for (let i = 0; i < W * H; i++) {
+        // 색은 이웃과 살짝 섞은 열로 고른다 — 같은 색끼리 뭉쳐 덩어리로 보이게
+        // (칸 하나하나의 열로 고르면 자글자글한 점무늬가 된다)
+        const x = i % W;
+        const h =
+          (heat[i] * 4 +
+            heat[x > 0 ? i - 1 : i] +
+            heat[x < W - 1 ? i + 1 : i] +
+            heat[i >= W ? i - W : i] +
+            heat[i < W * (H - 1) ? i + W : i]) /
+          8;
         // 위아래로 이어지지 않은 옅은 점은 지운다 — 불길 위에 둥둥 뜬 가로 토막·잡티
-        const h = heat[i];
         const lonely =
           h < 0.32 &&
           (i < W || heat[i - W] < 0.15) &&

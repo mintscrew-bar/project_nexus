@@ -1235,15 +1235,15 @@ body.scroll-locked {
 .cfx-petal-sway { animation: cfx-petal-sway 2.4s ease-in-out infinite; }
 
 /* 픽셀 화염 — 바닥 열기가 일렁인다 (불길은 pixel-fire.tsx 캔버스) */
+/* 불 뒤 그을음 — 사진 위에서도 불길이 또렷하게 보이도록 어둡게 깔고, 붉은 기만 살짝 일렁인다 */
 @keyframes cfx-heat {
-  0%, 100% { opacity: 0.6; }
-  30% { opacity: 1; }
-  55% { opacity: 0.7; }
-  75% { opacity: 0.95; }
+  0%, 100% { opacity: 0.9; }
+  40% { opacity: 1; }
+  70% { opacity: 0.85; }
 }
 .cfx-heat {
-  background: linear-gradient(to top, rgba(240, 106, 30, 0.7), rgba(240, 106, 30, 0.2) 60%, transparent);
-  animation: cfx-heat 0.9s ease-in-out infinite;
+  background: linear-gradient(to top, rgba(26, 6, 2, 0.88), rgba(40, 8, 2, 0.6) 45%, transparent 85%);
+  animation: cfx-heat 1.4s ease-in-out infinite;
 }
 
 /* 박쥐 떼 — 왼쪽에서 오른쪽으로 가로지른다 (위아래 흔들림은 cfx-bob) */
