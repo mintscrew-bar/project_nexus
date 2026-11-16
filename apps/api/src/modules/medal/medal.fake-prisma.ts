@@ -57,6 +57,18 @@ export function createFakePrisma() {
         ledger.push(row);
         return row;
       }),
+      aggregate: jest.fn(async ({ where }: any) => ({
+        _sum: {
+          amount: ledger
+            .filter(
+              (l) =>
+                l.userId === where.userId &&
+                l.dayKey === where.dayKey &&
+                where.reason.in.includes(l.reason),
+            )
+            .reduce((sum, l) => sum + l.amount, 0),
+        },
+      })),
       findMany: jest.fn(async ({ where, take, cursor }: any) => {
         let rows = ledger
           .filter((l) => l.userId === where.userId)
@@ -127,6 +139,8 @@ export function createFakePrisma() {
         users.has(where.id) ? { id: where.id } : null,
       ),
     },
+    // 지갑 행 잠금(SELECT ... FOR UPDATE) — 메모리에선 할 일이 없다
+    $executeRaw: jest.fn(async () => 1),
     // 트랜잭션 — 안에서 던지면 지갑·원장·감사 로그를 들어가기 전 상태로 되돌린다
     $transaction: jest.fn(async (fn: (tx: any) => Promise<any>) => {
       const walletSnap = new Map(

@@ -1,3 +1,4 @@
+import { MedalModule } from "../medal/medal.module";
 import { Module } from "@nestjs/common";
 import { MatchController } from "./match.controller";
 import { MatchService } from "./match.service";
@@ -23,6 +24,7 @@ import { PublicMatchController } from "./public-match.controller";
     DiscordModule,
     NotificationModule,
     RankingModule,
+    MedalModule,
   ],
   controllers: [MatchController, PublicMatchController],
   providers: [

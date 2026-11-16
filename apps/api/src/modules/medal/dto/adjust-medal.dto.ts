@@ -1,5 +1,7 @@
 import {
+  IsBoolean,
   IsInt,
+  IsOptional,
   IsNotEmpty,
   IsString,
   Max,
@@ -34,4 +36,24 @@ export class AdjustMedalDto {
   @IsNotEmpty()
   @MaxLength(100)
   requestId!: string;
+}
+
+/** POST medals/admin/retro (ADMIN) — 기존 경기 소급 지급. dryRun 이면 세기만 한다 */
+export class RetroMedalDto {
+  @KeepRaw()
+  @IsOptional()
+  @IsBoolean()
+  dryRun?: boolean;
+}
+
+/** POST medals/admin/void-match (ADMIN) — 경기 무효 처리·회수 */
+export class VoidMatchMedalDto {
+  @IsString()
+  @IsNotEmpty()
+  matchId!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: "무효 사유를 적어주세요." })
+  @MaxLength(300)
+  memo!: string;
 }

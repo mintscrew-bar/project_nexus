@@ -1,3 +1,4 @@
+import { MatchMedalService } from "../medal/match-medal.service";
 import {
   Injectable,
   NotFoundException,
@@ -60,6 +61,7 @@ export class MatchService {
     private readonly matchSeriesService: MatchSeriesService,
     private readonly balanceScores: BalanceScoreService,
     @Optional() private readonly rankingService?: RankingService,
+    @Optional() private readonly matchMedals?: MatchMedalService,
     @Optional() @Inject("DISCORD_BOT_SERVICE") discordBot?: any,
     @Optional() @Inject("DISCORD_VOICE_SERVICE") discordVoice?: any,
   ) {
@@ -389,6 +391,10 @@ export class MatchService {
     // fire-and-forget 작업이 서버 재시작과 겹치면 전적을 복구할 기회가 없다.
     await this.updateRankingsForMatch(matchId);
 
+    // 경기 메달 정산 (완주·승리·첫 내전 등). 실패해도 결과 처리는 계속한다 —
+    // 놓친 건 30분마다 도는 정리 작업이 메운다(MatchMedalService.reconcileRecent)
+    this.matchMedals?.settleMatchQuietly(matchId);
+
     // 다전제: 게임 결과를 시리즈에 반영한다.
     // 아직 선취 승수에 도달하지 않았으면 진출시키지 않고 다음 세트를 만든다
     // (세트 생성은 applyGameResult 안에서 처리).
@@ -555,6 +561,9 @@ export class MatchService {
         });
 
         this.logger.log(`Tournament completed for room ${roomId}`);
+
+        // 방(대회)이 끝났다 — 마지막 경기를 다시 정산해 방장 완주 보너스를 준다
+        this.matchMedals?.settleMatchQuietly(matchId);
 
         // 우승은 새 메시지 대신 모집 공지 패널의 종료 카드로 보여준다.
         this.refreshDiscordPanel(roomId);

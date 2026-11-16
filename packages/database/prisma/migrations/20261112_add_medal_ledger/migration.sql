@@ -22,6 +22,7 @@ CREATE TABLE "medal_ledger" (
     "sourceId" TEXT,
     "idempotencyKey" TEXT NOT NULL,
     "retro" BOOLEAN NOT NULL DEFAULT false,
+    "dayKey" TEXT,
     "metadata" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -32,6 +33,17 @@ CREATE UNIQUE INDEX "medal_ledger_idempotencyKey_key" ON "medal_ledger"("idempot
 CREATE INDEX "medal_ledger_userId_createdAt_idx" ON "medal_ledger"("userId", "createdAt");
 CREATE INDEX "medal_ledger_reason_createdAt_idx" ON "medal_ledger"("reason", "createdAt");
 CREATE INDEX "medal_ledger_sourceId_idx" ON "medal_ledger"("sourceId");
+CREATE INDEX "medal_ledger_userId_dayKey_idx" ON "medal_ledger"("userId", "dayKey");
+
+-- 메달 지급에서 뺀 경기 (운영자 무효 처리)
+CREATE TABLE "medal_match_voids" (
+    "matchId" TEXT NOT NULL,
+    "adminId" TEXT,
+    "memo" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "medal_match_voids_pkey" PRIMARY KEY ("matchId")
+);
 
 ALTER TABLE "medal_wallets" ADD CONSTRAINT "medal_wallets_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "medal_ledger" ADD CONSTRAINT "medal_ledger_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;

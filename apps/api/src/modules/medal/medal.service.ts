@@ -18,6 +18,8 @@ export interface MedalEntryInput {
   sourceId?: string | null;
   /** 메달 출시 전 경기에 대한 소급 지급 */
   retro?: boolean;
+  /** 하루 상한을 셀 날 (KST YYYY-MM-DD). 상한과 무관하면 비운다 */
+  dayKey?: string | null;
   metadata?: Prisma.InputJsonValue;
   /**
    * 차감으로 잔액이 0 아래로 내려가도 되는가.
@@ -174,10 +176,64 @@ export class MedalService {
         sourceId: input.sourceId ?? null,
         idempotencyKey: input.idempotencyKey,
         retro: input.retro ?? false,
+        dayKey: input.dayKey ?? null,
         metadata: input.metadata,
       },
       select: ENTRY_SELECT,
     });
+  }
+
+  /**
+   * 하루 상한이 있는 지급. 그날(dayKey) 이미 받은 상한 대상 메달을 세어
+   * 남은 만큼만 준다. 다 찼으면 0 메달 줄로 남긴다(분석·이상 활동 탐지용).
+   * 같은 사람의 지급이 동시에 들어와도 상한을 넘지 않게 지갑 행을 잠그고 센다.
+   */
+  async recordCapped(
+    input: MedalEntryInput & { dayKey: string },
+    opts: { dailyCap: number; cappedReasons: MedalReason[] },
+  ): Promise<MedalEntryResult> {
+    assertValidInput(input);
+    const existing = await this.findByKey(input.idempotencyKey);
+    if (existing) return { entry: existing, duplicated: true };
+
+    try {
+      const entry = await this.prisma.$transaction(async (tx) => {
+        await tx.medalWallet.upsert({
+          where: { userId: input.userId },
+          create: { userId: input.userId, balance: 0 },
+          update: {},
+        });
+        // 같은 사람의 상한 계산이 겹치지 않게 지갑 행을 잠근다
+        await tx.$executeRaw`SELECT 1 FROM "medal_wallets" WHERE "userId" = ${input.userId} FOR UPDATE`;
+        const used = await tx.medalLedger.aggregate({
+          where: {
+            userId: input.userId,
+            dayKey: input.dayKey,
+            reason: { in: opts.cappedReasons },
+          },
+          _sum: { amount: true },
+        });
+        const room = Math.max(0, opts.dailyCap - (used._sum.amount ?? 0));
+        const amount = Math.min(input.amount, room);
+        return this.recordInTx(tx, {
+          ...input,
+          amount,
+          metadata: {
+            ...((input.metadata as Record<string, unknown>) ?? {}),
+            ...(amount < input.amount
+              ? { capped: true, requested: input.amount }
+              : {}),
+          },
+        });
+      });
+      return { entry, duplicated: false };
+    } catch (err: any) {
+      if (err?.code === "P2002") {
+        const winner = await this.findByKey(input.idempotencyKey);
+        if (winner) return { entry: winner, duplicated: true };
+      }
+      throw err;
+    }
   }
 
   /**
