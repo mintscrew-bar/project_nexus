@@ -21,7 +21,7 @@ import { useEffect, useRef } from "react";
 
 /** 열 → 색 (아래 값부터). 0 은 투명 */
 const STOPS: [number, [number, number, number]][] = [
-  [0.1, [96, 12, 10]],
+  [0.15, [96, 12, 10]],
   [0.22, [168, 22, 16]],
   [0.36, [222, 52, 20]],
   [0.52, [255, 128, 24]],
@@ -33,9 +33,8 @@ function colorOf(h: number): [number, number, number, number] {
   if (h < STOPS[0][0]) return [0, 0, 0, 0];
   let c = STOPS[0][1];
   for (const [t, rgb] of STOPS) if (h >= t) c = rgb;
-  // 가장 옅은 열은 반투명 — 불길 끝이 사진 위에서 부드럽게 사라진다
-  const a = h < 0.16 ? 150 : 255;
-  return [c[0], c[1], c[2], a];
+  // 반투명 칸은 쓰지 않는다 — 사진 위에서 흐린 얼룩처럼 보여 지저분했다
+  return [c[0], c[1], c[2], 255];
 }
 
 export type FireSource =
@@ -142,7 +141,7 @@ export function PixelFire({
           // 가로로 같은 색 토막이 생긴다. 가끔(약 11%)만 옆으로 흔들린다 — 이웃끼리 조금 섞여 덩어리감이 산다
           const off = rnd < 0.11 + wind ? 1 : rnd > 0.89 + wind ? -1 : 0;
           const sx = Math.min(W - 1, Math.max(0, x + off));
-          const v = heat[below + sx] - cool * colCool[x] * (0.85 + rnd * 0.3);
+          const v = heat[below + sx] - cool * colCool[x] * (0.93 + rnd * 0.14);
           next[y * W + x] = v > 0 ? v : 0;
         }
       }
@@ -154,7 +153,7 @@ export function PixelFire({
       [heat, next] = [next, heat];
 
       // 불티 — 드물게 생겨 위로 떠오르며 식는다
-      if (Math.random() < 0.18 && seeds.length) {
+      if (Math.random() < 0.08 && seeds.length) {
         const i = seeds[(Math.random() * seeds.length) | 0];
         sparks.push({
           x: i % W,
@@ -174,7 +173,13 @@ export function PixelFire({
       // 그리기
       const d = img.data;
       for (let i = 0; i < W * H; i++) {
-        const [r, g, b, a] = colorOf(heat[i]);
+        // 위아래로 이어지지 않은 옅은 점은 지운다 — 불길 위에 둥둥 뜬 가로 토막·잡티
+        const h = heat[i];
+        const lonely =
+          h < 0.32 &&
+          (i < W || heat[i - W] < 0.15) &&
+          (i >= W * (H - 1) || heat[i + W] < 0.15);
+        const [r, g, b, a] = lonely ? [0, 0, 0, 0] : colorOf(h);
         d[i * 4] = r;
         d[i * 4 + 1] = g;
         d[i * 4 + 2] = b;
