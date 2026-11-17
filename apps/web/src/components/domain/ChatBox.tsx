@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Input, Avatar } from '@/components/ui';
 import { cn, getRelativeTime } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
+import { UserName } from '@/components/cosmetics/UserName';
 
 interface Message {
   id: string;
@@ -89,7 +90,10 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
                 <Avatar src={msg.avatar} alt={msg.username || '?'} fallback={msg.username?.[0] || '?'} size="sm" />
                 <div className={cn('min-w-0 flex-1 max-w-[70%]', isOwn && 'flex flex-col items-end')}>
                   <div className="flex max-w-full items-baseline gap-2 mb-1">
-                    <span className="text-sm font-medium text-text-primary">{msg.username || '알 수 없음'}</span>
+                    <span className="text-sm font-medium text-text-primary">
+                      {/* 장착한 닉네임 글꼴 — 같은 순간 그려진 메시지들의 장착 조회는 한 번으로 묶인다 */}
+                      <UserName userId={msg.userId}>{msg.username || '알 수 없음'}</UserName>
+                    </span>
                     <span className="text-xs text-text-tertiary">{getRelativeTime(msg.createdAt)}</span>
                   </div>
                   <div className={cn('px-4 py-2 rounded-lg break-words', isOwn ? 'bg-accent-primary text-accent-on' : 'bg-bg-tertiary text-text-primary')}>

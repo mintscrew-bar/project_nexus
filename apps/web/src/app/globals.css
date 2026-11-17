@@ -1486,12 +1486,25 @@ body.scroll-locked {
 .nfx-root {
   line-height: 1.15;
 }
-/* 먹선 — 흰 글자에 굵은 먹 테두리 */
+/* 먹선 — 흰 글자에 굵은 먹 테두리. 먹이 숨 쉬듯 번졌다 걷힌다 */
+@keyframes nfx-ink-bleed {
+  0%, 100% {
+    text-shadow:
+      -1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111,
+      0 2px 0 #000, 0 0 0 rgba(0, 0, 0, 0);
+  }
+  50% {
+    text-shadow:
+      -1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111,
+      0 2px 0 #000, 0 0 6px rgba(0, 0, 0, 0.95);
+  }
+}
 .nfx-ink {
   color: #f4f4f2;
   text-shadow:
     -1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111,
     0 2px 0 #000;
+  animation: nfx-ink-bleed 3.6s ease-in-out infinite;
 }
 /* 금빛 — 금박 위로 빛이 한 번씩 스쳐 간다 */
 @keyframes nfx-shine {
@@ -1510,21 +1523,40 @@ body.scroll-locked {
   filter: drop-shadow(0 1px 0 rgba(80, 40, 0, 0.9));
   animation: nfx-shine 3.2s ease-in-out infinite;
 }
-/* 픽셀 — 하늘색 글자에 한 칸 그림자 */
+/* 픽셀 — 하늘색 글자에 한 칸 그림자. 옛 게임 글자처럼 가끔 두 번 반짝인다 */
+@keyframes nfx-blink {
+  0%, 84%, 88%, 100% { color: #8ff6ff; }
+  86%, 90% { color: #ffffff; }
+  92% { color: #8ff6ff; }
+}
 .nfx-pixel {
   color: #8ff6ff;
   text-shadow: 1px 1px 0 #1b4f8a, 2px 2px 0 #0d2340;
   -webkit-font-smoothing: none;
+  animation: nfx-blink 3s steps(1, end) infinite;
 }
-/* 손글씨 — 분홍 펜 */
+/* 손글씨 — 분홍 펜. 잉크 색이 천천히 흘러간다 */
+@keyframes nfx-ink-flow {
+  to { background-position: -200% 0; }
+}
 .nfx-pen {
-  color: #ffb6d5;
-  text-shadow: 0 1px 0 rgba(90, 20, 50, 0.8);
+  background-image: linear-gradient(90deg, #ffb6d5, #ff86bb, #ffd6e8, #ffb6d5);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(90, 20, 50, 0.8));
+  animation: nfx-ink-flow 5s linear infinite;
 }
-/* 붓글씨 — 한지빛 먹물 */
+/* 붓글씨 — 한지빛 먹물. 붓 끝에 맺힌 빛이 은은하게 번진다 */
+@keyframes nfx-brush-glow {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(239, 229, 207, 0)); }
+  50% { filter: drop-shadow(0 0 4px rgba(239, 229, 207, 0.55)); }
+}
 .nfx-brush {
   color: #efe5cf;
   text-shadow: 0 0 1px #000, 1px 1px 0 #3a2a1a;
+  animation: nfx-brush-glow 4s ease-in-out infinite;
 }
 /* 네온 — 분홍 관이 가끔 지직거린다 */
 @keyframes nfx-flicker {

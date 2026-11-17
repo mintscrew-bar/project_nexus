@@ -28,6 +28,7 @@ import {
 } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
+import { UserName } from "@/components/cosmetics/UserName";
 import { AuctionStageError } from "@/components/domain/AuctionStageError";
 import { cn } from "@/lib/utils";
 import {
@@ -1298,7 +1299,9 @@ function MobileBidPanel({
           </p>
           <div className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-sm font-bold text-text-primary">
-              {currentPlayer.username}
+              <UserName userId={currentPlayer.id}>
+                {currentPlayer.username}
+              </UserName>
             </span>
             {currentPlayer.tier && (
               <span className="shrink-0 text-[10px] font-semibold text-text-tertiary">

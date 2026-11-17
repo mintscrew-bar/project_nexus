@@ -15,6 +15,7 @@ import { findCosmetic } from "@/components/cosmetics/catalog";
 import { CosmeticEffect } from "@/components/cosmetics/effects";
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
 import { useCosmeticLoadouts } from "@/components/cosmetics/useCosmeticLoadouts";
+import { UserName } from "@/components/cosmetics/UserName";
 
 interface PlayerHoverCardProps {
   userId: string;
@@ -284,7 +285,7 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
               <div className="min-w-0 flex-1 pt-0.5">
                 {/* 디스코드 닉네임 (메인) + 클랜 태그 */}
                 <div className="flex items-center gap-1.5">
-                  <p className="truncate text-sm font-black leading-tight text-text-primary">{data.username}</p>
+                  <p className="truncate text-sm font-black leading-tight text-text-primary"><UserName styleCode={loadouts[userId]?.NAME_STYLE ?? null}>{data.username}</UserName></p>
                   {(data.streamerProfiles ?? []).length > 0 && (
                     <span className="shrink-0 rounded-md bg-yellow-400/15 px-1.5 py-0.5 text-[10px] font-black leading-none text-yellow-700 dark:text-yellow-300">
                       streamer

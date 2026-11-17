@@ -1,7 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import type { CommendationSummary } from "@/lib/commendation";
 import { getDdragonVersion } from "./ddragon";
-import type { BroadcastSettings, GameTitle } from "@nexus/types";
+import type { BroadcastSettings, CosmeticSlot, GameTitle } from "@nexus/types";
 
 // 보이지 않는 유니코드 문자 제거 (복사-붙여넣기 시 포함되는 bidirectional formatting 등)
 const stripInvisibleChars = (str: string): string =>
@@ -2425,7 +2425,7 @@ export interface MedalSummary {
 /** 상점 진열 한 칸 — 상품 정의(@nexus/types) + 내 보유·장착 */
 export interface ShopItemState {
   code: string;
-  slot: "CARD_FRAME" | "AVATAR_FRAME";
+  slot: CosmeticSlot;
   price: number;
   rarity: "STARTER" | "COMMON" | "PREMIUM" | "RARE";
   onSale: boolean;
@@ -2433,9 +2433,7 @@ export interface ShopItemState {
   equipped: boolean;
 }
 
-export type CosmeticLoadoutState = Partial<
-  Record<"CARD_FRAME" | "AVATAR_FRAME", string>
->;
+export type CosmeticLoadoutState = Partial<Record<CosmeticSlot, string>>;
 
 /** 메달 상점 — 진열·구매·장착 */
 export const shopApi = {
@@ -2459,7 +2457,7 @@ export const shopApi = {
 
   /** 장착·해제 (code 가 null 이면 해제) */
   equip: async (
-    slot: "CARD_FRAME" | "AVATAR_FRAME",
+    slot: CosmeticSlot,
     code: string | null,
   ): Promise<CosmeticLoadoutState> => {
     const response = await apiClient.put("/shop/loadout", { slot, code });

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { UserName } from "@/components/cosmetics/UserName";
 import { getDoubleElimFeeders } from "@nexus/types";
 import {
   CheckCircle2,
@@ -38,6 +39,28 @@ export function getTeamDisplayName(team?: Team): string {
   if (!team) return "TBD";
   if (team.captain?.username) return `${team.captain.username} 팀`;
   return team.name;
+}
+
+/**
+ * 화면용 팀 이름 — 팀장 이름에 그 사람이 장착한 닉네임 글꼴을 입힌다 (Task 22).
+ * `suffix` 가 false 면 「팀」을 붙이지 않는다(좁은 칸).
+ */
+export function TeamDisplayName({
+  team,
+  suffix = true,
+}: {
+  team?: Team;
+  suffix?: boolean;
+}) {
+  if (!team) return <>TBD</>;
+  if (!team.captain?.username)
+    return <>{team.name.replace(/ 팀$/, suffix ? " 팀" : "")}</>;
+  return (
+    <>
+      <UserName userId={team.captain.id}>{team.captain.username}</UserName>
+      {suffix && " 팀"}
+    </>
+  );
 }
 
 export interface Match {
@@ -213,7 +236,7 @@ function TeamSlot({
               team ? "text-text-primary" : "text-text-tertiary",
             )}
           >
-            {getTeamDisplayName(team)}
+            <TeamDisplayName team={team} />
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -454,7 +477,7 @@ function TeamTile({
               dim ? "text-text-tertiary" : "text-text-primary",
             )}
           >
-            {getTeamDisplayName(team)}
+            <TeamDisplayName team={team} />
           </p>
           {/* 팀 이름이 이미 "팀장 팀"이라 팀장 대신 인원수를 붙인다 */}
           {memberCount > 0 && (

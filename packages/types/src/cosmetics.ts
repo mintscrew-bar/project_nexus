@@ -7,10 +7,20 @@
  * (관리자 상품 편집(Task 16)이 생기면 DB 로 옮긴다.)
  */
 
-/** 꾸미는 자리 — 자리마다 하나씩 장착한다 */
-export type CosmeticSlot = "CARD_FRAME" | "AVATAR_FRAME";
+/**
+ * 꾸미는 자리 — 자리마다 하나씩 장착한다.
+ * - CARD_FRAME: 카드 장식 (로비 카드·호버 카드)
+ * - AVATAR_FRAME: 아바타 테두리 장식
+ * - NAME_STYLE: 닉네임 글꼴 (글꼴 + 색·효과 세트, Task 22)
+ * DB 의 slot 은 문자열이라 자리를 더해도 마이그레이션이 필요 없다.
+ */
+export type CosmeticSlot = "CARD_FRAME" | "AVATAR_FRAME" | "NAME_STYLE";
 
-export const COSMETIC_SLOTS: CosmeticSlot[] = ["CARD_FRAME", "AVATAR_FRAME"];
+export const COSMETIC_SLOTS: CosmeticSlot[] = [
+  "CARD_FRAME",
+  "AVATAR_FRAME",
+  "NAME_STYLE",
+];
 
 export type CosmeticRarity = "STARTER" | "COMMON" | "PREMIUM" | "RARE";
 
@@ -136,6 +146,63 @@ export const COSMETIC_SHOP_ITEMS: CosmeticShopItem[] = [
     code: "AV_DRAGON",
     slot: "AVATAR_FRAME",
     price: 1800,
+    rarity: "RARE",
+    onSale: true,
+  },
+  // 닉네임 글꼴 — 자리가 작아 같은 등급 장식의 약 60% 가격 (2026-11-17)
+  {
+    code: "NM_INK",
+    slot: "NAME_STYLE",
+    price: 150,
+    rarity: "STARTER",
+    onSale: true,
+  },
+  {
+    code: "NM_PIXEL",
+    slot: "NAME_STYLE",
+    price: 150,
+    rarity: "STARTER",
+    onSale: true,
+  },
+  {
+    code: "NM_PEN",
+    slot: "NAME_STYLE",
+    price: 180,
+    rarity: "STARTER",
+    onSale: true,
+  },
+  {
+    code: "NM_BRUSH",
+    slot: "NAME_STYLE",
+    price: 270,
+    rarity: "COMMON",
+    onSale: true,
+  },
+  {
+    code: "NM_GOLD",
+    slot: "NAME_STYLE",
+    price: 360,
+    rarity: "COMMON",
+    onSale: true,
+  },
+  {
+    code: "NM_NEON",
+    slot: "NAME_STYLE",
+    price: 540,
+    rarity: "PREMIUM",
+    onSale: true,
+  },
+  {
+    code: "NM_RAINBOW",
+    slot: "NAME_STYLE",
+    price: 600,
+    rarity: "PREMIUM",
+    onSale: true,
+  },
+  {
+    code: "NM_FLAME",
+    slot: "NAME_STYLE",
+    price: 1100,
     rarity: "RARE",
     onSale: true,
   },

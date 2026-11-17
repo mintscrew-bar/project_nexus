@@ -17,6 +17,7 @@
 import { findCosmeticShopItem } from "@nexus/types";
 import type { AvatarEffectCode } from "./avatar-effects";
 import type { CosmeticEffectCode } from "./effects";
+import type { NameStyleCode } from "./name-styles";
 
 /** 화면에 보이는 재화 이름 — 이름을 바꾸면 여기 한 곳만 고친다 */
 export const MEDAL_LABEL = "메달";
@@ -25,14 +26,14 @@ export const MEDAL_LABEL = "메달";
  * 꾸미는 자리 — 자리마다 상품을 따로 판다(2026-11-12). 같은 자리에는 하나만 장착한다.
  * - CARD_FRAME: 로비 참가자 카드 장식
  * - AVATAR_FRAME: 프로필 아바타 장식
- * - NAME_COLOR: 닉네임 색 (1단계 상품 없음)
+ * - NAME_STYLE: 닉네임 글꼴 — 글꼴 + 색·효과 세트 (Task 22, 예전 NAME_COLOR 자리를 대신한다)
  */
-export type CosmeticSlot = "CARD_FRAME" | "AVATAR_FRAME" | "NAME_COLOR";
+export type CosmeticSlot = "CARD_FRAME" | "AVATAR_FRAME" | "NAME_STYLE";
 
 export const SLOT_LABEL: Record<CosmeticSlot, string> = {
   CARD_FRAME: "카드 장식",
   AVATAR_FRAME: "아바타 장식",
-  NAME_COLOR: "닉네임 색",
+  NAME_STYLE: "닉네임 글꼴",
 };
 export type CosmeticRarity = "STARTER" | "COMMON" | "PREMIUM" | "RARE";
 
@@ -44,8 +45,7 @@ export interface CosmeticItem {
   price: number;
   rarity: CosmeticRarity;
   /**
-   * CARD_FRAME: 카드를 감싸는 바깥 틀(3px)의 바탕 (AVATAR_FRAME 은 비운다)
-   * NAME_COLOR: 닉네임 글자에 붙는 클래스
+   * CARD_FRAME: 카드를 감싸는 바깥 틀(3px)의 바탕 (AVATAR_FRAME·NAME_STYLE 은 비운다)
    */
   className: string;
   /**
@@ -57,6 +57,8 @@ export interface CosmeticItem {
   effect?: CosmeticEffectCode;
   /** AVATAR_FRAME 전용 — 아바타 둘레 장식 (avatar-effects.tsx) */
   avatarEffect?: AvatarEffectCode;
+  /** NAME_STYLE 전용 — 닉네임 글꼴·효과 (name-styles.tsx) */
+  nameStyle?: NameStyleCode;
 }
 
 export const RARITY_LABEL: Record<CosmeticRarity, string> = {
@@ -112,7 +114,8 @@ const COSMETIC_DEFS: CosmeticItem[] = [
     code: "FX_FIRE",
     slot: "CARD_FRAME",
     name: "픽셀 화염",
-    description: "이글이글 일렁이는 불길이 초상화 아래를 집어삼키고 불씨가 솟구친다",
+    description:
+      "이글이글 일렁이는 불길이 초상화 아래를 집어삼키고 불씨가 솟구친다",
     price: 500,
     rarity: "COMMON",
     className: "bg-[#7a2a12]",
@@ -241,6 +244,87 @@ const COSMETIC_DEFS: CosmeticItem[] = [
     rarity: "RARE",
     className: "",
     avatarEffect: "dragon_orbit",
+  },
+  // ── 닉네임 글꼴 (로비·호버·프로필·채팅·대진표·경매·결과창) ──
+  {
+    code: "NM_INK",
+    slot: "NAME_STYLE",
+    name: "먹선",
+    description: "굵은 고딕에 먹 테두리, 먹이 숨 쉬듯 번졌다 걷힌다",
+    price: 150,
+    rarity: "STARTER",
+    className: "",
+    nameStyle: "ink",
+  },
+  {
+    code: "NM_PIXEL",
+    slot: "NAME_STYLE",
+    name: "픽셀",
+    description: "옛 게임 글자 — 하늘색 픽셀 글씨가 가끔 두 번 반짝인다",
+    price: 150,
+    rarity: "STARTER",
+    className: "",
+    nameStyle: "pixel",
+  },
+  {
+    code: "NM_PEN",
+    slot: "NAME_STYLE",
+    name: "손글씨",
+    description: "분홍 펜으로 쓴 글씨, 잉크 색이 천천히 흘러간다",
+    price: 180,
+    rarity: "STARTER",
+    className: "",
+    nameStyle: "pen",
+  },
+  {
+    code: "NM_BRUSH",
+    slot: "NAME_STYLE",
+    name: "붓글씨",
+    description: "한지빛 붓글씨, 붓 끝에 맺힌 빛이 은은하게 번진다",
+    price: 270,
+    rarity: "COMMON",
+    className: "",
+    nameStyle: "brush",
+  },
+  {
+    code: "NM_GOLD",
+    slot: "NAME_STYLE",
+    name: "금빛",
+    description: "금박 글씨 위로 빛이 한 번씩 스쳐 간다",
+    price: 360,
+    rarity: "COMMON",
+    className: "",
+    nameStyle: "gold",
+  },
+  {
+    code: "NM_NEON",
+    slot: "NAME_STYLE",
+    name: "네온",
+    description: "분홍 네온관 글씨가 가끔 지직거린다",
+    price: 540,
+    rarity: "PREMIUM",
+    className: "",
+    nameStyle: "neon",
+  },
+  {
+    code: "NM_RAINBOW",
+    slot: "NAME_STYLE",
+    name: "무지개",
+    description: "둥근 글씨 위로 무지개 색이 옆으로 흐른다",
+    price: 600,
+    rarity: "PREMIUM",
+    className: "",
+    nameStyle: "rainbow",
+  },
+  {
+    code: "NM_FLAME",
+    slot: "NAME_STYLE",
+    name: "불꽃",
+    description: "글자가 아래부터 타오르며 일렁인다",
+    price: 1100,
+    rarity: "RARE",
+    className: "",
+    nameStyle: "flame",
   },
 ];
 

@@ -318,6 +318,7 @@ export function LobbyParticipantsList({
               setKickTarget={setKickTarget}
               frameCode={loadouts[participant.userId]?.CARD_FRAME}
               avatarFrameCode={loadouts[participant.userId]?.AVATAR_FRAME}
+              nameStyleCode={loadouts[participant.userId]?.NAME_STYLE}
             />
           ))}
           {/* 빈 자리도 칸으로 — 단, 큰 방(xs)은 수십 칸이 되니 아래 한 줄로만 */}

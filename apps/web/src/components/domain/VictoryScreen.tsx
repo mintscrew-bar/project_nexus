@@ -11,6 +11,7 @@ import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
 import { PositionIcon } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { roomApi } from "@/lib/api-client";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { UserName } from "@/components/cosmetics/UserName";
 
 interface TeamMember {
   id: string;
@@ -94,7 +95,9 @@ function MemberRow({
 
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-1.5">
-          <span className="truncate text-sm font-semibold text-text-primary xl:text-xs">{displayName}</span>
+          <span className="truncate text-sm font-semibold text-text-primary xl:text-xs">
+            <UserName userId={member.userId}>{displayName}</UserName>
+          </span>
           {tagLine && <span className="shrink-0 text-xs text-text-tertiary xl:text-[10px]">#{tagLine}</span>}
           {member.tier && (
             <TierBadge

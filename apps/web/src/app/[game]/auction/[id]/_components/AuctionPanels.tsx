@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { getTierIcon } from "@/lib/tier-icon";
 import { Users, Coins, ScrollText, Maximize2 } from "lucide-react";
 import { getRoleIcon } from "@/lib/role-icon";
+import { UserName } from "@/components/cosmetics/UserName";
 
 function RoleIcon({ role, dim }: { role?: string; dim?: boolean }) {
   if (!role) return null;
@@ -134,7 +135,7 @@ export function PlayersList({
                       />
                     )}
                     <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">
-                      {player.username}
+                      <UserName userId={player.id}>{player.username}</UserName>
                     </span>
                     {(player.mainRole || player.subRole) && (
                       <span className="flex shrink-0 items-center gap-0.5">
@@ -180,7 +181,7 @@ export function PlayersList({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-text-primary truncate">
-                      {player.username}
+                      <UserName userId={player.id}>{player.username}</UserName>
                     </p>
                     {/* 배그는 인게임 닉네임으로 서로를 알아본다. */}
                     {player.pubgName && (
@@ -523,7 +524,9 @@ export function TeamSummaryPanel({
                           <span className="h-3 w-3 shrink-0 rounded-full bg-bg-elevated" />
                         )}
                         <span className="min-w-0 truncate text-[10px] font-medium text-text-secondary">
-                          {member.username}
+                          <UserName userId={member.id}>
+                            {member.username}
+                          </UserName>
                         </span>
                       </div>
                     </div>

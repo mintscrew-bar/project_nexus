@@ -42,6 +42,21 @@ describe("ShopService", () => {
       });
     });
 
+    it("닉네임 글꼴은 NAME_STYLE 자리에 장착되고 다른 자리와 따로 간다", async () => {
+      db.setBalance("u1", 1000);
+      await shop.purchase("u1", "AV_CAT_EARS", true);
+      const res = await shop.purchase("u1", "NM_GOLD", true);
+      // 금빛 360 = 같은 등급(일반) 장식의 약 60%
+      expect(res.balance).toBe(1000 - 300 - 360);
+      expect(await shop.getLoadout("u1")).toEqual({
+        AVATAR_FRAME: "AV_CAT_EARS",
+        NAME_STYLE: "NM_GOLD",
+      });
+      await expect(
+        shop.equip("u1", "CARD_FRAME", "NM_GOLD"),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it("메달이 모자라면 아무것도 남기지 않는다", async () => {
       db.setBalance("u1", 100);
       await expect(shop.purchase("u1", "FX_SLIME")).rejects.toBeInstanceOf(

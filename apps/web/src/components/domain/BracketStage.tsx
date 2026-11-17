@@ -18,7 +18,7 @@
 import React from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Match } from "./BracketView";
+import { TeamDisplayName, type Match } from "./BracketView";
 
 // ── 단계 이름 ───────────────────────────────────────────
 
@@ -155,12 +155,6 @@ export function isUserInMatch(m: Match, userId?: string | null): boolean {
   );
 }
 
-/** 바에서는 칸이 좁아 " 팀" 을 떼고 팀장 이름만 쓴다 */
-function shortName(team?: Match["team1"]): string {
-  if (!team) return "TBD";
-  return team.captain?.username ?? team.name.replace(/ 팀$/, "");
-}
-
 function ScoreLine({ m, size = "sm" }: { m: Match; size?: "sm" | "md" }) {
   const big = size === "md";
   return (
@@ -171,13 +165,13 @@ function ScoreLine({ m, size = "sm" }: { m: Match; size?: "sm" | "md" }) {
       )}
     >
       <span className="truncate">
-        {big ? `${shortName(m.team1)} 팀` : shortName(m.team1)}
+        <TeamDisplayName team={m.team1} suffix={big} />
       </span>
       <span className="shrink-0 font-black tabular-nums">
         {m.team1?.score ?? 0} : {m.team2?.score ?? 0}
       </span>
       <span className="truncate">
-        {big ? `${shortName(m.team2)} 팀` : shortName(m.team2)}
+        <TeamDisplayName team={m.team2} suffix={big} />
       </span>
     </span>
   );

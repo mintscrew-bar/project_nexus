@@ -69,6 +69,7 @@ import {
   type GameTitle,
 } from "@nexus/types";
 import { PubgProfileSection } from "@/components/pubg/PubgProfileSection";
+import { UserName } from "@/components/cosmetics/UserName";
 import { useProfileTarget } from "@/components/profile/ProfileTargetContext";
 import { myProfilePath, userProfilePath } from "@/lib/profile-routes";
 
@@ -559,7 +560,10 @@ export default function UserProfilePage() {
                 <div className="min-w-0 flex-1 pt-1">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <h1 className="text-xl font-black leading-tight text-text-primary md:text-2xl">
-                      {profile.username}
+                      {/* 장착한 닉네임 글꼴 (Task 22) */}
+                      <UserName userId={profile.id}>
+                        {profile.username}
+                      </UserName>
                     </h1>
                     {clan && (
                       <Badge

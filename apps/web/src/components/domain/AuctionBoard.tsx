@@ -25,6 +25,7 @@ import { AuctionLotDetails } from "./AuctionLotDetails";
 import { ChampionIcon } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import type { RoleTier } from "@/lib/role-tier";
 import { DEFAULT_GAME, GAMES } from "@nexus/types";
+import { UserName } from "@/components/cosmetics/UserName";
 
 interface Player {
   id: string;
@@ -398,7 +399,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   현재 매물 · 팀장 동시 입찰
                 </p>
                 <p className="truncate font-bold text-text-primary">
-                  {auctionState.currentPlayer.username}
+                  <UserName userId={auctionState.currentPlayer.id}>
+                    {auctionState.currentPlayer.username}
+                  </UserName>
                 </p>
               </div>
               <TierBadge
@@ -917,7 +920,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                             />
                             <div className="flex-1 min-w-0">
                               <p className="text-base font-semibold text-text-primary truncate">
-                                {player.username}
+                                <UserName userId={player.id}>
+                                  {player.username}
+                                </UserName>
                               </p>
                               <p className="text-sm text-text-secondary">
                                 {getPlayerPosition(player)}
@@ -1074,7 +1079,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                               size="sm"
                             />
                             <span className="font-semibold text-text-primary truncate flex-1 text-sm">
-                              {player.username}
+                              <UserName userId={player.id}>
+                                {player.username}
+                              </UserName>
                             </span>
                             <TierBadge
                               tier={player.tier}

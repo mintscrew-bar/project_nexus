@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { findCosmetic } from "@/components/cosmetics/catalog";
 import { CosmeticEffect } from "@/components/cosmetics/effects";
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
+import { UserName } from "@/components/cosmetics/UserName";
 import { PositionIcon } from "./icons";
 
 /**
@@ -107,7 +108,7 @@ export function PortraitParticipantCard({
   setKickTarget,
   frameCode,
   avatarFrameCode,
-  nameColorCode,
+  nameStyleCode,
 }: {
   p: any;
   size: PortraitCardSize;
@@ -127,12 +128,11 @@ export function PortraitParticipantCard({
   frameCode?: string | null;
   /** 장착한 아바타 장식 상품 코드 — 원형 사진 둘레에 그린다 */
   avatarFrameCode?: string | null;
-  /** 장착한 닉네임 색 상품 코드 */
-  nameColorCode?: string | null;
+  /** 장착한 닉네임 글꼴 상품 코드 (NAME_STYLE) */
+  nameStyleCode?: string | null;
 }) {
   const frame = findCosmetic(frameCode);
   const avatarFx = findCosmetic(avatarFrameCode)?.avatarEffect;
-  const nameColor = findCosmetic(nameColorCode);
   const cardRef = useRef<HTMLDivElement>(null);
   const riot = p.riotAccount;
   const pubg = p.pubgAccount;
@@ -214,12 +214,12 @@ export function PortraitParticipantCard({
       )}
       <span
         className={cn(
-          "truncate font-black",
-          nameColor?.className ?? "text-text-primary",
+          "truncate font-black text-text-primary",
           size === "lg" ? "text-sm" : "text-xs",
         )}
       >
-        {displayName}
+        {/* 장착한 닉네임 글꼴 — 로비 목록이 모아 읽은 코드를 받는다 */}
+        <UserName styleCode={nameStyleCode ?? null}>{displayName}</UserName>
       </span>
       {isSelf && (
         <span className="flex-shrink-0 text-[10px] font-bold text-accent-primary">
@@ -258,7 +258,9 @@ export function PortraitParticipantCard({
               <Crown className="h-3 w-3 flex-shrink-0 text-accent-gold" />
             )}
             <span className="truncate text-xs font-bold text-text-primary">
-              {displayName}
+              <UserName styleCode={nameStyleCode ?? null}>
+                {displayName}
+              </UserName>
             </span>
           </div>
           <span

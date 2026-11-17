@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Medal, Sparkles } from "lucide-react";
 import { PortraitParticipantCard } from "@/app/[game]/tournaments/[id]/lobby/_components/PortraitParticipantCard";
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
+import { StyledName } from "@/components/cosmetics/name-styles";
 import {
   COSMETICS,
   MEDAL_LABEL,
@@ -23,8 +24,8 @@ import { useAuthStore } from "@/stores/auth-store";
 import { shopApi, type ShopItemState } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
-type ShopSlot = "CARD_FRAME" | "AVATAR_FRAME";
-const SLOTS: ShopSlot[] = ["CARD_FRAME", "AVATAR_FRAME"];
+type ShopSlot = "CARD_FRAME" | "AVATAR_FRAME" | "NAME_STYLE";
+const SLOTS: ShopSlot[] = ["CARD_FRAME", "AVATAR_FRAME", "NAME_STYLE"];
 /** 진열 탭 — 자리별 상품 + 산 것만 모아 보는 보관함 */
 type ShopTab = ShopSlot | "OWNED";
 
@@ -137,6 +138,8 @@ export default function ShopPage() {
   // 미리보기에 입힐 것: 고른 상품 > 장착한 상품
   const shownCard = trying.CARD_FRAME ?? loadout.CARD_FRAME;
   const shownAvatar = trying.AVATAR_FRAME ?? loadout.AVATAR_FRAME;
+  const shownName = trying.NAME_STYLE ?? loadout.NAME_STYLE;
+  const shownNameStyle = findCosmetic(shownName)?.nameStyle;
   const avatarSrc = user?.avatar || AVATAR_FALLBACK;
   const me = {
     id: "me",
@@ -146,7 +149,9 @@ export default function ShopPage() {
     isHost: false,
     isReady: true,
   };
-  const isTrying = Boolean(trying.CARD_FRAME || trying.AVATAR_FRAME);
+  const isTrying = Boolean(
+    trying.CARD_FRAME || trying.AVATAR_FRAME || trying.NAME_STYLE,
+  );
   // 진열할 상품 — 보관함이면 산 것 전부(자리 순서대로), 아니면 그 자리 상품
   const shown = COSMETICS.filter((item) => stateByCode.has(item.code)).filter(
     (item) =>
@@ -194,13 +199,14 @@ export default function ShopPage() {
             p={me}
             frameCode={shownCard}
             avatarFrameCode={shownAvatar}
+            nameStyleCode={shownName ?? null}
           />
         </div>
         <div className="flex-shrink-0">
           <div className="mb-2 text-xs font-bold text-text-tertiary">
-            프로필 아바타
+            프로필 아바타·닉네임
           </div>
-          <div className="flex h-[180px] w-[200px] items-center justify-center">
+          <div className="flex h-[210px] w-[200px] flex-col items-center justify-center gap-3">
             <AvatarDecoration
               code={findCosmetic(shownAvatar)?.avatarEffect}
               size={96}
@@ -215,6 +221,10 @@ export default function ShopPage() {
                 />
               </div>
             </AvatarDecoration>
+            {/* 프로필 이름 크기로 닉네임 글꼴을 입혀 본다 */}
+            <div className="max-w-full truncate text-xl font-black text-text-primary">
+              <StyledName code={shownNameStyle}>{me.username}</StyledName>
+            </div>
           </div>
         </div>
         <div className="min-w-0 flex-1 text-sm text-text-secondary">
@@ -304,7 +314,29 @@ export default function ShopPage() {
                   className="text-left"
                   aria-label={`${item.name} 입어 보기`}
                 >
-                  {item.slot === "AVATAR_FRAME" ? (
+                  {item.slot === "NAME_STYLE" ? (
+                    // 닉네임 글꼴 — 프로필·로비 카드·채팅 크기로 함께 보여 준다
+                    <div className="flex h-[180px] flex-col items-center justify-center gap-3 rounded-lg bg-bg-secondary/60 px-2">
+                      <div className="max-w-full truncate text-2xl font-black text-text-primary">
+                        <StyledName code={item.nameStyle}>
+                          {me.username}
+                        </StyledName>
+                      </div>
+                      <div className="max-w-full truncate rounded-md bg-bg-tertiary/70 px-2 py-1 text-sm font-black text-text-primary">
+                        <StyledName code={item.nameStyle}>
+                          {me.username}
+                        </StyledName>
+                      </div>
+                      <div className="max-w-full truncate text-[13px] text-text-secondary">
+                        <span className="font-bold text-text-primary">
+                          <StyledName code={item.nameStyle}>
+                            {me.username}
+                          </StyledName>
+                        </span>
+                        : 다음 판 미드 갑니다
+                      </div>
+                    </div>
+                  ) : item.slot === "AVATAR_FRAME" ? (
                     <div className="flex h-[180px] items-center justify-center">
                       <AvatarDecoration code={item.avatarEffect} size={88}>
                         <div className="relative h-[88px] w-[88px] overflow-hidden rounded-full bg-bg-tertiary">
@@ -325,6 +357,7 @@ export default function ShopPage() {
                         p={{ ...me, id: `preview-${i}` }}
                         frameCode={item.code}
                         avatarFrameCode={shownAvatar}
+                        nameStyleCode={shownName ?? null}
                       />
                     </div>
                   )}
