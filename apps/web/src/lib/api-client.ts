@@ -2411,6 +2411,17 @@ export interface MedalHistoryItem {
   metadata: Record<string, unknown> | null;
 }
 
+/** 메달 요약 (GET /medals/me/summary) */
+export interface MedalSummary {
+  balance: number;
+  /** 오늘(KST) 상한에 잡히는 사유로 받은 양과 하루 상한 */
+  today: { earned: number; cap: number };
+  /** 지금까지 받은 순합(회수 반영), 쓴 양(구매 − 환불) */
+  earned: number;
+  spent: number;
+  byReason: { reason: string; amount: number }[];
+}
+
 /** 상점 진열 한 칸 — 상품 정의(@nexus/types) + 내 보유·장착 */
 export interface ShopItemState {
   code: string;
@@ -2471,6 +2482,12 @@ export const shopApi = {
 export const medalApi = {
   getMine: async (): Promise<{ balance: number }> => {
     const response = await apiClient.get("/medals/me");
+    return response.data;
+  },
+
+  /** 메달 화면 머리 — 잔액·오늘 받은 양/하루 상한·사유별 순합계 */
+  getSummary: async (): Promise<MedalSummary> => {
+    const response = await apiClient.get("/medals/me/summary");
     return response.data;
   },
 

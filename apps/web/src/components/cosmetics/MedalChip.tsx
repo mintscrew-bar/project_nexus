@@ -11,7 +11,7 @@ import { medalApi, type MedalHistoryItem } from "@/lib/api-client";
 import { MEDAL_LABEL } from "./catalog";
 
 /** 원장 사유 → 화면 이름 */
-const REASON_LABEL: Record<string, string> = {
+export const REASON_LABEL: Record<string, string> = {
   MATCH_COMPLETE: "완주",
   MATCH_WIN: "승리",
   RIOT_VERIFIED: "Riot 확인",
@@ -303,6 +303,13 @@ export function MedalChip() {
                 </div>
               ))}
             </div>
+            <Link
+              href="/shop/medals"
+              onClick={() => setOpen(false)}
+              className="mt-2 block rounded-lg py-1.5 text-center text-xs font-bold text-text-tertiary transition-colors hover:bg-bg-tertiary/50 hover:text-text-secondary"
+            >
+              전체 내역 보기
+            </Link>
           </motion.div>
         )}
       </AnimatePresence>

@@ -25,6 +25,8 @@ import { cn } from "@/lib/utils";
 
 type ShopSlot = "CARD_FRAME" | "AVATAR_FRAME";
 const SLOTS: ShopSlot[] = ["CARD_FRAME", "AVATAR_FRAME"];
+/** 진열 탭 — 자리별 상품 + 산 것만 모아 보는 보관함 */
+type ShopTab = ShopSlot | "OWNED";
 
 const RARITY_STYLE: Record<CosmeticItem["rarity"], string> = {
   STARTER: "bg-bg-elevated text-text-secondary",
@@ -68,7 +70,7 @@ export default function ShopPage() {
     enabled: isAuthenticated,
   });
 
-  const [tab, setTab] = useState<ShopSlot>("CARD_FRAME");
+  const [tab, setTab] = useState<ShopTab>("CARD_FRAME");
   // 입어 보는 중인 상품 — 자리별로 따로
   const [trying, setTrying] = useState<Partial<Record<ShopSlot, string>>>({});
   const [confirm, setConfirm] = useState<CosmeticItem | null>(null);
@@ -145,6 +147,12 @@ export default function ShopPage() {
     isReady: true,
   };
   const isTrying = Boolean(trying.CARD_FRAME || trying.AVATAR_FRAME);
+  // 진열할 상품 — 보관함이면 산 것 전부(자리 순서대로), 아니면 그 자리 상품
+  const shown = COSMETICS.filter((item) => stateByCode.has(item.code)).filter(
+    (item) =>
+      tab === "OWNED" ? stateByCode.get(item.code)!.owned : item.slot === tab,
+  );
+  const ownedCount = data?.items.filter((it) => it.owned).length ?? 0;
 
   return (
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6 md:px-6">
@@ -159,15 +167,20 @@ export default function ShopPage() {
             보세요.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-xl bg-amber-400/10 px-4 py-2.5">
+        {/* 잔액 — 누르면 메달 내역 전체 화면 */}
+        <Link
+          href="/shop/medals"
+          title={`${MEDAL_LABEL} 내역 보기`}
+          className="flex items-center gap-2 rounded-xl bg-amber-400/10 px-4 py-2.5 transition-colors hover:bg-amber-400/15"
+        >
           <Medal className="h-5 w-5 text-amber-300" />
           <span className="text-xl font-black tabular-nums text-text-primary">
             {balance.toLocaleString()}
           </span>
           <span className="text-sm font-bold text-text-tertiary">
-            {MEDAL_LABEL}
+            {MEDAL_LABEL} · 내역
           </span>
-        </div>
+        </Link>
       </div>
 
       {/* 내 모습 미리보기 */}
@@ -180,6 +193,7 @@ export default function ShopPage() {
             {...PREVIEW_CARD_PROPS}
             p={me}
             frameCode={shownCard}
+            avatarFrameCode={shownAvatar}
           />
         </div>
         <div className="flex-shrink-0">
@@ -234,20 +248,20 @@ export default function ShopPage() {
       </section>
 
       {/* 자리 탭 */}
-      <div className="flex gap-2">
-        {SLOTS.map((slot) => (
+      <div className="flex flex-wrap gap-2">
+        {[...SLOTS, "OWNED" as const].map((t) => (
           <button
-            key={slot}
+            key={t}
             type="button"
-            onClick={() => setTab(slot)}
+            onClick={() => setTab(t)}
             className={cn(
               "h-10 rounded-lg px-4 text-sm font-black transition-colors",
-              tab === slot
+              tab === t
                 ? "bg-accent-primary text-accent-on"
                 : "bg-bg-tertiary/60 text-text-secondary hover:bg-bg-tertiary",
             )}
           >
-            {SLOT_LABEL[slot]}
+            {t === "OWNED" ? `보관함 ${ownedCount}` : SLOT_LABEL[t]}
           </button>
         ))}
       </div>
@@ -257,142 +271,151 @@ export default function ShopPage() {
         <div className="py-20 text-center text-sm text-text-tertiary">
           불러오는 중…
         </div>
+      ) : tab === "OWNED" && shown.length === 0 ? (
+        <div className="rounded-xl bg-bg-secondary py-16 text-center text-sm text-text-tertiary">
+          아직 산 꾸미기가 없어요.
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {COSMETICS.filter((item) => item.slot === tab)
-            .filter((item) => stateByCode.has(item.code))
-            .map((item, i) => {
-              const state = stateByCode.get(item.code)!;
-              const selected = trying[tab] === item.code;
-              const short = balance < item.price;
-              return (
-                <div
-                  key={item.code}
-                  className={cn(
-                    "flex flex-col gap-3 rounded-xl p-4 transition-colors",
-                    selected
-                      ? "bg-accent-primary/10 ring-1 ring-inset ring-accent-primary/50"
-                      : "bg-bg-tertiary/40",
-                  )}
+          {shown.map((item, i) => {
+            const state = stateByCode.get(item.code)!;
+            const slot = item.slot as ShopSlot;
+            const selected = trying[slot] === item.code;
+            const short = balance < item.price;
+            return (
+              <div
+                key={item.code}
+                className={cn(
+                  "flex flex-col gap-3 rounded-xl p-4 transition-colors",
+                  selected
+                    ? "bg-accent-primary/10 ring-1 ring-inset ring-accent-primary/50"
+                    : "bg-bg-tertiary/40",
+                )}
+              >
+                {/* 누르면 위 미리보기에 입혀 본다 */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTrying((t) => ({
+                      ...t,
+                      [slot]: selected ? undefined : item.code,
+                    }))
+                  }
+                  className="text-left"
+                  aria-label={`${item.name} 입어 보기`}
                 >
-                  {/* 누르면 위 미리보기에 입혀 본다 */}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setTrying((t) => ({
-                        ...t,
-                        [tab]: selected ? undefined : item.code,
-                      }))
-                    }
-                    className="text-left"
-                    aria-label={`${item.name} 입어 보기`}
-                  >
-                    {item.slot === "AVATAR_FRAME" ? (
-                      <div className="flex h-[180px] items-center justify-center">
-                        <AvatarDecoration code={item.avatarEffect} size={88}>
-                          <div className="relative h-[88px] w-[88px] overflow-hidden rounded-full bg-bg-tertiary">
-                            <Image
-                              src={avatarSrc}
-                              alt=""
-                              fill
-                              unoptimized
-                              className="object-cover"
-                            />
-                          </div>
-                        </AvatarDecoration>
-                      </div>
-                    ) : (
-                      <div className="mx-auto w-[180px]">
-                        <PortraitParticipantCard
-                          {...PREVIEW_CARD_PROPS}
-                          p={{ ...me, id: `preview-${i}` }}
-                          frameCode={item.code}
-                        />
-                      </div>
-                    )}
-                  </button>
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-black text-text-primary">
-                        {item.name}
-                      </span>
-                      <span
-                        className={cn(
-                          "rounded px-1.5 py-0.5 text-[10px] font-bold",
-                          RARITY_STYLE[item.rarity],
-                        )}
-                      >
-                        {RARITY_LABEL[item.rarity]}
-                      </span>
+                  {item.slot === "AVATAR_FRAME" ? (
+                    <div className="flex h-[180px] items-center justify-center">
+                      <AvatarDecoration code={item.avatarEffect} size={88}>
+                        <div className="relative h-[88px] w-[88px] overflow-hidden rounded-full bg-bg-tertiary">
+                          <Image
+                            src={avatarSrc}
+                            alt=""
+                            fill
+                            unoptimized
+                            className="object-cover"
+                          />
+                        </div>
+                      </AvatarDecoration>
                     </div>
-                    <p className="mt-0.5 text-xs text-text-tertiary">
-                      {item.description}
-                    </p>
-                  </div>
+                  ) : (
+                    <div className="mx-auto w-[180px]">
+                      <PortraitParticipantCard
+                        {...PREVIEW_CARD_PROPS}
+                        p={{ ...me, id: `preview-${i}` }}
+                        frameCode={item.code}
+                        avatarFrameCode={shownAvatar}
+                      />
+                    </div>
+                  )}
+                </button>
 
-                  <div className="mt-auto">
-                    {state.owned ? (
-                      state.equipped ? (
-                        <button
-                          type="button"
-                          disabled={equip.isPending}
-                          onClick={() =>
-                            equip.mutate({
-                              slot: item.slot as ShopSlot,
-                              code: null,
-                            })
-                          }
-                          className="group/eq flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-accent-success/60 text-sm font-black text-white transition-colors hover:bg-bg-elevated hover:text-text-secondary"
-                        >
-                          <span className="flex items-center gap-1.5 group-hover/eq:hidden">
-                            <Check className="h-4 w-4" strokeWidth={3} />
-                            장착 중
-                          </span>
-                          <span className="hidden group-hover/eq:inline">
-                            장착 해제
-                          </span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={equip.isPending}
-                          onClick={() =>
-                            equip.mutate({
-                              slot: item.slot as ShopSlot,
-                              code: item.code,
-                            })
-                          }
-                          className="flex h-10 w-full items-center justify-center rounded-lg bg-bg-elevated text-sm font-black text-text-primary transition-colors hover:bg-accent-primary hover:text-accent-on"
-                        >
-                          장착하기
-                        </button>
-                      )
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-black text-text-primary">
+                      {item.name}
+                    </span>
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[10px] font-bold",
+                        RARITY_STYLE[item.rarity],
+                      )}
+                    >
+                      {RARITY_LABEL[item.rarity]}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-text-tertiary">
+                    {tab === "OWNED" && (
+                      <span className="mr-1 font-bold text-text-secondary">
+                        {SLOT_LABEL[item.slot]} ·
+                      </span>
+                    )}
+                    {item.description}
+                  </p>
+                </div>
+
+                <div className="mt-auto">
+                  {state.owned ? (
+                    state.equipped ? (
+                      <button
+                        type="button"
+                        disabled={equip.isPending}
+                        onClick={() =>
+                          equip.mutate({
+                            slot: item.slot as ShopSlot,
+                            code: null,
+                          })
+                        }
+                        className="group/eq flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-accent-success/60 text-sm font-black text-white transition-colors hover:bg-bg-elevated hover:text-text-secondary"
+                      >
+                        <span className="flex items-center gap-1.5 group-hover/eq:hidden">
+                          <Check className="h-4 w-4" strokeWidth={3} />
+                          장착 중
+                        </span>
+                        <span className="hidden group-hover/eq:inline">
+                          장착 해제
+                        </span>
+                      </button>
                     ) : (
                       <button
                         type="button"
-                        disabled={short}
-                        onClick={() => setConfirm(item)}
-                        className={cn(
-                          "flex h-10 w-full items-center justify-center gap-1.5 rounded-lg text-sm font-black transition-colors",
-                          short
-                            ? "cursor-not-allowed bg-bg-elevated/60 text-text-tertiary"
-                            : "bg-accent-primary text-accent-on hover:brightness-110",
-                        )}
+                        disabled={equip.isPending}
+                        onClick={() =>
+                          equip.mutate({
+                            slot: item.slot as ShopSlot,
+                            code: item.code,
+                          })
+                        }
+                        className="flex h-10 w-full items-center justify-center rounded-lg bg-bg-elevated text-sm font-black text-text-primary transition-colors hover:bg-accent-primary hover:text-accent-on"
                       >
-                        <Medal className="h-4 w-4" />
-                        {item.price.toLocaleString()} {MEDAL_LABEL}
-                        {short && (
-                          <span className="ml-1 text-xs font-bold">
-                            · {(item.price - balance).toLocaleString()} 부족
-                          </span>
-                        )}
+                        장착하기
                       </button>
-                    )}
-                  </div>
+                    )
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={short}
+                      onClick={() => setConfirm(item)}
+                      className={cn(
+                        "flex h-10 w-full items-center justify-center gap-1.5 rounded-lg text-sm font-black transition-colors",
+                        short
+                          ? "cursor-not-allowed bg-bg-elevated/60 text-text-tertiary"
+                          : "bg-accent-primary text-accent-on hover:brightness-110",
+                      )}
+                    >
+                      <Medal className="h-4 w-4" />
+                      {item.price.toLocaleString()} {MEDAL_LABEL}
+                      {short && (
+                        <span className="ml-1 text-xs font-bold">
+                          · {(item.price - balance).toLocaleString()} 부족
+                        </span>
+                      )}
+                    </button>
+                  )}
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
         </div>
       )}
 
