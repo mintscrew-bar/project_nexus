@@ -13,14 +13,7 @@ import { cn } from "@/lib/utils";
  */
 
 export type NameStyleCode =
-  | "ink"
-  | "gold"
-  | "pixel"
-  | "pen"
-  | "brush"
-  | "neon"
-  | "rainbow"
-  | "flame";
+  "ink" | "gold" | "pixel" | "pen" | "brush" | "neon" | "rainbow" | "flame";
 
 interface NameStyleDef {
   /** 글꼴 이름 (font-family) */
