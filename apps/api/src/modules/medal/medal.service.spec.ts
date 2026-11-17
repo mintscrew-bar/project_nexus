@@ -194,4 +194,28 @@ describe("MedalService", () => {
       expect(page2.nextCursor).toBeNull();
     });
   });
+
+  describe("getSummary — 메달 화면 요약", () => {
+    it("오늘 상한 진행, 받은·쓴 총량, 사유별 합계", async () => {
+      const day = "2026-11-17";
+      await grant("a", 10, { dayKey: day });
+      await grant("b", 10, { reason: MedalReason.MATCH_WIN, dayKey: day });
+      await grant("c", 50, { reason: MedalReason.FIRST_MATCH });
+      await grant("d", 10, { dayKey: "2026-11-16" });
+      await grant("e", -30, { reason: MedalReason.PURCHASE });
+      const s = await service.getSummary("u1", {
+        dayKey: day,
+        dailyCap: 180,
+        cappedReasons: [MedalReason.MATCH_COMPLETE, MedalReason.MATCH_WIN],
+      });
+      expect(s.balance).toBe(50);
+      expect(s.today).toEqual({ earned: 20, cap: 180 });
+      expect(s.earned).toBe(80);
+      expect(s.spent).toBe(30);
+      expect(s.byReason[0]).toEqual({
+        reason: MedalReason.FIRST_MATCH,
+        amount: 50,
+      });
+    });
+  });
 });

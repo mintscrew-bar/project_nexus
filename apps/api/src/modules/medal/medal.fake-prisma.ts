@@ -69,6 +69,15 @@ export function createFakePrisma() {
             .reduce((sum, l) => sum + l.amount, 0),
         },
       })),
+      groupBy: jest.fn(async ({ where }: any) => {
+        const sums = new Map<string, number>();
+        for (const l of ledger.filter((r) => r.userId === where.userId))
+          sums.set(l.reason, (sums.get(l.reason) ?? 0) + l.amount);
+        return [...sums].map(([reason, amount]) => ({
+          reason,
+          _sum: { amount },
+        }));
+      }),
       findMany: jest.fn(async ({ where, take, cursor }: any) => {
         let rows = ledger
           .filter((l) => l.userId === where.userId)

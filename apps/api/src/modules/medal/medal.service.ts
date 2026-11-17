@@ -103,6 +103,53 @@ export class MedalService {
   }
 
   /**
+   * 메달 화면 위쪽 요약 — 잔액, 오늘 상한 진행, 사유별 합계, 받은·쓴 총량.
+   * 상한 계산 기준(오늘 날짜·상한에 드는 사유)은 경기 메달 쪽이 정하므로 받아서 쓴다.
+   */
+  async getSummary(
+    userId: string,
+    cap: { dayKey: string; dailyCap: number; cappedReasons: MedalReason[] },
+  ) {
+    const [balance, today, groups] = await Promise.all([
+      this.getBalance(userId),
+      this.prisma.medalLedger.aggregate({
+        where: {
+          userId,
+          dayKey: cap.dayKey,
+          reason: { in: cap.cappedReasons },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.medalLedger.groupBy({
+        by: ["reason"],
+        where: { userId },
+        _sum: { amount: true },
+      }),
+    ]);
+    const byReason = groups
+      .map((g) => ({ reason: g.reason, amount: g._sum.amount ?? 0 }))
+      .filter((g) => g.amount !== 0)
+      .sort((a, b) => b.amount - a.amount);
+    const net = (r: MedalReason) =>
+      byReason.find((g) => g.reason === r)?.amount ?? 0;
+    // 쓴 것 = 구매 − 환불, 받은 것 = 구매·환불을 뺀 나머지 순합(회수는 빼고 센다)
+    const spent = -(net(MedalReason.PURCHASE) + net(MedalReason.REFUND));
+    const earned = byReason
+      .filter(
+        (g) =>
+          g.reason !== MedalReason.PURCHASE && g.reason !== MedalReason.REFUND,
+      )
+      .reduce((sum, g) => sum + g.amount, 0);
+    return {
+      balance,
+      today: { earned: today._sum.amount ?? 0, cap: cap.dailyCap },
+      earned,
+      spent,
+      byReason,
+    };
+  }
+
+  /**
    * 원장 한 줄 + 잔액 변경을 하나의 트랜잭션으로.
    * 같은 키가 이미 있으면 바꾸지 않고 그 줄을 돌려준다.
    */

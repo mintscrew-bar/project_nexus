@@ -19,7 +19,12 @@ import {
   RetroMedalDto,
   VoidMatchMedalDto,
 } from "./dto/adjust-medal.dto";
-import { MatchMedalService } from "./match-medal.service";
+import {
+  CAPPED_REASONS,
+  MEDAL_DAILY_CAP,
+  MatchMedalService,
+  kstDayKey,
+} from "./match-medal.service";
 
 @Controller("medals")
 export class MedalController {
@@ -33,6 +38,17 @@ export class MedalController {
   @UseGuards(JwtAuthGuard)
   async getMyBalance(@CurrentUser("sub") userId: string) {
     return { balance: await this.medalService.getBalance(userId) };
+  }
+
+  /** 내 메달 요약 — 메달 화면 위쪽 (오늘 상한 진행·사유별 합계) */
+  @Get("me/summary")
+  @UseGuards(JwtAuthGuard)
+  async getMySummary(@CurrentUser("sub") userId: string) {
+    return this.medalService.getSummary(userId, {
+      dayKey: kstDayKey(new Date()),
+      dailyCap: MEDAL_DAILY_CAP,
+      cappedReasons: CAPPED_REASONS,
+    });
   }
 
   /** 내 메달 내역 (최신순, 커서 페이지) */
