@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { cosmeticFxPaused } from "@/stores/cosmetic-fx-store";
 
 /**
  * 실시간 픽셀 불 — 칸마다 열(0~1)을 들고, 매 박자마다 아래 칸의 열을 물려받아
@@ -225,7 +226,8 @@ export function PixelFire({
     io.observe(canvas);
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      if (!visible || document.hidden) return;
+      // 꾸미기 효과 「멈춘 그림」·「숨기기」면 지금 모습에서 멈춘다
+      if (!visible || document.hidden || cosmeticFxPaused()) return;
       if (now - last < 1000 / fps) return;
       last = now;
       step();

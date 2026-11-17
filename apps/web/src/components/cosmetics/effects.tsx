@@ -632,7 +632,7 @@ export function CosmeticEffect({
   return (
     <div
       aria-hidden
-      className="cfx-root pointer-events-none absolute inset-0 overflow-hidden"
+      className="cfx-root cfx-deco pointer-events-none absolute inset-0 overflow-hidden"
     >
       <Fx px={px} />
     </div>

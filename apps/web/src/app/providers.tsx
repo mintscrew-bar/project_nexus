@@ -9,14 +9,18 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcuts";
 import { BgmPlayer } from "@/components/bgm/BgmPlayer";
 import { useSfxStore } from "@/stores/sfx-store";
+import { useCosmeticFxStore } from "@/stores/cosmetic-fx-store";
 import { GameNavigationProvider } from "@/components/GameNavigationProvider";
 
 function SfxSettingsInitializer() {
   const hydrate = useSfxStore((state) => state.hydrate);
+  // 꾸미기 효과 보기 설정도 같은 때 브라우저 저장값을 읽어 <html> 클래스에 반영한다
+  const hydrateFx = useCosmeticFxStore((state) => state.hydrate);
 
   useEffect(() => {
     hydrate();
-  }, [hydrate]);
+    hydrateFx();
+  }, [hydrate, hydrateFx]);
 
   return null;
 }

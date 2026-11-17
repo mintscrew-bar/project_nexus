@@ -442,7 +442,8 @@ export function AvatarDecoration({
       >
         {children}
       </div>
-      <div aria-hidden className="pointer-events-none">
+      {/* cfx-deco — 「숨기기」 설정이면 장식만 빠지고 아바타는 남는다 */}
+      <div aria-hidden className="cfx-deco pointer-events-none">
         <Fx px={size / 48} size={size} />
       </div>
     </div>

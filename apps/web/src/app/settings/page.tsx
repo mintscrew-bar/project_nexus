@@ -47,6 +47,7 @@ import {
 import { AddAccountModal } from "@/components/domain/AddAccountModal";
 import { BroadcastTokenSection } from "./_components/BroadcastTokenSection";
 import { StreamerSettingsSection } from "./_components/StreamerSettingsSection";
+import { CosmeticFxSection } from "./_components/CosmeticFxSection";
 import { useRiotStore } from "@/stores/riot-store";
 import { enabledGames } from "@nexus/types";
 import { pubgApi } from "@/lib/api-client";
@@ -1400,6 +1401,7 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   </div>
+                  <CosmeticFxSection />
                 </CardContent>
               </Card>
             )}
