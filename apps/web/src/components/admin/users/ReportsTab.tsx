@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { adminApi, type AdminUserActivity } from "@/lib/api-client";
 import {
@@ -12,6 +12,8 @@ import {
 } from "@/components/ui";
 import { Ban, CheckCircle } from "lucide-react";
 import { BAN_REASONS, Pagination, Modal, type AddToast } from "../shared";
+import { useQueryFieldSetter } from "@/hooks/useQuerySetter";
+import { useQuery } from "@tanstack/react-query";
 
 interface UserReportItem {
   id: string;
@@ -64,21 +66,14 @@ const REASON_LABELS: Record<string, string> = {
  * 같은 창에서 핵심만 보여 준다. 전문은 각 탭에서 본다.
  */
 function TargetActivity({ userId }: { userId: string }) {
-  const [data, setData] = useState<AdminUserActivity | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setData(null);
-    setFailed(false);
-    adminApi
-      .getUserActivity(userId)
-      .then((r) => !cancelled && setData(r))
-      .catch(() => !cancelled && setFailed(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
+  // 신고 대상이 바뀌면 키가 바뀌어 새로 불러온다 — 효과에서 비우고 다시 부르지 않는다
+  const activityQuery = useQuery({
+    queryKey: ["admin-user-activity", userId],
+    queryFn: () =>
+      adminApi.getUserActivity(userId) as Promise<AdminUserActivity>,
+  });
+  const data = activityQuery.data ?? null;
+  const failed = activityQuery.isError;
 
   if (failed)
     return (
@@ -162,12 +157,9 @@ function TargetActivity({ userId }: { userId: string }) {
 }
 
 export function ReportsTab({ addToast }: { addToast: AddToast }) {
-  const [reports, setReports] = useState<ReportItem[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [category, setCategory] = useState<"user" | "post">("user");
   const [status, setStatus] = useState<string>("PENDING");
-  const [loading, setLoading] = useState(true);
   const [reviewModal, setReviewModal] = useState<ReportItem | null>(null);
   const [reviewStatus, setReviewStatus] = useState<"APPROVED" | "REJECTED">(
     "APPROVED",
@@ -178,29 +170,32 @@ export function ReportsTab({ addToast }: { addToast: AddToast }) {
   const [banReasonCustom, setBanReasonCustom] = useState("");
 
   const limit = 20;
-  const totalPages = Math.ceil(total / limit);
 
-  const fetchReports = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await adminApi.getReports({
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setReports 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 처리 직후엔 캐시를 바로 고친다(setReports).
+  const reportsKey = ["admin-reports", page, status, category];
+  const reportsQuery = useQuery({
+    queryKey: reportsKey,
+    queryFn: () =>
+      adminApi.getReports({
         page,
         limit,
         status: status || undefined,
         category,
-      });
-      setReports(data.reports);
-      setTotal(data.total);
-    } catch {
-      addToast("신고 목록 로드 실패", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, status, category, addToast]);
-
+      }) as Promise<{ reports: ReportItem[]; total: number }>,
+  });
+  const reports = reportsQuery.data?.reports ?? [];
+  const total = reportsQuery.data?.total ?? 0;
+  const totalPages = Math.ceil(total / limit);
+  const loading = reportsQuery.isLoading;
+  const setReports = useQueryFieldSetter<
+    { reports: ReportItem[]; total: number },
+    "reports"
+  >(reportsKey, "reports");
+  const fetchReports = () => void reportsQuery.refetch();
   useEffect(() => {
-    fetchReports();
-  }, [fetchReports]);
+    if (reportsQuery.isError) addToast("신고 목록 로드 실패", "error");
+  }, [reportsQuery.isError, addToast]);
 
   const resetReviewBanForm = () => {
     setReviewModal(null);

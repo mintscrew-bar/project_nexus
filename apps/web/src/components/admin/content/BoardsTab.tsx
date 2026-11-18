@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 import type { AddToast } from "../shared";
+import { useQuery } from "@tanstack/react-query";
 
 /** 빈 폼 기본값 */
 const emptyForm: BoardInput = {
@@ -54,8 +55,6 @@ const WRITE_ROLE_LABELS: Record<NonNullable<Board["writeRole"]>, string> = {
 };
 
 export function BoardsTab({ addToast }: { addToast: AddToast }) {
-  const [boards, setBoards] = useState<Board[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // 생성/수정 모달 상태
@@ -66,21 +65,23 @@ export function BoardsTab({ addToast }: { addToast: AddToast }) {
   // 삭제 확인 모달
   const [deleteTarget, setDeleteTarget] = useState<Board | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setData 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 조건이 바뀌면 키가 바뀌어 새로 불러온다.
+  const dataQuery = useQuery({
+    queryKey: ["admin-boards"],
+    queryFn: async () => {
       const data = await boardApi.listForAdmin();
-      setBoards(data);
-    } catch {
-      addToast("게시판 목록을 불러오지 못했습니다.", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [addToast]);
-
+      return { boards: data };
+    },
+  });
+  const boards = (dataQuery.data?.boards ?? []) as Board[];
+  const loading = dataQuery.isLoading;
+  // 처리 뒤 새로고침 — 예전 이름 그대로 둔다
+  const load = useCallback(() => void dataQuery.refetch(), [dataQuery]);
   useEffect(() => {
-    load();
-  }, [load]);
+    if (dataQuery.isError)
+      addToast("게시판 목록을 불러오지 못했습니다.", "error");
+  }, [dataQuery.isError, addToast]);
 
   const openCreate = () => {
     setEditing(null);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, Button, LoadingSpinner } from "@/components/ui";
@@ -9,6 +9,9 @@ import { BoardsTab } from "./BoardsTab";
 import { useAdminGameScope } from "../game-scope";
 import { Pagination, type AddToast } from "../shared";
 import { useConfirm } from "../ConfirmDialog";
+import { useResetOn } from "@/hooks/useResetOn";
+import { useQueryFieldSetter } from "@/hooks/useQuerySetter";
+import { useQuery } from "@tanstack/react-query";
 
 interface AdminPost {
   id: string;
@@ -66,43 +69,38 @@ export function CommunityTab({
 /** 게시글 관리 (검색/고정/삭제) */
 function CommunityPostsTab({ addToast }: { addToast: AddToast }) {
   const { confirm, dialog } = useConfirm();
-  const [posts, setPosts] = useState<AdminPost[]>([]);
-  const [total, setTotal] = useState(0);
   const { gameParam } = useAdminGameScope();
-  const [page, setPage] = useState(1);
+  // 게임을 바꾸면 이전 게임의 페이지 번호를 끌고 가지 않는다(효과 없이 되돌림)
+  const [page, setPage] = useResetOn(1, gameParam);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [loading, setLoading] = useState(true);
 
   const limit = 20;
-  const totalPages = Math.ceil(total / limit);
 
-  const fetchPosts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await adminApi.getPosts({
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setPosts 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 삭제·고정 직후엔 캐시를 바로 고친다(setPosts).
+  const postsKey = ["admin-posts", page, search, gameParam];
+  const postsQuery = useQuery({
+    queryKey: postsKey,
+    queryFn: () =>
+      adminApi.getPosts({
         page,
         limit,
         search: search || undefined,
         gameTitle: gameParam,
-      });
-      setPosts(data.posts);
-      setTotal(data.total);
-    } catch {
-      addToast("게시글 로드 실패", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search, gameParam, addToast]);
-
-  // 게임을 바꾸면 이전 게임의 페이지 번호를 끌고 가지 않는다.
+      }) as Promise<{ posts: AdminPost[]; total: number }>,
+  });
+  const posts = postsQuery.data?.posts ?? [];
+  const total = postsQuery.data?.total ?? 0;
+  const totalPages = Math.ceil(total / limit);
+  const loading = postsQuery.isLoading;
+  const setPosts = useQueryFieldSetter<
+    { posts: AdminPost[]; total: number },
+    "posts"
+  >(postsKey, "posts");
   useEffect(() => {
-    setPage(1);
-  }, [gameParam]);
-
-  useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
+    if (postsQuery.isError) addToast("게시글 로드 실패", "error");
+  }, [postsQuery.isError, addToast]);
 
   const handleDelete = async (post: AdminPost) => {
     const ok = await confirm({

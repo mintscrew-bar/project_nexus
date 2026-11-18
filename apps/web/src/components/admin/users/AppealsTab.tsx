@@ -11,13 +11,11 @@ import {
 } from "@/components/ui";
 import { CheckCircle, XCircle } from "lucide-react";
 import { Pagination, Modal, type AddToast } from "../shared";
+import { useQuery } from "@tanstack/react-query";
 
 export function AppealsTab({ addToast }: { addToast: AddToast }) {
-  const [appeals, setAppeals] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("PENDING");
-  const [loading, setLoading] = useState(true);
   // 처리 모달 상태
   const [reviewTarget, setReviewTarget] = useState<any>(null);
   const [adminNote, setAdminNote] = useState("");
@@ -25,26 +23,31 @@ export function AppealsTab({ addToast }: { addToast: AddToast }) {
 
   const LIMIT = 20;
 
-  const fetchAppeals = useCallback(async () => {
-    setLoading(true);
-    try {
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setData 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 조건이 바뀌면 키가 바뀌어 새로 불러온다.
+  const appealsQuery = useQuery({
+    queryKey: ["admin-appeals", page, statusFilter],
+    queryFn: async () => {
       const data = await appealApi.list({
         page,
         limit: LIMIT,
         status: statusFilter || undefined,
       });
-      setAppeals(data.appeals);
-      setTotal(data.total);
-    } catch {
-      addToast("이의신청 목록 로드 실패", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, statusFilter, addToast]);
-
+      return { appeals: data.appeals, total: data.total };
+    },
+  });
+  const appeals = (appealsQuery.data?.appeals ?? []) as any[];
+  const total = appealsQuery.data?.total ?? 0;
+  const loading = appealsQuery.isLoading;
+  const totalPages = Math.ceil(total / LIMIT);
+  // 처리 뒤 새로고침 — 예전 이름 그대로 둔다
+  const fetchAppeals = useCallback(
+    () => void appealsQuery.refetch(),
+    [appealsQuery],
+  );
   useEffect(() => {
-    fetchAppeals();
-  }, [fetchAppeals]);
+    if (appealsQuery.isError) addToast("이의신청 목록 로드 실패", "error");
+  }, [appealsQuery.isError, addToast]);
 
   const handleReview = async (status: "APPROVED" | "REJECTED") => {
     if (!reviewTarget) return;
@@ -73,8 +76,6 @@ export function AppealsTab({ addToast }: { addToast: AddToast }) {
       setIsReviewing(false);
     }
   };
-
-  const totalPages = Math.ceil(total / LIMIT);
 
   const statusBadge = (s: string) => {
     if (s === "PENDING")

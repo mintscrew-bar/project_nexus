@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/api-client";
 import {
   Badge,
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui";
 import { Pagination, type AddToast } from "../shared";
 import { useConfirm } from "../ConfirmDialog";
+import { useQuery } from "@tanstack/react-query";
 
 /**
  * 배그 스크림 기록.
@@ -109,22 +110,24 @@ function ScrimDetailModal({
   onChanged: () => void;
   addToast: AddToast;
 }) {
-  const [detail, setDetail] = useState<ScrimDetail | null>(null);
   const [busy, setBusy] = useState(false);
   const { confirm, dialog } = useConfirm();
 
-  const load = useCallback(async () => {
-    try {
-      setDetail(await adminApi.getScrimDetail(scrimId));
-    } catch {
-      addToast("스크림 상세 로드 실패", "error");
-      onClose();
-    }
-  }, [scrimId, addToast, onClose]);
-
+  // 상세 — React Query 로 묻는다. 처리 뒤에는 load() 로 다시 읽는다.
+  const detailQuery = useQuery({
+    queryKey: ["admin-scrim", scrimId],
+    queryFn: () => adminApi.getScrimDetail(scrimId) as Promise<ScrimDetail>,
+  });
+  const detail = detailQuery.data ?? null;
+  const load = async () => {
+    await detailQuery.refetch();
+  };
+  // 못 불러오면 예전처럼 알리고 창을 닫는다
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!detailQuery.isError) return;
+    addToast("스크림 상세 로드 실패", "error");
+    onClose();
+  }, [detailQuery.isError, addToast, onClose]);
 
   const run = async (
     confirmText: string,
@@ -310,38 +313,33 @@ export function ScrimsTab({
   isAdmin?: boolean;
 }) {
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [scrims, setScrims] = useState<AdminScrim[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [loading, setLoading] = useState(true);
 
   const limit = 20;
-  const totalPages = Math.ceil(total / limit);
 
-  const fetchScrims = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await adminApi.getScrims({
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setScrims 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 상세 창에서 처리하면 fetchScrims 로 다시 읽는다.
+  const scrimsQuery = useQuery({
+    queryKey: ["admin-scrims", page, status, search],
+    queryFn: () =>
+      adminApi.getScrims({
         page,
         limit,
         status: (status || undefined) as AdminScrim["status"] | undefined,
         search: search || undefined,
-      });
-      setScrims(data.scrims);
-      setTotal(data.total);
-    } catch {
-      addToast("스크림 목록 로드 실패", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, status, search, addToast]);
-
+      }),
+  });
+  const scrims: AdminScrim[] = scrimsQuery.data?.scrims ?? [];
+  const total: number = scrimsQuery.data?.total ?? 0;
+  const totalPages = Math.ceil(total / limit);
+  const loading = scrimsQuery.isLoading;
+  const fetchScrims = () => void scrimsQuery.refetch();
   useEffect(() => {
-    fetchScrims();
-  }, [fetchScrims]);
+    if (scrimsQuery.isError) addToast("스크림 목록 로드 실패", "error");
+  }, [scrimsQuery.isError, addToast]);
 
   return (
     <div className="space-y-4">

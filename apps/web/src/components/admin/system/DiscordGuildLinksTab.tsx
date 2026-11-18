@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useQueryDataSetter } from "@/hooks/useQuerySetter";
 import { adminApi } from "@/lib/api-client";
 import {
   Card,
@@ -33,26 +35,24 @@ const GUILD_STATUS_META: Record<
 };
 
 export function DiscordGuildLinksTab({ addToast }: { addToast: AddToast }) {
-  const [links, setLinks] = useState<DiscordGuildLink[]>([]);
-  const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [sendingTestAlert, setSendingTestAlert] = useState(false);
 
-  const fetchLinks = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await adminApi.getDiscordGuildLinks();
-      setLinks(data);
-    } catch {
-      addToast("길드 연동 목록 로드 실패", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [addToast]);
-
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setLinks 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 승인·비활성 직후엔 캐시를 바로 고친다(setLinks).
+  const linksKey = ["admin-discord-links"];
+  const linksQuery = useQuery({
+    queryKey: linksKey,
+    queryFn: () =>
+      adminApi.getDiscordGuildLinks() as Promise<DiscordGuildLink[]>,
+  });
+  const links = linksQuery.data ?? [];
+  const loading = linksQuery.isLoading;
+  const setLinks = useQueryDataSetter<DiscordGuildLink[]>(linksKey, []);
+  const fetchLinks = () => void linksQuery.refetch();
   useEffect(() => {
-    fetchLinks();
-  }, [fetchLinks]);
+    if (linksQuery.isError) addToast("길드 연동 목록 로드 실패", "error");
+  }, [linksQuery.isError, addToast]);
 
   const handleApprove = async (link: DiscordGuildLink) => {
     setUpdatingId(link.id);

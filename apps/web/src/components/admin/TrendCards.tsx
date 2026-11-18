@@ -10,6 +10,7 @@ import {
 import type { GameTitle } from "@nexus/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { TrendingUp } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 type SeriesKey = Exclude<keyof AdminDailyStat, "date" | "scope">;
 interface Line {
@@ -134,39 +135,28 @@ function LineChart({ rows, lines }: { rows: AdminDailyStat[]; lines: Line[] }) {
  */
 export function TrendCards({ game }: { game: GameTitle | null }) {
   const [days, setDays] = useState(30);
-  const [rows, setRows] = useState<AdminDailyStat[] | null>(null);
-  const [cohorts, setCohorts] = useState<AdminCohort[] | null>(null);
-  const [sources, setSources] = useState<AdminSignupSource[] | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setRows(null);
-    setFailed(false);
-    adminApi
-      .getStatsSeries(game ?? "ALL", days)
-      .then((r) => !cancelled && setRows(r))
-      .catch(() => !cancelled && setFailed(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [game, days]);
-
-  useEffect(() => {
-    if (game) return;
-    let cancelled = false;
-    adminApi
-      .getCohortSurvival(8)
-      .then((r) => !cancelled && setCohorts(r))
-      .catch(() => undefined);
-    adminApi
-      .getSignupSources(days)
-      .then((r) => !cancelled && setSources(r))
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [game, days]);
+  // 게임·기간이 바뀌면 키가 바뀌어 새로 불러온다(효과에서 비우고 다시 부르지 않는다)
+  const seriesQuery = useQuery({
+    queryKey: ["admin-stats-series", game ?? "ALL", days],
+    queryFn: () =>
+      adminApi.getStatsSeries(game ?? "ALL", days) as Promise<AdminDailyStat[]>,
+  });
+  // 코호트·가입 경로는 공통(게임 없음)일 때만
+  const cohortQuery = useQuery({
+    queryKey: ["admin-cohort-survival", 8],
+    queryFn: () => adminApi.getCohortSurvival(8) as Promise<AdminCohort[]>,
+    enabled: !game,
+  });
+  const sourcesQuery = useQuery({
+    queryKey: ["admin-signup-sources", days],
+    queryFn: () =>
+      adminApi.getSignupSources(days) as Promise<AdminSignupSource[]>,
+    enabled: !game,
+  });
+  const rows = seriesQuery.data ?? null;
+  const failed = seriesQuery.isError;
+  const cohorts = cohortQuery.data ?? null;
+  const sources = sourcesQuery.data ?? null;
 
   const userLines: Line[] = [
     {

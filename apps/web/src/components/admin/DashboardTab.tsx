@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/api-client";
 import {
   Card,
@@ -26,6 +26,7 @@ import { useAdminGameScope } from "./game-scope";
 import { RoomFunnelCard } from "./RoomFunnelCard";
 import { TrendCards } from "./TrendCards";
 import { GAMES } from "@nexus/types";
+import { useQuery } from "@tanstack/react-query";
 
 export function DashboardTab({ addToast }: { addToast: AddToast }) {
   type SystemStatus = {
@@ -37,47 +38,35 @@ export function DashboardTab({ addToast }: { addToast: AddToast }) {
     };
   };
 
-  const [stats, setStats] = useState<any>(null);
-  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
-  const [systemStatusFailedAt, setSystemStatusFailedAt] = useState<
-    string | null
-  >(null);
-  const [loading, setLoading] = useState(true);
   const { game, gameParam } = useAdminGameScope();
   const gameLabel = game ? GAMES[game].shortLabel : "";
 
-  const fetchDashboardStats = useCallback(async () => {
-    setLoading(true);
-    const statsResult = await Promise.resolve(
-      adminApi.getStats({ gameTitle: gameParam }),
-    )
-      .then((value) => ({ status: "fulfilled" as const, value }))
-      .catch((reason) => ({ status: "rejected" as const, reason }));
-
-    const systemStatusResult = await adminApi
-      .getSystemStatus()
-      .catch(() => null);
-
-    if (statsResult.status === "fulfilled") {
-      setStats(statsResult.value);
-    } else {
-      addToast("대시보드 통계 로드 실패", "error");
-    }
-
-    if (systemStatusResult) {
-      setSystemStatus(systemStatusResult as SystemStatus);
-      setSystemStatusFailedAt(null);
-    } else {
-      setSystemStatus(null);
-      setSystemStatusFailedAt(new Date().toISOString());
-    }
-
-    setLoading(false);
-  }, [addToast, gameParam]);
-
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setStats 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 통계와 시스템 상태는 따로 묻는다(한쪽이 실패해도 다른 쪽은 보인다).
+  const statsQuery = useQuery({
+    queryKey: ["admin-dashboard-stats", gameParam],
+    queryFn: () => adminApi.getStats({ gameTitle: gameParam }),
+  });
+  const statusQuery = useQuery({
+    queryKey: ["admin-system-status"],
+    queryFn: () => adminApi.getSystemStatus() as Promise<SystemStatus>,
+    retry: false,
+  });
+  const stats = statsQuery.data ?? null;
+  const systemStatus = statusQuery.data ?? null;
+  // 시스템 상태를 못 받은 시각 — 마지막 확인 시각으로 보여 준다
+  const systemStatusFailedAt =
+    statusQuery.isError && statusQuery.errorUpdatedAt
+      ? new Date(statusQuery.errorUpdatedAt).toISOString()
+      : null;
+  const loading = statsQuery.isLoading || statusQuery.isLoading;
+  const fetchDashboardStats = () => {
+    void statsQuery.refetch();
+    void statusQuery.refetch();
+  };
   useEffect(() => {
-    fetchDashboardStats();
-  }, [fetchDashboardStats]);
+    if (statsQuery.isError) addToast("대시보드 통계 로드 실패", "error");
+  }, [statsQuery.isError, addToast]);
 
   if (loading)
     return (
