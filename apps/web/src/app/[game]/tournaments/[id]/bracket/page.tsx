@@ -274,7 +274,10 @@ export default function BracketPage() {
 
   // 가위바위보 소집(rps:invite) — 호스트가 매치 시작 시 상대 팀장 모달 자동 오픈
   const bracketMatchesRef = useRef(bracketMatches);
-  bracketMatchesRef.current = bracketMatches;
+  // 소켓 콜백이 최신 목록을 읽게 — 그리는 중이 아니라 그린 뒤에 옮긴다
+  useEffect(() => {
+    bracketMatchesRef.current = bracketMatches;
+  }, [bracketMatches]);
   useEffect(() => {
     const socket = connectMatchSocket();
     if (!socket) return;

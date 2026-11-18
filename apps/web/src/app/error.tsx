@@ -36,6 +36,8 @@ export default function Error({
             다시 시도
           </button>
           <button
+            // 오류 화면 — 깨진 상태를 버리고 처음부터 다시 불러오려고 일부러 전체 새로고침
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination
             onClick={() => (window.location.href = '/')}
             className="px-6 py-2.5 bg-bg-tertiary hover:bg-bg-elevated text-text-primary font-medium border border-text-tertiary rounded-lg transition-colors duration-150"
           >

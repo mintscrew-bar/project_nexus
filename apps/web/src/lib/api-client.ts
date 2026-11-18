@@ -370,6 +370,8 @@ export const authApi = {
   login: () => {
     // 동일 오리진 /api 경유 (next.config rewrites 통해 백엔드로 전달)
     // 환경변수 오설정으로 다른 도메인/포트로 튀는 문제를 방지
+    // OAuth 로그인 — Next 페이지가 아니라 API 주소라 브라우저가 실제로 이동해야 한다
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/api/auth/discord";
   },
 
@@ -424,6 +426,8 @@ export const authApi = {
   },
 
   googleLogin: () => {
+    // OAuth 로그인 — Next 페이지가 아니라 API 주소라 브라우저가 실제로 이동해야 한다
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/api/auth/google";
   },
 

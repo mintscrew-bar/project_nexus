@@ -84,7 +84,10 @@ export function AddAccountModal({
   // 현재 펼쳐진 섹션 — null이면 전부 접힘
   const [openSection, setOpenSection] = useState<Role | null>("MID");
   const stepRef = useRef(step);
-  stepRef.current = step;
+  // 비동기 콜백이 최신 단계를 읽게 — 그리는 중이 아니라 그린 뒤에 옮긴다
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
 
   useEffect(() => {
     if (isOpen) {

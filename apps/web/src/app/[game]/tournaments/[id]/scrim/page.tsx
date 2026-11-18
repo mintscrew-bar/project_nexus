@@ -100,7 +100,8 @@ export default function ScrimPage() {
   // 자동 수집은 커스텀 매치 판별이 실측되기 전까지 서버에서 꺼둔다.
   const [collectorEnabled, setCollectorEnabled] = useState(false);
   const [ruleOpen, setRuleOpen] = useState(false);
-  const [now, setNow] = useState(Date.now());
+  // 처음 값은 한 번만 잡는다(초기값 함수) — 이후엔 1초 타이머가 갱신한다
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);

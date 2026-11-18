@@ -561,29 +561,32 @@ function BannerCarousel() {
     touchStartX.current = e.touches[0].clientX;
   }, []);
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    touchEndX.current = e.changedTouches[0].clientX;
-    const diff = touchStartX.current - touchEndX.current;
-
-    if (Math.abs(diff) < SWIPE_THRESHOLD) return;
-
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (diff > 0) {
-      // 왼쪽 스와이프 → 다음 슬라이드
-      setCurrent((c) => (c + 1) % TOTAL_SLIDES);
-    } else {
-      // 오른쪽 스와이프 → 이전 슬라이드
-      setCurrent((c) => (c - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
-    }
-    startTimer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  // 자동 넘김 타이머 — 스와이프 처리보다 먼저 정의해야 그 안에서 쓸 수 있다
   const startTimer = useCallback(() => {
     timerRef.current = setInterval(() => {
       setCurrent((c) => (c + 1) % TOTAL_SLIDES);
     }, 5000);
   }, []);
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      touchEndX.current = e.changedTouches[0].clientX;
+      const diff = touchStartX.current - touchEndX.current;
+
+      if (Math.abs(diff) < SWIPE_THRESHOLD) return;
+
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (diff > 0) {
+        // 왼쪽 스와이프 → 다음 슬라이드
+        setCurrent((c) => (c + 1) % TOTAL_SLIDES);
+      } else {
+        // 오른쪽 스와이프 → 이전 슬라이드
+        setCurrent((c) => (c - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
+      }
+      startTimer();
+    },
+    [startTimer],
+  );
 
   useEffect(() => {
     startTimer();

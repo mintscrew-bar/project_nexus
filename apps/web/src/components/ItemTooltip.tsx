@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, ReactNode, useRef } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { useIsClient } from "@/hooks/useIsClient";
 import { getItemKoreanName } from "@nexus/types";
 import { getDdragonVersion, itemIconUrl } from "@/lib/ddragon";
 import { useCdnFallback } from "@/hooks/use-cdn-fallback";
@@ -130,7 +131,10 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
   const [loading, setLoading] = useState(false);
   const [placement, setPlacement] = useState<"top" | "bottom">("top");
   const [alignment, setAlignment] = useState<"center" | "left" | "right">("center");
-  const [isMounted, setIsMounted] = useState(false);
+  // 포털(document.body)은 브라우저에서만 — 효과로 mounted 를 세우지 않고 useIsClient 로 안다
+  const isMounted = useIsClient();
+  // 마우스를 올린 순간 잰 칸 위치 — 그리는 중에 ref 로 DOM 을 재지 않으려고 상태로 둔다
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -150,12 +154,10 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
   );
 
   // 클라이언트 마운트 확인 (SSR 대비)
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (isHovered && !item && !loading) {
+  // 처음 마우스를 올린 순간 한 번 불러온다(예전엔 hover 상태를 보는 효과 안에서 불렀다)
+  const handleEnter = () => {
+    setIsHovered(true);
+    if (!item && !loading) {
       setLoading(true);
       fetchItemData()
         .then((data) => {
@@ -163,7 +165,7 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
         })
         .finally(() => setLoading(false));
     }
-  }, [isHovered, item, itemId, loading]);
+  };
 
   // 툴팁 위치 계산 — 뷰포트 범위 감지
   useEffect(() => {
@@ -172,6 +174,7 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
     const calculatePlacement = () => {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
+      setAnchor(rect);
 
       const TOOLTIP_HEIGHT = 240; // 대략적인 툴팁 높이
       const TOOLTIP_WIDTH = 288; // w-72 = 18rem = 288px
@@ -211,9 +214,9 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
     : [];
 
   // Tooltip 위치 계산
-  const tooltipStyle: React.CSSProperties = containerRef.current
+  const tooltipStyle: React.CSSProperties = anchor
     ? (() => {
-        const rect = containerRef.current!.getBoundingClientRect();
+        const rect = anchor;
         const isTop = placement === "top";
 
         return {
@@ -234,7 +237,7 @@ export function ItemTooltip({ itemId, children, className }: ItemTooltipProps) {
     <div
       ref={containerRef}
       className={cn("relative inline-block", className)}
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={handleEnter}
       onMouseLeave={() => setIsHovered(false)}
     >
       {children}

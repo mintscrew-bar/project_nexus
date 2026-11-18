@@ -249,7 +249,7 @@ export default function TournamentLobbyPage() {
       if (e?.name === "AbortError") return;
       addToast("링크 복사에 실패했습니다.", "error");
     }
-  }, [roomId, room?.name, addToast, gamePrefix]);
+  }, [roomId, room, addToast, gamePrefix]);
 
   /**
    * 호버 프로필 열기를 살짝 미룬다.

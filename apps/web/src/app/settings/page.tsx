@@ -772,6 +772,8 @@ export default function SettingsPage() {
                                 const apiUrl =
                                   process.env.NEXT_PUBLIC_API_URL ||
                                   "http://localhost:4000";
+                                // 디스코드 연동 — Next 페이지가 아니라 API(OAuth) 주소라 브라우저가 실제로 이동해야 한다
+                                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                                 window.location.href = `${apiUrl}/auth/link/discord`;
                               }}
                             >

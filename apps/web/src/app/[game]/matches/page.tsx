@@ -188,6 +188,8 @@ function LolMatchesPage() {
             type: "summoner",
             gameName: gameName.trim(),
             tagLine: tagLine.trim(),
+            // 버튼을 누른 순간의 시각 — 이벤트 처리기 안이라 그리기와 무관하다(컴파일러 오탐)
+            // eslint-disable-next-line react-hooks/purity
             timestamp: Date.now(),
           });
           router.push(

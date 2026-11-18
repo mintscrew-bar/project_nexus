@@ -106,6 +106,8 @@ export function UserMenu() {
                 await userApi
                   .updateSettings({ onboardingSeen: false })
                   .catch(() => {});
+                // 로그아웃 — 메모리에 남은 사용자 상태를 전부 버리려고 일부러 전체 새로고침
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                 window.location.assign("/");
               }}
               className="flex w-full items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"

@@ -217,7 +217,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const scheduleHoverClose = useCallback(() => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
-  }, []);
+  }, [setHoveredPlayer]);
 
   // 300ms 대기 후 카드 표시 — 마우스 스쳐 지나가는 경우 불필요한 표시 방지
   const handlePlayerHover = useCallback(
@@ -229,7 +229,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
         300,
       );
     },
-    [cancelHoverClose],
+    [cancelHoverClose, setHoveredPlayer],
   );
 
   const [teamsExpanded, setTeamsExpanded] = useState(true);
