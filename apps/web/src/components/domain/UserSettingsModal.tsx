@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuthStore } from "@/stores/auth-store";
 import { userApi } from "@/lib/api-client";
@@ -9,6 +9,8 @@ import { Modal, Button, LoadingSpinner, StatusSelector } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { usePresence } from "@/hooks/usePresence";
 import { User, Bell, Shield, Palette } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useQueryDataSetter } from "@/hooks/useQuerySetter";
 
 type SettingsTab = "profile" | "notifications" | "privacy" | "appearance";
 
@@ -26,6 +28,16 @@ interface UserSettingsModalProps {
   onClose: () => void;
 }
 
+// 받아 오기 전·실패 시 보일 기본값
+const DEFAULT_SETTINGS: UserSettings = {
+  notifyMatchStart: true,
+  notifyMatchResult: true,
+  notifyClanActivity: true,
+  showOnlineStatus: true,
+  allowFriendRequests: true,
+  theme: "dark",
+};
+
 export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
   const { user, isAuthenticated } = useAuthStore();
   const { myStatus, setStatus } = usePresence();
@@ -33,50 +45,40 @@ export function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
 
-  // Settings state
-  const [settings, setSettings] = useState<UserSettings>({
-    notifyMatchStart: true,
-    notifyMatchResult: true,
-    notifyClanActivity: true,
-    showOnlineStatus: true,
-    allowFriendRequests: true,
-    theme: "dark",
-  });
-  const [settingsLoading, setSettingsLoading] = useState(true);
-
-  // Fetch settings when modal opens
-  useEffect(() => {
-    if (isOpen && isAuthenticated) {
-      setSettingsLoading(true);
-      userApi.getSettings()
-        .then((data) => {
-          const serverTheme = isPersistedTheme(data.theme) ? data.theme : "dark";
-          const storedTheme = getStoredThemePreference();
-          const theme = storedTheme ?? serverTheme;
-          setSettings({
-            notifyMatchStart: data.notifyMatchStart ?? true,
-            notifyMatchResult: data.notifyMatchResult ?? true,
-            notifyClanActivity: data.notifyClanActivity ?? true,
-            showOnlineStatus: data.showOnlineStatus ?? true,
-            allowFriendRequests: data.allowFriendRequests ?? true,
-            theme,
-          });
-          // 브라우저에 명시적으로 저장된 테마가 있으면 서버의 오래된 기본값보다 우선한다.
-          setNextTheme(theme);
-          if (storedTheme && storedTheme !== serverTheme) {
-            void userApi.updateSettings({ theme: storedTheme }).catch((error) => {
-              console.error("Theme settings sync error:", error);
-            });
-          }
-        })
-        .catch((err) => {
-          console.error("Failed to fetch settings:", err);
-        })
-        .finally(() => {
-          setSettingsLoading(false);
+  // 설정은 창이 열릴 때 React Query 로 받는다(예전엔 효과에서 setSettingsLoading·
+  // setSettings — react-hooks/set-state-in-effect). 바꾼 값은 캐시를 바로 고친다.
+  const settingsQuery = useQuery<UserSettings>({
+    queryKey: ["user-settings", user?.id],
+    enabled: isOpen && isAuthenticated,
+    staleTime: 0,
+    queryFn: async () => {
+      const data = await userApi.getSettings();
+      const serverTheme = isPersistedTheme(data.theme) ? data.theme : "dark";
+      const storedTheme = getStoredThemePreference();
+      const theme = storedTheme ?? serverTheme;
+      // 브라우저에 명시적으로 저장된 테마가 있으면 서버의 오래된 기본값보다 우선한다.
+      setNextTheme(theme);
+      if (storedTheme && storedTheme !== serverTheme) {
+        void userApi.updateSettings({ theme: storedTheme }).catch((error) => {
+          console.error("Theme settings sync error:", error);
         });
-    }
-  }, [isOpen, isAuthenticated, setNextTheme]);
+      }
+      return {
+        notifyMatchStart: data.notifyMatchStart ?? true,
+        notifyMatchResult: data.notifyMatchResult ?? true,
+        notifyClanActivity: data.notifyClanActivity ?? true,
+        showOnlineStatus: data.showOnlineStatus ?? true,
+        allowFriendRequests: data.allowFriendRequests ?? true,
+        theme,
+      };
+    },
+  });
+  const settings = settingsQuery.data ?? DEFAULT_SETTINGS;
+  const setSettings = useQueryDataSetter<UserSettings>(
+    ["user-settings", user?.id],
+    DEFAULT_SETTINGS,
+  );
+  const settingsLoading = settingsQuery.isPending;
 
   const handleSettingChange = async (key: keyof UserSettings, value: boolean | string) => {
     const prevSettings = { ...settings };

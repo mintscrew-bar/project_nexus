@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRoomStore } from "@/stores/room-store";
 import { useRouter } from "next/navigation";
 import {
@@ -45,6 +45,7 @@ import {
 } from "@nexus/types";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
 import { RoomCreationTour } from "@/components/onboarding/RoomCreationTour";
+import { useQuery } from "@tanstack/react-query";
 
 interface RoomCreationFormProps {
   gameTitle?: GameTitle;
@@ -149,9 +150,6 @@ export function RoomCreationForm({
   const [hostAsSpectator, setHostAsSpectator] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedDiscordGuildId, setSelectedDiscordGuildId] = useState("");
-  const [discordGuilds, setDiscordGuilds] = useState<DiscordGuildOption[]>([]);
-  const [isLoadingGuilds, setIsLoadingGuilds] = useState(false);
-  const [guildLoadError, setGuildLoadError] = useState<string | null>(null);
 
   // 경매 설정
   const [startingPoints, setStartingPoints] = useState(1000);
@@ -174,44 +172,23 @@ export function RoomCreationForm({
     DEFAULT_SERIES_PRESET,
   );
 
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !user) {
-      setDiscordGuilds([]);
-      setIsLoadingGuilds(false);
-      setGuildLoadError(null);
-      return;
-    }
-
-    let isMounted = true;
-
-    setIsLoadingGuilds(true);
-    setGuildLoadError(null);
-
-    discordApi
-      .getMyGuildLinks()
-      .then((data) => {
-        if (!isMounted) return;
-        setDiscordGuilds(
-          data.guilds.filter((guild) => guild.status === "ACTIVE"),
-        );
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setDiscordGuilds([]);
-        setGuildLoadError(
-          "연동 서버 목록을 불러오지 못했습니다. 넥서스 서버로는 생성할 수 있습니다.",
-        );
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsLoadingGuilds(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [authLoading, isAuthenticated, user]);
+  // 내 디스코드 연동 서버 목록 — 로그인했을 때만 React Query 로 받는다(예전엔 효과에서
+  // setIsLoadingGuilds·setDiscordGuilds — react-hooks/set-state-in-effect).
+  const guildsEnabled = !authLoading && isAuthenticated && !!user;
+  const guildsQuery = useQuery<DiscordGuildOption[]>({
+    queryKey: ["discord", "my-guild-links", user?.id],
+    enabled: guildsEnabled,
+    queryFn: async () =>
+      (await discordApi.getMyGuildLinks()).guilds.filter(
+        (guild) => guild.status === "ACTIVE",
+      ),
+  });
+  const discordGuilds = guildsEnabled ? (guildsQuery.data ?? []) : [];
+  const isLoadingGuilds = guildsEnabled && guildsQuery.isLoading;
+  const guildLoadError =
+    guildsEnabled && guildsQuery.isError
+      ? "연동 서버 목록을 불러오지 못했습니다. 넥서스 서버로는 생성할 수 있습니다."
+      : null;
 
   // 인원(=팀 수)이 바뀌면 고를 수 있는 프리셋 목록도 갈아끼워진다.
   // 이전 선택이 새 팀 수에서 유효하지 않으면 단판으로 되돌린다.

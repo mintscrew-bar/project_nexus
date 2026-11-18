@@ -79,6 +79,7 @@ import { findCosmetic } from "@/components/cosmetics/catalog";
 import { useCosmeticLoadouts } from "@/components/cosmetics/useCosmeticLoadouts";
 import { useProfileTarget } from "@/components/profile/ProfileTargetContext";
 import { myProfilePath, userProfilePath } from "@/lib/profile-routes";
+import { useQueryDataSetter } from "@/hooks/useQuerySetter";
 
 const ROLE_LABELS: Record<string, string> = {
   TOP: "탑",
@@ -198,15 +199,71 @@ export default function UserProfilePage() {
     staleTime: 2 * 60 * 1000,
   });
 
-  const [profile, setProfile] = useState<ProfileUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [friendshipStatus, setFriendshipStatus] =
-    useState<FriendshipStatus>("none");
-  const [friendshipId, setFriendshipId] = useState<string | null>(null);
+  // 서버 조회는 React Query 로 — 예전엔 들어올 때 효과에서 fetchX() 6개를 불러
+  // setProfile·setIsLoading 등을 했다(react-hooks/set-state-in-effect).
+  const profileQuery = useQuery<ProfileUser>({
+    queryKey: ["user-profile", userId],
+    queryFn: () => userApi.getProfile(userId),
+  });
+  const profile = profileQuery.data ?? null;
+  const isLoading = profileQuery.isLoading;
+  useEffect(() => {
+    // 로그아웃 상태면 화면이 로그인 안내를 띄우므로 오류 알림은 생략
+    if (profileQuery.isError && isAuthenticated)
+      addToast("프로필을 불러올 수 없습니다.", "error");
+  }, [profileQuery.isError, isAuthenticated, addToast]);
+
+  // 친구 관계 — 로그인했고 남의 프로필일 때만. 버튼을 누른 뒤엔 캐시를 바로 고친다
+  const friendshipKey = ["user-profile", userId, "friendship"];
+  const friendshipQuery = useQuery<{
+    status: FriendshipStatus;
+    id: string | null;
+  }>({
+    queryKey: friendshipKey,
+    enabled: isAuthenticated && !isOwnProfile,
+    queryFn: async () => {
+      const data = await friendApi.getFriendshipStatus(userId);
+      // 백엔드는 ACCEPTED/PENDING/BLOCKED + isRequester를 반환 → 프론트 상태로 매핑
+      const status: FriendshipStatus = !data.status
+        ? "none"
+        : data.status === "ACCEPTED"
+          ? "friends"
+          : data.status === "PENDING"
+            ? data.isRequester
+              ? "pending_sent"
+              : "pending_received"
+            : data.status === "BLOCKED"
+              ? "blocked"
+              : "none";
+      return { status, id: data.friendshipId || null };
+    },
+  });
+  const friendshipStatus = friendshipQuery.data?.status ?? "none";
+  const friendshipId = friendshipQuery.data?.id ?? null;
+  const setFriendship = useQueryDataSetter<{
+    status: FriendshipStatus;
+    id: string | null;
+  }>(friendshipKey, { status: "none", id: null });
+  const setFriendshipStatus = (status: FriendshipStatus) =>
+    setFriendship((prev) => ({ ...prev, status }));
+  const setFriendshipId = (id: string | null) =>
+    setFriendship((prev) => ({ ...prev, id }));
   const [friendActionLoading, setFriendActionLoading] = useState(false);
-  const [auctionStats, setAuctionStats] = useState<any>(null);
-  const [onlineStatus, setOnlineStatus] = useState<string | null>(null);
-  const [rep, setRep] = useState<any>(null);
+  // 아래 셋은 실패해도 화면에 큰 지장이 없어 조용히 비워 둔다
+  const { data: auctionStats = null } = useQuery<any>({
+    queryKey: ["user-profile", userId, "auction-stats"],
+    queryFn: () => statsApi.getUserAuctionStats(userId),
+  });
+  const { data: onlineStatus = null } = useQuery<string | null>({
+    queryKey: ["user-profile", userId, "online-status"],
+    enabled: isAuthenticated,
+    queryFn: async () =>
+      (await presenceApi.getUserStatus(userId))?.status || null,
+  });
+  const { data: rep = null } = useQuery<any>({
+    queryKey: ["user-profile", userId, "reputation"],
+    queryFn: () => reputationApi.getUserStats(userId),
+  });
   // 내 프로필 편집 창
   const [editOpen, setEditOpen] = useState(false);
   // 장착한 프로필 배경 장식(Task 22) — 있으면 올린 배경 이미지 대신 움직이는 배경을 보인다.
@@ -229,7 +286,8 @@ export default function UserProfilePage() {
     const games = GAME_TITLES.filter((title) => linked[title]);
     return games.length > 0 ? games : [DEFAULT_GAME];
   }, [isOwnProfile, profile?.linkedGames]);
-  const [activeGame, setActiveGame] = useState<GameTitle>(DEFAULT_GAME);
+  // 사용자가 누른 탭(없으면 null). 실제로 보일 탭은 아래에서 계산한다
+  const [chosenGame, setActiveGame] = useState<GameTitle | null>(null);
   /**
    * 어느 게임 경로에서 넘어왔는지(`/lol/profile/:id` → `?game=lol`).
    * 그 게임을 연동한 사람이면 그 탭으로 연다.
@@ -238,17 +296,17 @@ export default function UserProfilePage() {
     gameFromSlug(searchParams.get("game")) ??
     (isOwnProfile ? navigationGame : null);
 
-  // 연동 목록이 확정되면(로딩 완료) 탭을 맞춘다.
+  // 연동 목록이 확정되면(로딩 완료) 탭을 맞춘다 — 효과에서 setActiveGame 하던 것을 계산으로.
   // 롤 미연동·배그만 하는 사람 프로필이 빈 롤 탭으로 열리면 안 된다.
-  useEffect(() => {
-    const preferred =
-      requestedGame && availableGames.includes(requestedGame)
-        ? requestedGame
-        : availableGames[0];
-    setActiveGame((current) =>
-      availableGames.includes(current) && !requestedGame ? current : preferred,
-    );
-  }, [availableGames, requestedGame]);
+  // 경로로 게임이 정해져 왔으면 그 게임을, 아니면 누른 탭을(연동돼 있을 때) 쓴다.
+  const preferredGame =
+    requestedGame && availableGames.includes(requestedGame)
+      ? requestedGame
+      : availableGames[0];
+  const activeGame: GameTitle =
+    !requestedGame && chosenGame && availableGames.includes(chosenGame)
+      ? chosenGame
+      : preferredGame;
 
   // 공개 URL로 자기 프로필에 들어오면 정규 내 프로필 URL로 한 번만 정리한다.
   useEffect(() => {
@@ -257,96 +315,16 @@ export default function UserProfilePage() {
     }
   }, [currentUser, isOwnProfile, requestedGame, userId, router]);
 
-  const fetchProfile = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await userApi.getProfile(userId);
-      setProfile(data);
-    } catch {
-      // 로그아웃 상태면 화면이 로그인 안내를 띄우므로 오류 알림은 생략
-      if (isAuthenticated) addToast("프로필을 불러올 수 없습니다.", "error");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [userId, addToast, isAuthenticated]);
-
   // 편집·계정 변경 뒤 다시 불러오기 — 로딩 화면 없이 조용히 (창이 닫히지 않게)
+  const refetchProfile = profileQuery.refetch;
   const refreshProfile = useCallback(async () => {
-    try {
-      setProfile(await userApi.getProfile(userId));
-    } catch {
-      // 다음 새로고침에 맞춰진다
-    }
-  }, [userId]);
+    await refetchProfile();
+  }, [refetchProfile]);
 
-  const fetchFriendshipStatus = useCallback(async () => {
-    if (!isAuthenticated || isOwnProfile) return;
-    try {
-      const data = await friendApi.getFriendshipStatus(userId);
-      // 백엔드는 ACCEPTED/PENDING/BLOCKED + isRequester를 반환
-      // 프론트 상태로 매핑
-      if (!data.status) {
-        setFriendshipStatus("none");
-      } else if (data.status === "ACCEPTED") {
-        setFriendshipStatus("friends");
-      } else if (data.status === "PENDING") {
-        setFriendshipStatus(
-          data.isRequester ? "pending_sent" : "pending_received",
-        );
-      } else if (data.status === "BLOCKED") {
-        setFriendshipStatus("blocked");
-      } else {
-        setFriendshipStatus("none");
-      }
-      setFriendshipId(data.friendshipId || null);
-    } catch {
-      // Not critical
-    }
-  }, [userId, isAuthenticated, isOwnProfile]);
-
-  const fetchAuctionStats = useCallback(async () => {
-    try {
-      const data = await statsApi.getUserAuctionStats(userId);
-      setAuctionStats(data);
-    } catch {
-      // Not critical
-    }
-  }, [userId]);
-
-  const fetchOnlineStatus = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      const data = await presenceApi.getUserStatus(userId);
-      setOnlineStatus(data?.status || null);
-    } catch {
-      // Not critical
-    }
-  }, [userId, isAuthenticated]);
-
-  const fetchReputation = useCallback(async () => {
-    try {
-      const data = await reputationApi.getUserStats(userId);
-      setRep(data);
-    } catch {
-      // Not critical
-    }
-  }, [userId]);
-
+  // 챔피언 정보는 공용 스토어(외부 저장소)에서 받아 온다
   useEffect(() => {
-    fetchProfile();
-    fetchFriendshipStatus();
     fetchChampions();
-    fetchAuctionStats();
-    fetchOnlineStatus();
-    fetchReputation();
-  }, [
-    fetchProfile,
-    fetchFriendshipStatus,
-    fetchChampions,
-    fetchAuctionStats,
-    fetchOnlineStatus,
-    fetchReputation,
-  ]);
+  }, [fetchChampions]);
 
   const handleFriendAction = async () => {
     if (!isAuthenticated) {

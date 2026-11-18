@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { clanApi } from "@/lib/api-client";
@@ -12,6 +11,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import { BarChart2, Trophy, Swords, TrendingUp, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 // ─────────────────────────────────────────────────────────────
 // 타입 정의
@@ -144,26 +144,15 @@ interface ClanStatsProps {
 }
 
 export function ClanStats({ clanId }: ClanStatsProps) {
-  const [stats, setStats] = useState<ClanStatsData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchStats = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await clanApi.getClanStats(clanId);
-      setStats(data);
-    } catch {
-      setError("통계를 불러오는데 실패했습니다.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clanId]);
-
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setData 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 클랜이 바뀌면 키가 바뀌어 새로 불러온다.
+  const statsQuery = useQuery<ClanStatsData>({
+    queryKey: ["clan-stats", clanId],
+    queryFn: () => clanApi.getClanStats(clanId),
+  });
+  const stats = statsQuery.data ?? null;
+  const isLoading = statsQuery.isLoading;
+  const error = statsQuery.isError ? "통계를 불러오는데 실패했습니다." : null;
 
   if (isLoading) {
     return <StatsSkeleton />;

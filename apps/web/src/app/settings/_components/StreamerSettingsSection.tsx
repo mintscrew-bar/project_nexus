@@ -28,6 +28,7 @@ import {
   type StreamerPlatform,
   type StreamerProfile,
 } from "@/lib/api-client";
+import { useQuery } from "@tanstack/react-query";
 
 const PLATFORMS: Array<{
   value: StreamerPlatform;
@@ -51,11 +52,34 @@ const PLATFORMS: Array<{
   },
 ];
 
+// 받아 오기 전 빈 목록 — 그릴 때마다 새 배열이 생기지 않게 모듈 상수로 둔다
+const EMPTY_PROFILES: StreamerProfile[] = [];
+const EMPTY_LINKS: StreamerLink[] = [];
+
 export function StreamerSettingsSection() {
   const { addToast } = useToast();
-  const [profiles, setProfiles] = useState<StreamerProfile[]>([]);
-  const [links, setLinks] = useState<StreamerLink[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 방송 채널·링크 목록은 React Query 로 — 예전엔 효과에서 reload() 로 setProfiles·
+  // setLoading 했다(react-hooks/set-state-in-effect).
+  const streamerQuery = useQuery({
+    queryKey: ["settings", "streamer"],
+    queryFn: async () => {
+      const [profiles, links] = await Promise.all([
+        userApi.getStreamerProfiles(),
+        userApi.getStreamerLinks(),
+      ]);
+      return {
+        profiles: profiles as StreamerProfile[],
+        links: links as StreamerLink[],
+      };
+    },
+  });
+  const profiles = streamerQuery.data?.profiles ?? EMPTY_PROFILES;
+  const links = streamerQuery.data?.links ?? EMPTY_LINKS;
+  const loading = streamerQuery.isLoading;
+  useEffect(() => {
+    if (streamerQuery.isError)
+      addToast("방송 설정을 불러오지 못했습니다.", "error");
+  }, [streamerQuery.isError, addToast]);
   const [saving, setSaving] = useState(false);
   const [games, setGames] = useState<GameTitle[]>(["LOL"]);
   const [platform, setPlatform] = useState<StreamerPlatform>("CHZZK");
@@ -79,20 +103,10 @@ export function StreamerSettingsSection() {
     ? platform
     : (availablePlatforms[0]?.value ?? "CHZZK");
 
+  // 처리 뒤 새로고침 — 실패하면 예전처럼 던져서 부른 쪽 catch 가 받게 한다
   const reload = async () => {
-    const [nextProfiles, nextLinks] = await Promise.all([
-      userApi.getStreamerProfiles(),
-      userApi.getStreamerLinks(),
-    ]);
-    setProfiles(nextProfiles);
-    setLinks(nextLinks);
+    await streamerQuery.refetch({ throwOnError: true });
   };
-
-  useEffect(() => {
-    reload()
-      .catch(() => addToast("방송 설정을 불러오지 못했습니다.", "error"))
-      .finally(() => setLoading(false));
-  }, [addToast]);
 
   const saveChannel = async () => {
     if (!channelUrl.trim()) return;

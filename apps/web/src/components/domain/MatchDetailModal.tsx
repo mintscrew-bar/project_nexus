@@ -16,6 +16,7 @@ import { TierBadge } from '@/components/domain/TierBadge';
 import { PlayerHoverCard } from '@/components/domain/PlayerHoverCard';
 import { PlayerProfileModal } from '@/components/domain/PlayerProfileModal';
 import { cn } from '@/lib/utils';
+import { useQuery } from "@tanstack/react-query";
 
 type LaneKey = 'TOP' | 'JUNGLE' | 'MID' | 'ADC' | 'SUPPORT';
 const LANES: LaneKey[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
@@ -67,7 +68,16 @@ interface MatchDetailModalProps {
   onReportResult: (matchId: string, winnerId: string) => Promise<void>;
 }
 
-export function MatchDetailModal({
+/**
+ * 매치가 바뀌면 매치별 상태(가위바위보·오류·진행 중 표시 등)를 모두 처음으로 — 이전 매치의
+ * RPS·오류가 새 매치에 남는 버그 방지. 예전엔 효과에서 set 을 8번 불렀는데
+ * (react-hooks/set-state-in-effect), 매치 id 를 key 로 줘서 새로 만들면 한 번에 초기화된다.
+ */
+export function MatchDetailModal(props: MatchDetailModalProps) {
+  return <MatchDetailModalInner key={props.match?.id ?? "none"} {...props} />;
+}
+
+function MatchDetailModalInner({
   match,
   isOpen,
   isHost = false,
@@ -79,8 +89,6 @@ export function MatchDetailModal({
   const [isStarting, setIsStarting] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
-  const [fullMatch, setFullMatch] = useState<FullMatchDetails | null>(null);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   // 가위바위보 진영 결정
   const [rps, setRps] = useState<RpsStateData | null>(null);
@@ -95,18 +103,6 @@ export function MatchDetailModal({
     captainAIsBot?: boolean;
     captainBIsBot?: boolean;
   } | null>(null);
-
-  // 매치가 바뀌면 모든 매치별 상태 초기화 (이전 매치의 RPS·오류 등이 새 매치에 잔존하는 버그 방지)
-  useEffect(() => {
-    setRps(null);
-    setRpsReveal(null);
-    setRpsError(null);
-    setRpsReadyState(null);
-    rpsSeqRef.current = 0;
-    setReportError(null);
-    setIsStarting(false);
-    setIsReporting(false);
-  }, [match?.id]);
 
   // 모달이 PENDING 매치에 열려 있는 동안 /match 룸에 합류해 가위바위보 이벤트 수신
   useEffect(() => {
@@ -162,34 +158,36 @@ export function MatchDetailModal({
   // 단, 진영이 확정된(done) 결과는 남긴다. 서버는 진영이 정해지자마자 매치를
   // 시작하므로, 여기서 지우면 결과 화면이 뜨자마자 사라져 누가 어느 진영인지
   // 아무도 못 봤다(2026-10-01 운영자 제보).
-  useEffect(() => {
+  // 효과 대신 그리는 중에 상태가 바뀐 걸 알아채고 바로 고친다(React 문서의 "prop 이 바뀔 때
+  // 상태 조정" 방식, react-hooks/set-state-in-effect).
+  const [seenGameStatus, setSeenGameStatus] = useState(currentGameStatus);
+  if (seenGameStatus !== currentGameStatus) {
+    setSeenGameStatus(currentGameStatus);
     if (currentGameStatus && currentGameStatus !== 'PENDING') {
       setRps((prev) => (prev?.phase === 'done' ? prev : null));
       setRpsReveal(null);
     }
-  }, [currentGameStatus]);
+  }
 
   // 라인별 로스터에 쓰는 매치 상세.
   // MVP/ACE 투표와 별점 평가는 없앴다 — MVP/ACE 는 Riot 기록으로 자동으로 정하고
   // (api match/auto-mvp.util), 평판은 경기 뒤 칭찬 창(CommendationPrompt)이 받는다.
-  const fetchMatchDetails = useCallback(async (matchId: string) => {
-    try {
-      setFullMatch(await matchApi.getMatch(matchId));
-    } catch {
-      setFullMatch(null);
-    } finally {
-      setIsLoadingDetails(false);
-    }
-  }, []);
-
-  // 매치 열릴 때마다 라인별 멤버 데이터 로드
-  useEffect(() => {
-    if (isOpen && match?.id) {
-      setIsLoadingDetails(true);
-      setFullMatch(null);
-      fetchMatchDetails(match.id);
-    }
-  }, [isOpen, match?.id, fetchMatchDetails]);
+  // 매치 열릴 때마다 라인별 멤버 데이터를 React Query 로 다시 받는다(staleTime 0).
+  // 예전엔 효과에서 setIsLoadingDetails·setFullMatch 했다. 실패하면 상세 없이 그린다.
+  const detailsQuery = useQuery<FullMatchDetails | null>({
+    queryKey: ['match-detail', match?.id],
+    enabled: isOpen && !!match?.id,
+    staleTime: 0,
+    queryFn: async () => {
+      try {
+        return await matchApi.getMatch(match!.id);
+      } catch {
+        return null;
+      }
+    },
+  });
+  const fullMatch = detailsQuery.data ?? null;
+  const isLoadingDetails = detailsQuery.isFetching && !detailsQuery.data;
 
   if (!match) return null;
 
