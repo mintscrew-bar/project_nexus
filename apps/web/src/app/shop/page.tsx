@@ -8,7 +8,10 @@ import { Check, Medal, Sparkles } from "lucide-react";
 import { PortraitParticipantCard } from "@/app/[game]/tournaments/[id]/lobby/_components/PortraitParticipantCard";
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
 import { StyledName } from "@/components/cosmetics/name-styles";
-import { LiveBanner } from "@/components/cosmetics/live-banner";
+import {
+  LiveBanner,
+  liveBannerAspect,
+} from "@/components/cosmetics/live-banner";
 import {
   COSMETICS,
   MEDAL_LABEL,
@@ -323,8 +326,11 @@ export default function ShopPage() {
                   aria-label={`${item.name} 입어 보기`}
                 >
                   {item.slot === "PROFILE_BANNER" && item.liveBanner ? (
-                    // 프로필 배경 — 실제 프로필 배너와 같은 비율(약 3.6:1)로 움직이는 모습을 보여 준다
-                    <div className="relative aspect-[3.6/1] w-full overflow-hidden rounded-lg bg-bg-tertiary">
+                    // 프로필 배경 — 프로필 배너와 같이 영상 비율 그대로(잘림 없이) 보여 준다
+                    <div
+                      className="relative w-full overflow-hidden rounded-lg bg-bg-tertiary"
+                      style={{ aspectRatio: liveBannerAspect(item.liveBanner) }}
+                    >
                       <LiveBanner code={item.liveBanner} />
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg-secondary/80 to-transparent" />
                     </div>

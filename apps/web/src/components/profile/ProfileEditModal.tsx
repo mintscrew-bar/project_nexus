@@ -428,7 +428,7 @@ function BannerChoice({
           : "ring-transparent hover:ring-bg-elevated",
       )}
     >
-      <div className="relative aspect-[3.6/1] w-full overflow-hidden bg-bg-tertiary">
+      <div className="relative aspect-[12/5] w-full overflow-hidden bg-bg-tertiary">
         {children}
         {selected && (
           <span className="absolute right-1.5 top-1.5 rounded-full bg-accent-primary p-0.5 text-accent-on">

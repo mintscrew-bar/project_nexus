@@ -20,6 +20,8 @@ export interface LiveBannerDef {
   webm: string;
   mp4: string;
   poster: string;
+  /** 영상 원본 크기 — 프로필 배너를 이 비율로 키워 잘림 없이 다 보여 준다 */
+  size: [number, number];
   /** 배너가 영상보다 납작할 때 세로 어디를 보여 줄지 (0 위 ~ 1 아래) */
   focusY: number;
 }
@@ -29,11 +31,18 @@ export const LIVE_BANNERS = {
     webm: "/cosmetics/banners/ink_swordsman/loop.webm",
     mp4: "/cosmetics/banners/ink_swordsman/loop.mp4",
     poster: "/cosmetics/banners/ink_swordsman/poster.webp",
+    size: [1536, 640],
     focusY: 0.55,
   },
 } satisfies Record<string, LiveBannerDef>;
 
 export type LiveBannerCode = keyof typeof LIVE_BANNERS;
+
+/** 그 배경의 가로:세로 비율 (CSS aspect-ratio 값) — 배너·미리보기 칸을 영상과 같은 비율로 */
+export function liveBannerAspect(code: LiveBannerCode): string {
+  const [w, h] = LIVE_BANNERS[code].size;
+  return `${w} / ${h}`;
+}
 
 export function LiveBanner({
   code,
