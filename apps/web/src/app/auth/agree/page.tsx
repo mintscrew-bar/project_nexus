@@ -13,17 +13,19 @@ function AgreePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { fetchUser } = useAuthStore();
-  const [pendingToken, setPendingToken] = useState<string | null>(null);
-  const [tokenResolved, setTokenResolved] = useState(false);
+  // 최초 진입 시 토큰을 상태에 보관한 뒤 URL에서 제거한다. 처음 그릴 때 한 번만 읽어
+  // 두므로(초기값 함수) 주소를 지운 뒤에도 남는다 — 예전엔 효과에서 setPendingToken·
+  // setTokenResolved 했다(react-hooks/set-state-in-effect).
+  const [pendingToken] = useState<string | null>(() =>
+    searchParams.get("token"),
+  );
+  // 초기값에서 바로 읽으므로 기다릴 것이 없다
+  const tokenResolved = true;
 
   useEffect(() => {
-    const tokenFromUrl = searchParams.get("token");
-    if (tokenFromUrl) {
-      // 최초 진입 시 토큰을 상태에 보관한 뒤 URL에서 제거
-      setPendingToken(tokenFromUrl);
+    if (searchParams.get("token")) {
       window.history.replaceState({}, "", "/auth/agree");
     }
-    setTokenResolved(true);
   }, [searchParams]);
 
   const [agreements, setAgreements] = useState({

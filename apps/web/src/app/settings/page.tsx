@@ -54,6 +54,9 @@ import { pubgApi } from "@/lib/api-client";
 import { useSfxStore } from "@/stores/sfx-store";
 import { GAME_SFX, playSfx } from "@/lib/sfx";
 import { gameAccountSettingsPath } from "@/lib/profile-routes";
+import { useQuery } from "@tanstack/react-query";
+import { useQueryDataSetter } from "@/hooks/useQuerySetter";
+import { useIsClient } from "@/hooks/useIsClient";
 
 type SettingsTab =
   | "accounts"
@@ -115,6 +118,41 @@ const DISCORD_GUILD_STATUS_META: Record<
   },
 };
 
+const EMPTY_GUILD_LINKS: DiscordGuildLink[] = [];
+
+// 받아 오기 전·실패 시 보일 기본 설정
+const DEFAULT_SETTINGS: UserSettings = {
+  notifyFriendRequest: true,
+  notifyFriendAccepted: true,
+  notifyMatchStart: true,
+  notifyMatchResult: true,
+  notifyTeamInvite: true,
+  notifyMention: true,
+  notifyComment: true,
+  notifyClanActivity: true,
+  notifySystem: true,
+  showOnlineStatus: true,
+  showRiotAccounts: true,
+  showChampionStats: true,
+  allowFriendRequests: true,
+  highlightChampionId: null,
+  highlightStatType: null,
+  theme: "dark",
+};
+
+/** 주소의 ?tab= 이 아는 탭이면 그 탭, 아니면 null */
+function tabFromUrl(): SettingsTab | null {
+  const tab = new URLSearchParams(window.location.search).get("tab");
+  return tab === "accounts" ||
+    tab === "notifications" ||
+    tab === "privacy" ||
+    tab === "appearance" ||
+    tab === "broadcast" ||
+    tab === "about"
+    ? tab
+    : null;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading, logout, deleteAccount, fetchUser } =
@@ -145,7 +183,12 @@ export default function SettingsPage() {
     };
   }, []);
   const { addToast } = useToast();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("notifications");
+  // 누른 탭(없으면 null). 처음엔 주소의 ?tab= 을 따른다 — 예전엔 효과에서 주소를 읽어
+  // setActiveTab 했다(react-hooks/set-state-in-effect). 주소는 하이드레이션 뒤에 읽는다.
+  const [chosenTab, setActiveTab] = useState<SettingsTab | null>(null);
+  const isClient = useIsClient();
+  const activeTab: SettingsTab =
+    chosenTab ?? (isClient ? tabFromUrl() : null) ?? "notifications";
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   // 회원 탈퇴 모달 상태
@@ -167,32 +210,6 @@ export default function SettingsPage() {
   const [isSyncingAvatar, setIsSyncingAvatar] = useState(false);
   // 봇 서버 추가 진행 상태
   const [isAddingBot, setIsAddingBot] = useState(false);
-  const [discordGuildLinks, setDiscordGuildLinks] = useState<
-    DiscordGuildLink[]
-  >([]);
-  const [isLoadingGuildLinks, setIsLoadingGuildLinks] = useState(false);
-  const [guildLinksError, setGuildLinksError] = useState<string | null>(null);
-
-  // Settings state
-  const [settings, setSettings] = useState<UserSettings>({
-    notifyFriendRequest: true,
-    notifyFriendAccepted: true,
-    notifyMatchStart: true,
-    notifyMatchResult: true,
-    notifyTeamInvite: true,
-    notifyMention: true,
-    notifyComment: true,
-    notifyClanActivity: true,
-    notifySystem: true,
-    showOnlineStatus: true,
-    showRiotAccounts: true,
-    showChampionStats: true,
-    allowFriendRequests: true,
-    highlightChampionId: null,
-    highlightStatType: null,
-    theme: "dark",
-  });
-  const [settingsLoading, setSettingsLoading] = useState(true);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -204,17 +221,6 @@ export default function SettingsPage() {
     if (typeof window === "undefined") return;
 
     const searchParams = new URLSearchParams(window.location.search);
-    const tab = searchParams.get("tab");
-    if (
-      tab === "accounts" ||
-      tab === "notifications" ||
-      tab === "privacy" ||
-      tab === "appearance" ||
-      tab === "broadcast" ||
-      tab === "about"
-    ) {
-      setActiveTab(tab);
-    }
 
     const discordGuildResult = searchParams.get("discord_guild");
     if (discordGuildResult === "active") {
@@ -273,98 +279,67 @@ export default function SettingsPage() {
     }
   }, [isLoading, isAuthenticated, user]);
 
-  // Fetch settings
-  useEffect(() => {
-    if (isLoading || !isAuthenticated || !user) {
-      if (!isLoading) setSettingsLoading(false);
-      return;
-    }
-
-    let isMounted = true;
-
-    setSettingsLoading(true);
-
-    userApi
-      .getSettings()
-      .then((data) => {
-        if (!isMounted) return;
-        const serverTheme = isPersistedTheme(data.theme) ? data.theme : "dark";
-        const storedTheme = getStoredThemePreference();
-        const savedTheme = storedTheme ?? serverTheme;
-        setSettings({
-          notifyFriendRequest: data.notifyFriendRequest ?? true,
-          notifyFriendAccepted: data.notifyFriendAccepted ?? true,
-          notifyMatchStart: data.notifyMatchStart ?? true,
-          notifyMatchResult: data.notifyMatchResult ?? true,
-          notifyTeamInvite: data.notifyTeamInvite ?? true,
-          notifyMention: data.notifyMention ?? true,
-          notifyComment: data.notifyComment ?? true,
-          notifyClanActivity: data.notifyClanActivity ?? true,
-          notifySystem: data.notifySystem ?? true,
-          showOnlineStatus: data.showOnlineStatus ?? true,
-          showRiotAccounts: data.showRiotAccounts ?? true,
-          showChampionStats: data.showChampionStats ?? true,
-          allowFriendRequests: data.allowFriendRequests ?? true,
-          highlightChampionId: data.highlightChampionId ?? null,
-          highlightStatType: data.highlightStatType ?? null,
-          theme: savedTheme,
+  // 설정은 React Query 로 — 예전엔 효과에서 setSettingsLoading·setSettings 했다
+  // (react-hooks/set-state-in-effect). 바꾼 값은 캐시를 바로 고친다(setSettings).
+  const accountReady = !isLoading && isAuthenticated && !!user;
+  const settingsKey = ["settings-page", user?.id];
+  const settingsQuery = useQuery<UserSettings>({
+    queryKey: settingsKey,
+    enabled: accountReady,
+    queryFn: async () => {
+      const data = await userApi.getSettings();
+      const serverTheme = isPersistedTheme(data.theme) ? data.theme : "dark";
+      const storedTheme = getStoredThemePreference();
+      const savedTheme = storedTheme ?? serverTheme;
+      // 브라우저에 명시적으로 저장된 테마가 있으면 서버의 오래된 기본값보다 우선한다.
+      setNextTheme(savedTheme);
+      if (storedTheme && storedTheme !== serverTheme) {
+        void userApi.updateSettings({ theme: storedTheme }).catch((error) => {
+          console.error("Theme settings sync error:", error);
         });
-        // 브라우저에 명시적으로 저장된 테마가 있으면 서버의 오래된 기본값보다 우선한다.
-        setNextTheme(savedTheme);
-        if (storedTheme && storedTheme !== serverTheme) {
-          void userApi.updateSettings({ theme: storedTheme }).catch((error) => {
-            console.error("Theme settings sync error:", error);
-          });
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to fetch settings:", err);
-      })
-      .finally(() => {
-        if (isMounted) {
-          setSettingsLoading(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isLoading, isAuthenticated, user, setNextTheme]);
-
-  useEffect(() => {
-    if (isLoading || !isAuthenticated || !user) {
-      if (!isLoading) {
-        setDiscordGuildLinks([]);
-        setIsLoadingGuildLinks(false);
-        setGuildLinksError(null);
       }
-      return;
-    }
+      return {
+        notifyFriendRequest: data.notifyFriendRequest ?? true,
+        notifyFriendAccepted: data.notifyFriendAccepted ?? true,
+        notifyMatchStart: data.notifyMatchStart ?? true,
+        notifyMatchResult: data.notifyMatchResult ?? true,
+        notifyTeamInvite: data.notifyTeamInvite ?? true,
+        notifyMention: data.notifyMention ?? true,
+        notifyComment: data.notifyComment ?? true,
+        notifyClanActivity: data.notifyClanActivity ?? true,
+        notifySystem: data.notifySystem ?? true,
+        showOnlineStatus: data.showOnlineStatus ?? true,
+        showRiotAccounts: data.showRiotAccounts ?? true,
+        showChampionStats: data.showChampionStats ?? true,
+        allowFriendRequests: data.allowFriendRequests ?? true,
+        highlightChampionId: data.highlightChampionId ?? null,
+        highlightStatType: data.highlightStatType ?? null,
+        theme: savedTheme,
+      };
+    },
+  });
+  const settings = settingsQuery.data ?? DEFAULT_SETTINGS;
+  const setSettings = useQueryDataSetter<UserSettings>(
+    settingsKey,
+    DEFAULT_SETTINGS,
+  );
+  // 로그인 확인 중이면 그 결과를, 확인됐으면 설정 조회를 기다린다
+  const settingsLoading = accountReady ? settingsQuery.isPending : isLoading;
 
-    let isMounted = true;
-    setIsLoadingGuildLinks(true);
-    setGuildLinksError(null);
-
-    discordApi
-      .getMyGuildLinks()
-      .then((data) => {
-        if (!isMounted) return;
-        setDiscordGuildLinks(data.guilds);
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setGuildLinksError("연동 서버 목록을 불러오지 못했습니다.");
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsLoadingGuildLinks(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isLoading, isAuthenticated, user]);
+  // 디스코드 연동 서버 목록 — 로그인했을 때만 React Query 로(예전엔 효과에서 set 3개)
+  const guildLinksQuery = useQuery<DiscordGuildLink[]>({
+    queryKey: ["discord", "my-guild-links-all", user?.id],
+    enabled: accountReady,
+    queryFn: async () => (await discordApi.getMyGuildLinks()).guilds,
+  });
+  const discordGuildLinks = accountReady
+    ? (guildLinksQuery.data ?? EMPTY_GUILD_LINKS)
+    : EMPTY_GUILD_LINKS;
+  const isLoadingGuildLinks = accountReady && guildLinksQuery.isFetching;
+  const guildLinksError =
+    accountReady && guildLinksQuery.isError && !guildLinksQuery.isFetching
+      ? "연동 서버 목록을 불러오지 못했습니다."
+      : null;
 
   if (isLoading) {
     return (
@@ -406,18 +381,9 @@ export default function SettingsPage() {
   };
 
   const handleRefreshGuildLinks = async () => {
-    setIsLoadingGuildLinks(true);
-    setGuildLinksError(null);
-
-    try {
-      const data = await discordApi.getMyGuildLinks();
-      setDiscordGuildLinks(data.guilds);
-    } catch {
-      setGuildLinksError("연동 서버 목록을 불러오지 못했습니다.");
+    const result = await guildLinksQuery.refetch();
+    if (result.isError)
       addToast("연동 서버 목록을 불러오지 못했습니다.", "error");
-    } finally {
-      setIsLoadingGuildLinks(false);
-    }
   };
 
   const handleSettingChange = async (

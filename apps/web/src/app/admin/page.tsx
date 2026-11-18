@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToast } from "@/components/ui/Toast";
@@ -48,6 +48,7 @@ import {
   Trash2,
   Medal,
 } from "lucide-react";
+import { useResetOn } from "@/hooks/useResetOn";
 
 type Tab =
   | "dashboard"
@@ -241,7 +242,11 @@ function AdminPageInner() {
   const { addToast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  // 방금 누른 탭 — 주소가 바뀌기 전 잠깐 동안만 쓴다(주소가 바뀌면 비워진다)
+  const [pendingTab, setActiveTab] = useResetOn<Tab | null>(
+    null,
+    searchParams.toString(),
+  );
 
   const isAdmin = user?.role === "ADMIN";
 
@@ -280,6 +285,15 @@ function AdminPageInner() {
     [searchParams],
   );
 
+  // 보일 탭은 주소(?tab=)에서 계산한다 — 예전엔 효과에서 setActiveTab 했다
+  // (react-hooks/set-state-in-effect). 모르는 탭·권한 밖 탭은 대시보드.
+  const tabParam = searchParams.get("tab");
+  const urlTab: Tab =
+    isAdminTab(tabParam) && visibleTabIds.includes(tabParam)
+      ? tabParam
+      : "dashboard";
+  const activeTab: Tab = pendingTab ?? urlTab;
+
   useEffect(() => {
     const tab = searchParams.get("tab");
     // 옛 링크(`?tab=matches`)는 게임 없이 들어온다. 그 탭이 한 게임 전용이면
@@ -293,20 +307,17 @@ function AdminPageInner() {
       setGame(requested.scope);
       return;
     }
-    const nextTab =
-      isAdminTab(tab) && visibleTabIds.includes(tab) ? tab : "dashboard";
-    setActiveTab(nextTab);
-    if (tab && tab !== nextTab) {
+    if (tab && tab !== urlTab) {
       router.replace(buildHref("dashboard"), { scroll: false });
     }
-  }, [searchParams, router, visibleTabIds, buildHref, game, setGame]);
+  }, [searchParams, router, urlTab, buildHref, game, setGame]);
 
   const handleTabChange = useCallback(
     (tab: Tab) => {
       setActiveTab(tab);
       router.replace(buildHref(tab), { scroll: false });
     },
-    [router, buildHref],
+    [router, buildHref, setActiveTab],
   );
 
   return (

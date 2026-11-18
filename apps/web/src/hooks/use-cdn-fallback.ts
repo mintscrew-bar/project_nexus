@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { getDdragonVersion } from "@/lib/ddragon";
+import { useResetOn } from "@/hooks/useResetOn";
 
 /**
  * 로컬 아이콘 → DDragon CDN 폴백 훅.
@@ -20,14 +21,10 @@ export function useCdnFallback(
   localUrl: string,
   buildCdnUrl: (version: string) => string | null,
 ) {
-  const [src, setSrc] = useState(localUrl);
-  const [failed, setFailed] = useState(false);
-
-  // 대상이 바뀌면 다시 로컬 우선으로 되돌린다.
-  useEffect(() => {
-    setSrc(localUrl);
-    setFailed(false);
-  }, [localUrl]);
+  // 대상(localUrl)이 바뀌면 다시 로컬 우선으로 되돌린다 — 예전엔 효과에서 되돌렸다
+  // (react-hooks/set-state-in-effect). useResetOn 은 키가 바뀌면 처음 값을 보인다.
+  const [src, setSrc] = useResetOn(localUrl, localUrl);
+  const [failed, setFailed] = useResetOn(false, localUrl);
 
   const onError = useCallback(async () => {
     if (failed) return;
@@ -42,7 +39,7 @@ export function useCdnFallback(
     } catch {
       setFailed(true);
     }
-  }, [buildCdnUrl, failed, src]);
+  }, [buildCdnUrl, failed, src, setFailed, setSrc]);
 
   return { src, onError };
 }

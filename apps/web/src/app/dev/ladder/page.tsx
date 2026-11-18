@@ -64,6 +64,8 @@ export default function DevLadder() {
     setSeed((n) => n + 1);
   }, []);
   useEffect(() => {
+    // 개발용 화면 — 하이드레이션이 끝난 뒤 무작위로 뽑는 것이 목적이라 효과에서 부른다
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     redraw();
   }, [redraw]);
 
