@@ -19,6 +19,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { MedalChip } from "@/components/cosmetics/MedalChip";
 import { gamePath, useNavigationGame } from "@/hooks/useCurrentGame";
 import { scopedSectionPath } from "@/lib/scoped-section-routes";
+import { useIsClient } from "@/hooks/useIsClient";
 
 // 게임별 화면은 `/lol/*` 처럼 현재 게임 프리픽스가 붙는다.
 // 옛 경로를 그대로 쓰면 매 클릭마다 리다이렉트를 한 번 더 타고,
@@ -87,10 +88,8 @@ export function Header() {
   // 렌더링해야 서버 HTML과 클라이언트 첫 렌더가 일치한다.
   // mounted=true가 되면 실제 클라이언트 상태로 전환하여 UI를 업데이트한다.
   // ---------------------------------------------------------------
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // 브라우저에서 그리는 중인가 — 효과로 세우지 않고 useIsClient(useSyncExternalStore)로 안다
+  const mounted = useIsClient();
 
   // 마운트 전(SSR/hydration 단계): 클라이언트 전용 상태를 참조하지 않도록
   // isAuthenticated/isOpen/incomingCount를 모두 기본값으로 처리

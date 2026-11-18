@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CustomGameStatsCard } from "@/components/matches/CustomGameStatsCard";
 import { ChampionStatsCard } from "@/components/matches/ChampionStatsCard";
 import { PlayerHoverCard } from "@/components/domain/PlayerHoverCard";
+import { useIsClient } from "@/hooks/useIsClient";
 
 const RANKING = {
   totalGames: 23,
@@ -56,8 +57,8 @@ export default function CustomGameStatsPreviewPage() {
   const queryClient = useQueryClient();
   const [seeded, setSeeded] = useState(false);
   // 호버 카드는 window 크기로 자리를 잡아서 브라우저에서만 그린다
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // 브라우저에서 그리는 중인가 — 효과로 세우지 않고 useIsClient(useSyncExternalStore)로 안다
+  const mounted = useIsClient();
   if (!seeded) {
     queryClient.setQueryData(["hoverProfile", "preview-user", "LOL"], {
       username: "preview",

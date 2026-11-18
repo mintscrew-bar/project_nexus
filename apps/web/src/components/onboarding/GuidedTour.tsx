@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useIsClient } from "@/hooks/useIsClient";
 
 export type GuidedTourStep = {
   selector?: string;
@@ -60,7 +61,8 @@ export function GuidedTour({
   startDelay = 400,
   startOnMount = true,
 }: GuidedTourProps) {
-  const [mounted, setMounted] = useState(false);
+  // 브라우저에서 그리는 중인가 — 효과로 세우지 않고 useIsClient(useSyncExternalStore)로 안다
+  const mounted = useIsClient();
   const [isActive, setIsActive] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
@@ -70,10 +72,6 @@ export function GuidedTour({
     setIsActive(false);
     setStepIndex(0);
   }, [storageKey]);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     let startTimer: number | null = null;

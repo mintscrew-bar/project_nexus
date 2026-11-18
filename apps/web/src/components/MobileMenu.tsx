@@ -34,6 +34,7 @@ import { GameSwitcher } from "@/components/layout/GameSwitcher";
 import { gamePath, useNavigationGame } from "@/hooks/useCurrentGame";
 import { myProfilePath } from "@/lib/profile-routes";
 import { scopedSectionPath } from "@/lib/scoped-section-routes";
+import { useIsClient } from "@/hooks/useIsClient";
 
 interface MobileMenuProps {
   className?: string;
@@ -45,7 +46,8 @@ export function MobileMenu({ className }: MobileMenuProps) {
   const currentGame = useNavigationGame();
   const { user, isAuthenticated } = useAuthStore();
   const { resolvedTheme, toggleTheme } = usePersistentTheme();
-  const [mounted, setMounted] = useState(false);
+  // 브라우저에서 그리는 중인가 — 효과로 세우지 않고 useIsClient(useSyncExternalStore)로 안다
+  const mounted = useIsClient();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const scrollLockOwnerRef = useRef(Symbol("mobile-menu"));
@@ -61,10 +63,6 @@ export function MobileMenu({ className }: MobileMenuProps) {
   }, [pathname]);
 
   // Lock body scroll when menu is open
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   useEffect(() => {
     const scrollLockOwner = scrollLockOwnerRef.current;
     if (isOpen) {
