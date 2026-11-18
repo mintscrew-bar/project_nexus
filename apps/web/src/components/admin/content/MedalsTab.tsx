@@ -10,7 +10,12 @@
  * 잔액보다 큰 회수는 서버가 기본으로 막고, "마이너스 잔액 허용" 을 체크하고 확인 글자를
  * 입력해야만 보낸다(부정 획득 회수용).
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import Image from "next/image";
 import { Medal, RotateCcw, Search } from "lucide-react";
 import { Card, CardContent, LoadingSpinner } from "@/components/ui";
@@ -78,100 +83,69 @@ export function MedalsTab({ addToast }: { addToast: AddToast }) {
   const { confirm, dialog } = useConfirm();
 
   /* ── 사용자 검색 ── */
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<PickedUser[]>([]);
-  const [searching, setSearching] = useState(false);
+  // 입력이 0.3초 멈춘 뒤의 검색어 — 타이머 안에서만 바꾸므로 효과 안에서 바로 상태를 바꾸지 않는다
+  const [debounced, setDebounced] = useState("");
   const [picked, setPicked] = useState<PickedUser | null>(null);
-
   useEffect(() => {
-    const q = query.trim();
-    if (!q) {
-      setResults([]);
-      return;
-    }
-    // 입력이 멈추면 찾는다(0.3초)
-    const t = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const data = await adminApi.getUsers({
-          search: q,
-          limit: 8,
-          kind: "all",
-        });
-        setResults(
-          (data.users ?? []).map((u: PickedUser) => ({
-            id: u.id,
-            username: u.username,
-            avatar: u.avatar,
-          })),
-        );
-      } catch {
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
+    const t = setTimeout(() => setDebounced(query.trim()), 300);
     return () => clearTimeout(t);
   }, [query]);
+  const search = useQuery({
+    queryKey: ["admin-medal", "search", debounced],
+    queryFn: async () => {
+      const data = await adminApi.getUsers({
+        search: debounced,
+        limit: 8,
+        kind: "all",
+      });
+      return (data.users ?? []).map((u: PickedUser) => ({
+        id: u.id,
+        username: u.username,
+        avatar: u.avatar,
+      })) as PickedUser[];
+    },
+    enabled: debounced.length > 0,
+    staleTime: 30 * 1000,
+  });
+  // 입력을 지우면(또는 사람을 고르면) 결과를 숨긴다 — 상태로 지우지 않고 그릴 때 거른다
+  const results: PickedUser[] = query.trim() && search.data ? search.data : [];
+  const searching = search.isFetching;
 
   /* ── 고른 사람의 상세 ── */
-  const [detail, setDetail] = useState<AdminMedalUser | null>(null);
-  const loadDetail = useCallback(
-    async (userId: string) => {
-      try {
-        setDetail(await adminMedalApi.user(userId));
-      } catch (err) {
-        setDetail(null);
-        addToast(
-          getApiErrorMessage(err, "사용자 메달 정보를 못 불러왔어요."),
-          "error",
-        );
-      }
-    },
-    [addToast],
-  );
+  const detailQuery = useQuery({
+    queryKey: ["admin-medal", "user", picked?.id],
+    queryFn: () => adminMedalApi.user(picked!.id),
+    enabled: Boolean(picked),
+  });
+  const detail: AdminMedalUser | null = picked
+    ? (detailQuery.data ?? null)
+    : null;
 
   /* ── 원장 ── */
   const [reason, setReason] = useState("");
-  const [rows, setRows] = useState<AdminMedalLedgerItem[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const ledger = useInfiniteQuery({
+    queryKey: ["admin-medal", "ledger", picked?.id ?? "all", reason],
+    queryFn: ({ pageParam }) =>
+      adminMedalApi.ledger({
+        userId: picked?.id,
+        reason: reason || undefined,
+        cursor: pageParam,
+        limit: 50,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  });
+  const rows: AdminMedalLedgerItem[] =
+    ledger.data?.pages.flatMap((pg) => pg.items) ?? [];
+  const loading = ledger.isLoading;
+  const loadingMore = ledger.isFetchingNextPage;
+  const loadError = ledger.error ?? detailQuery.error;
 
-  const loadLedger = useCallback(
-    async (more = false) => {
-      more ? setLoadingMore(true) : setLoading(true);
-      try {
-        const data = await adminMedalApi.ledger({
-          userId: picked?.id,
-          reason: reason || undefined,
-          cursor: more ? (cursor ?? undefined) : undefined,
-          limit: 50,
-        });
-        setRows((prev) => (more ? [...prev, ...data.items] : data.items));
-        setCursor(data.nextCursor);
-      } catch (err) {
-        addToast(getApiErrorMessage(err, "원장을 못 불러왔어요."), "error");
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    // cursor 는 "더 보기" 때만 쓰므로 일부러 의존성에서 뺀다(필터가 바뀌면 처음부터)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [picked?.id, reason, addToast],
-  );
-
-  useEffect(() => {
-    void loadLedger(false);
-    if (picked) void loadDetail(picked.id);
-    else setDetail(null);
-  }, [picked, reason, loadLedger, loadDetail]);
-
-  const refreshAll = () => {
-    void loadLedger(false);
-    if (picked) void loadDetail(picked.id);
-  };
+  // 지급·회수·환불 뒤 — 이 탭의 조회(사람 상세·원장)를 전부 새로 읽는다
+  const refreshAll = () =>
+    void queryClient.invalidateQueries({ queryKey: ["admin-medal"] });
 
   /* ── 지급·회수 ── */
   const [amount, setAmount] = useState("");
@@ -336,7 +310,7 @@ export function MedalsTab({ addToast }: { addToast: AddToast }) {
                   onClick={() => {
                     setPicked(u);
                     setQuery("");
-                    setResults([]);
+                    setDebounced("");
                   }}
                   className="flex items-center gap-2 rounded-lg bg-bg-tertiary px-2.5 py-1.5 text-sm text-text-primary hover:bg-bg-elevated"
                 >
@@ -546,6 +520,13 @@ export function MedalsTab({ addToast }: { addToast: AddToast }) {
         </div>
       )}
 
+      {/* 불러오기 실패 — 예전엔 토스트였는데 조회는 화면에 남겨 두는 편이 덜 놓친다 */}
+      {loadError && (
+        <p className="rounded-lg bg-accent-danger/10 px-4 py-2 text-sm text-accent-danger">
+          {getApiErrorMessage(loadError, "메달 정보를 못 불러왔어요.")}
+        </p>
+      )}
+
       {/* 원장 */}
       <Card>
         <CardContent className="p-0">
@@ -634,10 +615,10 @@ export function MedalsTab({ addToast }: { addToast: AddToast }) {
               </table>
             </div>
           )}
-          {cursor && !loading && (
+          {ledger.hasNextPage && !loading && (
             <button
               type="button"
-              onClick={() => void loadLedger(true)}
+              onClick={() => void ledger.fetchNextPage()}
               disabled={loadingMore}
               className="w-full border-t border-bg-tertiary py-2.5 text-sm font-bold text-text-secondary hover:bg-bg-tertiary/40 disabled:opacity-60"
             >
