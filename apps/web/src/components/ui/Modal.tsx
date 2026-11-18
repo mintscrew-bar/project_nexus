@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { useEffect, useCallback, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { acquireBodyScrollLock, releaseBodyScrollLock } from '@/lib/body-scroll-lock';
+import { useResetOn } from "@/hooks/useResetOn";
 
 const openModalStack: symbol[] = [];
 
@@ -198,12 +199,8 @@ export function ConfirmModal({
   isLoading = false,
   dontAskAgainLabel,
 }: ConfirmModalProps) {
-  const [dontAskAgain, setDontAskAgain] = useState(false);
-
-  // 열 때마다 체크 상태 초기화 — 이전에 켜둔 체크가 남지 않게
-  useEffect(() => {
-    if (isOpen) setDontAskAgain(false);
-  }, [isOpen]);
+  // 열 때마다 체크 상태 초기화 — 이전에 켜둔 체크가 남지 않게(효과 없이 — useResetOn)
+  const [dontAskAgain, setDontAskAgain] = useResetOn(false, isOpen);
 
   const confirmButtonStyles = {
     danger: 'bg-accent-danger hover:bg-accent-danger/90',

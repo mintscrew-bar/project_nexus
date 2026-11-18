@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { DiscordIcon } from "@/components/icons/DiscordIcon";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
+import { useResetOn } from "@/hooks/useResetOn";
 
 type NavLink = { href: string; label: string };
 
@@ -21,13 +22,9 @@ type NavLink = { href: string; label: string };
 const SCROLL_LOCK_OWNER = Symbol("landing-mobile-nav");
 
 export function LandingMobileNav({ links }: { links: NavLink[] }) {
-  const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-
-  // 라우트 이동 시 닫기
-  useEffect(() => {
-    setIsOpen(false);
-  }, [pathname]);
+  // 라우트 이동 시 닫기(효과 없이 — useResetOn)
+  const [isOpen, setIsOpen] = useResetOn(false, pathname);
 
   /*
    * 열려 있을 때 body 스크롤 잠금.

@@ -12,6 +12,7 @@ import {
   Swords,
   ShieldX,
 } from "lucide-react";
+import { useResetOn } from "@/hooks/useResetOn";
 
 interface TeamMember {
   id: string;
@@ -1086,7 +1087,8 @@ export function BracketView({
   const [density, setDensity] = React.useState<Density>(
     isLarge ? "compact" : "detailed",
   );
-  const [zoom, setZoom] = React.useState(1);
+  // 밀도를 바꾸면 콘텐츠 폭이 달라지므로 배율을 되돌린다(효과 없이 — useResetOn)
+  const [zoom, setZoom] = useResetOn(1, density);
 
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -1121,10 +1123,7 @@ export function BracketView({
     if (naturalWidth <= 0) return;
     const next = (viewport.clientWidth - 8) / naturalWidth;
     setZoom(Math.max(MIN_ZOOM, Math.min(1, next)));
-  }, []);
-
-  // 밀도를 바꾸면 콘텐츠 폭이 달라지므로 배율을 되돌린다.
-  React.useEffect(() => setZoom(1), [density]);
+  }, [setZoom]);
 
   const inner = isDoubleElim ? (
     <DoubleEliminationBracket

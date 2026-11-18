@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { useResetOn } from "@/hooks/useResetOn";
 
 // 프로필 없는 사용자 기본 이미지 — 방송용과 동일한 무채색 non-avatar.
 // 렌더 크기에 맞는 걸 써서 다운스케일 뭉개짐을 줄인다.
@@ -29,12 +30,9 @@ export function Avatar({
   status,
   className,
 }: AvatarProps) {
-  const [imageError, setImageError] = useState(false);
   const normalizedSrc = src?.trim() || null;
-
-  useEffect(() => {
-    setImageError(false);
-  }, [normalizedSrc]);
+  // 주소가 바뀌면 깨진 이미지 표시를 되돌린다(효과 없이 — useResetOn)
+  const [imageError, setImageError] = useResetOn(false, normalizedSrc);
 
   const sizeStyles = {
     sm: 'h-8 w-8 text-xs',

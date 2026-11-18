@@ -16,6 +16,8 @@ import {
 } from "./LineTierSelector";
 import Image from "next/image";
 import { getRoleIcon } from "@/lib/role-icon";
+import { useResetOn } from "@/hooks/useResetOn";
+import { useOpenCount } from "@/hooks/useOpenCount";
 
 type Role = "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT";
 const ROLES: Role[] = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
@@ -37,7 +39,42 @@ interface EditAccountModalProps {
   account: RiotAccount | null;
 }
 
-export function EditAccountModal({
+/** 계정 → 수정 창의 처음 값 (예전 열림 효과가 채우던 값과 같다) */
+function initialFormFromAccount(account: RiotAccount | null) {
+  const main = ((account?.mainRole as Role) || "MID") as Role;
+  const sub = ((account?.subRole as Role) || "ADC") as Role;
+  const peakTier =
+    account?.peakTier && account.peakTier !== "UNRANKED"
+      ? account.peakTier
+      : "";
+  const championsByRole: Record<Role, string[]> = {
+    TOP: [],
+    JUNGLE: [],
+    MID: [],
+    ADC: [],
+    SUPPORT: [],
+  };
+  for (const pref of account?.championPreferences ?? []) {
+    const role = pref.role as Role;
+    if (championsByRole[role] !== undefined) {
+      championsByRole[role].push(pref.championId);
+    }
+  }
+  return {
+    main,
+    sub,
+    peakTier,
+    peakRank:
+      peakTier && !APEX_TIERS.has(peakTier) ? account?.peakRank || "IV" : "",
+    peakLp: ((account as any)?.peakLp ?? null) as number | null,
+    roleTiers: account
+      ? toLineTierMap(account.roleTiers)
+      : createEmptyLineTiers(),
+    championsByRole,
+  };
+}
+
+function EditAccountModalInner({
   isOpen,
   onClose,
   onAccountUpdated,
@@ -55,82 +92,34 @@ export function EditAccountModal({
     isLoading: championsLoading,
   } = useDdragonStore();
 
-  const [mainRole, setMainRole] = useState<Role>("MID");
-  const [subRole, setSubRole] = useState<Role>("ADC");
+  // 처음 값은 계정에서 바로 만든다 — 창을 열 때마다 새로 만들어(useOpenCount key) 다시 적용된다.
+  // 예전엔 열릴 때 효과에서 하나씩 setX 로 채웠다(react-hooks/set-state-in-effect).
+  const initial = initialFormFromAccount(account);
+  const [mainRole, setMainRole] = useState<Role>(initial.main);
+  const [subRole, setSubRole] = useState<Role>(initial.sub);
   const [championsByRole, setChampionsByRole] = useState<
     Record<Role, string[]>
-  >({
-    TOP: [],
-    JUNGLE: [],
-    MID: [],
-    ADC: [],
-    SUPPORT: [],
-  });
+  >(initial.championsByRole);
   const [expandedSections, setExpandedSections] = useState<Set<Role>>(
-    new Set(),
+    () => new Set([initial.main, initial.sub]),
   );
-  const [localError, setLocalError] = useState<string | null>(null);
+  // 이 창에서 낸 오류 — 스토어 오류가 새로 오면 비워서 스토어 오류가 보이게 한다
+  const [ownError, setLocalError] = useResetOn<string | null>(null, storeError);
+  const localError = ownError ?? storeError ?? null;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
-  const [peakTier, setPeakTier] = useState("");
-  const [peakRank, setPeakRank] = useState("");
-  const [peakLp, setPeakLp] = useState<number | null>(null);
-  const [roleTiers, setRoleTiers] = useState<LineTierMap>(createEmptyLineTiers);
+  const [peakTier, setPeakTier] = useState(initial.peakTier);
+  const [peakRank, setPeakRank] = useState(initial.peakRank);
+  const [peakLp, setPeakLp] = useState<number | null>(initial.peakLp);
+  const [roleTiers, setRoleTiers] = useState<LineTierMap>(initial.roleTiers);
 
-  // account가 바뀌거나 모달이 열릴 때 초기값 세팅
+  // 열리면 챔피언 목록을 받고 지난 스토어 오류를 지운다(바깥 상태만 다룬다)
   useEffect(() => {
     if (isOpen && account) {
       fetchChampions();
-      const main = (account.mainRole as Role) || "MID";
-      const sub = (account.subRole as Role) || "ADC";
-      const initialPeakTier =
-        account.peakTier && account.peakTier !== "UNRANKED"
-          ? account.peakTier
-          : "";
-      setMainRole(main);
-      setSubRole(sub);
-      setStep(1);
-      setPeakTier(initialPeakTier);
-      setPeakRank(
-        initialPeakTier && !APEX_TIERS.has(initialPeakTier)
-          ? account.peakRank || "IV"
-          : "",
-      );
-      setPeakLp((account as any).peakLp ?? null);
-      setRoleTiers(toLineTierMap(account.roleTiers));
       clearError();
-      setLocalError(null);
-
-      // championPreferences → championsByRole 변환
-      const byRole: Record<Role, string[]> = {
-        TOP: [],
-        JUNGLE: [],
-        MID: [],
-        ADC: [],
-        SUPPORT: [],
-      };
-      if (account.championPreferences) {
-        for (const pref of account.championPreferences) {
-          const role = pref.role as Role;
-          if (byRole[role] !== undefined) {
-            byRole[role].push(pref.championId);
-          }
-        }
-      }
-      setChampionsByRole(byRole);
-
-      // 주/부 역할 아코디언 펼침
-      setExpandedSections(new Set([main, sub]));
-    }
-    if (!isOpen) {
-      setLocalError(null);
-      setIsSubmitting(false);
     }
   }, [isOpen, account, fetchChampions, clearError]);
-
-  useEffect(() => {
-    if (storeError) setLocalError(storeError);
-  }, [storeError]);
 
   // 주/부 역할별 최소 3개 충족 여부
   const mainRoleSatisfied = championsByRole[mainRole].length >= 3;
@@ -506,5 +495,19 @@ function RoleAccordionSection({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * 열 때마다(그리고 다른 계정을 열면) 새로 만든다 — 지난번 입력값이 남지 않게.
+ * 닫을 때는 그대로 두어 닫힘 애니메이션이 산다.
+ */
+export function EditAccountModal(props: EditAccountModalProps) {
+  const openCount = useOpenCount(props.isOpen);
+  return (
+    <EditAccountModalInner
+      key={`${openCount}:${props.account?.id ?? ""}`}
+      {...props}
+    />
   );
 }

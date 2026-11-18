@@ -7,6 +7,7 @@ import { PlayerProfileModal } from "@/components/domain/PlayerProfileModal";
 import { PositionIcon } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import { Clock, Crown, Users, Swords } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useResetOn } from "@/hooks/useResetOn";
 
 interface Player {
   id: string;
@@ -50,8 +51,12 @@ export function DraftBoard({
   disabled = false,
 }: DraftBoardProps) {
   const [timeLeft, setTimeLeft] = React.useState(0);
-  const [selectedPlayer, setSelectedPlayer] = React.useState<string | null>(null);
-  const [isPicking, setIsPicking] = React.useState(false);
+  // 차례가 바뀌면 고른 선수·지명 중 표시를 비운다(효과 없이 — useResetOn)
+  const [selectedPlayer, setSelectedPlayer] = useResetOn<string | null>(
+    null,
+    draftState.currentTeamId,
+  );
+  const [isPicking, setIsPicking] = useResetOn(false, draftState.currentTeamId);
   const [hoveredPlayer, setHoveredPlayer] = useState<{ userId: string; rect: DOMRect } | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   // 모바일(<lg)에서 매물/팀 탭 전환
@@ -106,11 +111,6 @@ export function DraftBoard({
   const leftTeams = draftState.teams.slice(0, splitMid);
   const rightTeams = draftState.teams.slice(splitMid);
 
-  // Clear selection when turn changes or selected player was picked
-  React.useEffect(() => {
-    setSelectedPlayer(null);
-    setIsPicking(false);
-  }, [draftState.currentTeamId]);
 
   const handlePickPlayer = async () => {
     if (selectedPlayer && !disabled && isMyTurn && !isPicking) {

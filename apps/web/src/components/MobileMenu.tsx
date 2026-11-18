@@ -35,14 +35,16 @@ import { gamePath, useNavigationGame } from "@/hooks/useCurrentGame";
 import { myProfilePath } from "@/lib/profile-routes";
 import { scopedSectionPath } from "@/lib/scoped-section-routes";
 import { useIsClient } from "@/hooks/useIsClient";
+import { useResetOn } from "@/hooks/useResetOn";
 
 interface MobileMenuProps {
   className?: string;
 }
 
 export function MobileMenu({ className }: MobileMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  // 다른 페이지로 가면 닫힌다(효과 없이 — useResetOn)
+  const [isOpen, setIsOpen] = useResetOn(false, pathname);
   const currentGame = useNavigationGame();
   const { user, isAuthenticated } = useAuthStore();
   const { resolvedTheme, toggleTheme } = usePersistentTheme();
@@ -56,11 +58,6 @@ export function MobileMenu({ className }: MobileMenuProps) {
   // 관리자/모더레이터 여부 (마운트 후에만 확정 → hydration 불일치 방지)
   const isStaff =
     mounted && (user?.role === "ADMIN" || user?.role === "MODERATOR");
-
-  // Close menu on route change
-  useEffect(() => {
-    setIsOpen(false);
-  }, [pathname]);
 
   // Lock body scroll when menu is open
   useEffect(() => {
@@ -114,7 +111,7 @@ export function MobileMenu({ className }: MobileMenuProps) {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, setIsOpen]);
 
   // 게임별 화면은 현재 게임 프리픽스가 붙는다(`/lol/tournaments`).
   // 옛 경로를 쓰면 리다이렉트를 한 번 더 타고 활성 표시도 어긋난다.

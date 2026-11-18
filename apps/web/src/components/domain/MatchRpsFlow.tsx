@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useResetOn } from "@/hooks/useResetOn";
 
 export type RpsHand = "rock" | "paper" | "scissors";
 
@@ -76,8 +77,11 @@ export function MatchRpsFlow({
   const [count, setCount] = useState(0);
   const lastSeq = useRef<number>(-1);
   // 광클 방지: 서버 응답 오기 전 버튼 즉시 비활성화
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isChoosingSide, setIsChoosingSide] = useState(false);
+  // phase가 바뀌거나 submitted 목록이 초기화되면(무승부 재경기 등) 제출 상태 리셋
+  // (효과 없이 — useResetOn)
+  const roundKey = `${rps.phase}:${rps.submitted.length}`;
+  const [isSubmitting, setIsSubmitting] = useResetOn(false, roundKey);
+  const [isChoosingSide, setIsChoosingSide] = useResetOn(false, roundKey);
 
   // 새 reveal 도착 → 카운트다운 후 공개
   useEffect(() => {
@@ -103,11 +107,6 @@ export function MatchRpsFlow({
     return () => clearInterval(id);
   }, [reveal]);
 
-  // phase가 바뀌거나 submitted 목록이 초기화되면(무승부 재경기 등) 제출 상태 리셋
-  useEffect(() => {
-    setIsSubmitting(false);
-    setIsChoosingSide(false);
-  }, [rps.phase, rps.submitted.length]);
 
   const amCaptainA = currentUserId === rps.captainAId;
   const amCaptainB = currentUserId === rps.captainBId;

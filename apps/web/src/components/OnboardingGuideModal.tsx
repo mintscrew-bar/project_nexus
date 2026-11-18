@@ -31,7 +31,7 @@ export function OnboardingGuideModal() {
       user.id,
     );
     if (user.onboardingSeen) {
-      setIsOpen(false);
+      // 계정에 확인 이력이 있으면 아래 showModal 이 막는다(여기서 상태를 바꾸지 않는다)
       // 서버에 완료 이력만 있는 사용자는 로컬 선행 조건이 없어 후속 투어가 시작되지 않았다.
       if (!window.localStorage.getItem(userStorageKey)) {
         window.localStorage.setItem(userStorageKey, "1");
@@ -49,6 +49,8 @@ export function OnboardingGuideModal() {
       window.localStorage.getItem(userStorageKey) ||
       (!isNewAccount &&
         window.localStorage.getItem(ONBOARDING_MODAL_STORAGE_KEY));
+    // 브라우저 저장소·계정 생성 시각(바깥 상태)을 읽어 처음 한 번 연다 — 효과의 제 역할이다
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!seen) setIsOpen(true);
   }, [isAuthenticated, isLoading, user?.createdAt, user?.id, user?.onboardingSeen]);
 
@@ -90,7 +92,9 @@ export function OnboardingGuideModal() {
   const hasRoles = !!primaryRiot?.mainRole;
   const accountDone = hasRiot && hasRoles;
 
-  if (!isOpen) return null;
+  // 계정에 확인 이력이 생기면(다른 기기에서 봤어도) 닫힌 것으로 본다
+  const showModal = isOpen && !user?.onboardingSeen;
+  if (!showModal) return null;
 
   return (
     <>

@@ -42,6 +42,7 @@ import {
   killMatchSizeOptions,
   roomSizeOptions,
 } from "@/lib/room-size-options";
+import { useOpenCount } from "@/hooks/useOpenCount";
 
 type TeamCaptainSelection = "RANDOM" | "TIER" | "MANUAL" | "VOLUNTEER";
 type AuctionCaptainSelection = "TIER" | "MANUAL" | "VOLUNTEER";
@@ -126,7 +127,7 @@ const toSnakeCaptainSelection = (
   value?: TeamCaptainSelection,
 ): SnakeCaptainSelection => (value === "TIER" ? "TIER" : "RANDOM");
 
-export function RoomSettingsModal({
+function RoomSettingsModalInner({
   isOpen,
   onClose,
   room,
@@ -275,35 +276,8 @@ export function RoomSettingsModal({
     onClose();
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      setName(room.name);
-      setKillMatchDurationMinutes(String(room.killMatchDurationMinutes ?? 60));
-      setBattleRoyaleRounds(String(room.battleRoyaleRounds ?? 3));
-      setMaxParticipants(room.maxParticipants);
-      setIsPrivate(room.isPrivate);
-      setPassword("");
-      setTeamMode(room.teamMode);
-      setAllowSpectators(room.allowSpectators ?? true);
-      setCloseOnHostLeave(room.closeOnHostLeave ?? false);
-      setStartingPoints(room.startingPoints ?? 1000);
-      setMinBidIncrement(room.minBidIncrement ?? 50);
-      setBidTimeLimit(room.bidTimeLimit ?? 30);
-      setPickTimeLimit(room.pickTimeLimit ?? 60);
-      setSnakeCaptainSelection(toSnakeCaptainSelection(room.captainSelection));
-      setAuctionCaptainSelection(
-        toAuctionCaptainSelection(room.captainSelection),
-      );
-      setUseDoubleElim(room.bracketFormat === "DOUBLE_ELIMINATION");
-      setSeriesPreset(
-        normalizeSeriesPreset(
-          room.seriesPreset,
-          teamCountForRoom({ ...teamShape, maxParticipants: room.maxParticipants }),
-        ),
-      );
-      setError(null);
-    }
-  }, [isOpen, room, gameTitle, pubgGameMode, teamShape]);
+  // 열 때마다 방의 현재 값으로 시작한다 — 창을 새로 만들어(useOpenCount key) useState 초기값이
+  // 다시 적용된다. 예전엔 열림 효과에서 하나씩 setX 로 되돌렸다(set-state-in-effect).
 
   // 인원(=팀 수)이 바뀌면 고를 수 있는 프리셋 목록도 갈아끼워진다.
   const handleParticipantChange = (value: number) => {
@@ -864,4 +838,13 @@ export function RoomSettingsModal({
     />
     </>
   );
+}
+
+/**
+ * 열 때마다 새로 만든다 — 방의 최신 값으로 시작하고 지난번 입력이 남지 않게(useOpenCount key).
+ * 닫을 때는 그대로 두어 닫힘 애니메이션이 산다.
+ */
+export function RoomSettingsModal(props: RoomSettingsModalProps) {
+  const openCount = useOpenCount(props.isOpen);
+  return <RoomSettingsModalInner key={openCount} {...props} />;
 }
