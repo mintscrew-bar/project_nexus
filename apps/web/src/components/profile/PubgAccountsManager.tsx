@@ -8,7 +8,7 @@
  * 그 화면의 등록 카드·계정 목록·평가 창을 그대로 옮겨 왔다. 동작은 예전과 같다.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 
 import { pubgApi, type PubgPlayerLookupResult } from "@/lib/api-client";
 
@@ -24,17 +24,30 @@ import {
   Modal,
 } from "@/components/ui";
 import { Plus, Shield, Gamepad2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useQueryDataSetter } from "@/hooks/useQuerySetter";
 
 export function PubgAccountsManager() {
-  const [accounts, setAccounts] = useState<any[]>([]);
+  // 계정 목록은 React Query 로 — 들어오면 바로 받는다(예전엔 효과에서 setLoading·setAccounts,
+  // react-hooks/set-state-in-effect). 대표 변경 응답은 캐시에 바로 넣는다.
+  const accountsQuery = useQuery<any[]>({
+    queryKey: ["pubg-accounts", "mine"],
+    queryFn: () => pubgApi.getAccounts(),
+  });
+  const accounts = accountsQuery.data ?? [];
+  const setAccounts = useQueryDataSetter<any[]>(["pubg-accounts", "mine"], []);
+  const loading = accountsQuery.isLoading;
   const [playerName, setPlayerName] = useState("");
   // 등록은 두 단계다 — 닉네임으로 계정을 찾아 보여주고, 확인한 뒤에 등록한다.
   // PUBG API 는 소유권을 인증하지 않아서 "이 계정이 맞는지"를 사람이 봐야 한다.
   const [lookup, setLookup] = useState<PubgPlayerLookupResult | null>(null);
   const [looking, setLooking] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 처리 중 생긴 오류(직접 정함) — 없으면 목록 조회 오류를 보인다
+  const [actionError, setError] = useState<string | null>(null);
+  const error =
+    actionError ??
+    (accountsQuery.isError ? "PUBG 계정 목록을 불러오지 못했습니다." : null);
   const [scoreAccount, setScoreAccount] = useState<any | null>(null);
   const [scores, setScores] = useState({
     combatScore: 50,
@@ -62,21 +75,10 @@ export function PubgAccountsManager() {
             ? "4"
             : "5";
 
-  const loadAccounts = useCallback(async () => {
-    try {
-      setLoading(true);
-      setAccounts(await pubgApi.getAccounts());
-    } catch {
-      setError("PUBG 계정 목록을 불러오지 못했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // 내 프로필에서만 그려지므로 들어오면 바로 목록을 받는다
-  useEffect(() => {
-    void loadAccounts();
-  }, [loadAccounts]);
+  // 처리 뒤 목록 새로고침 — 예전 이름 그대로 둔다
+  const loadAccounts = async () => {
+    await accountsQuery.refetch();
+  };
 
   const handleLookup = async (event: React.FormEvent) => {
     event.preventDefault();

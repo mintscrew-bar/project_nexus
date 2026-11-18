@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
@@ -46,6 +46,11 @@ import {
   Flag,
   Tag,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  useQueryDataSetter,
+  useQueryFieldSetter,
+} from "@/hooks/useQuerySetter";
 
 // 게시글/댓글 신고 사유
 const REPORT_REASONS: { value: string; label: string }[] = [
@@ -119,6 +124,9 @@ const categoryConfig: Record<
   QNA: { label: "Q&A", icon: HelpCircle, color: "text-accent-primary" },
 };
 
+const EMPTY_COMMENT_LIKES: Record<string, { liked: boolean; count: number }> =
+  {};
+
 export default function PostDetailClient() {
   const navigationGame = useNavigationGame();
   const params = useParams();
@@ -126,23 +134,95 @@ export default function PostDetailClient() {
   const postId = params.id as string;
   const { user, isAuthenticated } = useAuthStore();
 
-  const [post, setPost] = useState<Post | null>(null);
+  // 글 본문·댓글 좋아요 수는 React Query 로 — 예전엔 효과에서 fetchPost() 로 setPost·
+  // setIsLoading 했다(react-hooks/set-state-in-effect). 좋아요를 누른 뒤 바뀌는 수는
+  // 캐시를 직접 고친다(setLikeCount·setCommentLikes).
+  const postKey = ["community-post", postId];
+  const postQuery = useQuery({
+    queryKey: postKey,
+    queryFn: async () => {
+      const data: Post = await communityApi.getPost(postId);
+
+      // 댓글 좋아요 초기 카운트 세팅
+      const allComments: Comment[] = [
+        ...(data.comments || []),
+        ...(data.comments || []).flatMap((c: Comment) => c.replies || []),
+      ];
+      const commentLikes: Record<string, { liked: boolean; count: number }> =
+        {};
+      allComments.forEach((c: Comment) => {
+        commentLikes[c.id] = { liked: false, count: c._count?.likes || 0 };
+      });
+
+      // 로그인 상태이면 배치 API로 liked 여부 확인
+      if (allComments.length > 0) {
+        try {
+          const likedStatus = await communityApi.getCommentLikedStatus(
+            allComments.map((c) => c.id),
+          );
+          Object.entries(likedStatus).forEach(([id, liked]) => {
+            if (commentLikes[id])
+              commentLikes[id] = { ...commentLikes[id], liked: !!liked };
+          });
+        } catch {
+          // 비로그인 or 실패 시 무시
+        }
+      }
+      return { post: data, likeCount: data._count?.likes || 0, commentLikes };
+    },
+  });
+  type PostData = NonNullable<typeof postQuery.data>;
+  const post = postQuery.data?.post ?? null;
+  const likeCount = postQuery.data?.likeCount ?? 0;
+  const setLikeCount = useQueryFieldSetter<PostData, "likeCount">(
+    postKey,
+    "likeCount",
+  );
+  const commentLikes = postQuery.data?.commentLikes ?? EMPTY_COMMENT_LIKES;
+  const setCommentLikes = useQueryFieldSetter<PostData, "commentLikes">(
+    postKey,
+    "commentLikes",
+  );
+  const isLoading = postQuery.isLoading;
+  // 삭제/비공개 글이나 잘못된 링크로 들어온 경우가 대부분이라 상태별 문구로 안내한다.
+  const error = postQuery.isError
+    ? getApiErrorMessage(postQuery.error, "게시글을 불러오는데 실패했습니다.", {
+        404: "게시글을 찾을 수 없습니다. 삭제되었거나 주소가 잘못되었을 수 있습니다.",
+        403: "이 게시글을 볼 권한이 없습니다.",
+      })
+    : null;
+  // 처리 뒤 새로고침 — 예전 이름 그대로 둔다(본문은 스켈레톤 없이 제자리에서 바뀐다)
+  const refetchPost = postQuery.refetch;
+  const fetchPost = useCallback(() => {
+    void refetchPost();
+  }, [refetchPost]);
+
+  // 내가 좋아요·북마크 했는지 — 로그인했을 때만
+  const likedKey = ["community-post", postId, "liked"];
+  const likedQuery = useQuery({
+    queryKey: likedKey,
+    enabled: isAuthenticated,
+    queryFn: async () => (await communityApi.hasLikedPost(postId)).hasLiked,
+  });
+  const hasLiked = likedQuery.data ?? false;
+  const setHasLiked = useQueryDataSetter<boolean>(likedKey, false);
+  const bookmarkedKey = ["community-post", postId, "bookmarked"];
+  const bookmarkedQuery = useQuery({
+    queryKey: bookmarkedKey,
+    enabled: isAuthenticated,
+    queryFn: async () =>
+      (await communityApi.hasBookmarkedPost(postId)).bookmarked,
+  });
+  const hasBookmarked = bookmarkedQuery.data ?? false;
+  const setHasBookmarked = useQueryDataSetter<boolean>(bookmarkedKey, false);
   const game = post?.board?.gameTitle ?? navigationGame;
   const communityPath = scopedSectionPath("community", game);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasLiked, setHasLiked] = useState(false);
   /** 좋아요 요청 진행 중. 연타로 요청이 겹치는 것을 막는다. */
   const [isLiking, setIsLiking] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
-  const [hasBookmarked, setHasBookmarked] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletePostConfirm, setDeletePostConfirm] = useState(false);
   const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
-  const [commentLikes, setCommentLikes] = useState<
-    Record<string, { liked: boolean; count: number }>
-  >({});
   const [replyTo, setReplyTo] = useState<{
     id: string;
     username: string;
@@ -196,64 +276,12 @@ export default function PostDetailClient() {
     }
   };
 
-  const fetchPost = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await communityApi.getPost(postId);
-      setPost(data);
-      setLikeCount(data._count?.likes || 0);
-
-      // 댓글 좋아요 초기 카운트 세팅
-      const allComments: Comment[] = [
-        ...(data.comments || []),
-        ...(data.comments || []).flatMap((c: Comment) => c.replies || []),
-      ];
-      const likesMap: Record<string, { liked: boolean; count: number }> = {};
-      allComments.forEach((c: Comment) => {
-        likesMap[c.id] = { liked: false, count: c._count?.likes || 0 };
-      });
-      setCommentLikes(likesMap);
-
-      // 로그인 상태이면 배치 API로 liked 여부 확인
-      if (allComments.length > 0) {
-        try {
-          const likedStatus = await communityApi.getCommentLikedStatus(
-            allComments.map((c) => c.id),
-          );
-          setCommentLikes((prev) => {
-            const updated = { ...prev };
-            Object.entries(likedStatus).forEach(([id, liked]) => {
-              if (updated[id]) updated[id] = { ...updated[id], liked };
-            });
-            return updated;
-          });
-        } catch {
-          // 비로그인 or 실패 시 무시
-        }
-      }
-    } catch (err: any) {
-      // 삭제/비공개 글이나 잘못된 링크로 들어온 경우가 대부분이라 상태별 문구로 안내한다.
-      setError(
-        getApiErrorMessage(err, "게시글을 불러오는데 실패했습니다.", {
-          404: "게시글을 찾을 수 없습니다. 삭제되었거나 주소가 잘못되었을 수 있습니다.",
-          403: "이 게시글을 볼 권한이 없습니다.",
-        }),
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [postId]);
-
+  // 좋아요 여부 다시 읽기(로그인했을 때만)
+  const refetchLiked = likedQuery.refetch;
   const checkLikeStatus = useCallback(async () => {
     if (!isAuthenticated) return;
-    try {
-      const { hasLiked: liked } = await communityApi.hasLikedPost(postId);
-      setHasLiked(liked);
-    } catch {
-      // Ignore error
-    }
-  }, [postId, isAuthenticated]);
+    await refetchLiked();
+  }, [isAuthenticated, refetchLiked]);
 
   /**
    * 좋아요 상태만 서버에서 다시 읽는다.
@@ -271,23 +299,7 @@ export default function PostDetailClient() {
     } catch {
       // 되맞추기 실패는 조용히 넘어간다 — 다음 조작에서 다시 시도된다.
     }
-  }, [postId, checkLikeStatus]);
-
-  const checkBookmarkStatus = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      const { bookmarked } = await communityApi.hasBookmarkedPost(postId);
-      setHasBookmarked(bookmarked);
-    } catch {
-      // Ignore error
-    }
-  }, [postId, isAuthenticated]);
-
-  useEffect(() => {
-    fetchPost();
-    checkLikeStatus();
-    checkBookmarkStatus();
-  }, [fetchPost, checkLikeStatus, checkBookmarkStatus]);
+  }, [postId, checkLikeStatus, setLikeCount]);
 
   /*
    * 좋아요 토글.

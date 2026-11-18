@@ -1,7 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import type { CommendationSummary } from "@/lib/commendation";
 import { getDdragonVersion } from "./ddragon";
-import type { BroadcastSettings, GameTitle } from "@nexus/types";
+import type { BroadcastSettings, CosmeticSlot, GameTitle } from "@nexus/types";
 
 // 보이지 않는 유니코드 문자 제거 (복사-붙여넣기 시 포함되는 bidirectional formatting 등)
 const stripInvisibleChars = (str: string): string =>
@@ -370,6 +370,8 @@ export const authApi = {
   login: () => {
     // 동일 오리진 /api 경유 (next.config rewrites 통해 백엔드로 전달)
     // 환경변수 오설정으로 다른 도메인/포트로 튀는 문제를 방지
+    // OAuth 로그인 — Next 페이지가 아니라 API 주소라 브라우저가 실제로 이동해야 한다
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/api/auth/discord";
   },
 
@@ -424,6 +426,8 @@ export const authApi = {
   },
 
   googleLogin: () => {
+    // OAuth 로그인 — Next 페이지가 아니라 API 주소라 브라우저가 실제로 이동해야 한다
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/api/auth/google";
   },
 
@@ -769,7 +773,11 @@ export const broadcastApi = {
   uploadTransition: async (file: File): Promise<{ url: string }> => {
     const formData = new FormData();
     formData.append("transition", file);
-    const response = await apiClient.post("/broadcast/settings/transition", formData, { headers: { "Content-Type": "multipart/form-data" } });
+    const response = await apiClient.post(
+      "/broadcast/settings/transition",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
     return response.data;
   },
   // OBS 브라우저 소스용 읽기전용 스냅샷
@@ -2393,6 +2401,166 @@ export type PopupNotice = {
   message: string;
   link: string | null;
   createdAt: string;
+};
+
+/** 메달 원장 한 줄 (서버 MedalLedger) */
+export interface MedalHistoryItem {
+  id: string;
+  amount: number;
+  balanceAfter: number;
+  reason: string;
+  createdAt: string;
+  sourceId: string | null;
+  retro: boolean;
+  metadata: Record<string, unknown> | null;
+}
+
+/** 메달 요약 (GET /medals/me/summary) */
+export interface MedalSummary {
+  balance: number;
+  /** 오늘(KST) 상한에 잡히는 사유로 받은 양과 하루 상한 */
+  today: { earned: number; cap: number };
+  /** 지금까지 받은 순합(회수 반영), 쓴 양(구매 − 환불) */
+  earned: number;
+  spent: number;
+  byReason: { reason: string; amount: number }[];
+}
+
+/** 상점 진열 한 칸 — 상품 정의(@nexus/types) + 내 보유·장착 */
+export interface ShopItemState {
+  code: string;
+  slot: CosmeticSlot;
+  price: number;
+  rarity: "STARTER" | "COMMON" | "PREMIUM" | "RARE";
+  onSale: boolean;
+  owned: boolean;
+  equipped: boolean;
+}
+
+export type CosmeticLoadoutState = Partial<Record<CosmeticSlot, string>>;
+
+/** 메달 상점 — 진열·구매·장착 */
+export const shopApi = {
+  getShop: async (): Promise<{
+    balance: number;
+    loadout: CosmeticLoadoutState;
+    items: ShopItemState[];
+  }> => {
+    const response = await apiClient.get("/shop");
+    return response.data;
+  },
+
+  /** 구매 — 기본으로 산 즉시 장착 */
+  purchase: async (
+    code: string,
+    equip = true,
+  ): Promise<{ balance: number; itemCode: string; equipped: boolean }> => {
+    const response = await apiClient.post("/shop/purchase", { code, equip });
+    return response.data;
+  },
+
+  /** 장착·해제 (code 가 null 이면 해제) */
+  equip: async (
+    slot: CosmeticSlot,
+    code: string | null,
+  ): Promise<CosmeticLoadoutState> => {
+    const response = await apiClient.put("/shop/loadout", { slot, code });
+    return response.data;
+  },
+
+  /** 여러 사람의 장착 상태 (로비 카드·프로필) */
+  getLoadouts: async (
+    userIds: string[],
+  ): Promise<Record<string, CosmeticLoadoutState>> => {
+    if (userIds.length === 0) return {};
+    const response = await apiClient.get("/shop/loadouts", {
+      params: { userIds: userIds.join(",") },
+    });
+    return response.data;
+  },
+};
+
+/** 메달 — 잔액과 내역 (리텐션 기획서 7절) */
+export const medalApi = {
+  getMine: async (): Promise<{ balance: number }> => {
+    const response = await apiClient.get("/medals/me");
+    return response.data;
+  },
+
+  /** 메달 화면 머리 — 잔액·오늘 받은 양/하루 상한·사유별 순합계 */
+  getSummary: async (): Promise<MedalSummary> => {
+    const response = await apiClient.get("/medals/me/summary");
+    return response.data;
+  },
+
+  /** 최신순 내역. cursor 는 직전 응답의 nextCursor */
+  getHistory: async (
+    params: { cursor?: string; limit?: number } = {},
+  ): Promise<{ items: MedalHistoryItem[]; nextCursor: string | null }> => {
+    const response = await apiClient.get("/medals/me/history", { params });
+    return response.data;
+  },
+};
+
+/** 관리자 원장 한 줄 — 누구 원장인지 이름이 붙는다 (Task 17) */
+export interface AdminMedalLedgerItem extends MedalHistoryItem {
+  userId: string | null;
+  user: { id: string; username: string; avatar: string | null } | null;
+}
+
+/** 관리자 사용자 메달 상세 (GET medals/admin/users/:id) */
+export interface AdminMedalUser {
+  user: {
+    id: string;
+    username: string;
+    avatar: string | null;
+    createdAt: string;
+  };
+  summary: MedalSummary;
+  cosmetics: {
+    loadout: CosmeticLoadoutState;
+    items: {
+      itemCode: string;
+      slot: CosmeticSlot | null;
+      source: string;
+      acquiredAt: string;
+      paid: number | null;
+      equipped: boolean;
+      refundable: boolean;
+    }[];
+  };
+}
+
+/** 관리자 메달 운영 — 원장 조회·사용자 상세·지급/회수·환불 (ADMIN, Task 17) */
+export const adminMedalApi = {
+  ledger: async (params: {
+    userId?: string;
+    reason?: string;
+    cursor?: string;
+    limit?: number;
+  }): Promise<{ items: AdminMedalLedgerItem[]; nextCursor: string | null }> => {
+    const response = await apiClient.get("/medals/admin/ledger", { params });
+    return response.data;
+  },
+  user: async (userId: string): Promise<AdminMedalUser> => {
+    const response = await apiClient.get(`/medals/admin/users/${userId}`);
+    return response.data;
+  },
+  /** 지급(양수)·회수(음수). requestId 는 화면이 한 번 만들어 재시도에도 같은 값을 쓴다 */
+  adjust: async (body: {
+    userId: string;
+    amount: number;
+    memo: string;
+    requestId: string;
+    allowNegative?: boolean;
+  }) => {
+    const response = await apiClient.post("/medals/admin/adjust", body);
+    return response.data;
+  },
+  refund: async (body: { userId: string; itemCode: string; memo: string }) => {
+    const response = await apiClient.post("/medals/admin/refund", body);
+    return response.data as { balance: number; refunded: number };
+  },
 };
 
 export const notificationApi = {

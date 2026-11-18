@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useIsClient } from "@/hooks/useIsClient";
 
 /**
  * 배그 화면의 필름 그레인.
@@ -19,8 +20,8 @@ import { createPortal } from "react-dom";
  */
 export function PubgSurfaceGrain() {
   // 포털은 DOM 이 있어야 한다. 서버 렌더에서는 아무것도 내보내지 않는다.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // 브라우저에서 그리는 중인가 — 효과로 세우지 않고 useIsClient(useSyncExternalStore)로 안다
+  const mounted = useIsClient();
 
   if (!mounted) return null;
 

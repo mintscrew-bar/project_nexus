@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { ChatBox } from "./ChatBox";
 import { MessageSquare, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useResetOn } from "@/hooks/useResetOn";
 
 interface GameChatPanelProps {
   roomId: string;
@@ -23,7 +24,8 @@ export function GameChatPanel({ roomId, isFinalStage, variant = "floating", clas
     useChatStore();
   const { user } = useAuthStore();
   const prevCountRef = useRef(messages.length);
-  const [unread, setUnread] = useState(0);
+  // 패널을 열고 닫을 때마다 0 부터(열면 읽은 것) — 효과 없이 useResetOn
+  const [unread, setUnread] = useResetOn(0, isOpen);
 
   useEffect(() => {
     connect(roomId);
@@ -39,12 +41,8 @@ export function GameChatPanel({ roomId, isFinalStage, variant = "floating", clas
       setUnread((u) => u + (messages.length - prevCountRef.current));
     }
     prevCountRef.current = messages.length;
-  }, [messages.length, isOpen]);
+  }, [messages.length, isOpen, setUnread]);
 
-  // Clear unread when panel opens
-  useEffect(() => {
-    if (isOpen) setUnread(0);
-  }, [isOpen]);
 
   // inline 모드: 토글 없이 항상 표시 (hooks 호출 이후로 분기)
   if (variant === "inline") {

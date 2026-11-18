@@ -1,7 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   BGM_DUCK_RATIO,
   BGM_MAX_VOLUME,
@@ -121,7 +127,9 @@ function BgmEngine() {
   const trackRef = useRef<BgmTrack | null>(null);
   const fadeTimerRef = useRef<number | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
-  const tabIdRef = useRef(Math.random().toString(36).slice(2));
+  // 탭 구분값 — 처음 한 번만 만든다(그릴 때마다 Math.random 을 부르지 않게)
+  const [tabId] = useState(() => Math.random().toString(36).slice(2));
+  const tabIdRef = useRef(tabId);
   // 비동기 콜백(재생 시작·페이드 완료)에서 최신 판단을 읽기 위한 사본
   const shouldPlayRef = useRef(shouldPlay);
   const allowedHereRef = useRef(allowedHere);
@@ -132,9 +140,13 @@ function BgmEngine() {
    * 사라진다. 게임 시작 순간은 방 상태도 같이 바뀌므로 실제로 겹친다.
    */
   const switchingRef = useRef(false);
-  shouldPlayRef.current = shouldPlay;
-  allowedHereRef.current = allowedHere;
-  targetVolumeRef.current = targetVolume;
+  // 최신 판단을 사본에 옮긴다 — 그리는 중이 아니라 그린 직후에. 레이아웃 효과라서
+  // 아래 일반 효과들보다 먼저 돌아, 같은 그리기의 효과들은 늘 새 값을 읽는다
+  useLayoutEffect(() => {
+    shouldPlayRef.current = shouldPlay;
+    allowedHereRef.current = allowedHere;
+    targetVolumeRef.current = targetVolume;
+  }, [shouldPlay, allowedHere, targetVolume]);
 
   const getAudio = useCallback(() => {
     if (!audioRef.current) {

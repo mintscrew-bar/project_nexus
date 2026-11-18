@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Search, X } from "lucide-react";
 import { adminApi } from "@/lib/api-client";
 import { Button, Card, CardContent, LoadingSpinner } from "@/components/ui";
@@ -17,35 +18,21 @@ interface ClientErrorLog {
 }
 
 export function ErrorLogsTab() {
-  const [logs, setLogs] = useState<ClientErrorLog[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [loading, setLoading] = useState(true);
   const limit = 50;
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await adminApi.getErrorLogs({
-        page,
-        limit,
-        search: search || undefined,
-      });
-      setLogs(data.logs ?? []);
-      setTotal(data.total ?? 0);
-    } catch {
-      setLogs([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search]);
-
-  useEffect(() => {
-    void fetchLogs();
-  }, [fetchLogs]);
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setLogs 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 실패하면 예전처럼 빈 목록으로 보인다.
+  const logsQuery = useQuery({
+    queryKey: ["admin-error-logs", page, search],
+    queryFn: () =>
+      adminApi.getErrorLogs({ page, limit, search: search || undefined }),
+  });
+  const logs: ClientErrorLog[] = logsQuery.data?.logs ?? [];
+  const total: number = logsQuery.data?.total ?? 0;
+  const loading = logsQuery.isLoading;
 
   return (
     <div className="space-y-4">

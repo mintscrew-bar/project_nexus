@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { streamerApi, type AdminStreamerItem } from "@/lib/api-client";
 import {
   Card,
@@ -13,6 +13,8 @@ import { CheckCircle, RefreshCw, Search, XCircle } from "lucide-react";
 import type { AddToast } from "../shared";
 import { useAdminGameScope } from "../game-scope";
 import { useConfirm } from "../ConfirmDialog";
+import { useQueryDataSetter } from "@/hooks/useQuerySetter";
+import { useQuery } from "@tanstack/react-query";
 
 const PLATFORM_LABELS: Record<string, string> = {
   CHZZK: "치지직",
@@ -41,32 +43,33 @@ function formatDateTime(value: string | null): string {
 export function StreamersTab({ addToast }: { addToast: AddToast }) {
   const { confirm, dialog } = useConfirm();
   const { gameParam } = useAdminGameScope();
-  const [streamers, setStreamers] = useState<AdminStreamerItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<VerifiedFilter>("all");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
 
-  const fetchStreamers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await streamerApi.listForAdmin({
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setStreamers 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 인증 처리 직후엔 캐시를 바로 고친다(setStreamers).
+  const streamersKey = ["admin-streamers", filter, search, gameParam];
+  const streamersQuery = useQuery({
+    queryKey: streamersKey,
+    queryFn: () =>
+      streamerApi.listForAdmin({
         verified: filter,
         search: search || undefined,
         gameTitle: gameParam,
-      });
-      setStreamers(data);
-    } catch {
-      addToast("스트리머 목록 로드 실패", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, search, gameParam, addToast]);
-
+      }),
+  });
+  const streamers: AdminStreamerItem[] = streamersQuery.data ?? [];
+  const loading = streamersQuery.isLoading;
+  const setStreamers = useQueryDataSetter<AdminStreamerItem[]>(
+    streamersKey,
+    [],
+  );
+  const fetchStreamers = () => streamersQuery.refetch();
   useEffect(() => {
-    fetchStreamers();
-  }, [fetchStreamers]);
+    if (streamersQuery.isError) addToast("스트리머 목록 로드 실패", "error");
+  }, [streamersQuery.isError, addToast]);
 
   /** 폴링(1분 주기)을 기다리지 않고 라이브 상태를 즉시 갱신한다. */
   const handleRefresh = async () => {

@@ -7,7 +7,10 @@ import { Logo } from "@/components/Logo";
 import { AlertCircle, X, CornerDownLeft } from "lucide-react";
 import Link from "next/link";
 import { withoutGamePrefix } from "@/lib/game-links";
-import { rememberPostLoginRedirect } from "@/lib/post-login-redirect";
+import {
+  rememberPostLoginRedirect,
+  sanitizePostLoginRedirect,
+} from "@/lib/post-login-redirect";
 
 /**
  * 어디서 로그인 화면으로 넘어왔는지 알려주는 복귀 안내 문구.
@@ -53,23 +56,24 @@ function toErrorMessage(code: string): string {
  */
 function LoginQueryNotices() {
   const searchParams = useSearchParams();
-  const [error, setError] = useState<string | null>(null);
-  // 에러 파라미터 처리 시 URL을 replaceState로 정리하므로 redirect 값은 state에 보관한다.
-  const [redirectTo, setRedirectTo] = useState<string | null>(null);
-
-  // URL에서 에러 파라미터 확인
-  useEffect(() => {
+  // 에러 파라미터 처리 시 URL을 replaceState로 정리하므로 에러·redirect 값은 처음 그릴 때
+  // 한 번 읽어 state 에 보관한다(초기값 함수). 예전엔 효과에서 setError·setRedirectTo
+  // 했다(react-hooks/set-state-in-effect).
+  const [error, setError] = useState<string | null>(() => {
     const errorParam = searchParams.get("error");
-    if (errorParam) {
-      setError(toErrorMessage(decodeURIComponent(errorParam)));
-      // URL에서 에러 파라미터 제거
-      window.history.replaceState({}, "", "/auth/login");
-    }
+    return errorParam ? toErrorMessage(decodeURIComponent(errorParam)) : null;
+  });
+  const [redirectTo] = useState<string | null>(() =>
+    sanitizePostLoginRedirect(searchParams.get("redirect")),
+  );
 
+  useEffect(() => {
+    // URL에서 에러 파라미터 제거
+    if (error) window.history.replaceState({}, "", "/auth/login");
     // 쿼리가 없으면 `null` 을 넘겨 이전 목적지를 버린다. 목적지 없이 로그인
     // 화면에 들어왔다는 건 "그냥 로그인" 이고, 그때는 종합 홈으로 가야 한다.
-    setRedirectTo(rememberPostLoginRedirect(searchParams.get("redirect")));
-  }, [searchParams]);
+    rememberPostLoginRedirect(redirectTo);
+  }, [error, redirectTo]);
 
   const redirectNotice = getRedirectNotice(redirectTo);
 

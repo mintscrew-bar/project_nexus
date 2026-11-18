@@ -8,6 +8,7 @@ import {
   bannerGlowGradient,
 } from "./banner-constants";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { useResetOn } from "@/hooks/useResetOn";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 상수 정의
@@ -63,19 +64,22 @@ const STAT_COUNT_DURATION = 1400;
 // "스코어보드" 컨셉 — 좌우 60:40 분할 레이아웃
 // ─────────────────────────────────────────────────────────────────────────────
 
+const ZERO_STATS = [0, 0, 0];
+
 export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
   const gamePrefix = useGamePrefix();
   const [isHovered, setIsHovered] = useState(false);
 
   // 스탯 카운트업 — 슬라이드가 활성화될 때마다 0→목표값
-  const [statValues, setStatValues] = useState<number[]>([0, 0, 0]);
+  // 슬라이드가 켜지고 꺼질 때마다 0 부터(효과 없이 — useResetOn)
+  const [statValues, setStatValues] = useResetOn<number[]>(
+    ZERO_STATS,
+    isActive,
+  );
 
   useEffect(() => {
-    // 비활성 시 0으로 리셋 — 다음 활성화 때 처음부터 카운트업
-    if (!isActive) {
-      setStatValues([0, 0, 0]);
-      return;
-    }
+    // 비활성이면 멈춘다 — 0 으로 되돌리기는 useResetOn 이 한다
+    if (!isActive) return;
 
     // 숫자 카운트업 — RAF 기반 easeOutCubic
     const start = performance.now();
@@ -100,7 +104,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
     frameId = requestAnimationFrame(tick);
 
     return () => cancelAnimationFrame(frameId);
-  }, [isActive]);
+  }, [isActive, setStatValues]);
 
   return (
     <Link

@@ -38,6 +38,14 @@
 #   /IT is required for step 6 to be able to open a window. The task deletes
 #   itself at the end.
 #
+# OPTIONAL: -Compact (added 2026-11-18)
+#   Compacts ext4.vhdx with diskpart while the VM is down, giving the space
+#   that WSL already freed back to C:. The root fs is mounted with `discard`,
+#   so deleted blocks are trimmed and diskpart can actually drop them.
+#   diskpart needs Administrator, so the task must be created with
+#   /RL HIGHEST (from an elevated shell) when -Compact is used. Without
+#   elevation the compact step logs the failure and the restart carries on.
+#
 # NOTE ON ENCODING
 #   ASCII only, matching scripts/wsl-compact.ps1. Windows PowerShell 5.1 reads
 #   BOM-less UTF-8 as ANSI, and a mojibake comment is not worth the risk in a
@@ -54,7 +62,10 @@ param(
     [string]$ProjectDir = "/home/haru/projects/nexus",
     [int]$ContainerTimeoutSeconds = 240,
     [string]$TaskName = "NexusWslPlannedRestart",
-    [switch]$NoResumeWindow
+    [switch]$NoResumeWindow,
+    # Compact ext4.vhdx while the VM is down (needs Administrator, see header).
+    [switch]$Compact,
+    [string]$VhdxPath = ""
 )
 
 $ErrorActionPreference = "Continue"
@@ -91,6 +102,56 @@ Start-Sleep -Seconds $DelaySeconds
 Write-Log "step 1/6: wsl --shutdown"
 & $Wsl --shutdown
 Start-Sleep -Seconds 10
+
+# --- 1b. optional: compact the vhdx -----------------------------------------
+# Runs only while the VM is down. Any failure here is logged and skipped - the
+# site coming back matters more than reclaiming space.
+if ($Compact) {
+    Write-Log "step 1b: compacting ext4.vhdx"
+    # The keepalive watchdog restarts WSL as soon as it sees it down. On the
+    # first -Compact run (2026-11-18) it did exactly that while the vhdx was
+    # being located, and diskpart failed with "file in use". Stop it here;
+    # step 5 starts it again.
+    Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
+        Where-Object { $_.CommandLine -like "*wsl-watchdog.ps1*" } |
+        ForEach-Object {
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            Write-Log "  stopped watchdog (pid $($_.ProcessId)) for the compact"
+        }
+    $vhdx = $VhdxPath
+    if (-not $vhdx) {
+        # Modern location first - scanning Packages took ~90s on this box.
+        $found = @(Get-ChildItem -Path "$env:LOCALAPPDATA\wsl\*\ext4.vhdx" -ErrorAction SilentlyContinue)
+        if ($found.Count -eq 0) {
+            $found = @(Get-ChildItem -Path "$env:LOCALAPPDATA\Packages\*\LocalState\ext4.vhdx" -ErrorAction SilentlyContinue)
+        }
+        if ($found.Count -gt 0) { $vhdx = $found[0].FullName }
+    }
+    # Make sure nothing brought the VM back in the meantime.
+    & $Wsl --shutdown
+    Start-Sleep -Seconds 5
+    if (-not $vhdx -or -not (Test-Path $vhdx)) {
+        Write-Log "  WARNING: ext4.vhdx not found, skipping compact"
+    } else {
+        $before = [math]::Round((Get-Item $vhdx).Length / 1GB, 2)
+        $freeBefore = [math]::Round((Get-PSDrive C).Free / 1GB, 2)
+        Write-Log "  target $vhdx ($before GB, C: free $freeBefore GB)"
+        $dp = New-TemporaryFile
+        Set-Content -Path $dp -Encoding ASCII -Value @"
+select vdisk file="$vhdx"
+attach vdisk readonly
+compact vdisk
+detach vdisk
+exit
+"@
+        $out = & diskpart /s $dp 2>&1
+        Remove-Item $dp -Force
+        $out | ForEach-Object { if ("$_".Trim()) { Write-Log "    diskpart: $_" } }
+        $after = [math]::Round((Get-Item $vhdx).Length / 1GB, 2)
+        $freeAfter = [math]::Round((Get-PSDrive C).Free / 1GB, 2)
+        Write-Log "  vhdx $before GB -> $after GB, C: free $freeBefore GB -> $freeAfter GB"
+    }
+}
 
 # --- 2. start back up -------------------------------------------------------
 # Any command boots the distro; /etc/wsl.conf has systemd=true so PID 1 comes

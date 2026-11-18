@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { matchApi, scrimApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLobbyStore } from "@/stores/lobby-store";
 import { useMatchStore } from "@/stores/match-store";
+import { useResetOn } from "@/hooks/useResetOn";
 
 /** 진행 중 방에서 내 경기 상태를 다시 확인하는 주기 */
 const POLL_INTERVAL_MS = 30_000;
@@ -32,7 +33,8 @@ export function useMyMatchInProgress(): boolean {
   const userId = useAuthStore((s) => s.user?.id);
   const room = useLobbyStore((s) => s.room);
   const roomMatches = useMatchStore((s) => s.roomMatches);
-  const [inMatch, setInMatch] = useState(false);
+  // 방이 바뀌면 처음(false)으로 — 다른 방에서 본 "진행 중" 이 새 방에 잠깐이라도 남지 않게
+  const [checkedInMatch, setInMatch] = useResetOn(false, room?.id);
 
   const roomId = room?.id;
   const watching = isAuthenticated && room?.status === "IN_PROGRESS";
@@ -56,10 +58,9 @@ export function useMyMatchInProgress(): boolean {
   );
 
   useEffect(() => {
-    if (!watching || !roomId) {
-      setInMatch(false);
-      return;
-    }
+    // 지켜볼 상황이 아니면 조회하지 않는다. 결과는 아래 반환에서 false 로 가린다
+    // (예전엔 여기서 setInMatch(false) — react-hooks/set-state-in-effect)
+    if (!watching || !roomId) return;
 
     let cancelled = false;
 
@@ -103,7 +104,14 @@ export function useMyMatchInProgress(): boolean {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [watching, roomId, isBattleRoyale, isPlayer, roomMatchesSignal]);
+  }, [
+    watching,
+    roomId,
+    isBattleRoyale,
+    isPlayer,
+    roomMatchesSignal,
+    setInMatch,
+  ]);
 
-  return inMatch;
+  return watching && !!roomId && checkedInMatch;
 }

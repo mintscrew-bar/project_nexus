@@ -4,8 +4,10 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { MatchStatus } from "@nexus/database";
+import { MatchMedalService } from "../medal/match-medal.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { resolveMatchMembers } from "../match/match-roster.util";
 import { NO_TEST_BOT_MATCH_WHERE } from "../common/test-bot.util";
@@ -70,7 +72,10 @@ export async function summarizeCommendations(
  */
 @Injectable()
 export class CommendationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly matchMedals?: MatchMedalService,
+  ) {}
 
   /**
    * 아직 칭찬 창을 안 끝낸 가장 최근 경기. 없으면 null.
@@ -204,6 +209,9 @@ export class CommendationService {
         }),
       ),
     ]);
+
+    // 칭찬 창 완료·받은 칭찬 메달 정산
+    this.matchMedals?.settleMatchQuietly(dto.matchId);
 
     return { submitted: dto.commendations.length };
   }

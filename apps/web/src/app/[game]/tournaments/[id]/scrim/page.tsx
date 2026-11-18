@@ -39,6 +39,7 @@ import {
   EmptyState,
   LoadingSpinner,
 } from "@/components/ui";
+import { useQuery } from "@tanstack/react-query";
 
 type ScrimRound = {
   id: string;
@@ -93,14 +94,13 @@ export default function ScrimPage() {
   const { user } = useAuthStore();
   const room = useLobbyStore((state) => state.room);
 
-  const [scrim, setScrim] = useState<Scrim | null>(null);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [editingRound, setEditingRound] = useState<number | null>(null);
   // 자동 수집은 커스텀 매치 판별이 실측되기 전까지 서버에서 꺼둔다.
   const [collectorEnabled, setCollectorEnabled] = useState(false);
   const [ruleOpen, setRuleOpen] = useState(false);
-  const [now, setNow] = useState(Date.now());
+  // 처음 값은 한 번만 잡는다(초기값 함수) — 이후엔 1초 타이머가 갱신한다
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
@@ -109,24 +109,27 @@ export default function ScrimPage() {
   const isHost = !!user && !!room && room.hostId === user.id;
   const teams = useMemo(() => room?.teams ?? [], [room]);
 
-  const load = useCallback(async () => {
-    try {
-      setScrim(await scrimApi.getScrim(roomId));
-    } catch {
+  // 스크림 정보는 React Query 로 — 예전엔 효과에서 load() 로 setScrim·setLoading 했다
+  // (react-hooks/set-state-in-effect). 마감 시각이 있고 안 끝났으면 15초마다 다시 받는다.
+  const scrimQuery = useQuery<Scrim | null>({
+    queryKey: ["scrim", roomId],
+    queryFn: async () => (await scrimApi.getScrim(roomId)) ?? null,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return data?.cutoffAt && data.status !== "COMPLETED" ? 15_000 : false;
+    },
+  });
+  const scrim = scrimQuery.data ?? null;
+  const loading = scrimQuery.isLoading;
+  useEffect(() => {
+    if (scrimQuery.isError)
       addToast("스크림 정보를 불러오지 못했습니다.", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [roomId, addToast]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-  useEffect(() => {
-    if (!scrim?.cutoffAt || scrim.status === "COMPLETED") return;
-    const timer = setInterval(() => void load(), 15_000);
-    return () => clearInterval(timer);
-  }, [load, scrim?.cutoffAt, scrim?.status]);
+  }, [scrimQuery.isError, addToast]);
+  // 처리 뒤·소켓 알림 뒤 새로고침 — 예전 이름 그대로 둔다
+  const refetchScrim = scrimQuery.refetch;
+  const load = useCallback(async () => {
+    await refetchScrim();
+  }, [refetchScrim]);
 
   useEffect(() => {
     void scrimApi

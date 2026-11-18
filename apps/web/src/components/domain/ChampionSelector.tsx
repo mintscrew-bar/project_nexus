@@ -6,6 +6,7 @@ import { Champion } from "@/stores/ddragon-store";
 import { X, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import { getRoleIcon } from "@/lib/role-icon";
+import { useResetOn } from "@/hooks/useResetOn";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 포지션 아이콘 매핑
@@ -72,14 +73,10 @@ export function ChampionSelector({
 }: ChampionSelectorProps) {
   // 기본 탭: 라인에 맞는 태그, 없으면 '전체'
   const defaultTag = role ? (ROLE_DEFAULT_TAG[role] ?? "all") : "all";
-  const [activeTag, setActiveTag] = useState<string>(defaultTag);
+  // 라인이 바뀌면 탭 초기화(효과 없이 — useResetOn)
+  const [activeTag, setActiveTag] = useResetOn<string>(defaultTag, role);
   const [searchTerm, setSearchTerm] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
-
-  // 라인이 바뀌면 탭 초기화
-  useEffect(() => {
-    setActiveTag(role ? (ROLE_DEFAULT_TAG[role] ?? "all") : "all");
-  }, [role]);
 
   // 섹션 펼쳐질 때 검색창 포커스
   useEffect(() => {

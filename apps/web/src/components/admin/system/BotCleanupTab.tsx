@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/api-client";
 import {
   Button,
@@ -13,6 +13,8 @@ import {
 import { Bot } from "lucide-react";
 import type { AddToast } from "../shared";
 import { useConfirm } from "../ConfirmDialog";
+import { useQueryDataSetter } from "@/hooks/useQuerySetter";
+import { useQuery } from "@tanstack/react-query";
 
 /**
  * 테스트 봇이 남긴 방·기록 정리. ADMIN 전용.
@@ -22,26 +24,23 @@ import { useConfirm } from "../ConfirmDialog";
  * 정보가 끊긴 기록은 대상이 아니다. 한 번에 200건까지라 남으면 다시 누른다.
  */
 export function BotCleanupTab({ addToast }: { addToast: AddToast }) {
-  const [preview, setPreview] = useState<{
-    rooms: number;
-    matches: number;
-  } | null>(null);
+  type Preview = { rooms: number; matches: number };
   const [rooms, setRooms] = useState(true);
   const [matches, setMatches] = useState(false);
   const [busy, setBusy] = useState(false);
   const { confirm, dialog } = useConfirm();
 
-  const load = useCallback(async () => {
-    try {
-      setPreview(await adminApi.getBotCleanupPreview());
-    } catch {
-      addToast("봇 정리 현황 로드 실패", "error");
-    }
-  }, [addToast]);
-
+  // 남은 봇 방·기록 수 — React Query 로 묻고, 정리 직후엔 받은 값으로 캐시를 바꾼다(setPreview)
+  const previewKey = ["admin-bot-cleanup-preview"];
+  const previewQuery = useQuery({
+    queryKey: previewKey,
+    queryFn: () => adminApi.getBotCleanupPreview() as Promise<Preview>,
+  });
+  const preview = previewQuery.data ?? null;
+  const setPreview = useQueryDataSetter<Preview | null>(previewKey, null);
   useEffect(() => {
-    load();
-  }, [load]);
+    if (previewQuery.isError) addToast("봇 정리 현황 로드 실패", "error");
+  }, [previewQuery.isError, addToast]);
 
   const run = async () => {
     const targets = [rooms && "방", matches && "내전 기록"]

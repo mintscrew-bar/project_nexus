@@ -345,9 +345,14 @@ function BroadcastControlContent() {
     enabled: live && Boolean(roomId),
     refetchInterval: 5000,
   });
-  const matches: ControlMatch[] = previewMode
-    ? MOCK_MATCHES
-    : ((matchesQuery.data as ControlMatch[] | undefined) ?? []);
+  // 빈 배열을 그릴 때마다 새로 만들면 아래 useMemo 가 매번 다시 돈다 — 한 번 묶어 둔다
+  const matches: ControlMatch[] = useMemo(
+    () =>
+      previewMode
+        ? MOCK_MATCHES
+        : ((matchesQuery.data as ControlMatch[] | undefined) ?? []),
+    [previewMode, matchesQuery.data],
+  );
 
   // 팀·선수 — 오버레이와 같은 스냅샷(미리보기 토큰)에서 받는다
   const snapshotQuery = useQuery({

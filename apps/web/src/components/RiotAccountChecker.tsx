@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useRiotStore } from '@/stores/riot-store';
 import { AddAccountModal } from '@/components/domain/AddAccountModal';
 import { gameFromSlug } from '@nexus/types';
+import { useResetOn } from "@/hooks/useResetOn";
 
 export function RiotAccountChecker({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -13,7 +14,8 @@ export function RiotAccountChecker({ children }: { children: React.ReactNode }) 
   const { fetchAccounts } = useRiotStore();
 
   const [showModal, setShowModal] = useState(false);
-  const [checked, setChecked] = useState(false);
+  // 다른 계정으로 바뀌면 다시 확인한다(효과 없이 — useResetOn)
+  const [checked, setChecked] = useResetOn(false, user?.id);
 
   // Riot 계정 안내는 롤 화면에서만 표시한다. 배그와 공통 화면은 제외한다.
   const shouldSkip = gameFromSlug(pathname.split('/')[1]) !== 'LOL';
@@ -40,11 +42,8 @@ export function RiotAccountChecker({ children }: { children: React.ReactNode }) 
     if (isAuthenticated) {
       checkRiotAccount();
     }
-  }, [isAuthenticated, shouldSkip, checked, fetchAccounts, user?.id]);
+  }, [isAuthenticated, shouldSkip, checked, fetchAccounts, user?.id, setChecked]);
 
-  useEffect(() => {
-    setChecked(false);
-  }, [user?.id]);
 
   return (
     <>

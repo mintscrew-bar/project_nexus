@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Eye, Heart, Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type Post, formatDate } from "./community-types";
-import { resolveBoardIcon } from "@/lib/board-icons";
+import { BoardIcon } from "@/components/community/BoardIcon";
 import { useNavigationGame } from "@/hooks/useCurrentGame";
 import { GAMES } from "@nexus/types";
 
@@ -18,7 +18,6 @@ interface PostRowProps {
 export function PostRow({ post, showCategoryIcon = false }: PostRowProps) {
   const router = useRouter();
   const game = useNavigationGame();
-  const CatIcon = resolveBoardIcon(post.board?.iconName);
   const catColor = post.board?.color ?? "text-text-secondary";
   const commentCount = post._count?.comments || 0;
 
@@ -29,8 +28,8 @@ export function PostRow({ post, showCategoryIcon = false }: PostRowProps) {
       }
       className={cn(
         "grid grid-cols-12 gap-2 px-4 py-3 hover:bg-bg-tertiary cursor-pointer transition-colors border-b border-bg-elevated last:border-0",
-        post.isPinned &&
-          "border-l-2 border-l-accent-primary bg-accent-primary/5",
+        // 고정 글은 옅은 바탕으로만 구분한다(왼쪽 색 막대 금지 — CLAUDE.md)
+        post.isPinned && "bg-accent-primary/5",
       )}
     >
       {/* 제목 열 */}
@@ -39,7 +38,10 @@ export function PostRow({ post, showCategoryIcon = false }: PostRowProps) {
           <Pin className="h-3.5 w-3.5 text-accent-primary flex-shrink-0" />
         )}
         {showCategoryIcon && (
-          <CatIcon className={cn("h-3.5 w-3.5 flex-shrink-0", catColor)} />
+          <BoardIcon
+            name={post.board?.iconName}
+            className={cn("h-3.5 w-3.5 flex-shrink-0", catColor)}
+          />
         )}
         <h3
           className={cn(

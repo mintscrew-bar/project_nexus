@@ -2,21 +2,27 @@
 
 import Link from "next/link";
 import { ArrowRight, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useIsClient } from "@/hooks/useIsClient";
 
 const DISMISSED_KEY = "nexus_creator_promo_dismissed";
 
-export function CreatorPromoStrip() {
-  const [isVisible, setIsVisible] = useState<boolean | null>(null);
+/** 이번 세션에 이미 닫았는가 — 저장소를 쓸 수 없으면 계속 보인다 */
+function wasDismissed(): boolean {
+  try {
+    return sessionStorage.getItem(DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
-  useEffect(() => {
-    try {
-      setIsVisible(sessionStorage.getItem(DISMISSED_KEY) !== "1");
-    } catch {
-      // 저장소를 사용할 수 없는 환경에서는 현재 세션에 계속 표시한다.
-      setIsVisible(true);
-    }
-  }, []);
+export function CreatorPromoStrip() {
+  // 하이드레이션 전엔 자리만 잡아 두고, 그 뒤엔 저장소를 그릴 때 읽는다
+  // (예전엔 효과에서 읽어 setState — react-hooks/set-state-in-effect).
+  const isClient = useIsClient();
+  // 이번에 닫기를 눌렀는지 — 저장소를 못 쓰는 환경에서도 바로 사라지게
+  const [dismissedNow, setDismissedNow] = useState(false);
+  const isVisible = isClient ? !dismissedNow && !wasDismissed() : null;
 
   if (isVisible === null) {
     return <div className="min-h-12 flex-shrink-0 border-b border-white/[0.06] bg-bg-secondary" aria-hidden="true" />;
@@ -24,7 +30,7 @@ export function CreatorPromoStrip() {
   if (!isVisible) return null;
 
   const dismiss = () => {
-    setIsVisible(false);
+    setDismissedNow(true);
     try {
       sessionStorage.setItem(DISMISSED_KEY, "1");
     } catch {

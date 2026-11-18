@@ -5,7 +5,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import Image from "next/image";
 import {
   ClanEmblem,
@@ -50,6 +54,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useQueryDataSetter } from "@/hooks/useQuerySetter";
 
 const CLAN_TIERS = [
   "IRON",
@@ -212,9 +217,6 @@ export default function ClanSettingsPage() {
   const clanId = params.id as string;
   const { user, isAuthenticated } = useAuthStore();
 
-  const [clan, setClan] = useState<Clan | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [myRole, setMyRole] = useState<"OWNER" | "OFFICER" | "MEMBER" | null>(null);
 
   // ── 정보 수정 폼 상태 ──
   const [name, setName] = useState("");
@@ -246,24 +248,12 @@ export default function ClanSettingsPage() {
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [inviteSearchQuery, setInviteSearchQuery] = useState("");
   const [isInviting, setIsInviting] = useState(false);
-  const [inviteSearchResults, setInviteSearchResults] = useState<UserSearchResult[]>([]);
-  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
-  const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
-  const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
   const [cancelingInvitationId, setCancelingInvitationId] = useState<string | null>(null);
 
   // ── 가입 요청 상태 ──
-  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
-  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   const [resolvingRequestId, setResolvingRequestId] = useState<string | null>(null);
   const [selectedJoinRequestIds, setSelectedJoinRequestIds] = useState<Set<string>>(new Set());
   const [isBulkResolvingRequests, setIsBulkResolvingRequests] = useState(false);
-
-  // ── 활동 로그 상태 ──
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [logCursor, setLogCursor] = useState<string | null>(null);
-  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-  const [hasMoreLogs, setHasMoreLogs] = useState(false);
 
   // ── 확인 모달 상태 ──
   const [kickTarget, setKickTarget] = useState<ClanMember | null>(null);
@@ -282,132 +272,123 @@ export default function ClanSettingsPage() {
   // ─────────────────────────────────────────────────────────────
   // 데이터 로딩
   // ─────────────────────────────────────────────────────────────
+  // 서버 조회는 모두 React Query 로 — 예전엔 효과에서 fetchX() 를 불러 setLoading·setData
+  // 했다(react-hooks/set-state-in-effect). 처리 뒤 새로고침은 예전 이름(fetchX)을 그대로 둔다.
+
+  // ── 클랜 정보 ──
+  const clanQuery = useQuery<Clan>({
+    queryKey: ["clan-settings", clanId],
+    enabled: isAuthenticated,
+    queryFn: () => clanApi.getClan(clanId),
+  });
+  const clan = clanQuery.data ?? null;
+  // 로그인 확인 전(조회 꺼짐)에도 로딩 화면을 보이도록 isPending
+  const isLoading = clanQuery.isPending;
+  const membership = user
+    ? clan?.members.find((m: ClanMember) => m.userId === user.id)
+    : undefined;
+  const myRole: "OWNER" | "OFFICER" | "MEMBER" | null =
+    (membership?.role as "OWNER" | "OFFICER" | "MEMBER" | undefined) || null;
+  const canManage = !!myRole && myRole !== "MEMBER";
+  const refetchClan = clanQuery.refetch;
   const fetchClan = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await clanApi.getClan(clanId);
-      setClan(data);
+    await refetchClan();
+  }, [refetchClan]);
 
-      if (user) {
-        const membership = data.members.find(
-          (m: ClanMember) => m.userId === user.id
-        );
-        const role = membership?.role || null;
-        setMyRole(role);
+  // 폼 초기값 — 새 응답이 올 때마다(처음·저장 뒤 새로고침) 서버 값으로 맞춘다.
+  // 효과 대신 그리는 중에 "어느 응답으로 채웠는지" 를 비교해 바로 고친다(React 문서의
+  // "prop 이 바뀔 때 상태 조정" 방식).
+  const [formFilledAt, setFormFilledAt] = useState(0);
+  if (clanQuery.data && clanQuery.dataUpdatedAt !== formFilledAt) {
+    const data = clanQuery.data;
+    setFormFilledAt(clanQuery.dataUpdatedAt);
+    setName(data.name || "");
+    setDescription(data.description || "");
+    setDiscord(data.discord || "");
+    setIsRecruiting(data.isRecruiting);
+    setMinTier(data.minTier || "");
+    setMaxMembers(String(data.maxMembers ?? 50));
+    setAccentColor(data.accentColor || DEFAULT_CLAN_ACCENT);
+    setOfficerCanManageSettings(data.officerCanManageSettings);
+    setOfficerCanManageMembers(data.officerCanManageMembers);
+    setOfficerCanManageAnnouncements(data.officerCanManageAnnouncements);
+    setOfficerCanManageInvitations(data.officerCanManageInvitations);
+  }
 
-        // 관리 권한이 없으면 클랜 페이지로 이동
-        if (!role || role === "MEMBER") {
-          router.push(`/clans/${clanId}`);
-          return;
-        }
-      }
+  // 로그인 안 했으면 로그인으로, 관리 권한이 없거나 못 불러오면 클랜 페이지로 (이동만 — 상태 없음)
+  const lacksPermission = !!clan && !!user && !canManage;
+  useEffect(() => {
+    if (!isAuthenticated) router.push("/auth/login");
+    else if (lacksPermission) router.push(`/clans/${clanId}`);
+  }, [isAuthenticated, lacksPermission, router, clanId]);
+  useEffect(() => {
+    if (!clanQuery.isError) return;
+    addToast("클랜 정보를 불러오는데 실패했습니다.", "error");
+    router.push(`/clans/${clanId}`);
+  }, [clanQuery.isError, addToast, router, clanId]);
 
-      // 폼 초기값 세팅
-      setName(data.name || "");
-      setDescription(data.description || "");
-      setDiscord(data.discord || "");
-      setIsRecruiting(data.isRecruiting);
-      setMinTier(data.minTier || "");
-      setMaxMembers(String(data.maxMembers ?? 50));
-      setAccentColor(data.accentColor || DEFAULT_CLAN_ACCENT);
-      setOfficerCanManageSettings(data.officerCanManageSettings);
-      setOfficerCanManageMembers(data.officerCanManageMembers);
-      setOfficerCanManageAnnouncements(data.officerCanManageAnnouncements);
-      setOfficerCanManageInvitations(data.officerCanManageInvitations);
-    } catch {
-      addToast("클랜 정보를 불러오는데 실패했습니다.", "error");
-      router.push(`/clans/${clanId}`);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clanId, user, router, addToast]);
+  // ── 가입 요청 목록 (관리 권한이 있을 때만) ──
+  const joinRequestsKey = ["clan-settings", clanId, "join-requests"];
+  const joinRequestsQuery = useQuery<JoinRequest[]>({
+    queryKey: joinRequestsKey,
+    enabled: canManage,
+    queryFn: () => clanApi.getPendingJoinRequests(clanId),
+  });
+  const joinRequests = joinRequestsQuery.data ?? [];
+  const setJoinRequests = useQueryDataSetter<JoinRequest[]>(joinRequestsKey, []);
+  const isLoadingRequests = joinRequestsQuery.isLoading;
 
-  // 가입 요청 목록 로드
-  const fetchJoinRequests = useCallback(async () => {
-    setIsLoadingRequests(true);
-    try {
-      const data = await clanApi.getPendingJoinRequests(clanId);
-      setJoinRequests(data);
-    } catch {
-      // 조용히 처리
-    } finally {
-      setIsLoadingRequests(false);
-    }
-  }, [clanId]);
+  // ── 보낸 초대 목록 ──
+  const sentInvitationsKey = ["clan-settings", clanId, "sent-invitations"];
+  const sentInvitationsQuery = useQuery<SentInvitation[]>({
+    queryKey: sentInvitationsKey,
+    enabled: canManage,
+    queryFn: () => clanApi.getSentInvitations(clanId),
+  });
+  const sentInvitations = sentInvitationsQuery.data ?? [];
+  const setSentInvitations = useQueryDataSetter<SentInvitation[]>(
+    sentInvitationsKey,
+    [],
+  );
+  const isLoadingInvitations = sentInvitationsQuery.isLoading;
+  const refetchSentInvitations = sentInvitationsQuery.refetch;
+  const fetchSentInvitations = useCallback(() => {
+    void refetchSentInvitations();
+  }, [refetchSentInvitations]);
 
-  const fetchSentInvitations = useCallback(async () => {
-    setIsLoadingInvitations(true);
-    try {
-      const data = await clanApi.getSentInvitations(clanId);
-      setSentInvitations(data);
-    } catch {
-      // 조용히 처리
-    } finally {
-      setIsLoadingInvitations(false);
-    }
-  }, [clanId]);
-
-  const searchInviteCandidates = useCallback(async (query: string) => {
-    const normalized = query.trim();
-    if (normalized.length < 2) {
-      setInviteSearchResults([]);
-      return;
-    }
-
-    setIsSearchingUsers(true);
-    try {
-      const data = await statsApi.searchUsers(normalized, 8);
-      setInviteSearchResults(data);
-    } catch {
-      setInviteSearchResults([]);
-    } finally {
-      setIsSearchingUsers(false);
-    }
-  }, []);
-
-  // 활동 로그 로드 (커서 페이지네이션)
-  const fetchActivityLogs = useCallback(
-    async (cursor?: string) => {
-      setIsLoadingLogs(true);
+  // ── 초대할 유저 검색 (두 글자 이상, 입력이 멈춘 뒤) ──
+  const normalizedInviteQuery = debouncedInviteSearchQuery.trim();
+  const inviteSearchQueryResult = useQuery<UserSearchResult[]>({
+    queryKey: ["clan-settings", "invite-search", normalizedInviteQuery],
+    enabled: normalizedInviteQuery.length >= 2,
+    queryFn: async () => {
       try {
-        const result = await clanApi.getActivityLogs(clanId, cursor, 20);
-        if (cursor) {
-          // "더 보기" 로드 — 기존 로그 뒤에 추가
-          setActivityLogs((prev) => [...prev, ...result.logs]);
-        } else {
-          // 최초 로드
-          setActivityLogs(result.logs);
-        }
-        setLogCursor(result.nextCursor);
-        setHasMoreLogs(!!result.nextCursor);
+        return await statsApi.searchUsers(normalizedInviteQuery, 8);
       } catch {
-        // 조용히 처리
-      } finally {
-        setIsLoadingLogs(false);
+        return [];
       }
     },
-    [clanId]
-  );
+  });
+  // 입력을 지우면(초대 직후 포함) 지연 없이 바로 비운다
+  const inviteSearchResults =
+    inviteSearchQuery.trim().length < 2
+      ? []
+      : (inviteSearchQueryResult.data ?? []);
+  const isSearchingUsers = inviteSearchQueryResult.isFetching;
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/auth/login");
-      return;
-    }
-    fetchClan();
-  }, [isAuthenticated, fetchClan, router]);
-
-  useEffect(() => {
-    if (myRole && myRole !== "MEMBER") {
-      fetchJoinRequests();
-      fetchSentInvitations();
-      fetchActivityLogs();
-    }
-  }, [myRole, fetchJoinRequests, fetchSentInvitations, fetchActivityLogs]);
-
-  useEffect(() => {
-    searchInviteCandidates(debouncedInviteSearchQuery);
-  }, [debouncedInviteSearchQuery, searchInviteCandidates]);
+  // ── 활동 로그 (커서 페이지네이션 — "더 보기" 로 다음 쪽을 이어 붙인다) ──
+  const logsQuery = useInfiniteQuery({
+    queryKey: ["clan-settings", clanId, "activity-logs"],
+    enabled: canManage,
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => clanApi.getActivityLogs(clanId, pageParam, 20),
+    getNextPageParam: (last: { nextCursor?: string | null }) =>
+      last.nextCursor ?? undefined,
+  });
+  const activityLogs: ActivityLog[] =
+    logsQuery.data?.pages.flatMap((page) => page.logs as ActivityLog[]) ?? [];
+  const hasMoreLogs = !!logsQuery.hasNextPage;
+  const isLoadingLogs = logsQuery.isFetching;
 
   // ─────────────────────────────────────────────────────────────
   // 클랜 정보 수정
@@ -624,7 +605,6 @@ export default function ClanSettingsPage() {
       await clanApi.inviteUser(clanId, inviteeId);
       addToast("초대를 보냈습니다.", "success");
       setInviteSearchQuery("");
-      setInviteSearchResults([]);
       fetchSentInvitations();
     } catch (err: any) {
       addToast(
@@ -1774,7 +1754,7 @@ export default function ClanSettingsPage() {
                         variant="ghost"
                         size="sm"
                         isLoading={isLoadingLogs}
-                        onClick={() => fetchActivityLogs(logCursor ?? undefined)}
+                        onClick={() => void logsQuery.fetchNextPage()}
                       >
                         더 보기
                       </Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { statsApi, matchApi } from "@/lib/api-client";
 import {
@@ -82,7 +82,8 @@ export default function RiotMatchList({
   );
   const [selectedQueueId, setSelectedQueueId] = useState<number | undefined>(undefined);
   const [expandedMatches, setExpandedMatches] = useState<Set<string>>(new Set());
-  const mountedMatchesRef = useRef(new Set<string>());
+  // 한 번이라도 펼친 경기 — 접어도 상세 내용을 살려 둔다. 그릴 때 읽으므로 ref 가 아니라 상태
+  const [mountedMatches, setMountedMatches] = useState<Set<string>>(new Set());
   const [matchDetailTabs, setMatchDetailTabs] = useState<Map<string, 'teams' | 'build' | 'stats' | 'timeline'>>(new Map());
   const [statsSubTabs, setStatsSubTabs] = useState<Map<string, 'combat' | 'farm' | 'vision'>>(new Map());
   const [timelineData, setTimelineData] = useState<Map<string, any>>(new Map());
@@ -125,12 +126,12 @@ export default function RiotMatchList({
     setMatchDetailTabs(new Map());
     setStatsSubTabs(new Map());
     setTimelineData(new Map());
-    mountedMatchesRef.current = new Set();
+    setMountedMatches(new Set());
   };
 
   const toggleMatchExpand = (matchId: string) => {
-    if (!expandedMatches.has(matchId)) {
-      mountedMatchesRef.current.add(matchId);
+    if (!mountedMatches.has(matchId)) {
+      setMountedMatches((prev) => new Set(prev).add(matchId));
     }
     setExpandedMatches(prev => {
       const newSet = new Set(prev);
@@ -534,7 +535,7 @@ export default function RiotMatchList({
                 </div>
 
                 {/* 내전 판: 넥서스 내전 상세를 펼친다 (어느 목록에서 열든 같은 모양) */}
-                {mountedMatchesRef.current.has(matchId) && nexusMatchId && (
+                {mountedMatches.has(matchId) && nexusMatchId && (
                   <div style={{ display: 'grid', gridTemplateRows: isExpanded ? '1fr' : '0fr', transition: 'grid-template-rows 0.2s ease' }}>
                     <div className="overflow-hidden">
                       <div className="border-t border-bg-tertiary/40 p-3 sm:p-4">
@@ -545,7 +546,7 @@ export default function RiotMatchList({
                 )}
 
                 {/* Expanded Content */}
-                {mountedMatchesRef.current.has(matchId) && !nexusMatchId && (
+                {mountedMatches.has(matchId) && !nexusMatchId && (
                   <div style={{ display: 'grid', gridTemplateRows: isExpanded ? '1fr' : '0fr', transition: 'grid-template-rows 0.2s ease' }}>
                   <div className="overflow-hidden"><div className="border-t border-bg-tertiary/40">
                     <div className="flex border-b border-bg-tertiary bg-bg-tertiary/30">

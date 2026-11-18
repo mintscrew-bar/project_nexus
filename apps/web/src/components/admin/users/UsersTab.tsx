@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { adminApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import {
@@ -38,6 +38,8 @@ import {
   PRESENCE_VARIANTS,
 } from "./user-types";
 import { UserDetailContent, RiotAccountsCell } from "./UserDetail";
+import { useQueryFieldSetter } from "@/hooks/useQuerySetter";
+import { useQuery } from "@tanstack/react-query";
 
 export function UsersTab({
   addToast,
@@ -48,8 +50,6 @@ export function UsersTab({
   currentUserId?: string;
   isAdmin: boolean;
 }) {
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [kind, setKind] = useState<UserKindFilter>("users");
   const [roleFilter, setRoleFilter] = useState<UserRoleFilter>("all");
@@ -58,9 +58,8 @@ export function UsersTab({
     useState<UserPresenceFilter>("all");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [rawSelectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<"ban" | "restrict" | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [banModal, setBanModal] = useState<AdminUser | null>(null);
@@ -78,12 +77,22 @@ export function UsersTab({
   const [msgBusy, setMsgBusy] = useState(false);
 
   const limit = 20;
-  const totalPages = Math.ceil(total / limit);
-
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await adminApi.getUsers({
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setUsers 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 권한·제재 처리 직후엔 캐시를 바로 고친다(setUsers).
+  type UsersPage = { users: AdminUser[]; total: number };
+  const usersKey = [
+    "admin-users",
+    page,
+    search,
+    kind,
+    roleFilter,
+    statusFilter,
+    presenceFilter,
+  ];
+  const usersQuery = useQuery({
+    queryKey: usersKey,
+    queryFn: () =>
+      adminApi.getUsers({
         page,
         limit,
         search: search || undefined,
@@ -91,26 +100,25 @@ export function UsersTab({
         role: roleFilter === "all" ? undefined : roleFilter,
         statusFilter: statusFilter === "all" ? undefined : statusFilter,
         presence: presenceFilter === "all" ? undefined : presenceFilter,
-      });
-      setUsers(data.users);
-      setTotal(data.total);
-    } catch {
-      addToast("유저 목록 로드 실패", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search, kind, roleFilter, statusFilter, presenceFilter, addToast]);
-
+      }) as Promise<UsersPage>,
+  });
+  const users = useMemo(() => usersQuery.data?.users ?? [], [usersQuery.data]);
+  const total = usersQuery.data?.total ?? 0;
+  const totalPages = Math.ceil(total / limit);
+  const loading = usersQuery.isLoading;
+  const setUsers = useQueryFieldSetter<UsersPage, "users">(usersKey, "users");
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    if (usersQuery.isError) addToast("유저 목록 로드 실패", "error");
+  }, [usersQuery.isError, addToast]);
 
-  useEffect(() => {
-    setSelectedIds((prev) => {
-      const visibleIds = new Set(users.map((u) => u.id));
-      return new Set(Array.from(prev).filter((id) => visibleIds.has(id)));
-    });
-  }, [users]);
+  // 고른 사람 중 지금 목록에 보이는 사람만 — 페이지·필터가 바뀌면 안 보이는 사람은 빠진다.
+  // 예전엔 효과에서 걸러 다시 넣었는데(set-state-in-effect), 그릴 때 거르면 같다.
+  const selectedIds = useMemo(() => {
+    const visibleIds = new Set(users.map((u) => u.id));
+    return new Set(
+      Array.from(rawSelectedIds).filter((id) => visibleIds.has(id)),
+    );
+  }, [rawSelectedIds, users]);
 
   const canModerateUser = useCallback(
     (u: AdminUser) => u.id !== currentUserId && (isAdmin || u.role === "USER"),

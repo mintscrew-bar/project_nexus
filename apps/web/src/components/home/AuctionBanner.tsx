@@ -8,6 +8,7 @@ import {
   bannerGlowGradient,
 } from "./banner-constants";
 import { useGamePrefix } from "@/hooks/useCurrentGame";
+import { useResetOn } from "@/hooks/useResetOn";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 상수 정의
@@ -88,24 +89,22 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
   const [isHovered, setIsHovered] = useState(false);
 
   // 현재 표시 중인 입찰 이벤트 인덱스 (순차 등장)
-  const [bidIndex, setBidIndex] = useState(0);
+  // 슬라이드가 켜지고 꺼질 때마다 0으로 돌아간다(효과 없이 — useResetOn)
+  const [bidIndex, setBidIndex] = useResetOn(0, isActive);
 
   // 입찰가 카운터 — 최신 입찰 로그와 동기화
   const currentBid = BID_COUNT_STEPS[Math.max(bidIndex - 1, 0)];
 
   // 슬라이드가 활성화될 때마다 입찰 이벤트 재시작
   useEffect(() => {
-    if (!isActive) {
-      setBidIndex(0);
-      return;
-    }
+    if (!isActive) return;
 
     // 각 입찰 이벤트를 시간차로 등장시킴
     const ids = BID_EVENTS.map((evt, i) =>
       setTimeout(() => setBidIndex(i + 1), evt.delay),
     );
     return () => ids.forEach(clearTimeout);
-  }, [isActive]);
+  }, [isActive, setBidIndex]);
 
   return (
     <Link

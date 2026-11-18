@@ -25,6 +25,9 @@ import { AuctionLotDetails } from "./AuctionLotDetails";
 import { ChampionIcon } from "@/app/[game]/tournaments/[id]/lobby/_components/icons";
 import type { RoleTier } from "@/lib/role-tier";
 import { DEFAULT_GAME, GAMES } from "@nexus/types";
+import { UserName } from "@/components/cosmetics/UserName";
+import { useSecondsLeft } from "@/hooks/useSecondsLeft";
+import { useBidAccumulator } from "@/hooks/useBidAccumulator";
 
 interface Player {
   id: string;
@@ -173,7 +176,6 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const getTeamBudget = (team?: Team | null) =>
     team?.remainingGold ?? team?.remainingBudget ?? 0;
 
-  const [accumulatedBid, setAccumulatedBid] = useState<number>(0);
   const [isBidding, setIsBidding] = useState(false);
   const currentTeam = sortedTeams.find((t) => t.captainId === currentUserId);
   const canCurrentUserBid =
@@ -190,6 +192,12 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const slotsNeeded = Math.max(0, teamSize - memberCount);
   const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
   const availableBudget = Math.max(0, myBudget - reserveAmount);
+  // 쌓은 추가 입찰액 — 경매 대상 선수가 바뀔 때만 0(다른 사람 입찰 시에는 유지),
+  // 예산을 넘으면 잘라 보인다(예비금 반영). 예전엔 효과 둘에서 setAccumulatedBid 했다.
+  const [accumulatedBid, setAccumulatedBid] = useBidAccumulator(
+    auctionState.currentPlayer?.id,
+    Math.max(0, availableBudget - auctionState.currentHighestBid),
+  );
   const totalBid = auctionState.currentHighestBid + accumulatedBid;
   const canPlaceBid =
     accumulatedBid > 0 && totalBid <= availableBudget && !isBidding;
@@ -216,7 +224,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
   const scheduleHoverClose = useCallback(() => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => setHoveredPlayer(null), 80);
-  }, []);
+  }, [setHoveredPlayer]);
 
   // 300ms 대기 후 카드 표시 — 마우스 스쳐 지나가는 경우 불필요한 표시 방지
   const handlePlayerHover = useCallback(
@@ -228,7 +236,7 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
         300,
       );
     },
-    [cancelHoverClose],
+    [cancelHoverClose, setHoveredPlayer],
   );
 
   const [teamsExpanded, setTeamsExpanded] = useState(true);
@@ -244,34 +252,8 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
       return next;
     });
   }, []);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const calculateTimeLeft = useCallback(
-    () => Math.max(0, Math.ceil((auctionState.timerEnd - Date.now()) / 1000)),
-    [auctionState.timerEnd],
-  );
-
-  React.useEffect(() => {
-    setTimeLeft(calculateTimeLeft());
-    const interval = setInterval(() => {
-      // Math.ceil: 9.1초 남았을 때 "9" 아닌 "10" 표시 — 숫자가 느리게 내려가는 자연스러운 카운트다운
-      setTimeLeft(calculateTimeLeft());
-    }, 100);
-    return () => clearInterval(interval);
-  }, [calculateTimeLeft]);
-
-  // 경매 대상 선수가 바뀔 때만 accumulated 리셋 (다른 사람 입찰 시에는 유지)
-  React.useEffect(() => {
-    setAccumulatedBid(0);
-  }, [auctionState.currentPlayer?.id]);
-
-  // 예산 초과 시 accumulated를 자동 클램핑 (예비금 반영)
-  React.useEffect(() => {
-    const maxAccumulated = Math.max(
-      0,
-      availableBudget - auctionState.currentHighestBid,
-    );
-    setAccumulatedBid((prev) => Math.min(prev, maxAccumulated));
-  }, [auctionState.currentHighestBid, availableBudget]);
+  // 남은 초 — 그릴 때 계산(예전엔 효과에서 setTimeLeft, react-hooks/set-state-in-effect)
+  const timeLeft = useSecondsLeft(auctionState.timerEnd);
 
   const handleBid = async () => {
     if (!canPlaceBid || isBidding) return;
@@ -398,7 +380,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                   현재 매물 · 팀장 동시 입찰
                 </p>
                 <p className="truncate font-bold text-text-primary">
-                  {auctionState.currentPlayer.username}
+                  <UserName userId={auctionState.currentPlayer.id}>
+                    {auctionState.currentPlayer.username}
+                  </UserName>
                 </p>
               </div>
               <TierBadge
@@ -917,7 +901,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                             />
                             <div className="flex-1 min-w-0">
                               <p className="text-base font-semibold text-text-primary truncate">
-                                {player.username}
+                                <UserName userId={player.id}>
+                                  {player.username}
+                                </UserName>
                               </p>
                               <p className="text-sm text-text-secondary">
                                 {getPlayerPosition(player)}
@@ -1074,7 +1060,9 @@ export const AuctionBoard: React.FC<AuctionBoardProps> = ({
                               size="sm"
                             />
                             <span className="font-semibold text-text-primary truncate flex-1 text-sm">
-                              {player.username}
+                              <UserName userId={player.id}>
+                                {player.username}
+                              </UserName>
                             </span>
                             <TierBadge
                               tier={player.tier}

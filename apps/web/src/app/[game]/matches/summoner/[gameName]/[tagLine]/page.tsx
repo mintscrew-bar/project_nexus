@@ -98,6 +98,8 @@ export default function SummonerStatsPage() {
   );
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // 「n분 전」 표시의 기준 시각 — 그릴 때마다 Date.now() 를 부르지 않고 화면을 연 시각으로 잡는다
+  const [openedAt] = useState(() => Date.now());
   const [refreshCooldown, setRefreshCooldown] = useState(0); // 갱신 쿨다운 (초)
   const [searchInput, setSearchInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
@@ -383,7 +385,7 @@ export default function SummonerStatsPage() {
   const formatRelativeTime = (value?: string | null) => {
     if (!value) return "기록 없음";
 
-    const diffMs = Date.now() - new Date(value).getTime();
+    const diffMs = openedAt - new Date(value).getTime();
     const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
 
     if (diffMinutes < 1) return "방금 전";

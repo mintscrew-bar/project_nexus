@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Play, Square, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { adminApi } from "@/lib/api-client";
 import { Button, Card, CardContent } from "@/components/ui";
+import { useQuery } from "@tanstack/react-query";
 
 /**
  * 경매 리허설 탭.
@@ -53,31 +54,24 @@ export function RehearsalTab({
 }: {
   addToast: (message: string, type?: "success" | "error" | "info") => void;
 }) {
-  const [status, setStatus] = useState<RehearsalStatus | null>(null);
   const [count, setCount] = useState(20);
   const [mode, setMode] = useState<"light" | "full">("full");
   const [bidTime, setBidTime] = useState(20);
   const [busy, setBusy] = useState(false);
   const logRef = useRef<HTMLDivElement | null>(null);
 
-  const refresh = useCallback(async () => {
-    try {
-      setStatus(await adminApi.getRehearsalStatus());
-    } catch {
-      // 폴링 실패는 조용히 넘긴다 — 다음 주기에 다시 묻는다.
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  // 돌고 있을 때만 짧은 주기로 따라간다. 멈춰 있으면 굳이 두드리지 않는다.
-  useEffect(() => {
-    if (!status?.running) return;
-    const timer = setInterval(() => void refresh(), 1000);
-    return () => clearInterval(timer);
-  }, [status?.running, refresh]);
+  // 리허설 상태 — React Query 로 묻고, 돌고 있을 때만 1초마다 따라간다(멈춰 있으면 두드리지 않는다).
+  // 폴링 실패는 조용히 넘긴다 — 다음 주기에 다시 묻는다.
+  const statusQuery = useQuery({
+    queryKey: ["admin-rehearsal-status"],
+    queryFn: () => adminApi.getRehearsalStatus() as Promise<RehearsalStatus>,
+    refetchInterval: (q) => (q.state.data?.running ? 1000 : false),
+    staleTime: 0,
+  });
+  const status = statusQuery.data ?? null;
+  const refresh = async () => {
+    await statusQuery.refetch();
+  };
 
   // 새 줄이 쌓이면 로그를 아래로 따라 내린다.
   useEffect(() => {

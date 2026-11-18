@@ -16,6 +16,7 @@ import {
   teamDisplayName,
   useBroadcastLook,
 } from "./look";
+import { useResetOn } from "@/hooks/useResetOn";
 
 /**
  * Nexus Broadcast HUD scenes.
@@ -931,12 +932,13 @@ export function MatchScene({ snapshot }: { snapshot: any }) {
  */
 function SideResultBanner({ result }: { result?: any }) {
   const hideAt: number | undefined = result?.hideAt;
-  const [leaving, setLeaving] = useState(false);
-  const [gone, setGone] = useState(false);
+  // 새 속보(hideAt·id 가 바뀜)가 오면 다시 보이는 상태로 — 예전엔 효과에서 되돌렸다
+  // (react-hooks/set-state-in-effect)
+  const bannerKey = `${hideAt}:${result?.id}`;
+  const [leaving, setLeaving] = useResetOn(false, bannerKey);
+  const [gone, setGone] = useResetOn(false, bannerKey);
 
   useEffect(() => {
-    setLeaving(false);
-    setGone(false);
     if (!hideAt) return;
 
     // 나가는 애니메이션(450ms)을 먼저 돌리고 실제로 걷는다.
@@ -950,7 +952,7 @@ function SideResultBanner({ result }: { result?: any }) {
       clearTimeout(leaveTimer);
       clearTimeout(goneTimer);
     };
-  }, [hideAt, result?.id]);
+  }, [hideAt, result?.id, setLeaving, setGone]);
 
   if (!result || gone) return null;
 

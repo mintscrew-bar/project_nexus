@@ -29,7 +29,7 @@ import {
   Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { resolveBoardIcon } from "@/lib/board-icons";
+import { BoardIcon } from "@/components/community/BoardIcon";
 import {
   POSTS_PER_PAGE,
   type Post,
@@ -330,9 +330,6 @@ function CommunityPageContent() {
   const categoryTitle = selectedBoard
     ? (selectedBoard.fullName ?? selectedBoard.name)
     : null;
-  const CategoryIcon = selectedBoard
-    ? resolveBoardIcon(selectedBoard.iconName)
-    : null;
   const categoryColor = selectedBoard?.color ?? null;
 
   return (
@@ -349,9 +346,10 @@ function CommunityPageContent() {
         />
 
         {/* ── 카테고리 헤더 ── */}
-        {categoryTitle && CategoryIcon ? (
+        {categoryTitle && selectedBoard ? (
           <div className="mb-4 flex items-center gap-2">
-            <CategoryIcon
+            <BoardIcon
+              name={selectedBoard.iconName}
               className={cn("h-5 w-5 flex-shrink-0", categoryColor)}
             />
             <h1 className="truncate text-lg font-bold text-text-primary">

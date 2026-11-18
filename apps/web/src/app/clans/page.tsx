@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
@@ -204,12 +204,7 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
   const gameTitle = useClanGame();
   const gameQuery = `game=${gameTitle.toLowerCase()}`;
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuthStore();
-  const clanRequestIdRef = useRef(0);
-
-  const [clans, setClans] = useState<Clan[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated, user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [showRecruitingOnly, setShowRecruitingOnly] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>("latest");
@@ -219,46 +214,39 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
   const [joiningClanId, setJoiningClanId] = useState<string | null>(null);
   // 초대 코드로 가입 모달 표시 여부
   const [showJoinByCodeModal, setShowJoinByCodeModal] = useState(false);
-  // 내 클랜 가입 여부 — 가입돼 있으면 만들기 버튼 숨김
-  const [hasMyClan, setHasMyClan] = useState<boolean | null>(
-    knownHasMyClan ?? null,
-  );
   const { addToast } = useToast();
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  const fetchClans = useCallback(async () => {
-    const requestId = ++clanRequestIdRef.current;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await clanApi.getClans({
-        gameTitle,
-        search: debouncedSearchQuery || undefined,
-        isRecruiting: showRecruitingOnly || undefined,
-        minTier: gameTitle === "LOL" ? minTierFilter || undefined : undefined,
-        recruitRoles:
-          gameTitle === "LOL" && recruitRoleFilter.length
-            ? recruitRoleFilter.join(",")
-            : undefined,
-        sort: sortOption,
-      });
-      if (requestId === clanRequestIdRef.current) setClans(data);
-    } catch (err: any) {
-      if (requestId === clanRequestIdRef.current) {
-        setError(err.message || "클랜 목록을 불러오는데 실패했습니다.");
-      }
-    } finally {
-      if (requestId === clanRequestIdRef.current) setIsLoading(false);
-    }
-  }, [
-    debouncedSearchQuery,
-    showRecruitingOnly,
-    minTierFilter,
-    recruitRoleFilter,
-    sortOption,
+  // 클랜 목록은 React Query 로 — 조건이 바뀌면 키가 바뀌어 새로 불러오고, 늦게 온 옛 응답은
+  // 알아서 버려진다(예전엔 요청 번호 ref 로 막고 효과에서 setIsLoading·setClans —
+  // react-hooks/set-state-in-effect).
+  const clanFilters = {
     gameTitle,
-  ]);
+    search: debouncedSearchQuery || undefined,
+    isRecruiting: showRecruitingOnly || undefined,
+    minTier: gameTitle === "LOL" ? minTierFilter || undefined : undefined,
+    recruitRoles:
+      gameTitle === "LOL" && recruitRoleFilter.length
+        ? recruitRoleFilter.join(",")
+        : undefined,
+    sort: sortOption,
+  };
+  const clansQuery = useQuery<Clan[]>({
+    queryKey: ["clans", "list", clanFilters],
+    queryFn: () => clanApi.getClans(clanFilters),
+  });
+  const clans = clansQuery.data ?? [];
+  const isLoading = clansQuery.isLoading;
+  const error = clansQuery.isError
+    ? (clansQuery.error as Error)?.message ||
+      "클랜 목록을 불러오는데 실패했습니다."
+    : null;
+  // 검색 버튼·만든 뒤 새로고침 — 예전 이름 그대로 둔다
+  const refetchClans = clansQuery.refetch;
+  const fetchClans = useCallback(() => {
+    void refetchClans();
+  }, [refetchClans]);
 
   // 모집 포지션 토글
   const toggleRecruitRole = (role: string) => {
@@ -267,25 +255,23 @@ function ClanExplorer({ knownHasMyClan }: ClanExplorerProps = {}) {
     );
   };
 
-  useEffect(() => {
-    fetchClans();
-  }, [fetchClans]);
-
-  // 내 클랜 가입 여부 조회 (만들기 버튼 노출 조건)
-  useEffect(() => {
-    if (knownHasMyClan !== undefined) {
-      setHasMyClan(knownHasMyClan);
-      return;
-    }
-    if (!isAuthenticated) {
-      setHasMyClan(false);
-      return;
-    }
-    clanApi
-      .getMyClan(gameTitle)
-      .then((c) => setHasMyClan(!!c))
-      .catch(() => setHasMyClan(false));
-  }, [gameTitle, isAuthenticated, knownHasMyClan]);
+  // 내 클랜 가입 여부 — 가입돼 있으면 만들기 버튼 숨김. 부모가 이미 알면 그 값을 쓰고,
+  // 모르면 부모와 같은 키로 조회한다(캐시 공유). 효과에서 setHasMyClan 하던 것을 계산으로.
+  const myClanQuery = useQuery<{ id: string } | null>({
+    queryKey: ["clans", "my", gameTitle, user?.id],
+    queryFn: () => clanApi.getMyClan(gameTitle).catch(() => null),
+    enabled: knownHasMyClan === undefined && isAuthenticated,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+  const hasMyClan: boolean | null =
+    knownHasMyClan !== undefined
+      ? knownHasMyClan
+      : !isAuthenticated
+        ? false
+        : myClanQuery.data === undefined
+          ? null
+          : !!myClanQuery.data;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

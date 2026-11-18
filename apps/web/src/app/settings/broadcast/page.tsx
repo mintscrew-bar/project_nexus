@@ -20,6 +20,7 @@ import { Button, Switch } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/auth-store";
 import { broadcastApi } from "@/lib/api-client";
+import { useIsClient } from "@/hooks/useIsClient";
 
 /**
  * 방송 오버레이 꾸미기 — 방송인이 자기 OBS 오버레이를 직접 바꾼다.
@@ -154,11 +155,14 @@ export default function BroadcastSettingsPage() {
   const { isAuthenticated, isLoading } = useAuthStore();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
-  const [previewMode, setPreviewMode] = useState(false);
+  // 개발 중 ?preview=1 이면 미리보기 모드 — 하이드레이션 뒤에 주소를 읽는다
+  // (예전엔 효과에서 읽어 setPreviewMode — react-hooks/set-state-in-effect)
+  const isClient = useIsClient();
+  const previewMode =
+    isClient &&
+    process.env.NODE_ENV !== "production" &&
+    new URLSearchParams(window.location.search).get("preview") === "1";
   const previewUrlsRef = useRef<string[]>([]);
-  useEffect(() => {
-    setPreviewMode(process.env.NODE_ENV !== "production" && new URLSearchParams(window.location.search).get("preview") === "1");
-  }, []);
   useEffect(() => () => previewUrlsRef.current.forEach(URL.revokeObjectURL), []);
 
   const { data: saved } = useQuery({

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { UserName } from "@/components/cosmetics/UserName";
 import { getDoubleElimFeeders } from "@nexus/types";
 import {
   CheckCircle2,
@@ -11,6 +12,7 @@ import {
   Swords,
   ShieldX,
 } from "lucide-react";
+import { useResetOn } from "@/hooks/useResetOn";
 
 interface TeamMember {
   id: string;
@@ -38,6 +40,28 @@ export function getTeamDisplayName(team?: Team): string {
   if (!team) return "TBD";
   if (team.captain?.username) return `${team.captain.username} 팀`;
   return team.name;
+}
+
+/**
+ * 화면용 팀 이름 — 팀장 이름에 그 사람이 장착한 닉네임 글꼴을 입힌다 (Task 22).
+ * `suffix` 가 false 면 「팀」을 붙이지 않는다(좁은 칸).
+ */
+export function TeamDisplayName({
+  team,
+  suffix = true,
+}: {
+  team?: Team;
+  suffix?: boolean;
+}) {
+  if (!team) return <>TBD</>;
+  if (!team.captain?.username)
+    return <>{team.name.replace(/ 팀$/, suffix ? " 팀" : "")}</>;
+  return (
+    <>
+      <UserName userId={team.captain.id}>{team.captain.username}</UserName>
+      {suffix && " 팀"}
+    </>
+  );
 }
 
 export interface Match {
@@ -213,7 +237,7 @@ function TeamSlot({
               team ? "text-text-primary" : "text-text-tertiary",
             )}
           >
-            {getTeamDisplayName(team)}
+            <TeamDisplayName team={team} />
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -454,7 +478,7 @@ function TeamTile({
               dim ? "text-text-tertiary" : "text-text-primary",
             )}
           >
-            {getTeamDisplayName(team)}
+            <TeamDisplayName team={team} />
           </p>
           {/* 팀 이름이 이미 "팀장 팀"이라 팀장 대신 인원수를 붙인다 */}
           {memberCount > 0 && (
@@ -1063,7 +1087,8 @@ export function BracketView({
   const [density, setDensity] = React.useState<Density>(
     isLarge ? "compact" : "detailed",
   );
-  const [zoom, setZoom] = React.useState(1);
+  // 밀도를 바꾸면 콘텐츠 폭이 달라지므로 배율을 되돌린다(효과 없이 — useResetOn)
+  const [zoom, setZoom] = useResetOn(1, density);
 
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -1098,10 +1123,7 @@ export function BracketView({
     if (naturalWidth <= 0) return;
     const next = (viewport.clientWidth - 8) / naturalWidth;
     setZoom(Math.max(MIN_ZOOM, Math.min(1, next)));
-  }, []);
-
-  // 밀도를 바꾸면 콘텐츠 폭이 달라지므로 배율을 되돌린다.
-  React.useEffect(() => setZoom(1), [density]);
+  }, [setZoom]);
 
   const inner = isDoubleElim ? (
     <DoubleEliminationBracket

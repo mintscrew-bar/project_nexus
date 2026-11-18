@@ -11,6 +11,7 @@ import {
   PortraitParticipantCard,
   portraitCardSize,
 } from "./PortraitParticipantCard";
+import { useCosmeticLoadouts } from "@/components/cosmetics/useCosmeticLoadouts";
 
 /**
  * 대기석에 한 번에 그리는 인원.
@@ -105,6 +106,12 @@ export function LobbyParticipantsList({
   const waitingPlayers = isManualTeamMode
     ? players.filter((player: any) => !player.teamId)
     : players;
+  // 참가자들이 장착한 카드 장식 — 초상화 카드에서만 그린다(큰 방의 작은 카드는 장식이 없다)
+  const loadouts = useCosmeticLoadouts(
+    layout === "cards" && !isManualTeamMode
+      ? waitingPlayers.map((player: any) => player.userId)
+      : [],
+  );
   const participantCard = (participant: any) => (
     <CompactParticipantCard
       key={participant.id}
@@ -309,6 +316,9 @@ export function LobbyParticipantsList({
               cancelHoverClose={cancelHoverClose}
               handleAddFriend={handleAddFriend}
               setKickTarget={setKickTarget}
+              frameCode={loadouts[participant.userId]?.CARD_FRAME}
+              avatarFrameCode={loadouts[participant.userId]?.AVATAR_FRAME}
+              nameStyleCode={loadouts[participant.userId]?.NAME_STYLE}
             />
           ))}
           {/* 빈 자리도 칸으로 — 단, 큰 방(xs)은 수십 칸이 되니 아래 한 줄로만 */}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { BroadcastShell } from "../[token]/_components/BroadcastShell";
 import { PlayerSpotlightCard } from "../[token]/_components/LotProfilePanel";
 import { LowerThird } from "../[token]/_components/LowerThird";
@@ -1292,6 +1293,8 @@ export function PreviewStage({
   bg: "transparent" | "opaque";
   settings?: unknown;
 }) {
+  // 목업 타이머 기준 시각 — 처음 그릴 때 한 번만 잡는다(그릴 때마다 Date.now() 면 시계가 되돌아간다)
+  const [mountedAt] = useState(() => Date.now());
   const baseSnapshot =
     sceneKey === "breakCountdown"
       ? {
@@ -1299,7 +1302,7 @@ export function PreviewStage({
           broadcast: {
             ...(SNAP.waiting.broadcast ?? {}),
             breakEndsAt: new Date(
-              Date.now() + 4 * 60_000 + 32_000,
+              mountedAt + 4 * 60_000 + 32_000,
             ).toISOString(),
           },
         }
@@ -1316,7 +1319,7 @@ export function PreviewStage({
       ...(sceneKey === "auctionMulti"
         ? MOCK_AUCTION_MULTI.auctionState
         : MOCK_AUCTION_LIVE.auctionState),
-      timerEnd: Date.now() + 9000,
+      timerEnd: mountedAt + 9000,
     },
   };
 
@@ -1359,7 +1362,7 @@ export function PreviewStage({
     <AuctionBoardView data={auctionLive} lotProfile={MOCK_LOT_PROFILE} />
   ) : sceneKey === "snakeDraft" ? (
     <SnakeDraftBoardView
-      draft={{ ...MOCK_SNAKE_DRAFT, timerEnd: Date.now() + 23_000 }}
+      draft={{ ...MOCK_SNAKE_DRAFT, timerEnd: mountedAt + 23_000 }}
       snapshot={snapshot}
     />
   ) : sceneKey.startsWith("teamReveal") ? (

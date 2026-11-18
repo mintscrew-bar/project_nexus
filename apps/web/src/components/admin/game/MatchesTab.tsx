@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   adminApi,
   type AdminInternalMatch,
@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 
 import type { AddToast } from "../shared";
+import { useQueryDataSetter } from "@/hooks/useQuerySetter";
+import { useQuery } from "@tanstack/react-query";
 
 const PAGE_SIZE = 20;
 
@@ -88,22 +90,19 @@ export function MatchesTab({
   addToast: AddToast;
   isAdmin?: boolean;
 }) {
-  const [matches, setMatches] = useState<AdminInternalMatch[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [collected, setCollected] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
   const [detailId, setDetailId] = useState<string | null>(null);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  const fetchMatches = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await adminApi.getInternalMatches({
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setMatches 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 조건이 바뀌면 키가 바뀌어 새로 불러온다.
+  const matchesQuery = useQuery({
+    queryKey: ["admin-internal-matches", page, status, collected, search],
+    queryFn: () =>
+      adminApi.getInternalMatches({
         page,
         limit: PAGE_SIZE,
         status: (status || undefined) as
@@ -111,19 +110,15 @@ export function MatchesTab({
         collected: (collected || undefined) as
           "collected" | "pending" | undefined,
         search: search || undefined,
-      });
-      setMatches(data.matches);
-      setTotal(data.total);
-    } catch {
-      addToast("내전 기록 로드 실패", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, status, collected, search, addToast]);
-
+      }),
+  });
+  const matches: AdminInternalMatch[] = matchesQuery.data?.matches ?? [];
+  const total: number = matchesQuery.data?.total ?? 0;
+  const loading = matchesQuery.isLoading;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   useEffect(() => {
-    fetchMatches();
-  }, [fetchMatches]);
+    if (matchesQuery.isError) addToast("내전 기록 로드 실패", "error");
+  }, [matchesQuery.isError, addToast]);
 
   const submitSearch = () => {
     setSearch(searchInput.trim());
@@ -357,30 +352,27 @@ function MatchDetailModal({
   addToast: AddToast;
 }) {
   const [retrying, setRetrying] = useState(false);
-  const [detail, setDetail] = useState<AdminInternalMatchDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-
+  // 상세 — 고른 경기가 바뀌면 키가 바뀌어 새로 불러온다. 수집 재시도 직후엔 캐시를 고친다(setDetail).
+  const detailKey = ["admin-internal-match", matchId];
+  const detailQuery = useQuery({
+    queryKey: detailKey,
+    queryFn: () =>
+      adminApi.getInternalMatchDetail(
+        matchId,
+      ) as Promise<AdminInternalMatchDetail>,
+  });
+  const detail = detailQuery.data ?? null;
+  const loading = detailQuery.isLoading;
+  const setDetail = useQueryDataSetter<AdminInternalMatchDetail | null>(
+    detailKey,
+    null,
+  );
+  // 못 불러오면 예전처럼 알리고 창을 닫는다
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    adminApi
-      .getInternalMatchDetail(matchId)
-      .then((data) => {
-        if (!cancelled) setDetail(data);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          addToast("내전 상세 로드 실패", "error");
-          onClose();
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [matchId, addToast, onClose]);
+    if (!detailQuery.isError) return;
+    addToast("내전 상세 로드 실패", "error");
+    onClose();
+  }, [detailQuery.isError, addToast, onClose]);
 
   // 참가자를 Nexus 팀 기준으로 나눈다. 전적 미수집 매치는 참가자 자체가 비어 있을 수 있다.
   const teams = useMemo(() => {

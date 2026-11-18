@@ -23,6 +23,8 @@ import {
 } from "./LineTierSelector";
 import Image from "next/image";
 import { getRoleIcon } from "@/lib/role-icon";
+import { useResetOn } from "@/hooks/useResetOn";
+import { useOpenCount } from "@/hooks/useOpenCount";
 
 // Define specific props for the new AddAccountModal
 interface AddAccountModalProps {
@@ -34,7 +36,7 @@ interface AddAccountModalProps {
 type Role = "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT";
 const ROLES: Role[] = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
 
-export function AddAccountModal({
+function AddAccountModalInner({
   isOpen,
   onClose,
   onAccountAdded,
@@ -57,7 +59,10 @@ export function AddAccountModal({
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [gameName, setGameName] = useState("");
   const [tagLine, setTagLine] = useState("");
-  const [localError, setLocalError] = useState<string | null>(null);
+  // 이 창에서 낸 오류 — 스토어 오류가 새로 오면 비워서 스토어 오류가 보이게 한다
+  // (예전엔 효과에서 setLocalError(storeError) 로 덮었다, set-state-in-effect)
+  const [ownError, setLocalError] = useResetOn<string | null>(null, storeError);
+  const localError = ownError ?? storeError ?? null;
   // 등록 시 사용할 라이엇 ID 스냅샷 — step 1 통과 후 step 3 에서 그대로 전달
   const [pendingRiotId, setPendingRiotId] = useState<{
     gameName: string;
@@ -84,40 +89,18 @@ export function AddAccountModal({
   // 현재 펼쳐진 섹션 — null이면 전부 접힘
   const [openSection, setOpenSection] = useState<Role | null>("MID");
   const stepRef = useRef(step);
-  stepRef.current = step;
-
+  // 비동기 콜백이 최신 단계를 읽게 — 그리는 중이 아니라 그린 뒤에 옮긴다
   useEffect(() => {
-    if (isOpen) {
-      fetchChampions();
-    } else {
-      setStep(1);
-      setGameName("");
-      setTagLine("");
-      setLocalError(null);
-      setPendingRiotId(null);
-      setIsSubmitting(false);
-      setPeakTier("");
-      setPeakRank("");
-      setPeakLp(null);
-      setRoleTiers(createEmptyLineTiers());
-      setMainRole("MID");
-      setSubRole("ADC");
-      setChampionsByRole({
-        TOP: [],
-        JUNGLE: [],
-        MID: [],
-        ADC: [],
-        SUPPORT: [],
-      });
-      setOpenSection("MID");
-      resetRiotStore();
-    }
+    stepRef.current = step;
+  }, [step]);
+
+  // 열면 챔피언 목록을 받고, 닫으면 Riot 스토어를 비운다(바깥 상태만 다룬다).
+  // 입력값은 열 때마다 창을 새로 만들어(useOpenCount key) 처음 값으로 돌아간다.
+  useEffect(() => {
+    if (isOpen) fetchChampions();
+    else resetRiotStore();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
-
-  useEffect(() => {
-    setLocalError(storeError);
-  }, [storeError]);
 
   const handleClearError = () => {
     setLocalError(null);
@@ -713,4 +696,13 @@ function RoleAccordionSection({
       )}
     </div>
   );
+}
+
+/**
+ * 열 때마다 새로 만든다 — 지난번 입력값·단계·오류가 남지 않게(useOpenCount key).
+ * 닫을 때는 그대로 두어 닫힘 애니메이션이 산다.
+ */
+export function AddAccountModal(props: AddAccountModalProps) {
+  const openCount = useOpenCount(props.isOpen);
+  return <AddAccountModalInner key={openCount} {...props} />;
 }

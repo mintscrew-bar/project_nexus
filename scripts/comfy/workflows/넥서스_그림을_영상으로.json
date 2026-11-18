@@ -1,0 +1,917 @@
+{
+ "last_node_id": 41,
+ "last_link_id": 20,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "MarkdownNote",
+   "pos": [
+    0,
+    0
+   ],
+   "size": [
+    420,
+    640
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "MarkdownNote"
+   },
+   "widgets_values": [
+    "## 그림 → 반복 영상 (넥서스 프로필 배경)\n\n**모델** — 이미 받아 둠\n- 영상: `ltxv-2b-0.9.8-distilled` (LTX-Video 2B)\n- 문장 인코더: `t5xxl_fp8_e4m3fn_scaled`\n- 라이선스: 연 매출 1천만 달러 미만 무료, 출력물 권리 주장 없음\n\n**쓰는 법**\n1. **③ 시작 그림**에 움직일 그림을 고른다 (업로드 가능)\n2. **① 움직임 설명**을 영어로 고친다\n3. **④ 길이**와 **⑤ 시드**를 정한다\n4. 오른쪽 위 ▷ 실행 — 3초 기준 약 4분 (GTX 1080)\n5. 결과: `ComfyUI-Shared/output/my_video_…webm`\n\n**잘 나오게 하는 요령**\n- 작게 움직이려면 *gentle, subtle, sway slightly, keeping their shape*\n- *strong wind*·*flow* 같은 말은 칼·얼굴까지 휘게 만든다\n- 마음에 안 들면 **시드만 바꿔** 여러 번 돌려 고른다\n- 얼굴·칼이 뭉개지는 건 사이트에 붙일 때 고정 처리로 막는다 (Claude 에게)\n"
+   ],
+   "title": "사용법",
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 2,
+   "type": "MarkdownNote",
+   "pos": [
+    0,
+    670
+   ],
+   "size": [
+    420,
+    260
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "MarkdownNote"
+   },
+   "widgets_values": [
+    "### 길이·시간표 (24fps)\n| length | 길이 | 생성 시간 |\n|---|---|---|\n| 49 | 2초 | 약 2.5분 |\n| 73 | 3초 | 약 4분 |\n| 97 | 4초 | 약 5.5분 |\n\n길이는 **8의 배수 + 1** 이어야 한다.\n가로·세로는 32의 배수. 배너는 1536 × 640.\n"
+   ],
+   "title": "설정 참고표",
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 10,
+   "type": "LoadImage",
+   "pos": [
+    470,
+    0
+   ],
+   "size": [
+    420,
+    360
+   ],
+   "flags": {},
+   "order": 10,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      1
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "ink_swordsman.png",
+    "image"
+   ],
+   "title": "③ 시작 그림",
+   "color": "#223",
+   "bgcolor": "#335"
+  },
+  {
+   "id": 11,
+   "type": "ImageScale",
+   "pos": [
+    470,
+    390
+   ],
+   "size": [
+    420,
+    130
+   ],
+   "flags": {},
+   "order": 11,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      2
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ImageScale"
+   },
+   "widgets_values": [
+    "lanczos",
+    1536,
+    640,
+    "center"
+   ],
+   "title": "배너 크기로 맞춤 (1536×640)"
+  },
+  {
+   "id": 12,
+   "type": "LTXVPreprocess",
+   "pos": [
+    470,
+    550
+   ],
+   "size": [
+    420,
+    60
+   ],
+   "flags": {},
+   "order": 12,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "output",
+     "type": "IMAGE",
+     "links": [
+      8
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LTXVPreprocess"
+   },
+   "widgets_values": [
+    30
+   ],
+   "title": "그림 전처리 (움직임이 덜 굳게)"
+  },
+  {
+   "id": 20,
+   "type": "CheckpointLoaderSimple",
+   "pos": [
+    940,
+    0
+   ],
+   "size": [
+    420,
+    100
+   ],
+   "flags": {},
+   "order": 20,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      12
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [],
+     "slot_index": 1
+    },
+    {
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      7,
+      19
+     ],
+     "slot_index": 2
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CheckpointLoaderSimple"
+   },
+   "widgets_values": [
+    "ltxv-2b-0.9.8-distilled.safetensors"
+   ],
+   "title": "영상 모델 (LTX 2B)"
+  },
+  {
+   "id": 21,
+   "type": "CLIPLoader",
+   "pos": [
+    940,
+    130
+   ],
+   "size": [
+    420,
+    110
+   ],
+   "flags": {},
+   "order": 21,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [
+      3,
+      4
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPLoader"
+   },
+   "widgets_values": [
+    "t5xxl_fp8_e4m3fn_scaled.safetensors",
+    "ltxv",
+    "default"
+   ],
+   "title": "문장 인코더"
+  },
+  {
+   "id": 22,
+   "type": "CLIPTextEncode",
+   "pos": [
+    940,
+    270
+   ],
+   "size": [
+    420,
+    220
+   ],
+   "flags": {},
+   "order": 22,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      5
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "A still ink-wash painting gently comes alive. Subtle idle animation only. A soft breeze makes the long black ponytail and red ribbons sway slightly in place, keeping their shape. The black ink dragon breathes slowly. Clouds drift very slowly. A few red ink droplets float. The camera is completely static. Nothing changes shape, no new objects appear."
+   ],
+   "title": "① 움직임 설명 (영어)",
+   "color": "#223",
+   "bgcolor": "#335"
+  },
+  {
+   "id": 23,
+   "type": "CLIPTextEncode",
+   "pos": [
+    940,
+    520
+   ],
+   "size": [
+    420,
+    130
+   ],
+   "flags": {},
+   "order": 23,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 4
+    }
+   ],
+   "outputs": [
+    {
+     "name": "CONDITIONING",
+     "type": "CONDITIONING",
+     "links": [
+      6
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPTextEncode"
+   },
+   "widgets_values": [
+    "worst quality, inconsistent motion, blurry, jittery, distorted, camera shake, zoom, pan, cut, text, watermark, morphing face, extra limbs, bent sword"
+   ],
+   "title": "② 피할 것"
+  },
+  {
+   "id": 30,
+   "type": "LTXVImgToVideo",
+   "pos": [
+    1410,
+    0
+   ],
+   "size": [
+    380,
+    230
+   ],
+   "flags": {},
+   "order": 30,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 5
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 6
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 7
+    },
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 8
+    }
+   ],
+   "outputs": [
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "links": [
+      9
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "links": [
+      10
+     ],
+     "slot_index": 1
+    },
+    {
+     "name": "latent",
+     "type": "LATENT",
+     "links": [
+      11,
+      17
+     ],
+     "slot_index": 2
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LTXVImgToVideo"
+   },
+   "widgets_values": [
+    1536,
+    640,
+    73,
+    1,
+    1.0
+   ],
+   "title": "④ 크기·길이 (length 49=2초 73=3초 97=4초)",
+   "color": "#223",
+   "bgcolor": "#335"
+  },
+  {
+   "id": 31,
+   "type": "LTXVConditioning",
+   "pos": [
+    1410,
+    260
+   ],
+   "size": [
+    380,
+    80
+   ],
+   "flags": {},
+   "order": 31,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 9
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 10
+    }
+   ],
+   "outputs": [
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "links": [
+      13
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "links": [
+      14
+     ],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LTXVConditioning"
+   },
+   "widgets_values": [
+    24
+   ],
+   "title": "프레임 속도 (24)"
+  },
+  {
+   "id": 32,
+   "type": "LTXVScheduler",
+   "pos": [
+    1410,
+    370
+   ],
+   "size": [
+    380,
+    180
+   ],
+   "flags": {},
+   "order": 32,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "latent",
+     "type": "LATENT",
+     "link": 11
+    }
+   ],
+   "outputs": [
+    {
+     "name": "SIGMAS",
+     "type": "SIGMAS",
+     "links": [
+      16
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LTXVScheduler"
+   },
+   "widgets_values": [
+    8,
+    2.05,
+    0.95,
+    true,
+    0.1
+   ],
+   "title": "스텝 (distilled 는 8)"
+  },
+  {
+   "id": 33,
+   "type": "KSamplerSelect",
+   "pos": [
+    1410,
+    580
+   ],
+   "size": [
+    380,
+    60
+   ],
+   "flags": {},
+   "order": 33,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "SAMPLER",
+     "type": "SAMPLER",
+     "links": [
+      15
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSamplerSelect"
+   },
+   "widgets_values": [
+    "euler"
+   ]
+  },
+  {
+   "id": 34,
+   "type": "SamplerCustom",
+   "pos": [
+    1410,
+    670
+   ],
+   "size": [
+    380,
+    250
+   ],
+   "flags": {},
+   "order": 34,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 12
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 13
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 14
+    },
+    {
+     "name": "sampler",
+     "type": "SAMPLER",
+     "link": 15
+    },
+    {
+     "name": "sigmas",
+     "type": "SIGMAS",
+     "link": 16
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 17
+    }
+   ],
+   "outputs": [
+    {
+     "name": "output",
+     "type": "LATENT",
+     "links": [
+      18
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "denoised_output",
+     "type": "LATENT",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SamplerCustom"
+   },
+   "widgets_values": [
+    true,
+    7,
+    "fixed",
+    1.0
+   ],
+   "title": "⑤ 생성 — 시드를 바꾸면 다른 움직임",
+   "color": "#223",
+   "bgcolor": "#335"
+  },
+  {
+   "id": 40,
+   "type": "VAEDecode",
+   "pos": [
+    1840,
+    0
+   ],
+   "size": [
+    300,
+    60
+   ],
+   "flags": {},
+   "order": 40,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 18
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 19
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      20
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 41,
+   "type": "SaveWEBM",
+   "pos": [
+    1840,
+    100
+   ],
+   "size": [
+    520,
+    420
+   ],
+   "flags": {},
+   "order": 41,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 20
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "SaveWEBM"
+   },
+   "widgets_values": [
+    "my_video",
+    "vp9",
+    24,
+    24
+   ],
+   "title": "결과 저장 (output 폴더, 화면에서 바로 재생)"
+  }
+ ],
+ "links": [
+  [
+   1,
+   10,
+   0,
+   11,
+   0,
+   "IMAGE"
+  ],
+  [
+   2,
+   11,
+   0,
+   12,
+   0,
+   "IMAGE"
+  ],
+  [
+   3,
+   21,
+   0,
+   22,
+   0,
+   "CLIP"
+  ],
+  [
+   4,
+   21,
+   0,
+   23,
+   0,
+   "CLIP"
+  ],
+  [
+   5,
+   22,
+   0,
+   30,
+   0,
+   "CONDITIONING"
+  ],
+  [
+   6,
+   23,
+   0,
+   30,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   7,
+   20,
+   2,
+   30,
+   2,
+   "VAE"
+  ],
+  [
+   8,
+   12,
+   0,
+   30,
+   3,
+   "IMAGE"
+  ],
+  [
+   9,
+   30,
+   0,
+   31,
+   0,
+   "CONDITIONING"
+  ],
+  [
+   10,
+   30,
+   1,
+   31,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   11,
+   30,
+   2,
+   32,
+   0,
+   "LATENT"
+  ],
+  [
+   12,
+   20,
+   0,
+   34,
+   0,
+   "MODEL"
+  ],
+  [
+   13,
+   31,
+   0,
+   34,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   14,
+   31,
+   1,
+   34,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   15,
+   33,
+   0,
+   34,
+   3,
+   "SAMPLER"
+  ],
+  [
+   16,
+   32,
+   0,
+   34,
+   4,
+   "SIGMAS"
+  ],
+  [
+   17,
+   30,
+   2,
+   34,
+   5,
+   "LATENT"
+  ],
+  [
+   18,
+   34,
+   0,
+   40,
+   0,
+   "LATENT"
+  ],
+  [
+   19,
+   20,
+   2,
+   40,
+   1,
+   "VAE"
+  ],
+  [
+   20,
+   40,
+   0,
+   41,
+   0,
+   "IMAGE"
+  ]
+ ],
+ "groups": [
+  {
+   "title": "시작 그림",
+   "bounding": [
+    455,
+    -45,
+    450,
+    670
+   ],
+   "color": "#3f789e",
+   "font_size": 22
+  },
+  {
+   "title": "움직임 설명",
+   "bounding": [
+    925,
+    -45,
+    450,
+    710
+   ],
+   "color": "#8A8",
+   "font_size": 22
+  },
+  {
+   "title": "영상 설정",
+   "bounding": [
+    1395,
+    -45,
+    410,
+    980
+   ],
+   "color": "#b06634",
+   "font_size": 22
+  },
+  {
+   "title": "결과",
+   "bounding": [
+    1825,
+    -45,
+    550,
+    580
+   ],
+   "color": "#88A",
+   "font_size": 22
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.6,
+   "offset": [
+    40,
+    80
+   ]
+  }
+ },
+ "version": 0.4
+}

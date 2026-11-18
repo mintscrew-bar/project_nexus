@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { adminApi } from "@/lib/api-client";
 import { Card, CardContent, Button, LoadingSpinner } from "@/components/ui";
 import { Search, X } from "lucide-react";
 import { Pagination } from "../shared";
+import { useQuery } from "@tanstack/react-query";
 
 // DM·클랜 채팅은 개인정보보호법·통신비밀보호법상 임의 열람 위법 소지 → 제외
 // 클랜 채팅은 신고 접수 건에 한해 신고 관리 탭에서 확인
@@ -32,8 +33,6 @@ const LOCATION_HEADERS: Record<ChatLogCategory, string> = {
 };
 
 export function ChatLogsTab() {
-  const [logs, setLogs] = useState<ChatLog[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [category, setCategory] = useState<ChatLogCategory>("room");
   const [roomName, setRoomName] = useState("");
@@ -42,34 +41,27 @@ export function ChatLogsTab() {
   const [roomInput, setRoomInput] = useState("");
   const [userInput, setUserInput] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [loading, setLoading] = useState(true);
 
   const limit = 50;
-  const totalPages = Math.ceil(total / limit);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await adminApi.getChatLogs({
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setLogs 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 실패하면 예전처럼 조용히 빈 목록.
+  const logsQuery = useQuery({
+    queryKey: ["admin-chat-logs", page, category, roomName, userId, search],
+    queryFn: () =>
+      adminApi.getChatLogs({
         page,
         limit,
         category,
         roomName: category === "room" && roomName ? roomName : undefined,
         userId: userId || undefined,
         search: search || undefined,
-      });
-      setLogs(data.logs ?? []);
-      setTotal(data.total ?? 0);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }, [page, category, roomName, userId, search]);
-
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+      }),
+  });
+  const logs: ChatLog[] = logsQuery.data?.logs ?? [];
+  const total: number = logsQuery.data?.total ?? 0;
+  const totalPages = Math.ceil(total / limit);
+  const loading = logsQuery.isLoading;
 
   const handleCategoryChange = (cat: ChatLogCategory) => {
     setCategory(cat);

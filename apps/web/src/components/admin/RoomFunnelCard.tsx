@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { adminApi, type AdminRoomFunnel } from "@/lib/api-client";
 import type { GameTitle } from "@nexus/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { Filter } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 const DAY_OPTIONS = [7, 30, 90];
 
@@ -16,21 +17,17 @@ const DAY_OPTIONS = [7, 30, 90];
  */
 export function RoomFunnelCard({ game }: { game: GameTitle }) {
   const [days, setDays] = useState(30);
-  const [data, setData] = useState<AdminRoomFunnel | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setData(null);
-    setFailed(false);
-    adminApi
-      .getRoomFunnel({ gameTitle: game, days })
-      .then((res) => !cancelled && setData(res))
-      .catch(() => !cancelled && setFailed(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [game, days]);
+  // 게임·기간이 바뀌면 키가 바뀌어 새로 불러온다(효과에서 비우고 다시 부르지 않는다)
+  const funnelQuery = useQuery({
+    queryKey: ["admin-room-funnel", game, days],
+    queryFn: () =>
+      adminApi.getRoomFunnel({
+        gameTitle: game,
+        days,
+      }) as Promise<AdminRoomFunnel>,
+  });
+  const data = funnelQuery.data ?? null;
+  const failed = funnelQuery.isError;
 
   const pct = (n: number, base: number) =>
     base === 0 ? "-" : `${Math.round((n / base) * 100)}%`;

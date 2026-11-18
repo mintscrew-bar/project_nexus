@@ -175,13 +175,15 @@ export default function AuctionLayoutPreviewPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (n >= 2 && n <= 8) setTeamCount(n);
   }, []);
+  // 목업 타이머 기준 시각 — 처음 한 번만 잡는다(그릴 때마다 Date.now() 면 시계가 되돌아간다)
+  const [mountedAt] = useState(() => Date.now());
   const teams = mockTeams(teamCount);
   const auctionState = {
     currentPlayer: CURRENT,
     currentPlayerIndex: 0,
     currentHighestBid: 0,
     currentHighestBidder: null,
-    timerEnd: Date.now() + 27_000,
+    timerEnd: mountedAt + 27_000,
     status: "IN_PROGRESS" as const,
     yuchalCount: 0,
     maxYuchalCycles: 2,

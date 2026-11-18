@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { lastGameOrDefault } from "@/lib/last-game";
 import { useNavigationGameContext } from "@/components/GameNavigationProvider";
@@ -10,6 +9,7 @@ import {
   gameFromSlug,
   type GameTitle,
 } from "@nexus/types";
+import { useIsClient } from "@/hooks/useIsClient";
 
 /**
  * 지금 보고 있는 화면의 게임.
@@ -67,13 +67,12 @@ export function useGamePrefix(): string {
  * 마지막으로 본 게임을 기억해 두었다가 그걸 쓴다.
  *
  * **첫 렌더는 기본 게임으로 시작한다.** localStorage 는 서버에 없어서, 처음부터
- * 읽은 값을 쓰면 SSR 결과와 어긋나 하이드레이션이 깨진다. 마운트 뒤에 바꾼다.
+ * 읽은 값을 쓰면 SSR 결과와 어긋나 하이드레이션이 깨진다. 하이드레이션 뒤에 읽는다.
  */
 export function useLastGamePrefix(): string {
-  const [game, setGame] = useState<GameTitle>(DEFAULT_GAME);
-  useEffect(() => {
-    setGame(lastGameOrDefault());
-  }, []);
+  // 하이드레이션이 끝난 뒤에만 저장소를 읽는다(효과에서 setState 하지 않고 그릴 때 읽기)
+  const isClient = useIsClient();
+  const game: GameTitle = isClient ? lastGameOrDefault() : DEFAULT_GAME;
   return `/${GAMES[game].slug}`;
 }
 

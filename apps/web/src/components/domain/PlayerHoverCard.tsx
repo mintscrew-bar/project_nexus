@@ -11,6 +11,11 @@ import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 import { useCurrentGame } from "@/hooks/useCurrentGame";
 import { PUBG_PLATFORM_LABELS } from "@nexus/types";
+import { findCosmetic } from "@/components/cosmetics/catalog";
+import { CosmeticEffect } from "@/components/cosmetics/effects";
+import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
+import { useCosmeticLoadouts } from "@/components/cosmetics/useCosmeticLoadouts";
+import { UserName } from "@/components/cosmetics/UserName";
 
 interface PlayerHoverCardProps {
   userId: string;
@@ -186,6 +191,10 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
     gcTime: 10 * 60 * 1000,
     enabled: Boolean(userId),
   });
+  // 장착한 꾸미기 — 카드 장식은 헤더 뒤 무대로, 아바타 장식은 사진 둘레에 (Task 22)
+  const loadouts = useCosmeticLoadouts([userId]);
+  const cardFx = findCosmetic(loadouts[userId]?.CARD_FRAME)?.effect;
+  const avatarFx = findCosmetic(loadouts[userId]?.AVATAR_FRAME)?.avatarEffect;
 
   const TOOLTIP_OFFSET = 8;
   const isMobileScreen = window.innerWidth < 640;
@@ -238,28 +247,45 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
       ) : data ? (
         <>
           {/* ── 헤더: 아바타 + 이름 + 티어 ── */}
-          <div className="px-4 pt-4 pb-3">
-            <div className="flex items-start gap-3">
+          {/* 아바타 장식(왕관·고양이 귀 등)은 사진 위로 솟아서, 장착했으면 위 여백을 더 둔다 */}
+          <div className={`relative overflow-hidden px-4 pb-3 ${avatarFx ? "pt-7" : "pt-4"}`}>
+            {/* 카드 장식 — 헤더 뒤에 깔고, 글자가 묻히지 않게 글자 쪽은 바탕색으로 눌러 둔다 */}
+            {cardFx && (
+              <>
+                <CosmeticEffect code={cardFx} px={2.5} />
+                {/* 아바타 자리(왼쪽 30%)는 그대로 보이고, 이름이 시작되는 곳부터는 거의 가린다 */}
+                <div
+                  className="cfx-deco pointer-events-none absolute inset-0"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, rgb(var(--color-bg-primary) / 0.05) 0%, rgb(var(--color-bg-primary) / 0.15) 22%, rgb(var(--color-bg-primary) / 0.82) 36%, rgb(var(--color-bg-primary) / 0.9) 100%)",
+                  }}
+                />
+              </>
+            )}
+            <div className="relative z-10 flex items-start gap-3">
 
-              {/* 아바타 — 원형 + 티어 링 */}
-              <div
-                className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full bg-bg-tertiary"
-                style={{ border: `2px solid ${hasTier ? ACCENT + "88" : "rgb(var(--color-bg-elevated))"}` }}
-              >
-                {data.avatar ? (
-                  <Image src={data.avatar} alt={data.username} fill className="object-cover" unoptimized />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-bg-tertiary">
-                    <Users className="h-8 w-8 text-text-tertiary" />
-                  </div>
-                )}
-              </div>
+              {/* 아바타 — 원형 + 티어 링, 장착한 아바타 장식을 둘레에 */}
+              <AvatarDecoration code={avatarFx} size={64}>
+                <div
+                  className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full bg-bg-tertiary"
+                  style={{ border: `2px solid ${hasTier ? ACCENT + "88" : "rgb(var(--color-bg-elevated))"}` }}
+                >
+                  {data.avatar ? (
+                    <Image src={data.avatar} alt={data.username} fill className="object-cover" unoptimized />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-bg-tertiary">
+                      <Users className="h-8 w-8 text-text-tertiary" />
+                    </div>
+                  )}
+                </div>
+              </AvatarDecoration>
 
               {/* 이름 + 클랜 + 티어 */}
               <div className="min-w-0 flex-1 pt-0.5">
                 {/* 디스코드 닉네임 (메인) + 클랜 태그 */}
                 <div className="flex items-center gap-1.5">
-                  <p className="truncate text-sm font-black leading-tight text-text-primary">{data.username}</p>
+                  <p className="truncate text-sm font-black leading-tight text-text-primary"><UserName styleCode={loadouts[userId]?.NAME_STYLE ?? null}>{data.username}</UserName></p>
                   {(data.streamerProfiles ?? []).length > 0 && (
                     <span className="shrink-0 rounded-md bg-yellow-400/15 px-1.5 py-0.5 text-[10px] font-black leading-none text-yellow-700 dark:text-yellow-300">
                       streamer

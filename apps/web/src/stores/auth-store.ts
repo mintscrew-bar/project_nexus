@@ -166,6 +166,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       clearUserFromStorage();
       set({ user: null, isAuthenticated: false, isLoading: false });
       setAccessToken(null);
+      // 로그아웃 — 상태를 전부 버리려고 일부러 전체 새로고침
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = '/'; // Redirect to home on logout
     }
   },
@@ -191,6 +193,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       clearUserFromStorage();
       set({ user: null, isAuthenticated: false, isLoading: false });
       setAccessToken(null);
+      // 회원 탈퇴 — 상태를 전부 버리려고 일부러 전체 새로고침
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = '/'; // 홈으로 리다이렉트
     }
   },

@@ -6,9 +6,13 @@
  * 2026-11 게임 계정 관리 화면을 내 프로필로 합치면서, 그 화면 머리에 있던 편집 기능을
  * 창 하나로 옮겼다. 사진·배경은 고른 뒤 조정 화면(ImageCropper)에서 위치·크기를 맞춰 올리고,
  * 닉네임·소개는 "저장"을 눌러야 반영된다. 올리는 파일은 서버 규칙대로 5MB 이하.
+ *
+ * 프로필 배경은 「올린 이미지」와 「가진 배경 장식」 중 하나를 고른다(Task 22). 고르면 바로
+ * 적용된다 — 장식을 고르면 PROFILE_BANNER 자리에 장착, 올린 이미지를 고르면 장식을 해제한다.
+ * 상점·보관함의 장착과 같은 상태라 어디서 바꿔도 결과가 같다. 올린 이미지는 지우지 않는다.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { Camera, User } from "lucide-react";
 import { userApi } from "@/lib/api-client";
@@ -16,6 +20,17 @@ import { getApiErrorMessage } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { AVATAR_CROP, BANNER_CROP, ImageCropper } from "./ImageCropper";
 import { Button, Modal } from "@/components/ui";
+import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, ImageIcon } from "lucide-react";
+import { shopApi } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
+import { COSMETICS } from "@/components/cosmetics/catalog";
+import { LiveBanner } from "@/components/cosmetics/live-banner";
+import {
+  LOADOUT_QUERY_KEY,
+  useCosmeticLoadouts,
+} from "@/components/cosmetics/useCosmeticLoadouts";
 import { useToast } from "@/components/ui/Toast";
 
 const IMAGE_TYPES = /^image\/(jpeg|jpg|png|gif|webp)$/;
@@ -38,7 +53,44 @@ export function ProfileEditModal({
   onSaved: () => void;
 }) {
   const { user, fetchUser } = useAuthStore();
+  const queryClient = useQueryClient();
   const { addToast } = useToast();
+  // 프로필 배경 고르기 — 가진 배경 장식 목록과 지금 장착 상태
+  const loadouts = useCosmeticLoadouts([user?.id]);
+  const equippedBanner = user?.id
+    ? (loadouts[user.id]?.PROFILE_BANNER ?? null)
+    : null;
+  const { data: shop } = useQuery({
+    queryKey: ["shop"],
+    queryFn: shopApi.getShop,
+    enabled: isOpen && Boolean(user?.id),
+  });
+  const ownedBanners = COSMETICS.filter(
+    (item) =>
+      item.slot === "PROFILE_BANNER" &&
+      item.liveBanner &&
+      shop?.items.some((it) => it.code === item.code && it.owned),
+  );
+  // 누른 쪽을 바로 표시한다(서버 응답 전) — 실패하면 되돌린다
+  const [pendingBanner, setPendingBanner] = useState<string | null | undefined>(
+    undefined,
+  );
+  const chosenBanner =
+    pendingBanner === undefined ? equippedBanner : pendingBanner;
+  const chooseBanner = async (code: string | null) => {
+    if (code === chosenBanner) return;
+    setPendingBanner(code);
+    try {
+      await shopApi.equip("PROFILE_BANNER", code);
+      // 프로필·상점이 들고 있는 장착 상태를 새로 읽게 한다
+      await queryClient.invalidateQueries({ queryKey: [LOADOUT_QUERY_KEY] });
+      await queryClient.invalidateQueries({ queryKey: ["shop"] });
+    } catch {
+      addToast("배경을 바꾸지 못했어요. 다시 시도해 주세요.", "error");
+    } finally {
+      setPendingBanner(undefined);
+    }
+  };
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [saving, setSaving] = useState(false);
@@ -255,6 +307,62 @@ export function ProfileEditModal({
             />
           </div>
 
+          {/* 프로필 배경 — 올린 이미지 / 가진 배경 장식 중 하나 */}
+          <div>
+            <div className="mb-2 flex items-baseline justify-between">
+              <span className="text-xs font-semibold text-text-secondary">
+                프로필 배경
+              </span>
+              <Link
+                href="/shop"
+                onClick={onClose}
+                className="text-xs font-semibold text-text-tertiary hover:text-text-secondary"
+              >
+                {ownedBanners.length > 0
+                  ? "더 많은 배경 → 상점"
+                  : "배경 장식 보러 가기 → 상점"}
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {/* 올린 이미지 (없으면 기본 배경) */}
+              <BannerChoice
+                label={shownBanner ? "올린 이미지" : "기본 배경"}
+                selected={chosenBanner === null}
+                onClick={() => void chooseBanner(null)}
+              >
+                {shownBanner ? (
+                  <Image
+                    src={shownBanner}
+                    alt=""
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-accent-primary/30 to-accent-primary/5">
+                    <ImageIcon className="h-5 w-5 text-text-tertiary" />
+                  </div>
+                )}
+              </BannerChoice>
+              {/* 가진 배경 장식 — 움직이는 모습 그대로 */}
+              {ownedBanners.map((item) => (
+                <BannerChoice
+                  key={item.code}
+                  label={item.name}
+                  selected={chosenBanner === item.code}
+                  onClick={() => void chooseBanner(item.code)}
+                >
+                  <LiveBanner code={item.liveBanner!} />
+                </BannerChoice>
+              ))}
+            </div>
+            {chosenBanner !== null && (
+              <p className="mt-1.5 text-xs text-text-tertiary">
+                배경 장식을 쓰는 동안에도 올린 이미지는 지워지지 않아요.
+              </p>
+            )}
+          </div>
+
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-text-secondary">
               닉네임
@@ -293,5 +401,49 @@ export function ProfileEditModal({
         </div>
       )}
     </Modal>
+  );
+}
+
+/** 프로필 배경 고르기 한 칸 — 배너 비율 썸네일 + 이름, 고른 칸은 테두리와 체크 */
+function BannerChoice({
+  label,
+  selected,
+  onClick,
+  children,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        "overflow-hidden rounded-lg text-left ring-2 transition-colors",
+        selected
+          ? "ring-accent-primary"
+          : "ring-transparent hover:ring-bg-elevated",
+      )}
+    >
+      <div className="relative aspect-[12/5] w-full overflow-hidden bg-bg-tertiary">
+        {children}
+        {selected && (
+          <span className="absolute right-1.5 top-1.5 rounded-full bg-accent-primary p-0.5 text-accent-on">
+            <Check className="h-3 w-3" strokeWidth={3} />
+          </span>
+        )}
+      </div>
+      <div
+        className={cn(
+          "bg-bg-tertiary/60 px-2 py-1 text-xs font-semibold",
+          selected ? "text-text-primary" : "text-text-secondary",
+        )}
+      >
+        {label}
+      </div>
+    </button>
   );
 }

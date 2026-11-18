@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Lock } from "lucide-react";
@@ -17,6 +17,7 @@ import {
   CardContent,
   LoadingSpinner,
 } from "@/components/ui";
+import { useQuery } from "@tanstack/react-query";
 
 /** 보고 있는 사람의 헤더에 쓰는 정보 */
 interface TargetInfo {
@@ -47,9 +48,44 @@ export function PubgMatchesPage() {
   const targetUserId = requested || user?.id || null;
   const isSelf = !!user && targetUserId === user.id;
 
-  const [history, setHistory] = useState<PubgHistoryResponse | null>(null);
-  const [state, setState] = useState<LoadState>("loading");
-  const [target, setTarget] = useState<TargetInfo | null>(null);
+  // 전적·대상 정보는 React Query 로 — 예전엔 효과에서 setState("loading")·setHistory 등을
+  // 불렀다(react-hooks/set-state-in-effect). 대상이 바뀌면 키가 바뀌어 새로 불러온다.
+  const historyQuery = useQuery<PubgHistoryResponse>({
+    queryKey: ["pubg-history", targetUserId],
+    enabled: !authLoading && isAuthenticated && !!targetUserId,
+    retry: false,
+    queryFn: () => pubgApi.getHistory(targetUserId!),
+  });
+  const history = historyQuery.data ?? null;
+  // 403 은 상대가 공개하지 않은 것이고, 나머지는 실패다.
+  const state: LoadState = historyQuery.isSuccess
+    ? "ready"
+    : historyQuery.isError
+      ? (historyQuery.error as any)?.response?.status === 403
+        ? "hidden"
+        : "failed"
+      : "loading";
+
+  // 다른 사람을 보고 있을 때만 그 사람의 이름·계정을 가져온다. 실패하면 없이 그린다.
+  const showTarget = !!requested && !isSelf;
+  const targetQuery = useQuery<TargetInfo | null>({
+    queryKey: ["pubg-history", "target", requested],
+    enabled: showTarget,
+    queryFn: async () => {
+      try {
+        const profile = await userApi.getHoverProfile(requested!, "PUBG");
+        return {
+          username: profile.username,
+          avatar: profile.avatar,
+          playerName: profile.pubgAccount?.playerName ?? null,
+          platform: profile.pubgAccount?.lastMatchShard ?? null,
+        };
+      } catch {
+        return null;
+      }
+    },
+  });
+  const target = showTarget ? (targetQuery.data ?? null) : null;
 
   useEffect(() => {
     if (authLoading) return;
@@ -59,54 +95,6 @@ export function PubgMatchesPage() {
       router.push(`/auth/login?redirect=${encodeURIComponent(back)}`);
     }
   }, [authLoading, isAuthenticated, user, router, pathname, searchParams]);
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || !targetUserId) return;
-    let cancelled = false;
-    setState("loading");
-    setHistory(null);
-    void (async () => {
-      try {
-        const data = await pubgApi.getHistory(targetUserId);
-        if (cancelled) return;
-        setHistory(data);
-        setState("ready");
-      } catch (error: any) {
-        if (cancelled) return;
-        // 403 은 상대가 공개하지 않은 것이고, 나머지는 실패다.
-        setState(error?.response?.status === 403 ? "hidden" : "failed");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, isAuthenticated, targetUserId]);
-
-  // 다른 사람을 보고 있을 때만 그 사람의 이름·계정을 가져온다.
-  useEffect(() => {
-    if (!requested || isSelf) {
-      setTarget(null);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const profile = await userApi.getHoverProfile(requested, "PUBG");
-        if (cancelled) return;
-        setTarget({
-          username: profile.username,
-          avatar: profile.avatar,
-          playerName: profile.pubgAccount?.playerName ?? null,
-          platform: profile.pubgAccount?.lastMatchShard ?? null,
-        });
-      } catch {
-        if (!cancelled) setTarget(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [requested, isSelf]);
 
   if (authLoading || !isAuthenticated || !user) {
     return (

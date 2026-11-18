@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { communityApi } from "@/lib/api-client";
@@ -25,6 +25,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import Image from "next/image";
+import { useQuery } from "@tanstack/react-query";
 
 type PostCategory = "NOTICE" | "FREE" | "TIP" | "QNA";
 
@@ -60,9 +61,6 @@ export default function BookmarksPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { addToast } = useToast();
 
-  const [posts, setPosts] = useState<BookmarkedPost[]>([]);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
@@ -71,25 +69,31 @@ export default function BookmarksPage() {
     }
   }, [isAuthenticated, authLoading, router]);
 
-  const fetchBookmarks = useCallback(async (page: number) => {
-    setIsLoading(true);
-    try {
-      const offset = (page - 1) * ITEMS_PER_PAGE;
+  // 북마크 목록은 React Query 로 — 쪽이 바뀌면 키가 바뀌어 새로 불러온다
+  // (예전엔 효과에서 setIsLoading·setPosts, react-hooks/set-state-in-effect).
+  const bookmarksQuery = useQuery({
+    queryKey: ["community-bookmarks", currentPage],
+    enabled: isAuthenticated,
+    queryFn: async () => {
+      const offset = (currentPage - 1) * ITEMS_PER_PAGE;
       const data = await communityApi.getBookmarks(ITEMS_PER_PAGE, offset);
-      setPosts(data.posts || []);
-      setTotal(data.total || 0);
-    } catch {
-      addToast("북마크를 불러오는데 실패했습니다.", "error");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [addToast]);
+      return {
+        posts: (data.posts || []) as BookmarkedPost[],
+        total: data.total || 0,
+      };
+    },
+  });
+  const posts = bookmarksQuery.data?.posts ?? [];
+  const total = bookmarksQuery.data?.total ?? 0;
+  // 로그인 확인 전(조회 꺼짐)에도 스켈레톤을 보이도록 isPending 을 쓴다
+  const isLoading = bookmarksQuery.isPending;
+  // 처리 뒤 새로고침 — 예전 이름 그대로(쪽 인자는 지금 쪽이라 무시)
+  const fetchBookmarks = (_page?: number) => void bookmarksQuery.refetch();
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchBookmarks(currentPage);
-    }
-  }, [isAuthenticated, currentPage, fetchBookmarks]);
+    if (bookmarksQuery.isError)
+      addToast("북마크를 불러오는데 실패했습니다.", "error");
+  }, [bookmarksQuery.isError, addToast]);
 
   const handleUnbookmark = async (postId: string) => {
     try {

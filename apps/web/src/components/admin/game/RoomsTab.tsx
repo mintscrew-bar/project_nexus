@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/api-client";
 import {
   Card,
@@ -13,6 +13,9 @@ import { XCircle } from "lucide-react";
 import { Pagination, type AddToast } from "../shared";
 import { useAdminGameScope } from "../game-scope";
 import { useConfirm } from "../ConfirmDialog";
+import { useResetOn } from "@/hooks/useResetOn";
+import { useQueryFieldSetter } from "@/hooks/useQuerySetter";
+import { useQuery } from "@tanstack/react-query";
 
 interface AdminRoom {
   id: string;
@@ -25,54 +28,42 @@ interface AdminRoom {
 
 export function RoomsTab({ addToast }: { addToast: AddToast }) {
   const { confirm, dialog } = useConfirm();
-  const [rooms, setRooms] = useState<AdminRoom[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(true);
-  const requestIdRef = useRef(0);
   // 상단 전역 스위치가 정한 게임. 바뀌면 목록을 다시 읽는다.
   const { gameParam } = useAdminGameScope();
-
-  const limit = 20;
-  const totalPages = Math.ceil(total / limit);
-
-  const fetchRooms = useCallback(async () => {
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-    try {
-      const data = await adminApi.getRooms({
-        page,
-        limit,
-        status: status || undefined,
-        gameTitle: gameParam,
-      });
-      if (requestId === requestIdRef.current) {
-        setRooms(data.rooms);
-        setTotal(data.total);
-      }
-    } catch {
-      if (requestId === requestIdRef.current) {
-        addToast("방 목록 로드 실패", "error");
-      }
-    } finally {
-      if (requestId === requestIdRef.current) setLoading(false);
-    }
-  }, [page, status, gameParam, addToast]);
-
   /*
-   * 게임이 바뀌면 첫 페이지로 돌아간다.
+   * 게임이 바뀌면 첫 페이지로 돌아간다(효과 없이 — useResetOn).
    *
    * 페이지 번호는 게임마다 다른 목록에 매겨진 값이다. 롤 5페이지를 보다가
    * 배그로 바꾸면 배그에 5페이지가 없어 빈 화면이 된다.
    */
-  useEffect(() => {
-    setPage(1);
-  }, [gameParam]);
+  const [page, setPage] = useResetOn(1, gameParam);
+  const [status, setStatus] = useState("");
 
+  const limit = 20;
+
+  // 서버 조회는 React Query 로 — 늦게 온 옛 응답이 새 결과를 덮지 않는 것도 키가 맡는다
+  // (예전 requestId 비교를 대신한다). 삭제 직후엔 캐시를 바로 고친다(setRooms·setTotal).
+  type RoomsPage = { rooms: AdminRoom[]; total: number };
+  const roomsKey = ["admin-rooms", page, status, gameParam];
+  const roomsQuery = useQuery({
+    queryKey: roomsKey,
+    queryFn: () =>
+      adminApi.getRooms({
+        page,
+        limit,
+        status: status || undefined,
+        gameTitle: gameParam,
+      }) as Promise<RoomsPage>,
+  });
+  const rooms = roomsQuery.data?.rooms ?? [];
+  const total = roomsQuery.data?.total ?? 0;
+  const totalPages = Math.ceil(total / limit);
+  const loading = roomsQuery.isLoading;
+  const setRooms = useQueryFieldSetter<RoomsPage, "rooms">(roomsKey, "rooms");
+  const setTotal = useQueryFieldSetter<RoomsPage, "total">(roomsKey, "total");
   useEffect(() => {
-    fetchRooms();
-  }, [fetchRooms]);
+    if (roomsQuery.isError) addToast("방 목록 로드 실패", "error");
+  }, [roomsQuery.isError, addToast]);
 
   const handleClose = async (room: AdminRoom) => {
     const ok = await confirm({

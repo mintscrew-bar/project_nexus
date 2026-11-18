@@ -13,6 +13,10 @@ import {
 import { TierBadge } from "@/components/domain/TierBadge";
 import { getRoleTier } from "@/lib/role-tier";
 import { cn } from "@/lib/utils";
+import { findCosmetic } from "@/components/cosmetics/catalog";
+import { CosmeticEffect } from "@/components/cosmetics/effects";
+import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
+import { UserName } from "@/components/cosmetics/UserName";
 import { PositionIcon } from "./icons";
 
 /**
@@ -40,12 +44,22 @@ export const PORTRAIT_GRID_COLS: Record<PortraitCardSize, string> = {
   xs: "grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6",
 };
 
-/** 크기별 카드 높이 — 빈 자리 카드도 같은 높이를 쓴다 */
+/**
+ * 크기별 카드 높이 — 빈 자리 카드도 같은 높이를 쓴다.
+ * 원형 사진 + 아바타 장식이 들어가면서 30px 안팎 키웠다 (Task 22 시안 A2).
+ */
 export const PORTRAIT_CARD_HEIGHT: Record<PortraitCardSize, string> = {
-  lg: "h-[180px]",
-  md: "h-[150px]",
-  sm: "h-[128px]",
+  lg: "h-[210px]",
+  md: "h-[170px]",
+  sm: "h-[140px]",
   xs: "h-12",
+};
+
+/** 크기별 원형 사진 지름(px) — 아바타 장식도 이 지름에 맞춰 그린다 */
+const PORTRAIT_AVATAR_PX: Record<Exclude<PortraitCardSize, "xs">, number> = {
+  lg: 88,
+  md: 68,
+  sm: 52,
 };
 
 /** 빈 자리 카드 — 몇 자리가 남았는지 칸 모양으로 보여준다 */
@@ -71,10 +85,11 @@ export function EmptyPortraitSlot({
 }
 
 /**
- * 로비 데스크톱 참가자 카드 — 초상화가 카드 위쪽 폭을 다 쓰고, 맨 아래에
- * 준비 상태 띠를 가로로 꽉 채운다 (왼쪽 색 막대는 쓰지 않는다 — CLAUDE.md 규칙).
+ * 로비 데스크톱 참가자 카드 — 가운데 원형 사진(아바타 장식 포함) 아래에 이름·티어,
+ * 맨 아래에 준비 상태 띠를 가로로 꽉 채운다 (왼쪽 색 막대는 쓰지 않는다 — CLAUDE.md 규칙).
+ * 카드 장식 효과는 준비 띠 위 전체(이름 줄 뒤까지)를 무대로 쓴다 (Task 22 시안 A2).
  *
- * 준비 안 한 사람은 초상화를 흑백·반투명으로 눌러서, 멀리서 봐도 컬러 카드
+ * 준비 안 한 사람은 사진을 흑백·반투명으로 눌러서, 멀리서 봐도 컬러 사진
  * = 준비한 사람으로 읽히게 한다. 기능(호버 프로필·친구 추가·강퇴·음성 상태)은
  * 예전 목록 카드(CompactParticipantCard)와 같다.
  */
@@ -91,6 +106,9 @@ export function PortraitParticipantCard({
   cancelHoverClose,
   handleAddFriend,
   setKickTarget,
+  frameCode,
+  avatarFrameCode,
+  nameStyleCode,
 }: {
   p: any;
   size: PortraitCardSize;
@@ -106,7 +124,15 @@ export function PortraitParticipantCard({
   cancelHoverClose: () => void;
   handleAddFriend: (userId: string) => void;
   setKickTarget: (value: { id: string; username: string } | null) => void;
+  /** 장착한 카드 테두리 상품 코드 (components/cosmetics/catalog.ts). 없으면 테두리 없음 */
+  frameCode?: string | null;
+  /** 장착한 아바타 장식 상품 코드 — 원형 사진 둘레에 그린다 */
+  avatarFrameCode?: string | null;
+  /** 장착한 닉네임 글꼴 상품 코드 (NAME_STYLE) */
+  nameStyleCode?: string | null;
 }) {
+  const frame = findCosmetic(frameCode);
+  const avatarFx = findCosmetic(avatarFrameCode)?.avatarEffect;
   const cardRef = useRef<HTMLDivElement>(null);
   const riot = p.riotAccount;
   const pubg = p.pubgAccount;
@@ -192,7 +218,8 @@ export function PortraitParticipantCard({
           size === "lg" ? "text-sm" : "text-xs",
         )}
       >
-        {displayName}
+        {/* 장착한 닉네임 글꼴 — 로비 목록이 모아 읽은 코드를 받는다 */}
+        <UserName styleCode={nameStyleCode ?? null}>{displayName}</UserName>
       </span>
       {isSelf && (
         <span className="flex-shrink-0 text-[10px] font-bold text-accent-primary">
@@ -231,7 +258,9 @@ export function PortraitParticipantCard({
               <Crown className="h-3 w-3 flex-shrink-0 text-accent-gold" />
             )}
             <span className="truncate text-xs font-bold text-text-primary">
-              {displayName}
+              <UserName styleCode={nameStyleCode ?? null}>
+                {displayName}
+              </UserName>
             </span>
           </div>
           <span
@@ -249,8 +278,9 @@ export function PortraitParticipantCard({
     );
   }
 
-  /* ─── lg·md·sm: 초상화 카드 ─── */
-  return (
+  /* ─── lg·md·sm: 원형 사진 카드 ─── */
+  const avatarPx = PORTRAIT_AVATAR_PX[size];
+  const card = (
     <div
       ref={cardRef}
       onMouseEnter={handleMouseEnter}
@@ -263,72 +293,103 @@ export function PortraitParticipantCard({
         isSelf && "ring-1 ring-inset ring-accent-primary/60",
       )}
     >
-      {/* 초상화 — 남는 높이를 다 쓴다. 준비 전에는 흑백으로 눌러 둔다 */}
-      <div className="relative min-h-0 flex-1 bg-bg-elevated">
-        <Image
-          src={avatarSrc}
-          alt=""
-          fill
-          unoptimized
-          sizes="220px"
-          className={cn(
-            "object-cover transition-[filter,opacity]",
-            !p.isReady && "opacity-50 grayscale",
-          )}
-        />
+      {/* 무대 — 준비 띠 위 전체. 카드 장식 효과가 이름 줄 뒤까지 깔린다 */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        {frame?.effect && (
+          <CosmeticEffect
+            code={frame.effect}
+            px={size === "lg" ? 3 : size === "md" ? 2 : 1.5}
+          />
+        )}
+        <div className="relative z-10 flex h-full flex-col items-center">
+          {/* 원형 사진 — 위쪽에 여유를 두고 조금 아래로. 준비 전에는 흑백으로 눌러 둔다 */}
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 items-center justify-center",
+              size === "lg" ? "pt-4" : "pt-2.5",
+            )}
+          >
+            <AvatarDecoration code={avatarFx} size={avatarPx}>
+              <div
+                className="relative overflow-hidden rounded-full bg-bg-elevated"
+                style={{ width: avatarPx, height: avatarPx }}
+              >
+                <Image
+                  src={avatarSrc}
+                  alt=""
+                  fill
+                  unoptimized
+                  sizes={`${avatarPx * 2}px`}
+                  className={cn(
+                    "object-cover transition-[filter,opacity]",
+                    !p.isReady && "opacity-50 grayscale",
+                  )}
+                />
+              </div>
+            </AvatarDecoration>
+          </div>
+
+          {/* 이름·티어·라인 — 장식 효과 위에서도 읽히게 아래로 갈수록 어두운 막을 깐다 */}
+          <div className="relative w-full flex-shrink-0">
+            {frame?.effect && (
+              <div className="cfx-deco absolute inset-0 bg-gradient-to-t from-black/70 via-black/45 to-transparent" />
+            )}
+            <div
+              className={cn(
+                "relative flex flex-col items-center px-1.5",
+                size === "lg" ? "gap-1 py-2" : "gap-0.5 py-1.5",
+                frame?.effect &&
+                  "[&_span]:drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)]",
+              )}
+            >
+              {nameRow}
+              <div className="flex min-w-0 items-center justify-center gap-1">
+                {riot?.tier && (
+                  <span
+                    className="flex-shrink-0"
+                    title={displayTier ? "주 포지션 티어" : "솔로랭크 티어"}
+                  >
+                    <TierBadge
+                      tier={displayTier?.tier || riot.tier}
+                      rank={displayTier?.rank || riot.rank || undefined}
+                      size="sm"
+                      showIcon={false}
+                    />
+                  </span>
+                )}
+                {pubg && (
+                  <span className="flex-shrink-0 rounded bg-accent-primary/10 px-1 py-0.5 text-[9px] font-bold text-accent-primary">
+                    {pubg.lastMatchShard === "STEAM"
+                      ? "스배"
+                      : pubg.lastMatchShard === "KAKAO"
+                        ? "카배"
+                        : "미확인"}
+                  </span>
+                )}
+                {/* 라인 아이콘은 sm(40명 방)에선 자리가 없어 뺀다 — 호버 카드에서 보인다 */}
+                {size !== "sm" && mainRole && (
+                  <PositionIcon position={mainRole} className="!h-3.5 !w-3.5" />
+                )}
+                {size === "lg" && subRole && (
+                  <PositionIcon
+                    position={subRole}
+                    className="!h-3 !w-3"
+                    opacity={0.5}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 왼쪽 위: 음성 상태 / 오른쪽 위: 친구 추가·강퇴 */}
         {voiceBadge && (
-          <span className="absolute left-1.5 top-1.5 rounded-md bg-black/55 p-1 backdrop-blur">
+          <span className="absolute left-1.5 top-1.5 z-20 rounded-md bg-black/55 p-1 backdrop-blur">
             {voiceBadge}
           </span>
         )}
-        <div className="absolute right-1.5 top-1.5 flex gap-1">
+        <div className="absolute right-1.5 top-1.5 z-20 flex gap-1">
           {actionButtons}
-        </div>
-      </div>
-
-      {/* 이름·티어·라인 — 초상화를 가리지 않게 아래에 둔다 */}
-      <div
-        className={cn(
-          "flex flex-shrink-0 flex-col items-center px-1.5",
-          size === "lg" ? "gap-1 py-2" : "gap-0.5 py-1.5",
-        )}
-      >
-        {nameRow}
-        <div className="flex min-w-0 items-center justify-center gap-1">
-          {riot?.tier && (
-            <span
-              className="flex-shrink-0"
-              title={displayTier ? "주 포지션 티어" : "솔로랭크 티어"}
-            >
-              <TierBadge
-                tier={displayTier?.tier || riot.tier}
-                rank={displayTier?.rank || riot.rank || undefined}
-                size="sm"
-                showIcon={false}
-              />
-            </span>
-          )}
-          {pubg && (
-            <span className="flex-shrink-0 rounded bg-accent-primary/10 px-1 py-0.5 text-[9px] font-bold text-accent-primary">
-              {pubg.lastMatchShard === "STEAM"
-                ? "스배"
-                : pubg.lastMatchShard === "KAKAO"
-                  ? "카배"
-                  : "미확인"}
-            </span>
-          )}
-          {/* 라인 아이콘은 sm(40명 방)에선 자리가 없어 뺀다 — 호버 카드에서 보인다 */}
-          {size !== "sm" && mainRole && (
-            <PositionIcon position={mainRole} className="!h-3.5 !w-3.5" />
-          )}
-          {size === "lg" && subRole && (
-            <PositionIcon
-              position={subRole}
-              className="!h-3 !w-3"
-              opacity={0.5}
-            />
-          )}
         </div>
       </div>
 
@@ -357,6 +418,32 @@ export function PortraitParticipantCard({
             ? "대기 중"
             : "대기"}
       </div>
+    </div>
+  );
+
+  // 장착한 테두리가 있으면 3px 바깥 틀로 감싼다 — 둘레 전체를 두르는 모양만 쓴다.
+  // 틀 안에는 움직이는 층(layerClassName)을 카드 뒤에 깔아서, 카드가 덮지 않은
+  // 테두리 띠에서만 빛이 돌거나 스쳐 지나가게 한다.
+  if (!frame) return card;
+  return (
+    <div
+      className={cn(
+        "relative isolate overflow-hidden rounded-[15px] p-[3px]",
+        frame.className,
+      )}
+    >
+      {frame.layerClassName && (
+        <span
+          aria-hidden
+          className={cn(
+            // cfx-layer — 꾸미기 효과 설정이 이 층의 움직임을 멈추거나 숨긴다
+            "cfx-layer pointer-events-none absolute -z-10",
+            frame.layerClassName,
+          )}
+        />
+      )}
+      {/* 카드 바탕이 반투명이라 틀 색이 비치지 않게 불투명한 바탕을 한 겹 깐다 */}
+      <div className="rounded-xl bg-bg-secondary">{card}</div>
     </div>
   );
 }

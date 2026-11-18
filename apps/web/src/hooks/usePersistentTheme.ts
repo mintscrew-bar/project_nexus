@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { userApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToast } from "@/components/ui/Toast";
+import { useIsClient } from "@/hooks/useIsClient";
 
 const THEME_STORAGE_KEY = "theme";
 
@@ -26,14 +27,12 @@ export function getStoredThemePreference(): PersistedTheme | null {
 }
 
 export function usePersistentTheme() {
-  const [mounted, setMounted] = useState(false);
+  // 브라우저에서 그리는 중인가 — 효과로 세우지 않고 useIsClient(useSyncExternalStore)로 안다
+  const mounted = useIsClient();
   const { theme, resolvedTheme, setTheme } = useTheme();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { addToast } = useToast();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const applyTheme = useCallback(
     (nextTheme: PersistedTheme) => {

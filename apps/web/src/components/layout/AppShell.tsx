@@ -23,6 +23,7 @@ import { useExplicitGameContext } from "@/components/GameNavigationProvider";
 import { gameFromSlug } from "@nexus/types";
 import { rememberGame } from "@/lib/last-game";
 import { withoutGamePrefix } from "@/lib/game-links";
+import { useIsClient } from "@/hooks/useIsClient";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -37,10 +38,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // 인증 상태를 무관하게 전체 셸을 렌더링한다.
   // (실제 리다이렉트/보호는 각 페이지 컴포넌트에서 처리)
   // ---------------------------------------------------------------
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // 브라우저에서 그리는 중인가 — 효과로 세우지 않고 useIsClient(useSyncExternalStore)로 안다
+  const mounted = useIsClient();
 
   useEffect(() => {
     if (mounted && !isAuthenticated) {

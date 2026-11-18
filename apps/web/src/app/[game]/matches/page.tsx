@@ -25,6 +25,7 @@ import { useToast } from "@/components/ui/Toast";
 import { statsApi } from "@/lib/api-client";
 import { MatchesTour } from "@/components/onboarding/PrimaryPageTours";
 import { AdSlotCard } from "@/components/ads/AdSlot";
+import { useIsClient } from "@/hooks/useIsClient";
 
 interface RecentSearch {
   type: "summoner" | "user";
@@ -94,29 +95,43 @@ function formatRecentTime(timestamp: number) {
   return new Date(timestamp).toLocaleDateString("ko-KR");
 }
 
+const EMPTY_RECENT: RecentSearch[] = [];
+const EMPTY_RESULTS: SearchResult[] = [];
+
+/** 저장소의 최근 검색 — 없거나 깨졌으면 빈 목록 */
+function loadRecentSearches(): RecentSearch[] {
+  try {
+    const saved = localStorage.getItem("recentSearches");
+    return saved ? (JSON.parse(saved) as RecentSearch[]) : EMPTY_RECENT;
+  } catch (error) {
+    console.error("Failed to load recent searches:", error);
+    return EMPTY_RECENT;
+  }
+}
+
 function LolMatchesPage() {
   const router = useRouter();
   const gamePrefix = useGamePrefix();
   const { addToast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [searchType, setSearchType] = useState<"summoner" | "user">("summoner");
-  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  // 최근 검색 — 고친 적이 없으면 저장소 값을 보인다(하이드레이션 뒤에만 읽는다).
+  // 예전엔 효과에서 읽어 setRecentSearches 했다(react-hooks/set-state-in-effect).
+  const isClient = useIsClient();
+  const [editedRecent, setRecentSearches] = useState<RecentSearch[] | null>(
+    null,
+  );
+  const recentSearches =
+    editedRecent ?? (isClient ? loadRecentSearches() : EMPTY_RECENT);
+  const [rawSearchResults, setSearchResults] = useState<SearchResult[]>([]);
+  // 유저 검색 조건(유저 모드 + 두 글자 이상)이 아니면 결과를 비운 것으로 본다
+  // (예전엔 효과의 else 에서 setSearchResults([])·setShowDropdown(false))
+  const userSearchActive =
+    searchType === "user" && searchInput.trim().length >= 2;
+  const searchResults = userSearchActive ? rawSearchResults : EMPTY_RESULTS;
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Load recent searches from localStorage
-    const saved = localStorage.getItem("recentSearches");
-    if (saved) {
-      try {
-        setRecentSearches(JSON.parse(saved));
-      } catch (error) {
-        console.error("Failed to load recent searches:", error);
-      }
-    }
-  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -135,7 +150,7 @@ function LolMatchesPage() {
 
   // Debounced search for users
   useEffect(() => {
-    if (searchType === "user" && searchInput.trim().length >= 2) {
+    if (userSearchActive) {
       const timer = setTimeout(async () => {
         setIsSearching(true);
         try {
@@ -151,11 +166,8 @@ function LolMatchesPage() {
       }, 300);
 
       return () => clearTimeout(timer);
-    } else {
-      setSearchResults([]);
-      setShowDropdown(false);
     }
-  }, [searchInput, searchType]);
+  }, [searchInput, userSearchActive]);
 
   const saveRecentSearch = (search: RecentSearch) => {
     const updated = [
@@ -188,6 +200,8 @@ function LolMatchesPage() {
             type: "summoner",
             gameName: gameName.trim(),
             tagLine: tagLine.trim(),
+            // 버튼을 누른 순간의 시각 — 이벤트 처리기 안이라 그리기와 무관하다(컴파일러 오탐)
+            // eslint-disable-next-line react-hooks/purity
             timestamp: Date.now(),
           });
           router.push(

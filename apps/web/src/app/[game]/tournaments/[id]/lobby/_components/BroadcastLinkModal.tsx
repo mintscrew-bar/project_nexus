@@ -8,6 +8,8 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { broadcastApi } from "@/lib/api-client";
+import { useQuery } from "@tanstack/react-query";
+import { useQueryFieldSetter } from "@/hooks/useQuerySetter";
 
 /**
  * 로비 방송 상태 모달 — 호스트 전용.
@@ -23,23 +25,27 @@ interface Props {
 
 export function BroadcastLinkModal({ isOpen, onClose, roomId }: Props) {
   const { addToast } = useToast();
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [hasToken, setHasToken] = useState(false);
-  const [pinned, setPinned] = useState(false);
-
+  // 방송 상태는 창이 열려 있을 때 React Query 로 받는다(예전엔 효과에서 setLoading·
+  // setPinned — react-hooks/set-state-in-effect). 고정을 바꾸면 캐시를 바로 고친다.
+  const liveKey = ["broadcast", "live-state", roomId];
+  const liveQuery = useQuery({
+    queryKey: liveKey,
+    enabled: isOpen,
+    staleTime: 0,
+    queryFn: () => broadcastApi.getLiveState(roomId),
+  });
+  const loading = liveQuery.isPending;
+  const hasToken = liveQuery.data?.hasToken ?? false;
+  const pinned = liveQuery.data?.pinned ?? false;
+  const setPinned = useQueryFieldSetter<
+    NonNullable<typeof liveQuery.data>,
+    "pinned"
+  >(liveKey, "pinned");
   useEffect(() => {
-    if (!isOpen) return;
-    setLoading(true);
-    broadcastApi
-      .getLiveState(roomId)
-      .then((res) => {
-        setHasToken(res.hasToken);
-        setPinned(res.pinned);
-      })
-      .catch(() => addToast("방송 상태를 불러오지 못했습니다.", "error"))
-      .finally(() => setLoading(false));
-  }, [isOpen, roomId, addToast]);
+    if (liveQuery.isError)
+      addToast("방송 상태를 불러오지 못했습니다.", "error");
+  }, [liveQuery.isError, addToast]);
 
   const togglePin = useCallback(async () => {
     setBusy(true);
@@ -57,7 +63,7 @@ export function BroadcastLinkModal({ isOpen, onClose, roomId }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [roomId, pinned, addToast]);
+  }, [roomId, pinned, addToast, setPinned]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="방송 연동" size="md">

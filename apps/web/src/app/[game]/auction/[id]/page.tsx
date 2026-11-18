@@ -28,6 +28,7 @@ import {
 } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { GameChatPanel } from "@/components/domain/GameChatPanel";
+import { UserName } from "@/components/cosmetics/UserName";
 import { AuctionStageError } from "@/components/domain/AuctionStageError";
 import { cn } from "@/lib/utils";
 import {
@@ -49,6 +50,9 @@ import {
   RemainingPlayersPanel,
   TeamSummaryPanel,
 } from "./_components/AuctionPanels";
+import { useSecondsLeft } from "@/hooks/useSecondsLeft";
+import { useBidAccumulator } from "@/hooks/useBidAccumulator";
+import { useResetOn } from "@/hooks/useResetOn";
 
 // 입찰 포기 확인 모달의 "다시 보지 않기" 저장 키 (브라우저 단위)
 const FOLD_CONFIRM_SKIP_KEY = "auction:fold-confirm-skip";
@@ -116,10 +120,6 @@ export default function AuctionRoomPage() {
   const [mobileTab, setMobileTab] = useState<
     "auction" | "players" | "log" | "chat"
   >("auction");
-  // 경매 완료 결과 화면 카운트다운
-  const [completeCountdown, setCompleteCountdown] = useState<number | null>(
-    null,
-  );
   // 대기 선수 전체 보기 모달
   const [playersModalOpen, setPlayersModalOpen] = useState(false);
 
@@ -172,42 +172,56 @@ export default function AuctionRoomPage() {
     return () => clearInterval(interval);
   }, [captainSelectionPhase?.timerEnd]);
 
-  // 경매 완료 → 5초 카운트다운 후 역할 선택으로 이동
-  useEffect(() => {
-    if (hasRedirected.current) return;
-    if (auctionState?.status !== "COMPLETED") return;
-    // 역할 선택이 열리지 않았다면 이동하지 않고 여기서 호스트의 재시도를 기다린다.
-    // 이동하면 역할 선택 화면에 빈 상태로 도착하고, 그쪽엔 재시도 수단이 없다.
-    // 재시도가 풀리면(서버가 auction-error-cleared 를 방송) stageError 가 지워져
-    // 이 효과가 다시 돌며 카운트다운을 재개한다.
-    if (stageError?.retryable) return;
+  // 경매 완료 → 5초 카운트다운 후 역할 선택으로 이동.
+  // 역할 선택이 열리지 않았다면(stageError.retryable) 이동하지 않고 여기서 호스트의 재시도를
+  // 기다린다. 이동하면 역할 선택 화면에 빈 상태로 도착하고, 그쪽엔 재시도 수단이 없다.
+  // 재시도가 풀리면(서버가 auction-error-cleared 를 방송) stageError 가 지워져 5초부터 다시 센다.
+  //
+  // 예전엔 효과에서 setCompleteCountdown(5) 로 시작하고 setState 갱신 함수 안에서 이동까지
+  // 했다(react-hooks/set-state-in-effect). 지금은 "몇 번째 카운트다운인지(run)" 와 "몇 초
+  // 지났는지(ticks)" 만 상태로 두고 남은 초는 계산한다. 이동은 0 이 된 뒤 별도 효과에서 한다.
+  const countdownActive =
+    auctionState?.status === "COMPLETED" && !stageError?.retryable;
+  // 카운트다운이 (다시) 시작될 때마다 run 이 1 씩 는다 — 그리는 중에 바뀐 걸 알아채고 고친다
+  const [countdownRun, setCountdownRun] = useState({ active: false, run: 0 });
+  let run = countdownRun.run;
+  if (countdownRun.active !== countdownActive) {
+    run = countdownActive ? countdownRun.run + 1 : countdownRun.run;
+    setCountdownRun({ active: countdownActive, run });
+  }
+  // run 이 바뀌면 지난 초는 0 으로 돌아간다
+  const [countdownTicks, setCountdownTicks] = useResetOn(0, run);
+  // 경매 완료 결과 화면 카운트다운 — 한 번도 시작하지 않았으면 null(결과 화면을 띄우지 않음)
+  const completeCountdown: number | null =
+    auctionState?.status === "COMPLETED" && run > 0
+      ? Math.max(0, 5 - countdownTicks)
+      : null;
 
-    setCompleteCountdown(5);
-    const interval = setInterval(() => {
-      setCompleteCountdown((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(interval);
-          if (!hasRedirected.current) {
-            goToNextStage(
-              afterTeamsPath(
-                { id: auctionId, gameTitle: game, teamMode: "AUCTION" },
-                gamePrefix,
-              ),
-            );
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  // 1초마다 센다 — 0 이 되면 멈춘다
+  const countdownDone = completeCountdown === 0;
+  useEffect(() => {
+    if (!countdownActive || hasRedirected.current) return;
+    if (countdownDone) return;
+    const interval = setInterval(() => setCountdownTicks((t) => t + 1), 1000);
     return () => clearInterval(interval);
+  }, [countdownActive, countdownDone, setCountdownTicks]);
+
+  useEffect(() => {
+    if (!countdownActive || completeCountdown !== 0) return;
+    if (hasRedirected.current) return;
+    goToNextStage(
+      afterTeamsPath(
+        { id: auctionId, gameTitle: game, teamMode: "AUCTION" },
+        gamePrefix,
+      ),
+    );
   }, [
-    auctionState?.status,
+    countdownActive,
+    completeCountdown,
     auctionId,
     goToNextStage,
     gamePrefix,
     game,
-    stageError?.retryable,
   ]);
   useEffect(() => {
     if (
@@ -920,7 +934,8 @@ export default function AuctionRoomPage() {
             <Button
               variant="primary"
               onClick={() => {
-                setCompleteCountdown(0);
+                // 바로 이동 — 남은 초를 0 으로(지난 초를 5 로) 맞춘다
+                setCountdownTicks(5);
                 goToNextStage(
                   afterTeamsPath(
                     { id: auctionId, gameTitle: game, teamMode: "AUCTION" },
@@ -1216,9 +1231,9 @@ function MobileBidPanel({
   isVotingItemSkip?: boolean;
 }) {
   const game = useCurrentGame();
-  const [accBid, setAccBid] = useState(0);
   const [isBidding, setIsBidding] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(0);
+  // 남은 초 — 그릴 때 계산(예전엔 효과에서 setTimeLeft, react-hooks/set-state-in-effect)
+  const timeLeft = useSecondsLeft(auctionState.timerEnd);
 
   const bidIncrement = auctionState.bidIncrement ?? 50;
   const bidSteps = [bidIncrement, bidIncrement * 2, bidIncrement * 5];
@@ -1229,6 +1244,11 @@ function MobileBidPanel({
   const reserveAmount = Math.max(0, (slotsNeeded - 1) * bidIncrement);
   const budget = myTeam.remainingGold ?? myTeam.remainingBudget ?? 0;
   const availableBudget = Math.max(0, budget - reserveAmount);
+  // 쌓은 추가 입찰액 — 매물이 바뀌면 0, 예산을 넘으면 잘라 보인다(효과 없이)
+  const [accBid, setAccBid] = useBidAccumulator(
+    auctionState.currentPlayer?.id,
+    Math.max(0, availableBudget - auctionState.currentHighestBid),
+  );
   const totalBid = auctionState.currentHighestBid + accBid;
   const canBid = accBid > 0 && totalBid <= availableBudget && !isBidding;
   const currentPlayer = auctionState.currentPlayer;
@@ -1237,27 +1257,6 @@ function MobileBidPanel({
   const foldRequired = auctionState.skipVotesRequired || 0;
   const hasFolded =
     !!myTeam?.id && (auctionState.skipTeamIds ?? []).includes(myTeam.id);
-
-  // 매물 전환 시 리셋
-  React.useEffect(() => {
-    setAccBid(0);
-  }, [auctionState.currentPlayer?.id]);
-  // 예산 초과 시 클램핑
-  React.useEffect(() => {
-    const max = Math.max(0, availableBudget - auctionState.currentHighestBid);
-    setAccBid((prev) => Math.min(prev, max));
-  }, [auctionState.currentHighestBid, availableBudget]);
-  const calculateTimeLeft = React.useCallback(
-    () => Math.max(0, Math.ceil((auctionState.timerEnd - Date.now()) / 1000)),
-    [auctionState.timerEnd],
-  );
-  React.useEffect(() => {
-    setTimeLeft(calculateTimeLeft());
-    const interval = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
-    }, 100);
-    return () => clearInterval(interval);
-  }, [calculateTimeLeft]);
 
   const addToBid = (inc: number) => {
     setAccBid((prev) => {
@@ -1298,7 +1297,9 @@ function MobileBidPanel({
           </p>
           <div className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-sm font-bold text-text-primary">
-              {currentPlayer.username}
+              <UserName userId={currentPlayer.id}>
+                {currentPlayer.username}
+              </UserName>
             </span>
             {currentPlayer.tier && (
               <span className="shrink-0 text-[10px] font-semibold text-text-tertiary">

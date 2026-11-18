@@ -1,3 +1,4 @@
+import { MatchMedalService } from "../medal/match-medal.service";
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RiotMatchService, MatchDto } from "../riot/riot-match.service";
@@ -74,6 +75,7 @@ export class MatchDataCollectionService {
     private readonly prisma: PrismaService,
     private readonly riotMatchService: RiotMatchService,
     @Optional() private readonly rankingService?: RankingService,
+    @Optional() private readonly matchMedals?: MatchMedalService,
   ) {}
 
   private buildExpectedMembers(match: any): CrossrefExpectedMember[] {
@@ -652,6 +654,9 @@ export class MatchDataCollectionService {
           },
         });
       });
+
+      // Riot 기록이 확인됐다 — Riot 확인·MVP·ACE 메달 정산
+      this.matchMedals?.settleMatchQuietly(matchId);
 
       const affectedUserIds = Array.from(
         new Set([

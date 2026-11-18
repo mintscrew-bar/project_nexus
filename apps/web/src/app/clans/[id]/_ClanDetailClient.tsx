@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -545,11 +545,23 @@ export default function ClanDetailClient({
   // presence-store에서 온라인 상태 조회
   const getFriendStatus = usePresenceStore(state => state.getFriendStatus);
 
-  const [clan, setClan] = useState<Clan | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isMember, setIsMember] = useState(false);
-  const [myRole, setMyRole] = useState<"OWNER" | "OFFICER" | "MEMBER" | null>(null);
+  // 클랜 정보는 React Query 로 — 예전엔 효과에서 fetchClan() 으로 setClan·setIsLoading
+  // (react-hooks/set-state-in-effect). 내 가입 여부·역할은 응답에서 계산한다.
+  const clanQuery = useQuery<Clan>({
+    queryKey: ["clan-detail", clanId],
+    queryFn: () => clanApi.getClan(clanId),
+  });
+  const clan = clanQuery.data ?? null;
+  const isLoading = clanQuery.isLoading;
+  const error = clanQuery.isError
+    ? (clanQuery.error as Error)?.message || "클랜 정보를 불러오는데 실패했습니다."
+    : null;
+  const membership = user
+    ? clan?.members.find((m: ClanMember) => m.userId === user.id)
+    : undefined;
+  const isMember = !!membership;
+  const myRole: "OWNER" | "OFFICER" | "MEMBER" | null =
+    (membership?.role as "OWNER" | "OFFICER" | "MEMBER" | undefined) || null;
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showJoinByCodeModal, setShowJoinByCodeModal] = useState(false);
   const { addToast } = useToast();
@@ -564,30 +576,11 @@ export default function ClanDetailClient({
     retry: 1,
   });
 
+  // 처리 뒤 새로고침 — 예전 이름 그대로 둔다
+  const refetchClan = clanQuery.refetch;
   const fetchClan = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await clanApi.getClan(clanId);
-      setClan(data);
-
-      if (user) {
-        const membership = data.members.find(
-          (m: ClanMember) => m.userId === user.id
-        );
-        setIsMember(!!membership);
-        setMyRole(membership?.role || null);
-      }
-    } catch (err: any) {
-      setError(err.message || "클랜 정보를 불러오는데 실패했습니다.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clanId, user]);
-
-  useEffect(() => {
-    fetchClan();
-  }, [fetchClan]);
+    await refetchClan();
+  }, [refetchClan]);
 
   // 가입하기 (모집 중인 클랜)
   const handleJoinClan = async () => {

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { adminApi, type AdminAuditLogItem } from "@/lib/api-client";
 import { Badge, Card, CardContent, LoadingSpinner } from "@/components/ui";
 import { Pagination, type AddToast } from "../shared";
+import { useQuery } from "@tanstack/react-query";
 
 /** 관리 작업 이름. 새 액션이 생기면 여기에도 넣는다 — 없으면 원문이 그대로 보인다. */
 const ACTION_LABEL: Record<string, string> = {
@@ -27,6 +28,9 @@ const ACTION_LABEL: Record<string, string> = {
   SCRIM_COLLECT_RETRY: "스크림 수집 재시도",
   SCRIM_CANCEL: "스크림 취소",
   MATCH_COLLECT_RETRY: "내전 수집 재시도",
+  BOT_CLEANUP: "봇 정리",
+  MEDAL_ADJUST: "메달 지급·회수",
+  MEDAL_REFUND: "상점 구매 환불",
 };
 
 const TARGET_LABEL: Record<string, string> = {
@@ -53,20 +57,18 @@ const DAY_RANGES = [
  * 기록은 서버가 조치할 때 남기므로 여기서는 읽기만 한다.
  */
 export function AuditLogsTab({ addToast }: { addToast: AddToast }) {
-  const [logs, setLogs] = useState<AdminAuditLogItem[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [action, setAction] = useState("");
   const [rangeDays, setRangeDays] = useState(7);
   const [open, setOpen] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const limit = 50;
-  const totalPages = Math.ceil(total / limit);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
-    try {
+  // 서버 조회는 React Query 로 — 효과 안에서 setLoading·setData 를 부르지 않는다
+  // (react-hooks/set-state-in-effect). 조건이 바뀌면 키가 바뀌어 새로 불러온다.
+  const logsQuery = useQuery({
+    queryKey: ["admin-audit-logs", page, action, rangeDays],
+    queryFn: async () => {
       const data = await adminApi.getAuditLogs({
         page,
         limit,
@@ -75,18 +77,16 @@ export function AuditLogsTab({ addToast }: { addToast: AddToast }) {
           ? new Date(Date.now() - rangeDays * 86_400_000).toISOString()
           : undefined,
       });
-      setLogs(data.logs);
-      setTotal(data.total);
-    } catch {
-      addToast("관리 기록 로드 실패", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, action, rangeDays, addToast]);
-
+      return { logs: data.logs, total: data.total };
+    },
+  });
+  const logs = (logsQuery.data?.logs ?? []) as AdminAuditLogItem[];
+  const total = logsQuery.data?.total ?? 0;
+  const loading = logsQuery.isLoading;
+  const totalPages = Math.ceil(total / limit);
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    if (logsQuery.isError) addToast("관리 기록 로드 실패", "error");
+  }, [logsQuery.isError, addToast]);
 
   return (
     <div className="space-y-4">

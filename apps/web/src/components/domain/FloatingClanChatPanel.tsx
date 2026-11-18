@@ -15,12 +15,14 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { X, Minus, Shield, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import { useFriendStore } from "@/stores/friend-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useClanStore } from "@/stores/clan-store";
 import { clanApi } from "@/lib/api-client";
 import { ClanChat } from "@/components/domain/ClanChat";
 import { clanGameFromLocation } from "@/lib/clan-game";
+import { useOpenCount } from "@/hooks/useOpenCount";
 
 // ========================================
 // 리사이즈 관련 상수
@@ -52,20 +54,6 @@ export function FloatingClanChatPanel() {
   const startY = useRef(0);
   const startHeight = useRef(DEFAULT_HEIGHT);
 
-  // 내 클랜 정보
-  const [myClan, setMyClan] = useState<{
-    id: string;
-    name: string;
-    tag: string;
-  } | null>(null);
-  // 현재 유저의 클랜 내 역할 (메시지 삭제 권한 판단에 사용)
-  const [myRole, setMyRole] = useState<"OWNER" | "OFFICER" | "MEMBER" | null>(
-    null,
-  );
-  const [isLoadingClan, setIsLoadingClan] = useState(false);
-  // API 에러 상태 — 에러 시 패널을 바로 닫지 않고 재시도 UI 제공
-  const [fetchError, setFetchError] = useState(false);
-
   // 최소화 상태에서 새 메시지 도착 감지 → pulse 효과
   const [hasPulse, setHasPulse] = useState(false);
   const prevUnreadRef = useRef(unreadCount);
@@ -81,12 +69,8 @@ export function FloatingClanChatPanel() {
     prevUnreadRef.current = unreadCount;
   }, [unreadCount, isMinimized]);
 
-  // 최소화 해제 시 pulse 초기화
-  useEffect(() => {
-    if (!isMinimized) {
-      setHasPulse(false);
-    }
-  }, [isMinimized]);
+  // 펼쳐져 있으면 pulse 를 보이지 않는다 — 효과에서 끄던 것을 그릴 때 계산으로
+  const showPulse = hasPulse && isMinimized;
 
   // ========================================
   // 드래그 리사이즈 핸들러
@@ -122,37 +106,46 @@ export function FloatingClanChatPanel() {
     [panelHeight],
   );
 
-  // 클랜 정보 조회 함수 (초기 + 재시도 공통)
-  const fetchMyClan = () => {
-    setIsLoadingClan(true);
-    setFetchError(false);
-    clanApi
-      .getMyClan(clanGameFromLocation())
-      .then((clan: unknown) => {
-        const c = clan as {
-          id?: string;
-          name?: string;
-          tag?: string;
-          myRole?: "OWNER" | "OFFICER" | "MEMBER";
-        } | null;
-        if (c?.id) {
-          setMyClan({ id: c.id, name: c.name ?? "", tag: c.tag ?? "" });
-          setMyRole(c.myRole ?? null);
-        } else {
-          // 클랜이 없으면 자동으로 닫기
-          setMyClan(null);
-          setMyRole(null);
-          closeClanChat();
-        }
-      })
-      .catch(() => {
-        // API 에러 시 패널을 닫지 않고 에러 상태만 설정 (재시도 가능)
-        setMyClan(null);
-        setMyRole(null);
-        setFetchError(true);
-      })
-      .finally(() => setIsLoadingClan(false));
-  };
+  // 내 클랜 정보 — 창이 열려 있을 때만 조회한다. 예전엔 효과에서 fetchMyClan() 을 불러
+  // 로딩·결과를 setState 했다(react-hooks/set-state-in-effect). 창을 다시 열면
+  // 열 때마다 키(openCount)가 바뀌어 새로 불러온다. 지난번 "클랜 없음" 결과가 남아
+  // 있으면 그사이 가입했어도 열자마자 닫혀 버리므로, 지난 결과는 쓰지 않는다.
+  const clanGame = clanGameFromLocation();
+  const openCount = useOpenCount(isClanChatOpen);
+  const myClanQuery = useQuery({
+    queryKey: ["floating-clan-chat", "my-clan", clanGame, openCount],
+    enabled: isClanChatOpen && isAuthenticated,
+    gcTime: 0,
+    retry: false,
+    queryFn: async () => {
+      const c = (await clanApi.getMyClan(clanGame)) as {
+        id?: string;
+        name?: string;
+        tag?: string;
+        myRole?: "OWNER" | "OFFICER" | "MEMBER";
+      } | null;
+      if (!c?.id) return null;
+      return {
+        clan: { id: c.id, name: c.name ?? "", tag: c.tag ?? "" },
+        // 현재 유저의 클랜 내 역할 (메시지 삭제 권한 판단에 사용)
+        role: c.myRole ?? null,
+      };
+    },
+  });
+  const myClan = myClanQuery.data?.clan ?? null;
+  const myRole = myClanQuery.data?.role ?? null;
+  // 받아 온 것이 없을 때 불러오는 중이면 스피너
+  const isLoadingClan = myClanQuery.isFetching && !myClanQuery.data;
+  // API 에러 상태 — 에러 시 패널을 바로 닫지 않고 재시도 UI 제공
+  const fetchError = myClanQuery.isError && !myClanQuery.isFetching;
+  // 재시도 버튼용
+  const fetchMyClan = () => void myClanQuery.refetch();
+
+  // 클랜이 없으면 자동으로 닫기 — 스토어 동작이라 효과에서 불러도 된다
+  const hasNoClan = myClanQuery.isSuccess && myClanQuery.data === null;
+  useEffect(() => {
+    if (hasNoClan) closeClanChat();
+  }, [hasNoClan, closeClanChat]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -160,13 +153,6 @@ export function FloatingClanChatPanel() {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
-
-  // 클랜 채팅 창 열릴 때 내 클랜 정보 조회
-  useEffect(() => {
-    if (!isClanChatOpen || !isAuthenticated) return;
-    fetchMyClan();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClanChatOpen, isAuthenticated]);
 
   if (!isClanChatOpen) return null;
 
@@ -193,7 +179,7 @@ export function FloatingClanChatPanel() {
       {/* 헤더 */}
       <motion.div
         animate={
-          hasPulse
+          showPulse
             ? {
                 backgroundColor: [
                   "rgba(var(--accent-primary-rgb, 99, 102, 241), 0)",
@@ -204,7 +190,7 @@ export function FloatingClanChatPanel() {
             : {}
         }
         transition={
-          hasPulse ? { duration: 1, repeat: 1, ease: "easeInOut" } : {}
+          showPulse ? { duration: 1, repeat: 1, ease: "easeInOut" } : {}
         }
         className="flex items-center justify-between px-3 py-2 border-b border-bg-tertiary bg-bg-secondary/95 backdrop-blur-sm"
       >
@@ -233,7 +219,11 @@ export function FloatingClanChatPanel() {
           {/* 최소화/복원 — 모바일에서는 숨김 */}
           {!isMobile && (
             <button
-              onClick={() => setIsMinimized((v) => !v)}
+              onClick={() => {
+                // 접고 펼칠 때 지난 pulse 를 지운다(다시 접었을 때 남아 있지 않게)
+                setHasPulse(false);
+                setIsMinimized((v) => !v);
+              }}
               className="p-1.5 rounded hover:bg-bg-elevated text-text-tertiary hover:text-text-primary transition-colors"
               title={isMinimized ? "복원" : "최소화"}
             >

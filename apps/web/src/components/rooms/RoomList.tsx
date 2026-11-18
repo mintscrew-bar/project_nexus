@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import { roomApi } from "@/lib/api-client";
 import { connectRoomSocket, roomSocketHelpers } from "@/lib/socket-client";
@@ -30,6 +30,7 @@ import {
   type PubgGameMode,
   type PubgPlatform,
 } from "@nexus/types";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
 export type StatusFilter = "ALL" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
 type ModeFilter =
@@ -143,13 +144,6 @@ export function RoomList({
   const currentUserId = useAuthStore((state) => state.user?.id);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const authLoading = useAuthStore((state) => state.isLoading);
-  const [rooms, setRooms] = useState<any[]>([]);
-  const [totalRooms, setTotalRooms] = useState(0);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const nextCursorRef = useRef<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [modeFilter, setModeFilter] = useState<ModeFilter>("ALL");
   // 배그는 경기 모드가 1순위 필터다.
@@ -194,39 +188,51 @@ export function RoomList({
     ],
   );
 
+  // 방 목록은 React Query(커서 페이지)로 — 예전엔 효과에서 loadRooms() 로 setIsLoading·
+  // setRooms 했다(react-hooks/set-state-in-effect). 필터·정렬·검색이 바뀌면 키가 바뀌어
+  // 첫 페이지부터 다시 불러오고, "방 더 보기" 는 다음 쪽을 이어 붙인다.
+  const roomsQuery = useInfiniteQuery({
+    queryKey: ["rooms", "list", roomQuery],
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      roomApi.getRooms({
+        ...roomQuery,
+        ...(pageParam ? { cursor: pageParam } : {}),
+      }),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+  const rooms = useMemo(() => {
+    // 쪽 사이에 방이 옮겨 와 겹칠 수 있어 id 로 한 번만 남긴다
+    const seen = new Set<string>();
+    const list: any[] = [];
+    for (const page of roomsQuery.data?.pages ?? []) {
+      for (const room of page.items as any[]) {
+        if (seen.has(room.id)) continue;
+        seen.add(room.id);
+        list.push(room);
+      }
+    }
+    return list;
+  }, [roomsQuery.data]);
+  const pages = roomsQuery.data?.pages;
+  const totalRooms: number = pages?.[pages.length - 1]?.total ?? 0;
+  const nextCursor = roomsQuery.hasNextPage;
+  const isLoading = roomsQuery.isLoading;
+  const isLoadingMore = roomsQuery.isFetchingNextPage;
+  const roomsError = roomsQuery.error as any;
+  const error: string | null = roomsQuery.isError
+    ? (roomsError?.response?.data?.message ??
+      roomsError?.message ??
+      "방 목록을 불러오지 못했습니다.")
+    : null;
+  // 다시 불러오기(append=true 면 다음 쪽) — 예전 이름 그대로 둔다
+  const { refetch: refetchRooms, fetchNextPage } = roomsQuery;
   const loadRooms = useCallback(
     async (append = false) => {
-      const cursor = nextCursorRef.current;
-      if (append && !cursor) return;
-      append ? setIsLoadingMore(true) : setIsLoading(true);
-      setError(null);
-      try {
-        const page = await roomApi.getRooms({
-          ...roomQuery,
-          ...(append ? { cursor: cursor ?? undefined } : {}),
-        });
-        setRooms((current) => {
-          if (!append) return page.items;
-          const ids = new Set(current.map((room: any) => room.id));
-          return [
-            ...current,
-            ...page.items.filter((room: any) => !ids.has(room.id)),
-          ];
-        });
-        setTotalRooms(page.total);
-        setNextCursor(page.nextCursor);
-        nextCursorRef.current = page.nextCursor;
-      } catch (err: any) {
-        setError(
-          err?.response?.data?.message ??
-            err?.message ??
-            "방 목록을 불러오지 못했습니다.",
-        );
-      } finally {
-        append ? setIsLoadingMore(false) : setIsLoading(false);
-      }
+      if (append) await fetchNextPage();
+      else await refetchRooms();
     },
-    [roomQuery],
+    [fetchNextPage, refetchRooms],
   );
 
   const visibleRooms = useMemo(() => {
@@ -246,12 +252,7 @@ export function RoomList({
     });
   }, [rooms, showOnlyJoinable, currentUserId]);
 
-  // 필터·정렬·검색은 서버가 처리하고, 변경될 때 첫 페이지부터 다시 불러온다.
-  useEffect(() => {
-    void loadRooms();
-  }, [loadRooms]);
-
-  // 첫 페이지는 실시간 델타가 오면 서버 기준으로 다시 조회한다. 구독 응답의
+  // 실시간 델타가 오면 불러온 쪽들을 서버 기준으로 다시 조회한다. 구독 응답의
   // 전체 배열은 무시해, 페이지네이션 상태를 덮어쓰지 않는다.
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
