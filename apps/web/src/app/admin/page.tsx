@@ -12,6 +12,7 @@ import { ChatLogsTab } from "@/components/admin/users/ChatLogsTab";
 import { CommunityTab } from "@/components/admin/content/CommunityTab";
 import { AnnouncementsTab } from "@/components/admin/content/AnnouncementsTab";
 import { StreamersTab } from "@/components/admin/content/StreamersTab";
+import { MedalsTab } from "@/components/admin/content/MedalsTab";
 import { ClansTab } from "@/components/admin/game/ClansTab";
 import { RoomsTab } from "@/components/admin/game/RoomsTab";
 import { MatchesTab } from "@/components/admin/game/MatchesTab";
@@ -45,6 +46,7 @@ import {
   Bug,
   ClipboardList,
   Trash2,
+  Medal,
 } from "lucide-react";
 
 type Tab =
@@ -59,6 +61,7 @@ type Tab =
   | "chatlogs"
   | "announcements"
   | "streamers"
+  | "medals"
   | "appeals"
   | "discord"
   | "errors"
@@ -155,6 +158,12 @@ const TAB_GROUPS: TabGroup[] = [
         scope: "game",
         label: "스트리머",
         icon: <Radio className="h-4 w-4" />,
+      },
+      // 메달 경제 운영(Task 17) — 계정 공통이라 공통 범위, ADMIN 전용(MODERATOR_TABS 에 넣지 않음)
+      {
+        id: "medals",
+        label: "메달·원장",
+        icon: <Medal className="h-4 w-4" />,
       },
     ],
   },
@@ -376,6 +385,7 @@ function AdminPageInner() {
             <AnnouncementsTab addToast={addToast} />
           )}
           {activeTab === "streamers" && <StreamersTab addToast={addToast} />}
+          {activeTab === "medals" && <MedalsTab addToast={addToast} />}
           {activeTab === "clans" && <ClansTab addToast={addToast} />}
           {activeTab === "rooms" && <RoomsTab addToast={addToast} />}
           {activeTab === "scrims" && (

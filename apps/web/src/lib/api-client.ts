@@ -2498,6 +2498,67 @@ export const medalApi = {
   },
 };
 
+/** 관리자 원장 한 줄 — 누구 원장인지 이름이 붙는다 (Task 17) */
+export interface AdminMedalLedgerItem extends MedalHistoryItem {
+  userId: string | null;
+  user: { id: string; username: string; avatar: string | null } | null;
+}
+
+/** 관리자 사용자 메달 상세 (GET medals/admin/users/:id) */
+export interface AdminMedalUser {
+  user: {
+    id: string;
+    username: string;
+    avatar: string | null;
+    createdAt: string;
+  };
+  summary: MedalSummary;
+  cosmetics: {
+    loadout: CosmeticLoadoutState;
+    items: {
+      itemCode: string;
+      slot: CosmeticSlot | null;
+      source: string;
+      acquiredAt: string;
+      paid: number | null;
+      equipped: boolean;
+      refundable: boolean;
+    }[];
+  };
+}
+
+/** 관리자 메달 운영 — 원장 조회·사용자 상세·지급/회수·환불 (ADMIN, Task 17) */
+export const adminMedalApi = {
+  ledger: async (params: {
+    userId?: string;
+    reason?: string;
+    cursor?: string;
+    limit?: number;
+  }): Promise<{ items: AdminMedalLedgerItem[]; nextCursor: string | null }> => {
+    const response = await apiClient.get("/medals/admin/ledger", { params });
+    return response.data;
+  },
+  user: async (userId: string): Promise<AdminMedalUser> => {
+    const response = await apiClient.get(`/medals/admin/users/${userId}`);
+    return response.data;
+  },
+  /** 지급(양수)·회수(음수). requestId 는 화면이 한 번 만들어 재시도에도 같은 값을 쓴다 */
+  adjust: async (body: {
+    userId: string;
+    amount: number;
+    memo: string;
+    requestId: string;
+    allowNegative?: boolean;
+  }) => {
+    const response = await apiClient.post("/medals/admin/adjust", body);
+    return response.data;
+  },
+  refund: async (body: { userId: string; itemCode: string; memo: string }) => {
+    const response = await apiClient.post("/medals/admin/refund", body);
+    return response.data as { balance: number; refunded: number };
+  },
+};
+
 export const notificationApi = {
   getNotifications: async (limit = 20, offset = 0) => {
     const response = await apiClient.get("/notifications", {

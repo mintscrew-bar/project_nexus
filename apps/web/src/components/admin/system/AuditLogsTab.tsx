@@ -27,6 +27,9 @@ const ACTION_LABEL: Record<string, string> = {
   SCRIM_COLLECT_RETRY: "스크림 수집 재시도",
   SCRIM_CANCEL: "스크림 취소",
   MATCH_COLLECT_RETRY: "내전 수집 재시도",
+  BOT_CLEANUP: "봇 정리",
+  MEDAL_ADJUST: "메달 지급·회수",
+  MEDAL_REFUND: "상점 구매 환불",
 };
 
 const TARGET_LABEL: Record<string, string> = {
