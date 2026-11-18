@@ -100,16 +100,17 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-const getModeIcon = (mode: Room["teamMode"]) => {
+/** 팀 구성 방식 아이콘 — 컴포넌트를 골라 돌려주지 않고 요소를 바로 만든다(그릴 때 정해지는 태그 경고 방지) */
+const modeIcon = (mode: Room["teamMode"], className: string) => {
   switch (mode) {
     case "AUCTION":
-      return Gavel;
+      return <Gavel className={className} />;
     case "SNAKE_DRAFT":
-      return ListOrdered;
+      return <ListOrdered className={className} />;
     case "AUTO_BALANCE":
-      return Scale;
+      return <Scale className={className} />;
     default:
-      return ArrowLeftRight;
+      return <ArrowLeftRight className={className} />;
   }
 };
 
@@ -131,7 +132,6 @@ export const RoomCard: React.FC<RoomCardProps> = ({
     room.status === "WAITING" && isFull && room.allowSpectators !== false;
   const canJoin = canJoinAsPlayer || canWatch;
   const canEnter = canJoin || isParticipant;
-  const ModeIcon = getModeIcon(room.teamMode);
   const occupancy = Math.max(
     0,
     Math.min(100, (currentPlayers / Math.max(room.maxParticipants, 1)) * 100),
@@ -159,7 +159,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         <div className="mb-6 flex items-start justify-between gap-5">
           <div className="flex min-w-0 items-start gap-3.5">
             <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-accent-primary/[0.09] text-accent-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]">
-              <ModeIcon className="h-4 w-4" />
+              {modeIcon(room.teamMode, "h-4 w-4")}
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2">

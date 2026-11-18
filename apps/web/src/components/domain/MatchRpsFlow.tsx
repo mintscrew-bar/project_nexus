@@ -129,8 +129,10 @@ export function MatchRpsFlow({
   const showSide = rps.phase === "side" && anim !== "countdown";
   const showDone = rps.phase === "done";
 
-  // 팀장 패널
-  const Panel = ({ team, isA }: { team: RpsTeam; isA: boolean }) => {
+  // 팀장 패널 — 컴포넌트가 아니라 그리기 함수다. 컴포넌트를 이 안에서 만들면 다시 그릴
+  // 때마다 새 컴포넌트가 되어 패널이 통째로 다시 붙고 애니메이션이 처음부터 돌았다
+  // (react-hooks/static-components). 훅을 쓰지 않아 함수로 불러도 같다.
+  const renderPanel = (team: RpsTeam, isA: boolean) => {
     const submitted = isA ? submittedA : submittedB;
     const isMe = isA ? amCaptainA : amCaptainB;
     // 진영 선택만 하는 세트에서는 승패 연출을 하지 않는다.
@@ -238,9 +240,9 @@ export function MatchRpsFlow({
       </div>
 
       <div className="relative flex items-stretch gap-2">
-        <Panel team={teamA} isA />
+        {renderPanel(teamA, true)}
         <div className="flex items-center text-lg font-black text-text-tertiary">VS</div>
-        <Panel team={teamB} isA={false} />
+        {renderPanel(teamB, false)}
         {/* 카운트다운: 뒤 패널 dim(고정) + 숫자만 강조(박자마다 팝). 끝나면 dim 해제 */}
         <AnimatePresence>
           {anim === "countdown" && (

@@ -121,17 +121,14 @@ function ContextMenu({
     });
   }, [ctx.x, ctx.y]);
 
-  const Item = ({
-    icon: Icon,
-    label,
-    onClick,
+  // 메뉴 한 줄 — 컴포넌트가 아니라 그리기 함수(이 안에서 컴포넌트를 만들면 다시 그릴
+  // 때마다 새 컴포넌트가 된다, react-hooks/static-components)
+  const item = (
+    Icon: React.ElementType,
+    label: string,
+    onClick: () => void,
     danger = false,
-  }: {
-    icon: React.ElementType;
-    label: string;
-    onClick: () => void;
-    danger?: boolean;
-  }) => (
+  ) => (
     <button
       className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors text-left hover:bg-bg-elevated ${
         danger ? "text-accent-danger" : "text-text-primary"
@@ -152,22 +149,18 @@ function ContextMenu({
       style={{ position: "fixed", left: pos.left, top: pos.top, zIndex: 9999 }}
       className="bg-bg-secondary border border-bg-tertiary rounded-lg shadow-2xl min-w-[180px] py-1 overflow-hidden"
     >
-      <Item icon={User} label="프로필 보기" onClick={onProfile} />
+      {item(User, "프로필 보기", onProfile)}
       <div className="border-t border-bg-tertiary my-1" />
-      <Item icon={Tag} label="별명 설정" onClick={onNickname} />
-      <Item icon={FileText} label="메모" onClick={onMemo} />
-      <Item icon={FolderOpen} label="카테고리 변경" onClick={onCategory} />
+      {item(Tag, "별명 설정", onNickname)}
+      {item(FileText, "메모", onMemo)}
+      {item(FolderOpen, "카테고리 변경", onCategory)}
       {(onInvite || onJoin) && (
         <div className="border-t border-bg-tertiary my-1" />
       )}
-      {onInvite && (
-        <Item icon={Sword} label="내전 초대하기" onClick={onInvite} />
-      )}
-      {onJoin && (
-        <Item icon={ExternalLink} label="내전 참가하기" onClick={onJoin} />
-      )}
+      {onInvite && item(Sword, "내전 초대하기", onInvite)}
+      {onJoin && item(ExternalLink, "내전 참가하기", onJoin)}
       <div className="border-t border-bg-tertiary my-1" />
-      <Item icon={Trash2} label="친구 삭제" onClick={onRemove} danger />
+      {item(Trash2, "친구 삭제", onRemove, true)}
     </div>
   );
 }

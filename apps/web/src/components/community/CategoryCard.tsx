@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { type Post, formatDate } from "./community-types";
 import { type Board } from "@/lib/api-client";
-import { resolveBoardIcon } from "@/lib/board-icons";
+import { BoardIcon } from "@/components/community/BoardIcon";
 import { useCommunityStore } from "@/stores/community-store";
 import { useNavigationGame } from "@/hooks/useCurrentGame";
 import { GAMES } from "@nexus/types";
@@ -27,7 +27,6 @@ export function CategoryCard({
   const router = useRouter();
   const game = useNavigationGame();
   const setSelectedCategory = useCommunityStore((s) => s.setSelectedCategory);
-  const Icon = resolveBoardIcon(board.iconName);
   const title = board.fullName ?? board.name;
 
   // 최대 5개 표시
@@ -38,7 +37,8 @@ export function CategoryCard({
       {/* 카드 헤더 */}
       <div className="bg-bg-tertiary border-b border-bg-elevated px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Icon
+          <BoardIcon
+            name={board.iconName}
             className={cn("h-4 w-4", board.color ?? "text-text-secondary")}
           />
           <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
