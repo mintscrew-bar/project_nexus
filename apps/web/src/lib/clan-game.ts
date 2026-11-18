@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { lastGameOrDefault } from "@/lib/last-game";
+import { useIsClient } from "@/hooks/useIsClient";
 
 export type ClanGameTitle = "LOL" | "PUBG";
 
@@ -39,10 +39,10 @@ export function useClanGame(): ClanGameTitle {
   const searchParams = useSearchParams();
   const param = searchParams.get("game")?.toLowerCase();
 
-  const [remembered, setRemembered] = useState<ClanGameTitle>("LOL");
-  useEffect(() => {
-    setRemembered(lastGameOrDefault() === "PUBG" ? "PUBG" : "LOL");
-  }, []);
+  // 하이드레이션이 끝난 뒤에만 저장소를 읽는다(효과에서 setState 하지 않고 그릴 때 읽기)
+  const isClient = useIsClient();
+  const remembered: ClanGameTitle =
+    isClient && lastGameOrDefault() === "PUBG" ? "PUBG" : "LOL";
 
   if (param === "pubg") return "PUBG";
   if (param === "lol") return "LOL";

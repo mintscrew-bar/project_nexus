@@ -33,33 +33,38 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
   const [inputValue, setInputValue] = useState('');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // 마지막으로 바닥에서 본 메시지 수. 안 읽은 수는 여기서 계산한다 — 예전엔 메시지가
+  // 늘 때마다 효과에서 setUnreadCount(+1) 했다(react-hooks/set-state-in-effect).
+  const [seenCount, setSeenCount] = useState(messages.length);
+  const unreadCount = isAtBottom ? 0 : Math.max(0, messages.length - seenCount);
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    const container = scrollContainerRef.current;
-    if (container) {
-      container.scrollTo({ top: container.scrollHeight, behavior });
-    }
-    setUnreadCount(0);
-  }, []);
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = 'smooth') => {
+      const container = scrollContainerRef.current;
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior });
+      }
+      setSeenCount(messages.length);
+    },
+    [messages.length],
+  );
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
     const threshold = 60;
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    // 바닥에 있었거나 바닥에 닿았으면 지금까지의 메시지는 다 본 것
+    if (atBottom || isAtBottom) setSeenCount(messages.length);
     setIsAtBottom(atBottom);
-    if (atBottom) setUnreadCount(0);
-  }, []);
+  }, [isAtBottom, messages.length]);
 
+  // 바닥에 있을 때 새 메시지가 오면 따라 내려간다(화면 조작만, 상태는 바꾸지 않는다)
   useEffect(() => {
-    if (isAtBottom) {
-      scrollToBottom('auto');
-      setUnreadCount(0);
-    } else {
-      setUnreadCount((prev) => prev + 1);
-    }
-  }, [messages.length, isAtBottom, scrollToBottom]);
+    if (!isAtBottom) return;
+    const container = scrollContainerRef.current;
+    container?.scrollTo({ top: container.scrollHeight, behavior: 'auto' });
+  }, [messages.length, isAtBottom]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

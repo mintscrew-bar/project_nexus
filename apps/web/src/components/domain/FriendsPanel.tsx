@@ -1042,14 +1042,16 @@ function ConversationList({
   onOpenChat: (userId: string) => void;
   getDisplayName: (friendId: string, username: string) => string;
 }) {
-  const [loaded, setLoaded] = useState(false);
+  // 처음 열 때 한 번만 대화 목록을 불러온다. 부모가 그릴 때마다 새 함수를 넘겨서
+  // 의존성만으로는 매번 다시 부르게 되므로 "불렀는지" 를 ref 로 기억한다
+  // (예전엔 상태로 기억해 효과 안에서 setState — react-hooks/set-state-in-effect).
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (!loaded) {
-      onFetchConversations();
-      setLoaded(true);
-    }
-  }, [loaded, onFetchConversations]);
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+    onFetchConversations();
+  }, [onFetchConversations]);
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);

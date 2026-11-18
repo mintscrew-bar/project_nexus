@@ -130,6 +130,8 @@ export function GuidedTour({
 
     const target = findVisibleTarget(steps[stepIndex]?.selector);
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // 강조할 요소의 화면 위치(DOM)를 재서 맞추는 외부 동기화라 효과에서 부른다
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     updateTarget();
 
     const settledUpdate = window.setTimeout(updateTarget, 350);
