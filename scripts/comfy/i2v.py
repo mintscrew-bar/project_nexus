@@ -26,6 +26,10 @@ def main():
     ap.add_argument("--steps", type=int, default=8)
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--fps", type=float, default=24)
+    # 반복 영상 — 마지막 장면도 첫 그림으로 고정해 원래 모습으로 돌아오며 끝나게 한다.
+    # 양 끝이 원본에 묶여 중간에 형태가 무너지는 것도 줄어든다(4초 단일 고정판은 머리카락이 처졌다)
+    ap.add_argument("--loop", action="store_true")
+    ap.add_argument("--loop-strength", type=float, default=1.0)
     a = ap.parse_args()
     seed = a.seed if a.seed is not None else random.randint(0, 2**31)
     name = upload(a.image)
@@ -59,6 +63,18 @@ def main():
                "inputs": {"images": ["12", 0], "filename_prefix": "live_video", "codec": "vp9",
                           "fps": a.fps, "crf": 24}},
     }
+    if a.loop:
+        # 첫 그림을 마지막 프레임 안내로 덧붙이고, 샘플링 뒤 안내 프레임을 잘라 낸다
+        wf["14"] = {"class_type": "LTXVAddGuide",
+                    "inputs": {"positive": ["7", 0], "negative": ["7", 1], "vae": ["1", 2],
+                               "latent": ["7", 2], "image": ["6", 0], "frame_idx": -1,
+                               "strength": a.loop_strength}}
+        wf["8"]["inputs"].update({"positive": ["14", 0], "negative": ["14", 1]})
+        wf["9"]["inputs"]["latent"] = ["14", 2]
+        wf["11"]["inputs"]["latent_image"] = ["14", 2]
+        wf["15"] = {"class_type": "LTXVCropGuides",
+                    "inputs": {"positive": ["8", 0], "negative": ["8", 1], "latent": ["11", 0]}}
+        wf["12"]["inputs"]["samples"] = ["15", 2]
     outs, took = run(wf, poll=5)
     o = outs["13"]
     item = (o.get("images") or o.get("videos") or o.get("gifs"))[0]
