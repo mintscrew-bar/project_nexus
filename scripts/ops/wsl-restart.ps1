@@ -108,12 +108,28 @@ Start-Sleep -Seconds 10
 # site coming back matters more than reclaiming space.
 if ($Compact) {
     Write-Log "step 1b: compacting ext4.vhdx"
+    # The keepalive watchdog restarts WSL as soon as it sees it down. On the
+    # first -Compact run (2026-11-18) it did exactly that while the vhdx was
+    # being located, and diskpart failed with "file in use". Stop it here;
+    # step 5 starts it again.
+    Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
+        Where-Object { $_.CommandLine -like "*wsl-watchdog.ps1*" } |
+        ForEach-Object {
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            Write-Log "  stopped watchdog (pid $($_.ProcessId)) for the compact"
+        }
     $vhdx = $VhdxPath
     if (-not $vhdx) {
-        $found = @(Get-ChildItem -Path "$env:LOCALAPPDATA\wsl\*\ext4.vhdx" -ErrorAction SilentlyContinue) +
-                 @(Get-ChildItem -Path "$env:LOCALAPPDATA\Packages\*\LocalState\ext4.vhdx" -ErrorAction SilentlyContinue)
+        # Modern location first - scanning Packages took ~90s on this box.
+        $found = @(Get-ChildItem -Path "$env:LOCALAPPDATA\wsl\*\ext4.vhdx" -ErrorAction SilentlyContinue)
+        if ($found.Count -eq 0) {
+            $found = @(Get-ChildItem -Path "$env:LOCALAPPDATA\Packages\*\LocalState\ext4.vhdx" -ErrorAction SilentlyContinue)
+        }
         if ($found.Count -gt 0) { $vhdx = $found[0].FullName }
     }
+    # Make sure nothing brought the VM back in the meantime.
+    & $Wsl --shutdown
+    Start-Sleep -Seconds 5
     if (-not $vhdx -or -not (Test-Path $vhdx)) {
         Write-Log "  WARNING: ext4.vhdx not found, skipping compact"
     } else {
