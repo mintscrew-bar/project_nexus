@@ -71,6 +71,7 @@ import { AutoBalanceReview } from "./_components/AutoBalanceReview";
 import { LobbyErrorState } from "./_components/LobbyErrorState";
 import { BroadcastLinkModal } from "./_components/BroadcastLinkModal";
 import { TeamModeHelp, type TeamMode } from "@/components/rooms/TeamModeHelp";
+import { useResetOn } from "@/hooks/useResetOn";
 
 const STAGE_TRANSITION_MAX_ATTEMPTS = 12;
 const STAGE_TRANSITION_RETRY_DELAY_MS = 750;
@@ -154,19 +155,61 @@ export default function TournamentLobbyPage() {
   const [addingFriend, setAddingFriend] = useState<string | null>(null);
   const [sentFriendIds, setSentFriendIds] = useState<Set<string>>(new Set());
   const [mobileTab, setMobileTab] = useState<string>("participants");
-  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
-  const previousMessageCountRef = useRef(messages.length);
-  const [connectTimedOut, setConnectTimedOut] = useState(false);
+  // 읽지 않은 채팅 수 — "채팅을 보고 있을 때의 메시지 수" 를 기억해 두고 계산한다.
+  // 예전엔 메시지가 늘 때마다 효과에서 setUnreadChatCount 했다(react-hooks/set-state-in-effect).
+  // 새 방에서는 이전 방의 읽지 않은 개수를 이어가지 않는다(방이 바뀌면 0 부터).
+  const chatVisible = !isMobileLayout || mobileTab === "chat";
+  const [seenChatCount, setSeenChatCount] = useResetOn(0, roomId);
+  if (chatVisible && seenChatCount !== messages.length) {
+    // 채팅이 보이는 동안 온 메시지는 읽은 것 — 그리는 중에 바로 맞춘다
+    setSeenChatCount(messages.length);
+  }
+  const unreadChatCount = chatVisible
+    ? 0
+    : Math.min(100, Math.max(0, messages.length - seenChatCount));
   // 시작 조건이 안 맞은 채로 "내전 시작"을 누르면 모달로 막힌 항목·사람·호출
   // 버튼을 보여준다(StartBlockedModal). 사라지는 토스트로는 무엇을 고쳐야
   // 하는지 인식하지 못했다(2026-09-22 운영자 제보).
   const [startBlockOpen, setStartBlockOpen] = useState(false);
   // 서버가 거절한 사유. 화면 판정만으로 연 모달이면 null 이다.
-  const [serverStartBlock, setServerStartBlock] =
-    useState<ServerStartBlock | null>(null);
+  // 참가·준비·음성 상태가 바뀌면 서버가 준 거절 사유는 더 이상 사실이 아닐
+  // 수 있다 — 그때의 방 상태와 같이 들고 있다가 달라지면 버린다(모달은 체크리스트의
+  // 최신 계산으로 돌아간다). 예전엔 효과에서 setServerStartBlock(null) 했다.
+  const [serverStartBlockState, setServerStartBlockState] = useState<{
+    block: ServerStartBlock;
+    participants: unknown;
+    status: unknown;
+    teamMode: unknown;
+  } | null>(null);
+  const serverStartBlock =
+    serverStartBlockState &&
+    serverStartBlockState.participants === room?.participants &&
+    serverStartBlockState.status === room?.status &&
+    serverStartBlockState.teamMode === room?.teamMode
+      ? serverStartBlockState.block
+      : null;
+  const setServerStartBlock = (block: ServerStartBlock | null) =>
+    setServerStartBlockState(
+      block
+        ? {
+            block,
+            participants: room?.participants,
+            status: room?.status,
+            teamMode: room?.teamMode,
+          }
+        : null,
+    );
   // "다시 시도"를 누를 때마다 증가시켜 connect 이펙트를 재실행한다.
   const [retryNonce, setRetryNonce] = useState(0);
+  // 연결 시간 초과 — 방·재시도·입장 상태가 바뀌면 처음(false)으로 돌아간다. 예전엔 입장하거나
+  // 오류가 나면 효과에서 setConnectTimedOut(false) 했다. 오류가 있으면 그 화면이 우선이다.
+  const lobbyJoined = isConnected && !!room;
+  const [rawConnectTimedOut, setConnectTimedOut] = useResetOn(
+    false,
+    `${roomId}:${retryNonce}:${lobbyJoined}`,
+  );
+  const connectTimedOut = rawConnectTimedOut && !error;
   const hasRedirected = useRef(false);
   // 최초 입장 성공 여부 — 이후의 재연결 대기에는 타임아웃을 걸지 않는다.
   const hasJoinedOnce = useRef(false);
@@ -188,29 +231,6 @@ export default function TournamentLobbyPage() {
     mediaQuery.addEventListener("change", updateLayout);
     return () => mediaQuery.removeEventListener("change", updateLayout);
   }, []);
-
-  useEffect(() => {
-    const previousCount = previousMessageCountRef.current;
-    const addedCount = Math.max(0, messages.length - previousCount);
-    previousMessageCountRef.current = messages.length;
-
-    if (!isMobileLayout || mobileTab === "chat") {
-      setUnreadChatCount(0);
-    } else if (addedCount > 0) {
-      setUnreadChatCount((count) => Math.min(100, count + addedCount));
-    }
-  }, [messages.length, mobileTab, isMobileLayout]);
-
-  useEffect(() => {
-    previousMessageCountRef.current = 0;
-    setUnreadChatCount(0);
-  }, [roomId]); // 새 방에서는 이전 방의 읽지 않은 개수를 이어가지 않는다.
-
-  useEffect(() => {
-    // 참가·준비·음성 상태가 바뀌면 서버가 준 거절 사유는 더 이상 사실이 아닐
-    // 수 있다. 모달은 체크리스트의 최신 계산으로 돌아간다.
-    setServerStartBlock(null);
-  }, [room?.participants, room?.status, room?.teamMode]);
 
   // 방장 퇴장으로 방이 해산됐다 — 안내 토스트를 띄우고 내전 목록으로 보낸다.
   useEffect(() => {
@@ -460,13 +480,9 @@ export default function TournamentLobbyPage() {
     // 연결 + 방 데이터까지 도착해야 정상 상태다. join-room 응답이 오지 않는 경우도 함께 끊는다.
     if (isConnected && room) {
       hasJoinedOnce.current = true;
-      setConnectTimedOut(false);
       return;
     }
-    if (error) {
-      setConnectTimedOut(false);
-      return;
-    }
+    if (error) return;
     const timer = setTimeout(
       () => setConnectTimedOut(true),
       LOBBY_CONNECT_TIMEOUT_MS,
@@ -479,7 +495,7 @@ export default function TournamentLobbyPage() {
     // 아직 방에 입장한 적이 없으므로 leave 없이 소켓만 정리하고 재연결한다.
     disconnect({ skipLeave: true });
     setRetryNonce((prev) => prev + 1);
-  }, [disconnect]);
+  }, [disconnect, setConnectTimedOut]);
 
   useEffect(() => {
     if (hasRedirected.current || !room) return;

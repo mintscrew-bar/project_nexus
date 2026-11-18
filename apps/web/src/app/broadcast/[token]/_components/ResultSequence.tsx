@@ -11,6 +11,7 @@ import {
   teamDisplayName,
   useBroadcastLook,
 } from "./look";
+import { useResetOn } from "@/hooks/useResetOn";
 
 /**
  * 경기 결과 — 타이포그래피 영상처럼 순서대로 재생한다(Riot 기록이 수집된 판).
@@ -170,20 +171,20 @@ export function ResultSequence({
 }) {
   const look = useBroadcastLook();
   const animate = look.settings.transition.style !== "none";
-  const [stage, setStage] = useState<Stage>(animate ? "win" : "board");
+  // 경기가 바뀌면 처음부터 다시 재생 — 경기·연출 여부가 바뀌면 첫 단계로 돌아간다.
+  // 예전엔 효과에서 setStage("win") 으로 되돌렸다(react-hooks/set-state-in-effect).
+  const [stage, setStage] = useResetOn<Stage>(
+    animate ? "win" : "board",
+    `${match.id}:${animate}`,
+  );
 
-  // 경기가 바뀌면 처음부터 다시 재생
   useEffect(() => {
-    if (!animate) {
-      setStage("board");
-      return;
-    }
-    setStage("win");
+    if (!animate) return;
     const timers = TIMELINE.slice(1).map(({ stage: next, at }) =>
       setTimeout(() => setStage(next), at),
     );
     return () => timers.forEach(clearTimeout);
-  }, [match.id, animate]);
+  }, [match.id, animate, setStage]);
 
   const winnerIsRed = winner?.id === match.red?.id;
   const winColor = winnerIsRed
