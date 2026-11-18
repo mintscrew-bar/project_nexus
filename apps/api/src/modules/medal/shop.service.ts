@@ -73,6 +73,16 @@ export class ShopService {
     });
     if (already) throw new ConflictException("이미 가진 상품이에요.");
 
+    // 환불받은 적 있는 상품을 다시 사면 회차 키를 쓴다 — 첫 구매 키(`purchase:<사람>:<상품>`)는
+    // 원장에 이미 있어서 그대로 쓰면 유니크 제약에 걸려 영영 다시 못 산다(Task 17)
+    const refunds = await this.prisma.medalLedger.count({
+      where: { userId, reason: MedalReason.REFUND, sourceId: code },
+    });
+    const purchaseKey =
+      refunds === 0
+        ? `purchase:${userId}:${code}`
+        : `purchase:${userId}:${code}:${refunds}`;
+
     try {
       const result = await this.prisma.$transaction(async (tx) => {
         // 잔액이 모자라면 여기서 InsufficientMedalsError 로 통째로 되돌린다
@@ -80,7 +90,7 @@ export class ShopService {
           userId,
           amount: -item.price,
           reason: MedalReason.PURCHASE,
-          idempotencyKey: `purchase:${userId}:${code}`,
+          idempotencyKey: purchaseKey,
           sourceId: code,
           metadata: { itemCode: code, price: item.price },
         });
@@ -140,6 +150,127 @@ export class ShopService {
       update: { itemCode: code },
     });
     return this.getLoadout(userId);
+  }
+
+  /**
+   * 관리자 환불 (Task 17) — 구매 원장의 금액을 돌려주고 보유·장착을 지운다.
+   *
+   * - 산 값은 상품표의 현재 가격이 아니라 구매 원장 줄의 금액을 따른다(가격이 바뀌었어도 낸 만큼).
+   * - 운영자가 직접 준 상품(구매 원장 없음)은 환불할 메달이 없어 거절한다.
+   * - 환불 원장 키는 `refund:<구매 원장 id>` — 두 번 눌러도 한 번만 돌려준다.
+   * - 지운 뒤 같은 상품을 다시 사면 purchase 가 회차 키를 쓴다.
+   */
+  async adminRefund(input: {
+    adminId: string;
+    userId: string;
+    itemCode: string;
+    memo: string;
+  }) {
+    const owned = await this.prisma.userCosmetic.findUnique({
+      where: {
+        userId_itemCode: { userId: input.userId, itemCode: input.itemCode },
+      },
+    });
+    if (!owned) throw new NotFoundException("이 사람이 가진 상품이 아니에요.");
+    const purchase = owned.ledgerId
+      ? await this.prisma.medalLedger.findUnique({
+          where: { id: owned.ledgerId },
+        })
+      : null;
+    if (!purchase || purchase.reason !== MedalReason.PURCHASE) {
+      throw new BadRequestException(
+        "메달로 산 상품만 환불할 수 있어요 (운영자가 준 상품이에요).",
+      );
+    }
+    const price = -purchase.amount;
+
+    const entry = await this.prisma
+      .$transaction(async (tx) => {
+        const row = await this.medalService.recordInTx(tx, {
+          userId: input.userId,
+          amount: price,
+          reason: MedalReason.REFUND,
+          idempotencyKey: `refund:${purchase.id}`,
+          sourceId: input.itemCode,
+          metadata: {
+            itemCode: input.itemCode,
+            price,
+            purchaseLedgerId: purchase.id,
+            memo: input.memo,
+            adminId: input.adminId,
+          },
+        });
+        await tx.userCosmetic.delete({ where: { id: owned.id } });
+        // 그 상품을 끼고 있었으면 자리를 비운다(기본 모습으로)
+        await tx.userCosmeticLoadout.deleteMany({
+          where: { userId: input.userId, itemCode: input.itemCode },
+        });
+        await tx.adminAuditLog.create({
+          data: {
+            adminId: input.adminId,
+            action: "MEDAL_REFUND",
+            targetType: "USER",
+            targetId: input.userId,
+            details: {
+              itemCode: input.itemCode,
+              amount: price,
+              memo: input.memo,
+              ledgerId: row.id,
+              purchaseLedgerId: purchase.id,
+              balanceAfter: row.balanceAfter,
+            },
+          },
+        });
+        return row;
+      })
+      .catch((err: any) => {
+        // 같은 환불을 동시에 두 번 누른 경우 — 한쪽은 통째로 되돌려졌다
+        if (err?.code === "P2002") {
+          throw new ConflictException("이미 환불한 구매예요.");
+        }
+        throw err;
+      });
+    return { balance: entry.balanceAfter, refunded: price, ledgerId: entry.id };
+  }
+
+  /**
+   * 관리자 사용자 상세 (Task 17) — 가진 상품(얻은 경로·구매 원장)과 장착 상태
+   */
+  async adminUserCosmetics(userId: string) {
+    const [owned, loadout] = await Promise.all([
+      this.prisma.userCosmetic.findMany({
+        where: { userId },
+        orderBy: { acquiredAt: "desc" },
+      }),
+      this.getLoadout(userId),
+    ]);
+    const ledgerIds = owned
+      .map((o) => o.ledgerId)
+      .filter((id): id is string => !!id);
+    const purchases = ledgerIds.length
+      ? await this.prisma.medalLedger.findMany({
+          where: { id: { in: ledgerIds } },
+          select: { id: true, amount: true, createdAt: true },
+        })
+      : [];
+    const byId = new Map(purchases.map((p) => [p.id, p]));
+    const equipped = new Set(Object.values(loadout));
+    return {
+      loadout,
+      items: owned.map((o) => {
+        const item = findCosmeticShopItem(o.itemCode);
+        const p = o.ledgerId ? byId.get(o.ledgerId) : undefined;
+        return {
+          itemCode: o.itemCode,
+          slot: item?.slot ?? null,
+          source: o.source,
+          acquiredAt: o.acquiredAt,
+          paid: p ? -p.amount : null,
+          equipped: equipped.has(o.itemCode),
+          refundable: o.source === "PURCHASE" && !!p,
+        };
+      }),
+    };
   }
 
   /** 한 사람의 장착 상태 */

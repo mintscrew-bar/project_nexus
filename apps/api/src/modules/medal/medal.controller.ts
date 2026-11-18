@@ -4,6 +4,8 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
+  Param,
   Post,
   Query,
   UseGuards,
@@ -16,9 +18,13 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { MedalService } from "./medal.service";
 import {
   AdjustMedalDto,
+  AdminLedgerQueryDto,
+  RefundCosmeticDto,
   RetroMedalDto,
   VoidMatchMedalDto,
 } from "./dto/adjust-medal.dto";
+import { ShopService } from "./shop.service";
+import { PrismaService } from "../prisma/prisma.service";
 import {
   CAPPED_REASONS,
   MEDAL_DAILY_CAP,
@@ -31,6 +37,8 @@ export class MedalController {
   constructor(
     private readonly medalService: MedalService,
     private readonly matchMedals: MatchMedalService,
+    private readonly shopService: ShopService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /** 내 메달 잔액 */
@@ -101,5 +109,52 @@ export class MedalController {
     @Body() dto: VoidMatchMedalDto,
   ) {
     return this.matchMedals.voidMatch(dto.matchId, adminId, dto.memo);
+  }
+
+  /** 관리자 원장 조회 — 전체 또는 한 사람, 사유 필터, 최신순 커서 페이지 (Task 17) */
+  @Get("admin/ledger")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async adminLedger(@Query() q: AdminLedgerQueryDto) {
+    const n = q.limit ? Number.parseInt(q.limit, 10) : undefined;
+    return this.medalService.adminLedger({
+      userId: q.userId || undefined,
+      reason: q.reason,
+      cursor: q.cursor || undefined,
+      limit: Number.isFinite(n) ? n : undefined,
+    });
+  }
+
+  /** 관리자 사용자 메달 상세 — 잔액·합계·사유별, 가진 상품과 장착 (Task 17) */
+  @Get("admin/users/:userId")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async adminUser(@Param("userId") userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, username: true, avatar: true, createdAt: true },
+    });
+    if (!user) throw new NotFoundException("사용자를 찾을 수 없어요.");
+    const [summary, cosmetics] = await Promise.all([
+      this.medalService.getSummary(userId, {
+        dayKey: kstDayKey(new Date()),
+        dailyCap: MEDAL_DAILY_CAP,
+        cappedReasons: CAPPED_REASONS,
+      }),
+      this.shopService.adminUserCosmetics(userId),
+    ]);
+    return { user, summary, cosmetics };
+  }
+
+  /** 관리자 상점 구매 환불 — 산 값을 돌려주고 보유·장착을 지운다 (Task 17) */
+  @Post("admin/refund")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async adminRefund(
+    @CurrentUser("sub") adminId: string,
+    @Body() dto: RefundCosmeticDto,
+  ) {
+    return this.shopService.adminRefund({ adminId, ...dto });
   }
 }

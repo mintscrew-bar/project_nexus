@@ -159,10 +159,30 @@ describe("MedalService", () => {
       expect(db.audit()).toHaveLength(1);
     });
 
-    it("회수는 잔액보다 많아도 마이너스로 기록한다", async () => {
+    it("잔액보다 큰 회수는 기본으로 막는다 (Task 17)", async () => {
       db.setBalance("u1", 30);
-      const res = await adjust(-50, "req-2");
+      await expect(adjust(-50, "req-2")).rejects.toThrow("메달이 부족해요.");
+      expect(db.balance("u1")).toBe(30);
+      expect(db.ledger()).toHaveLength(0);
+      expect(db.audit()).toHaveLength(0);
+    });
+
+    it("마이너스 허용을 체크하면 잔액보다 큰 회수도 기록한다", async () => {
+      db.setBalance("u1", 30);
+      const res = await service.adminAdjust({
+        adminId: "admin",
+        userId: "u1",
+        amount: -50,
+        memo: "부정 획득 회수",
+        requestId: "req-3",
+        allowNegative: true,
+      });
       expect(res.entry.balanceAfter).toBe(-20);
+      expect(db.audit()[0].details).toMatchObject({
+        balanceBefore: 30,
+        balanceAfter: -20,
+        allowNegative: true,
+      });
     });
 
     it("없는 사용자·0 메달은 거절한다", async () => {

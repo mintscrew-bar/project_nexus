@@ -8,7 +8,9 @@ import {
   MaxLength,
   Min,
   NotEquals,
+  IsIn,
 } from "class-validator";
+import { MedalReason } from "@nexus/database";
 import { KeepRaw } from "../../../common/keep-raw.decorator";
 
 /** POST medals/admin/adjust (ADMIN) — 관리자 지급(양수)·회수(음수) */
@@ -36,6 +38,11 @@ export class AdjustMedalDto {
   @IsNotEmpty()
   @MaxLength(100)
   requestId!: string;
+  /** 잔액보다 큰 회수를 허용 — 기본은 막는다(Task 17). 부정 획득 회수처럼 마이너스 잔액이 맞을 때만 */
+  @KeepRaw()
+  @IsOptional()
+  @IsBoolean()
+  allowNegative?: boolean;
 }
 
 /** POST medals/admin/retro (ADMIN) — 기존 경기 소급 지급. dryRun 이면 세기만 한다 */
@@ -56,4 +63,41 @@ export class VoidMatchMedalDto {
   @IsNotEmpty({ message: "무효 사유를 적어주세요." })
   @MaxLength(300)
   memo!: string;
+}
+
+/** POST medals/admin/refund (ADMIN) — 상점 구매 환불 */
+export class RefundCosmeticDto {
+  @IsString()
+  @IsNotEmpty()
+  userId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  itemCode!: string;
+
+  /** 사유 — 감사 로그와 원장에 남는다 */
+  @IsString()
+  @IsNotEmpty({ message: "환불 사유를 적어주세요." })
+  @MaxLength(300)
+  memo!: string;
+}
+
+/** GET medals/admin/ledger (ADMIN) — 원장 조회 필터 */
+export class AdminLedgerQueryDto {
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
+  @IsOptional()
+  @IsIn(Object.values(MedalReason))
+  reason?: MedalReason;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @IsString()
+  limit?: string;
 }

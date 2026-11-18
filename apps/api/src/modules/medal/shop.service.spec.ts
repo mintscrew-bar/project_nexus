@@ -163,4 +163,54 @@ describe("ShopService", () => {
       });
     });
   });
+
+  describe("adminRefund (Task 17)", () => {
+    const refund = (itemCode = "FX_SLIME", userId = "u1") =>
+      shop.adminRefund({ adminId: "admin", userId, itemCode, memo: "잘못 삼" });
+
+    it("낸 값을 돌려주고 보유·장착을 지우며 감사 로그를 남긴다", async () => {
+      db.setBalance("u1", 300);
+      await shop.purchase("u1", "FX_SLIME", true);
+      const res = await refund();
+      expect(res).toMatchObject({ balance: 300, refunded: 250 });
+      expect(db.cosmetics()).toHaveLength(0);
+      expect(await shop.getLoadout("u1")).toEqual({});
+      const last = db.ledger()[db.ledger().length - 1];
+      expect(last).toMatchObject({
+        reason: MedalReason.REFUND,
+        amount: 250,
+        sourceId: "FX_SLIME",
+      });
+      expect(db.audit()[0]).toMatchObject({ action: "MEDAL_REFUND" });
+    });
+
+    it("환불한 상품을 다시 살 수 있다 (구매 키 회차)", async () => {
+      db.setBalance("u1", 300);
+      await shop.purchase("u1", "FX_SLIME");
+      await refund();
+      const again = await shop.purchase("u1", "FX_SLIME");
+      expect(again.balance).toBe(50);
+      expect(db.ledger().map((l: any) => l.idempotencyKey)).toEqual([
+        "purchase:u1:FX_SLIME",
+        expect.stringMatching(/^refund:/),
+        "purchase:u1:FX_SLIME:1",
+      ]);
+    });
+
+    it("가지지 않은 상품·운영자가 준 상품은 거절한다", async () => {
+      await expect(refund("FX_DRAGON")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      db.cosmetics().push({
+        id: "gift",
+        userId: "u1",
+        itemCode: "FX_GHOST",
+        source: "ADMIN",
+        ledgerId: null,
+      });
+      await expect(refund("FX_GHOST")).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+  });
 });

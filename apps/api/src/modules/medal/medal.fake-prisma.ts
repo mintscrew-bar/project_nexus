@@ -41,7 +41,20 @@ export function createFakePrisma() {
     medalLedger: {
       findUnique: jest.fn(
         async ({ where }: any) =>
-          ledger.find((l) => l.idempotencyKey === where.idempotencyKey) ?? null,
+          ledger.find((l) =>
+            where.id
+              ? l.id === where.id
+              : l.idempotencyKey === where.idempotencyKey,
+          ) ?? null,
+      ),
+      count: jest.fn(
+        async ({ where }: any) =>
+          ledger.filter(
+            (l) =>
+              (where.userId === undefined || l.userId === where.userId) &&
+              (where.reason === undefined || l.reason === where.reason) &&
+              (where.sourceId === undefined || l.sourceId === where.sourceId),
+          ).length,
       ),
       create: jest.fn(async ({ data }: any) => {
         if (ledger.some((l) => l.idempotencyKey === data.idempotencyKey)) {
@@ -80,7 +93,12 @@ export function createFakePrisma() {
       }),
       findMany: jest.fn(async ({ where, take, cursor }: any) => {
         let rows = ledger
-          .filter((l) => l.userId === where.userId)
+          .filter((l) =>
+            where.id?.in
+              ? where.id.in.includes(l.id)
+              : (where.userId === undefined || l.userId === where.userId) &&
+                (where.reason === undefined || l.reason === where.reason),
+          )
           .sort((a, b) => b.createdAt - a.createdAt);
         if (cursor) {
           const i = rows.findIndex((r) => r.id === cursor.id);
@@ -107,6 +125,11 @@ export function createFakePrisma() {
       findMany: jest.fn(async ({ where }: any) =>
         cosmetics.filter((c) => c.userId === where.userId),
       ),
+      delete: jest.fn(async ({ where }: any) => {
+        const row = cosmetics.find((c) => c.id === where.id);
+        cosmetics = cosmetics.filter((c) => c.id !== where.id);
+        return row;
+      }),
       create: jest.fn(async ({ data }: any) => {
         if (
           cosmetics.some(
@@ -138,7 +161,12 @@ export function createFakePrisma() {
       deleteMany: jest.fn(async ({ where }: any) => {
         const before = loadouts.length;
         loadouts = loadouts.filter(
-          (l) => !(l.userId === where.userId && l.slot === where.slot),
+          (l) =>
+            !(
+              l.userId === where.userId &&
+              (where.slot === undefined || l.slot === where.slot) &&
+              (where.itemCode === undefined || l.itemCode === where.itemCode)
+            ),
         );
         return { count: before - loadouts.length };
       }),

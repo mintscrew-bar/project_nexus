@@ -293,6 +293,11 @@ export class MedalService {
     amount: number;
     memo: string;
     requestId: string;
+    /**
+     * 잔액보다 큰 회수를 허용할지 (Task 17). 기본은 막는다 — 잘못 친 숫자로 잔액이
+     * 마이너스가 되지 않게. 부정 획득 회수처럼 마이너스가 맞는 경우만 화면에서 따로 체크한다.
+     */
+    allowNegative?: boolean;
   }): Promise<MedalEntryResult> {
     if (input.amount === 0) {
       throw new BadRequestException("0 메달은 조정할 수 없어요.");
@@ -315,9 +320,13 @@ export class MedalService {
           reason: MedalReason.ADMIN_ADJUST,
           idempotencyKey,
           sourceId: input.adminId,
-          // 회수는 이미 써 버린 메달이라도 기록이 맞아야 하므로 마이너스를 허용한다
-          allowNegative: true,
-          metadata: { memo: input.memo, adminId: input.adminId },
+          // 잔액보다 큰 회수는 기본으로 막는다(InsufficientMedalsError). 허용하면 마이너스 잔액이 된다
+          allowNegative: input.allowNegative ?? false,
+          metadata: {
+            memo: input.memo,
+            adminId: input.adminId,
+            ...(input.allowNegative ? { allowNegative: true } : {}),
+          },
         });
         await tx.adminAuditLog.create({
           data: {
@@ -329,7 +338,9 @@ export class MedalService {
               amount: input.amount,
               memo: input.memo,
               ledgerId: row.id,
+              balanceBefore: row.balanceAfter - input.amount,
               balanceAfter: row.balanceAfter,
+              allowNegative: input.allowNegative ?? false,
             },
           },
         });
@@ -343,6 +354,35 @@ export class MedalService {
       }
       throw err;
     }
+  }
+
+  /**
+   * 관리자 원장 조회 (Task 17) — 전체 또는 한 사람, 사유로 거를 수 있다. 최신순 커서 페이지.
+   * 누가 받았는지 보이게 사용자 이름을 붙인다(탈퇴로 끊긴 줄은 user 가 null).
+   */
+  async adminLedger(opts: {
+    userId?: string;
+    reason?: MedalReason;
+    cursor?: string;
+    limit?: number;
+  }) {
+    const take = Math.min(Math.max(opts.limit ?? 50, 1), 100);
+    const rows = await this.prisma.medalLedger.findMany({
+      where: {
+        ...(opts.userId ? { userId: opts.userId } : {}),
+        ...(opts.reason ? { reason: opts.reason } : {}),
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: take + 1,
+      ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
+      include: { user: { select: { id: true, username: true, avatar: true } } },
+    });
+    const hasMore = rows.length > take;
+    const items = hasMore ? rows.slice(0, take) : rows;
+    return {
+      items,
+      nextCursor: hasMore ? items[items.length - 1].id : null,
+    };
   }
 
   private findByKey(idempotencyKey: string) {

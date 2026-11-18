@@ -1945,6 +1945,7 @@ enum AdminAction {
   MATCH_COLLECT_RETRY
   BOT_CLEANUP
   MEDAL_ADJUST
+  MEDAL_REFUND // 상점 구매 환불 (Task 17)
 }
 
 enum VoteType {
