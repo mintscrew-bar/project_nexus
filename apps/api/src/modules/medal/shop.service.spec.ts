@@ -57,6 +57,18 @@ describe("ShopService", () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    it("프로필 배경은 PROFILE_BANNER 자리에 장착되고 2,500 메달이다", async () => {
+      db.setBalance("u1", 3000);
+      const res = await shop.purchase("u1", "BN_INK_SWORDSMAN", true);
+      expect(res.balance).toBe(500);
+      expect(await shop.getLoadout("u1")).toEqual({
+        PROFILE_BANNER: "BN_INK_SWORDSMAN",
+      });
+      // 해제하면 자리만 빈다 — 올린 배경 이미지는 상점이 건드리지 않는다
+      await shop.equip("u1", "PROFILE_BANNER", null);
+      expect(await shop.getLoadout("u1")).toEqual({});
+    });
+
     it("메달이 모자라면 아무것도 남기지 않는다", async () => {
       db.setBalance("u1", 100);
       await expect(shop.purchase("u1", "FX_SLIME")).rejects.toBeInstanceOf(

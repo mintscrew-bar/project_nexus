@@ -70,6 +70,9 @@ import {
 } from "@nexus/types";
 import { PubgProfileSection } from "@/components/pubg/PubgProfileSection";
 import { UserName } from "@/components/cosmetics/UserName";
+import { LiveBanner } from "@/components/cosmetics/live-banner";
+import { findCosmetic } from "@/components/cosmetics/catalog";
+import { useCosmeticLoadouts } from "@/components/cosmetics/useCosmeticLoadouts";
 import { useProfileTarget } from "@/components/profile/ProfileTargetContext";
 import { myProfilePath, userProfilePath } from "@/lib/profile-routes";
 
@@ -202,6 +205,12 @@ export default function UserProfilePage() {
   const [rep, setRep] = useState<any>(null);
   // 내 프로필 편집 창
   const [editOpen, setEditOpen] = useState(false);
+  // 장착한 프로필 배경 장식(Task 22) — 있으면 올린 배경 이미지 대신 움직이는 배경을 보인다.
+  // 올린 이미지는 지우지 않아서, 상점에서 해제하면 바로 다시 보인다
+  const loadouts = useCosmeticLoadouts([profile?.id]);
+  const bannerFx = profile
+    ? findCosmetic(loadouts[profile.id]?.PROFILE_BANNER)?.liveBanner
+    : undefined;
   const searchParams = useSearchParams();
   /**
    * 프로필에 띄울 게임 탭.
@@ -500,6 +509,8 @@ export default function UserProfilePage() {
                   }
             }
           >
+            {/* 올린 배경 이미지(또는 기본 그라데이션)는 늘 깔아 둔다 — 배경 장식을 장착하면
+                그 위를 덮고, 꾸미기 효과 「숨기기」 설정이면 장식이 빠져 이 이미지가 보인다 */}
             {profile.profileBanner && (
               <Image
                 src={profile.profileBanner}
@@ -509,6 +520,7 @@ export default function UserProfilePage() {
                 unoptimized
               />
             )}
+            {bannerFx && <LiveBanner code={bannerFx} />}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-bg-secondary to-transparent" />
           </div>
           <CardContent className="p-4 md:p-5">

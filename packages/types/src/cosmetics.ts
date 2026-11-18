@@ -12,14 +12,18 @@
  * - CARD_FRAME: 카드 장식 (로비 카드·호버 카드)
  * - AVATAR_FRAME: 아바타 테두리 장식
  * - NAME_STYLE: 닉네임 글꼴 (글꼴 + 색·효과 세트, Task 22)
+ * - PROFILE_BANNER: 프로필 배경 — 움직이는 원작 일러스트. 장착하면 올린 배경 이미지 대신 보이고,
+ *   해제하면 올린 이미지가 다시 보인다(이미지는 지우지 않는다)
  * DB 의 slot 은 문자열이라 자리를 더해도 마이그레이션이 필요 없다.
  */
-export type CosmeticSlot = "CARD_FRAME" | "AVATAR_FRAME" | "NAME_STYLE";
+export type CosmeticSlot =
+  "CARD_FRAME" | "AVATAR_FRAME" | "NAME_STYLE" | "PROFILE_BANNER";
 
 export const COSMETIC_SLOTS: CosmeticSlot[] = [
   "CARD_FRAME",
   "AVATAR_FRAME",
   "NAME_STYLE",
+  "PROFILE_BANNER",
 ];
 
 export type CosmeticRarity = "STARTER" | "COMMON" | "PREMIUM" | "RARE";
@@ -203,6 +207,14 @@ export const COSMETIC_SHOP_ITEMS: CosmeticShopItem[] = [
     code: "NM_FLAME",
     slot: "NAME_STYLE",
     price: 1100,
+    rarity: "RARE",
+    onSale: true,
+  },
+  // 프로필 배경 — 프로필 전체를 차지하고 제작비가 가장 커서 최상위 가격 (2026-11-18)
+  {
+    code: "BN_INK_SWORDSMAN",
+    slot: "PROFILE_BANNER",
+    price: 2500,
     rarity: "RARE",
     onSale: true,
   },

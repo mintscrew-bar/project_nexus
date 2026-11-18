@@ -18,6 +18,7 @@ import { findCosmeticShopItem } from "@nexus/types";
 import type { AvatarEffectCode } from "./avatar-effects";
 import type { CosmeticEffectCode } from "./effects";
 import type { NameStyleCode } from "./name-styles";
+import type { LiveBannerCode } from "./live-banner";
 
 /** 화면에 보이는 재화 이름 — 이름을 바꾸면 여기 한 곳만 고친다 */
 export const MEDAL_LABEL = "메달";
@@ -27,13 +28,16 @@ export const MEDAL_LABEL = "메달";
  * - CARD_FRAME: 로비 참가자 카드 장식
  * - AVATAR_FRAME: 프로필 아바타 장식
  * - NAME_STYLE: 닉네임 글꼴 — 글꼴 + 색·효과 세트 (Task 22, 예전 NAME_COLOR 자리를 대신한다)
+ * - PROFILE_BANNER: 프로필 배경 — 움직이는 원작 일러스트(live-banner.tsx)
  */
-export type CosmeticSlot = "CARD_FRAME" | "AVATAR_FRAME" | "NAME_STYLE";
+export type CosmeticSlot =
+  "CARD_FRAME" | "AVATAR_FRAME" | "NAME_STYLE" | "PROFILE_BANNER";
 
 export const SLOT_LABEL: Record<CosmeticSlot, string> = {
   CARD_FRAME: "카드 장식",
   AVATAR_FRAME: "아바타 장식",
   NAME_STYLE: "닉네임 글꼴",
+  PROFILE_BANNER: "프로필 배경",
 };
 export type CosmeticRarity = "STARTER" | "COMMON" | "PREMIUM" | "RARE";
 
@@ -59,6 +63,8 @@ export interface CosmeticItem {
   avatarEffect?: AvatarEffectCode;
   /** NAME_STYLE 전용 — 닉네임 글꼴·효과 (name-styles.tsx) */
   nameStyle?: NameStyleCode;
+  /** PROFILE_BANNER 전용 — 움직이는 프로필 배경 (live-banner.tsx) */
+  liveBanner?: LiveBannerCode;
 }
 
 export const RARITY_LABEL: Record<CosmeticRarity, string> = {
@@ -325,6 +331,18 @@ const COSMETIC_DEFS: CosmeticItem[] = [
     rarity: "RARE",
     className: "",
     nameStyle: "flame",
+  },
+  // ── 프로필 배경 (프로필 위쪽 배너) ──
+  {
+    code: "BN_INK_SWORDSMAN",
+    slot: "PROFILE_BANNER",
+    name: "수묵 검객",
+    description:
+      "붉은 해 앞의 먹빛 흑룡과 검객 — 머리칼과 붉은 끈이 바람에 날리고 안개가 흐른다",
+    price: 2500,
+    rarity: "RARE",
+    className: "",
+    liveBanner: "ink_swordsman",
   },
 ];
 

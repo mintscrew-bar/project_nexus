@@ -8,6 +8,7 @@ import { Check, Medal, Sparkles } from "lucide-react";
 import { PortraitParticipantCard } from "@/app/[game]/tournaments/[id]/lobby/_components/PortraitParticipantCard";
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
 import { StyledName } from "@/components/cosmetics/name-styles";
+import { LiveBanner } from "@/components/cosmetics/live-banner";
 import {
   COSMETICS,
   MEDAL_LABEL,
@@ -24,8 +25,13 @@ import { useAuthStore } from "@/stores/auth-store";
 import { shopApi, type ShopItemState } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
-type ShopSlot = "CARD_FRAME" | "AVATAR_FRAME" | "NAME_STYLE";
-const SLOTS: ShopSlot[] = ["CARD_FRAME", "AVATAR_FRAME", "NAME_STYLE"];
+type ShopSlot = "CARD_FRAME" | "AVATAR_FRAME" | "NAME_STYLE" | "PROFILE_BANNER";
+const SLOTS: ShopSlot[] = [
+  "CARD_FRAME",
+  "AVATAR_FRAME",
+  "NAME_STYLE",
+  "PROFILE_BANNER",
+];
 /** 진열 탭 — 자리별 상품 + 산 것만 모아 보는 보관함 */
 type ShopTab = ShopSlot | "OWNED";
 
@@ -297,6 +303,8 @@ export default function ShopPage() {
                 key={item.code}
                 className={cn(
                   "flex flex-col gap-3 rounded-xl p-4 transition-colors",
+                  // 프로필 배경은 가로로 긴 배너라 두 칸을 쓴다
+                  item.slot === "PROFILE_BANNER" && "sm:col-span-2",
                   selected
                     ? "bg-accent-primary/10 ring-1 ring-inset ring-accent-primary/50"
                     : "bg-bg-tertiary/40",
@@ -314,7 +322,13 @@ export default function ShopPage() {
                   className="text-left"
                   aria-label={`${item.name} 입어 보기`}
                 >
-                  {item.slot === "NAME_STYLE" ? (
+                  {item.slot === "PROFILE_BANNER" && item.liveBanner ? (
+                    // 프로필 배경 — 실제 프로필 배너와 같은 비율(약 3.6:1)로 움직이는 모습을 보여 준다
+                    <div className="relative aspect-[3.6/1] w-full overflow-hidden rounded-lg bg-bg-tertiary">
+                      <LiveBanner code={item.liveBanner} />
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg-secondary/80 to-transparent" />
+                    </div>
+                  ) : item.slot === "NAME_STYLE" ? (
                     // 닉네임 글꼴 — 프로필·로비 카드·채팅 크기로 함께 보여 준다
                     <div className="flex h-[180px] flex-col items-center justify-center gap-3 rounded-lg bg-bg-secondary/60 px-2">
                       <div className="max-w-full truncate text-2xl font-black text-text-primary">

@@ -16,6 +16,15 @@ import { getApiErrorMessage } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { AVATAR_CROP, BANNER_CROP, ImageCropper } from "./ImageCropper";
 import { Button, Modal } from "@/components/ui";
+import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
+import { Sparkles } from "lucide-react";
+import { shopApi } from "@/lib/api-client";
+import { findCosmetic } from "@/components/cosmetics/catalog";
+import {
+  LOADOUT_QUERY_KEY,
+  useCosmeticLoadouts,
+} from "@/components/cosmetics/useCosmeticLoadouts";
 import { useToast } from "@/components/ui/Toast";
 
 const IMAGE_TYPES = /^image\/(jpeg|jpg|png|gif|webp)$/;
@@ -38,6 +47,24 @@ export function ProfileEditModal({
   onSaved: () => void;
 }) {
   const { user, fetchUser } = useAuthStore();
+  const queryClient = useQueryClient();
+  // 장착한 프로필 배경 장식 — 있으면 프로필에는 올린 배경 대신 이 장식이 보인다 (Task 22)
+  const loadouts = useCosmeticLoadouts([user?.id]);
+  const bannerItem = user?.id
+    ? findCosmetic(loadouts[user.id]?.PROFILE_BANNER)
+    : undefined;
+  const [unequipping, setUnequipping] = useState(false);
+  const unequipBanner = async () => {
+    setUnequipping(true);
+    try {
+      await shopApi.equip("PROFILE_BANNER", null);
+      // 프로필·상점이 들고 있는 장착 상태를 새로 읽게 한다
+      await queryClient.invalidateQueries({ queryKey: [LOADOUT_QUERY_KEY] });
+      await queryClient.invalidateQueries({ queryKey: ["shop"] });
+    } finally {
+      setUnequipping(false);
+    }
+  };
   const { addToast } = useToast();
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
@@ -254,6 +281,39 @@ export function ProfileEditModal({
               onChange={(e) => pick(e.target.files?.[0], "banner")}
             />
           </div>
+
+          {/* 배경 장식을 장착 중이면 — 프로필에는 장식이 보이고, 올린 배경은 그대로 남아 있다 */}
+          {bannerItem && (
+            <div className="flex items-start gap-3 rounded-xl bg-amber-400/10 px-4 py-3 text-sm">
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-text-primary">
+                  지금 프로필에는 배경 장식 「{bannerItem.name}」이 보여요
+                </p>
+                <p className="mt-0.5 text-xs text-text-tertiary">
+                  올린 배경 이미지는 지워지지 않아요. 장식을 해제하면 다시
+                  보여요.
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={unequipBanner}
+                    disabled={unequipping}
+                    className="rounded-lg bg-bg-elevated px-3 py-1.5 text-xs font-bold text-text-secondary hover:text-text-primary disabled:opacity-60"
+                  >
+                    {unequipping ? "해제하는 중…" : "배경 장식 해제"}
+                  </button>
+                  <Link
+                    href="/shop"
+                    onClick={onClose}
+                    className="rounded-lg px-3 py-1.5 text-xs font-bold text-text-tertiary hover:text-text-secondary"
+                  >
+                    상점에서 바꾸기
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
 
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-text-secondary">
