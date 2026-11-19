@@ -148,16 +148,16 @@ function DragonOrbitFx({ size }: FxProps) {
   const diameter = size * 1.72;
   return (
     <div
-      className="absolute overflow-hidden rounded-full"
+      className="absolute"
       style={{
         ...FRONT,
         left: (size - diameter) / 2,
         top: (size - diameter) / 2,
         width: diameter,
         height: diameter,
-        maskImage: "radial-gradient(circle, transparent 0 31%, black 38% 67%, transparent 75%)",
-        WebkitMaskImage: "radial-gradient(circle, transparent 0 31%, black 38% 67%, transparent 75%)",
-        backgroundColor: "#f3f0e9",
+        // 흰 종이는 걷었다(투명 영상) — 어두운 바탕에서도 먹이 보이게 옅은 빛만 두른다
+        filter:
+          "drop-shadow(0 0 1.5px rgba(236,229,212,0.7)) drop-shadow(0 0 5px rgba(236,229,212,0.25))",
       }}
     >
       <InkDragonVideo variant="avatar" className="absolute inset-0 h-full w-full" />

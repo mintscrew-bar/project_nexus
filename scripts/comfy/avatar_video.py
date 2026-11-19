@@ -43,12 +43,15 @@ def main():
     ap.add_argument("--blend", type=int, default=12, help="끝을 처음과 겹치는 프레임 수")
     ap.add_argument("--skip", type=int, default=0, help="앞에서 버릴 프레임 수")
     ap.add_argument("--fps", type=int, default=24)
+    ap.add_argument("--hole", type=float, default=0.5, help="가운데 뚫을 지름 비율(아바타 자리)")
+    ap.add_argument("--outer", type=float, default=0.92, help="남길 바깥 지름 비율")
+    ap.add_argument("--poster-webp", action="store_true", help="포스터를 투명 webp 로도 저장")
     a = ap.parse_args()
     os.makedirs(a.out_dir, exist_ok=True)
 
     src = av.open(a.src)
     frames = [f.to_image().convert("RGB") for f in src.decode(video=0)][a.skip:]
-    mask = ring_mask(a.size)
+    mask = ring_mask(a.size, a.hole, a.outer)
     rgba = []
     for im in frames:
         im = im.resize((a.size, a.size), Image.LANCZOS)
@@ -81,9 +84,10 @@ def main():
     for p in st.encode():
         dst.mux(p)
     dst.close()
-    Image.fromarray(rgba[0].clip(0, 255).astype(np.uint8), "RGBA").save(
-        os.path.join(a.out_dir, f"{a.name}.png")
-    )
+    poster = Image.fromarray(rgba[0].clip(0, 255).astype(np.uint8), "RGBA")
+    poster.save(os.path.join(a.out_dir, f"{a.name}.png"))
+    if a.poster_webp:
+        poster.save(os.path.join(a.out_dir, f"{a.name}.webp"), "WEBP", quality=88, method=6)
     print(f"{path}  프레임 {len(rgba)}  {os.path.getsize(path) // 1024}KB")
 
 
