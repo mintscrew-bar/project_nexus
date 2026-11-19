@@ -118,10 +118,11 @@
      `.dark` 는 <html> 에 붙고 이 클래스는 그 자손에 붙는다. 커스텀 속성은
      가까운 조상이 이기므로 `.dark .game-pubg` 를 따로 쓸 필요가 없다. */
   :root {
-    /* 형태 토큰. 롤과 게임 무관 화면의 기본값은 지금 모습 그대로다 —
-       둥글고 매끈한 쪽이 롤의 언어다. */
-    --radius-panel: 1.75rem; /* 28px */
-    --radius-control: 0.75rem; /* 12px */
+    /* 형태 토큰. 롤과 게임 무관 화면의 기본값.
+       2026-11-19 운영자 의견("전반적으로 너무 둥글다")으로 판 28→12px, 조작 12→8px 로 줄였다.
+       배그(.game-pubg)는 아래에서 2px 로 따로 덮는다. */
+    --radius-panel: 0.75rem; /* 12px */
+    --radius-control: 0.5rem; /* 8px */
     --radius-chip: 9999px;
     --font-figure: inherit;
   }

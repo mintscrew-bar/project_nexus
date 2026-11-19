@@ -13,12 +13,8 @@ import {
   COSMETICS,
   MEDAL_LABEL,
   SLOT_LABEL,
-  type CosmeticSlot,
 } from "@/components/cosmetics/catalog";
-import {
-  LiveBanner,
-  liveBannerAspect,
-} from "@/components/cosmetics/live-banner";
+import { CosmeticPreview } from "@/components/cosmetics/CosmeticPreview";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
@@ -455,29 +451,21 @@ function QuickActions({ gameTitle }: { gameTitle?: "LOL" | "PUBG" }) {
 }
 
 /**
- * 출석 + 상점 미리보기 + 배너를 한 줄에.
+ * 출석 + 배너 — 히어로 바로 아래 두 번째 줄.
  *
- * 배너(3:2 그림)는 예전엔 맨 아래에서 폭 전체를 써 화면 높이를 거의 다 차지했다. 높이만 줄이면
- * 그림이 잘리므로 폭을 3분의 1로 줄여 출석·상점 옆에 둔다(2026-11-19).
+ * 배너(그림)는 예전엔 맨 아래에서 폭 전체를 써 화면 높이를 거의 다 차지했다. 여기서는 출석 카드
+ * 높이에 맞춰 옆에 붙인다(그림은 틀을 채우도록 잘라 보인다). 2026-11-19.
  */
-function MedalRow() {
+function AttendanceBannerRow() {
   const queryClient = useQueryClient();
   const attendance = useQuery({
     queryKey: ATTENDANCE_QUERY_KEY,
     queryFn: medalApi.getAttendance,
     staleTime: 60 * 1000,
   });
-  // 상점 미리보기 — 프로필 배경(움직이는 그림)이 가장 눈에 띄어 하나를 크게 보여 준다
-  const featured = COSMETICS.find((item) => item.liveBanner);
-  const slotCounts = (Object.keys(SLOT_LABEL) as CosmeticSlot[]).map(
-    (slot) => ({
-      slot,
-      count: COSMETICS.filter((item) => item.slot === slot).length,
-    }),
-  );
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
       <GlassCard className="p-4">
         {attendance.data ? (
           <AttendanceCard
@@ -490,68 +478,109 @@ function MedalRow() {
           <Skeleton className="h-56 w-full rounded-lg" />
         )}
       </GlassCard>
-
-      <GlassCard className="flex flex-col p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-text-primary">
-            <ShoppingBag className="h-4 w-4 text-text-tertiary" />
-            {MEDAL_LABEL} 상점
-          </h2>
-          <Link
-            href="/shop"
-            className="flex items-center gap-1 text-xs text-text-tertiary transition-colors hover:text-text-primary"
-          >
-            전체
-            <ChevronRight className="h-3 w-3" />
-          </Link>
-        </div>
-        {featured?.liveBanner && (
-          <Link
-            href="/shop"
-            className="group block overflow-hidden rounded-lg border border-bg-tertiary"
-          >
-            <div
-              className="relative w-full"
-              style={{ aspectRatio: liveBannerAspect(featured.liveBanner) }}
-            >
-              <LiveBanner
-                code={featured.liveBanner}
-                className="absolute inset-0"
-              />
-            </div>
-            <div className="flex items-center justify-between px-3 py-2">
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-bold text-text-primary">
-                  {featured.name}
-                </span>
-                <span className="text-[11px] text-text-tertiary">
-                  {SLOT_LABEL[featured.slot]}
-                </span>
-              </span>
-              <span className="flex-shrink-0 text-sm font-black tabular-nums text-amber-300">
-                {featured.price.toLocaleString()}
-              </span>
-            </div>
-          </Link>
-        )}
-        <div className="mt-3 grid grid-cols-2 gap-1.5 text-xs">
-          {slotCounts.map(({ slot, count }) => (
-            <Link
-              key={slot}
-              href="/shop"
-              className="flex items-center justify-between rounded-md bg-bg-tertiary/50 px-2.5 py-1.5 text-text-secondary transition-colors hover:text-text-primary"
-            >
-              {SLOT_LABEL[slot]}
-              <span className="tabular-nums text-text-tertiary">{count}</span>
-            </Link>
-          ))}
-        </div>
-      </GlassCard>
-
       <ErrorBoundary>
-        <BannerCarousel />
+        <BannerCarousel className="aspect-[3/2] lg:aspect-auto lg:h-full lg:min-h-[300px]" />
       </ErrorBoundary>
     </div>
+  );
+}
+
+/** 상점 줄에서 한 번에 넘기는 간격(ms) */
+const SHOP_ROTATE_MS = 4000;
+
+/**
+ * 메달 상점 줄 — 한 줄을 통째로 쓰고 상품이 돌아가며 나온다.
+ *
+ * 넓은 화면은 3개, 중간은 2개, 좁으면 1개가 보이고 4초마다 한 칸씩 옆으로 민다.
+ * 마우스를 올리면 멈춘다. 각 칸은 상품을 실제로 입힌 모습(로비 카드·아바타·닉네임·배경).
+ * 한 칸 폭은 CSS 변수(--tile)로 화면 폭마다 정하고, 밀어낼 거리는 그 칸 수만큼이다.
+ */
+function ShopCarousel() {
+  const user = useAuthStore((s) => s.user);
+  const router = useRouter();
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  // 넓은 화면(3칸) 기준으로 마지막 칸이 끝에 닿으면 처음으로
+  const last = Math.max(0, COSMETICS.length - 3);
+
+  useEffect(() => {
+    if (paused) return;
+    const timer = setInterval(
+      () => setIndex((i) => (i >= last ? 0 : i + 1)),
+      SHOP_ROTATE_MS,
+    );
+    return () => clearInterval(timer);
+  }, [paused, last]);
+
+  const step = (d: number) =>
+    setIndex((i) => (i + d < 0 ? last : i + d > last ? 0 : i + d));
+
+  return (
+    <GlassCard>
+      <CardHeader
+        icon={ShoppingBag}
+        title={`${MEDAL_LABEL} 상점`}
+        actionLabel="전체"
+        onAction={() => router.push("/shop")}
+      />
+      <div
+        className="relative px-5 pb-5"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
+        <div className="overflow-hidden [--tile:100%] sm:[--tile:50%] lg:[--tile:33.3333%]">
+          <div
+            className="flex transition-transform duration-500 ease-out"
+            style={{ transform: `translateX(calc(${-index} * var(--tile)))` }}
+          >
+            {COSMETICS.map((item) => (
+              <Link
+                key={item.code}
+                href="/shop"
+                className="group flex-none basis-[var(--tile)] px-1.5"
+              >
+                <div className="overflow-hidden rounded-panel border border-bg-tertiary bg-bg-tertiary/30 transition-colors group-hover:border-text-tertiary/40">
+                  <CosmeticPreview
+                    item={item}
+                    username={user?.username ?? "플레이어"}
+                    avatar={user?.avatar}
+                  />
+                  <div className="flex items-center justify-between gap-2 border-t border-bg-tertiary px-3 py-2">
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-text-primary">
+                        {item.name}
+                      </span>
+                      <span className="text-[11px] text-text-tertiary">
+                        {SLOT_LABEL[item.slot]}
+                      </span>
+                    </span>
+                    <span className="flex-shrink-0 text-sm font-black tabular-nums text-amber-300">
+                      {item.price.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          aria-label="이전 상품"
+          className="absolute left-1 top-[108px] z-10 rounded-control bg-bg-primary/80 p-1.5 text-text-secondary hover:text-text-primary"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => step(1)}
+          aria-label="다음 상품"
+          className="absolute right-1 top-[108px] z-10 rounded-control bg-bg-primary/80 p-1.5 text-text-secondary hover:text-text-primary"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </GlassCard>
   );
 }
 
@@ -562,7 +591,7 @@ function MedalRow() {
 // 배너 슬라이드 총 개수 — 각각 전용 컴포넌트로 렌더링
 const TOTAL_SLIDES = 4;
 
-function BannerCarousel() {
+function BannerCarousel({ className }: { className?: string }) {
   const [current, setCurrent] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -634,7 +663,10 @@ function BannerCarousel() {
     <div
       // 배너 글자·배치는 화면 폭이 아니라 이 틀의 폭을 따른다(컨테이너 쿼리) —
       // 홈에서 3분의 1 폭으로 줄였을 때 큰 화면용 글자가 넘치지 않게
-      className="relative aspect-[3/2] w-full overflow-hidden rounded-panel [container-type:inline-size]"
+      className={cn(
+        "relative w-full overflow-hidden rounded-panel [container-type:inline-size]",
+        className ?? "aspect-[3/2]",
+      )}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -1468,6 +1500,9 @@ export function DashboardContent({
         clan={myClan}
       />
 
+      {/* 두 번째 줄 — 출석 · 배너 */}
+      <AttendanceBannerRow />
+
       <QuickActions gameTitle={gameTitle} />
 
       {/* 방송 중인 스트리머가 있을 때만 나타나는 섹션 */}
@@ -1478,8 +1513,8 @@ export function DashboardContent({
       {/* 모집중인 내전 */}
       <ActiveRoomsCard rooms={rooms} />
 
-      {/* 출석 · 상점 · 배너 */}
-      <MedalRow />
+      {/* 메달 상점 — 상품이 돌아가며 3개씩 */}
+      <ShopCarousel />
 
       {/* 내 전적 */}
       <div data-tour="home-my-stats">
