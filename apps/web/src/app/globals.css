@@ -1631,3 +1631,18 @@ html.cfx-off .nfx-root {
   text-shadow: none !important;
   animation: none !important;
 }
+
+/*
+ * 관리자 표의 행 빠른 동작(RowActions) — 마우스가 있는 기기에서만 행에 올렸을 때 보인다.
+ * 터치 기기는 늘 보인다. Tailwind 의 미디어 변형과 group-hover 를 겹치면 생성 순서에 따라
+ * 숨김이 호버를 이길 수 있어 여기서 순서를 고정한다.
+ */
+@media (hover: hover) {
+  .admin-row-actions {
+    opacity: 0;
+  }
+  .group:hover .admin-row-actions,
+  .group:focus-within .admin-row-actions {
+    opacity: 1;
+  }
+}

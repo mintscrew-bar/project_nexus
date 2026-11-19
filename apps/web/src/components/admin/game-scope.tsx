@@ -75,15 +75,17 @@ export function useAdminGameScope(): AdminGameScope {
 }
 
 /**
- * 상단 게임 탭. 공통 / 롤 / 배그.
+ * 화면 안 게임 필터 칩 — 전체 / 롤 / 배그.
  *
- * 스위치가 사이드바 안에 있을 때는 "필터" 로 읽혀 메뉴가 그대로인 채 숫자만
- * 바뀌었다. 탭으로 올리면 게임마다 자기 메뉴를 갖는 별개의 작업 공간이 된다.
+ * 예전엔 관리자 맨 위의 공통·롤·배그 탭을 먼저 골라야 사이드바 메뉴가 바뀌었다. 메뉴가
+ * 사라졌다 나타나서 어디 있는지 헷갈렸다. 이제 메뉴는 기능별로 고정이고, 게임으로 나뉘는
+ * 화면(방·클랜·커뮤니티·스트리머·통계)만 화면 안에서 이 칩으로 거른다. 고른 값은 주소의
+ * `?game=` 에 실려 같은 칩을 가진 다른 화면으로 옮겨도 유지된다.
  */
-export function AdminGameTabs() {
+export function AdminGameFilter({ className }: { className?: string }) {
   const { game, setGame } = useAdminGameScope();
   const options: Array<{ value: GameTitle | null; label: string }> = [
-    { value: null, label: "공통" },
+    { value: null, label: "전체" },
     ...enabledGames().map((g) => ({
       value: g.title as GameTitle | null,
       label: g.shortLabel,
@@ -92,9 +94,9 @@ export function AdminGameTabs() {
 
   return (
     <div
-      className="flex flex-shrink-0 items-end gap-1 border-b border-bg-tertiary bg-bg-secondary px-3 pt-2"
-      role="tablist"
-      aria-label="관리할 게임"
+      className={`inline-flex items-center gap-0.5 rounded-lg bg-bg-tertiary p-0.5 ${className ?? ""}`}
+      role="radiogroup"
+      aria-label="게임으로 거르기"
     >
       {options.map((opt) => {
         const active = game === opt.value;
@@ -102,13 +104,13 @@ export function AdminGameTabs() {
           <button
             key={opt.label}
             type="button"
-            role="tab"
-            aria-selected={active}
+            role="radio"
+            aria-checked={active}
             onClick={() => setGame(opt.value)}
-            className={`-mb-px rounded-t-lg border border-b-0 px-5 py-2 text-sm font-bold transition-colors ${
+            className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
               active
-                ? "border-bg-tertiary bg-bg-primary text-accent-primary"
-                : "border-transparent text-text-secondary hover:text-text-primary"
+                ? "bg-bg-primary text-accent-primary shadow-sm"
+                : "text-text-secondary hover:text-text-primary"
             }`}
           >
             {opt.label}

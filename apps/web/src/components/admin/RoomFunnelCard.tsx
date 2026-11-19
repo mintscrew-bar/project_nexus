@@ -1,13 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { adminApi, type AdminRoomFunnel } from "@/lib/api-client";
 import type { GameTitle } from "@nexus/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { Filter } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-
-const DAY_OPTIONS = [7, 30, 90];
 
 /**
  * 방 깔때기. 생성 → 시작 → 결과.
@@ -15,8 +12,14 @@ const DAY_OPTIONS = [7, 30, 90];
  * 방은 끝나면 지워지므로 기록이 쌓이기 시작한 시점부터만 센다. 기간을 못 채운
  * 상태에서 비율만 보여 주면 "방이 적다" 로 오해하니 첫 기록 시각을 같이 적는다.
  */
-export function RoomFunnelCard({ game }: { game: GameTitle }) {
-  const [days, setDays] = useState(30);
+export function RoomFunnelCard({
+  game,
+  days,
+}: {
+  game: GameTitle;
+  /** 기간 — 통계 탭 맨 위의 기간 선택을 따른다 */
+  days: number;
+}) {
   // 게임·기간이 바뀌면 키가 바뀌어 새로 불러온다(효과에서 비우고 다시 부르지 않는다)
   const funnelQuery = useQuery({
     queryKey: ["admin-room-funnel", game, days],
@@ -64,20 +67,6 @@ export function RoomFunnelCard({ game }: { game: GameTitle }) {
             >
               CSV
             </button>
-            {DAY_OPTIONS.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDays(d)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-                  days === d
-                    ? "bg-accent-primary text-accent-on"
-                    : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                {d}일
-              </button>
-            ))}
           </div>
         </div>
       </CardHeader>

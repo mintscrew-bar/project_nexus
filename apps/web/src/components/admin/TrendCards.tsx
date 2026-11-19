@@ -13,7 +13,7 @@ import { TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 type SeriesKey = Exclude<keyof AdminDailyStat, "date" | "scope">;
-interface Line {
+export interface Line {
   key: SeriesKey;
   label: string;
   /** Tailwind stroke 색 클래스 */
@@ -21,13 +21,19 @@ interface Line {
   dot: string;
 }
 
-const DAY_OPTIONS = [14, 30, 90];
-
 /**
  * 일별 추이 선 그래프. 외부 차트 라이브러리 없이 SVG 로 그린다.
  * null(기록 없음)은 0 으로 그리지 않고 선을 끊는다 — 0 은 "없었다" 가 아니라 "0 이었다" 다.
+ *
+ * 마우스를 올리면 가장 가까운 날에 세로 기준선·점이 생기고 그날 값이 툴팁으로 뜬다.
  */
-function LineChart({ rows, lines }: { rows: AdminDailyStat[]; lines: Line[] }) {
+export function LineChart({
+  rows,
+  lines,
+}: {
+  rows: AdminDailyStat[];
+  lines: Line[];
+}) {
   // 카드 폭에 맞춘다. viewBox 비율을 고정하면 넓은 카드에서 그래프가 가운데에 좁게 놓인다.
   const wrapRef = useRef<HTMLDivElement>(null);
   const [W, setW] = useState(600);
@@ -40,7 +46,9 @@ function LineChart({ rows, lines }: { rows: AdminDailyStat[]; lines: Line[] }) {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const H = 160;
+  // 마우스가 가리키는 날(행 번호). 없으면 null
+  const [hover, setHover] = useState<number | null>(null);
+  const H = 180;
   const pad = { l: 36, r: 8, t: 8, b: 20 };
   const innerW = W - pad.l - pad.r;
   const innerH = H - pad.t - pad.b;
@@ -68,9 +76,33 @@ function LineChart({ rows, lines }: { rows: AdminDailyStat[]; lines: Line[] }) {
     return d;
   };
 
+  // 마우스 x 좌표 → 가장 가까운 날
+  const handleMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = ((e.clientX - rect.left) / rect.width) * W;
+    if (rows.length === 0) return;
+    const t = rows.length <= 1 ? 0 : (px - pad.l) / innerW;
+    const i = Math.round(t * (rows.length - 1));
+    setHover(Math.min(rows.length - 1, Math.max(0, i)));
+  };
+
+  const hovered = hover !== null ? rows[hover] : null;
+  // 툴팁이 그래프 밖으로 나가지 않게, 오른쪽 절반이면 왼쪽에 띄운다
+  const tipLeft = hover !== null && x(hover) > W / 2;
+
   return (
-    <div ref={wrapRef}>
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img">
+    <div ref={wrapRef} className="relative">
+      <svg
+        width={W}
+        height={H}
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label="일별 추이 그래프"
+        className="touch-none"
+        onPointerMove={handleMove}
+        onPointerDown={handleMove}
+        onPointerLeave={() => setHover(null)}
+      >
         {[0, 0.5, 1].map((t) => (
           <g key={t}>
             <line
@@ -117,7 +149,74 @@ function LineChart({ rows, lines }: { rows: AdminDailyStat[]; lines: Line[] }) {
               </text>
             ),
         )}
+        {/* 가리키는 날의 세로 기준선과 각 선의 점 */}
+        {hovered && hover !== null && (
+          <g pointerEvents="none">
+            <line
+              x1={x(hover)}
+              x2={x(hover)}
+              y1={pad.t}
+              y2={pad.t + innerH}
+              className="stroke-text-muted"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+            />
+            {lines.map((l) => {
+              const v = hovered[l.key] as number | null;
+              if (v === null) return null;
+              return (
+                <circle
+                  key={l.key}
+                  cx={x(hover)}
+                  cy={y(v)}
+                  r={3.5}
+                  className={`${l.stroke} fill-bg-primary`}
+                  strokeWidth={2}
+                />
+              );
+            })}
+          </g>
+        )}
+        {/* 그래프 전체를 덮는 투명 판 — 선 사이 빈 곳에서도 마우스를 받는다 */}
+        <rect
+          x={pad.l}
+          y={pad.t}
+          width={innerW}
+          height={innerH}
+          fill="transparent"
+        />
       </svg>
+      {hovered && hover !== null && (
+        <div
+          className="pointer-events-none absolute top-1 z-10 min-w-[140px] rounded-lg border border-bg-elevated bg-bg-primary px-3 py-2 text-xs shadow-xl"
+          style={
+            tipLeft ? { right: W - x(hover) + 10 } : { left: x(hover) + 10 }
+          }
+        >
+          <p className="mb-1 font-semibold text-text-primary">
+            {hovered.date.slice(0, 10)}
+          </p>
+          {lines.map((l) => {
+            const v = hovered[l.key] as number | null;
+            return (
+              <p
+                key={l.key}
+                className="flex items-center justify-between gap-3 py-0.5"
+              >
+                <span className="flex items-center gap-1.5 text-text-muted">
+                  <span
+                    className={`inline-block h-2 w-2 rounded-full ${l.dot}`}
+                  />
+                  {l.label}
+                </span>
+                <span className="font-medium tabular-nums text-text-primary">
+                  {v === null ? "기록 없음" : v.toLocaleString()}
+                </span>
+              </p>
+            );
+          })}
+        </div>
+      )}
       <div className="mt-1 flex flex-wrap gap-3 text-xs text-text-secondary">
         {lines.map((l) => (
           <span key={l.key} className="flex items-center gap-1">
@@ -130,55 +229,31 @@ function LineChart({ rows, lines }: { rows: AdminDailyStat[]; lines: Line[] }) {
   );
 }
 
-/**
- * 추이 카드. `game` 이 없으면 공통(유저 활성·가입), 있으면 그 게임의 방·기록.
- */
-export function TrendCards({ game }: { game: GameTitle | null }) {
-  const [days, setDays] = useState(30);
-  // 게임·기간이 바뀌면 키가 바뀌어 새로 불러온다(효과에서 비우고 다시 부르지 않는다)
-  const seriesQuery = useQuery({
-    queryKey: ["admin-stats-series", game ?? "ALL", days],
-    queryFn: () =>
-      adminApi.getStatsSeries(game ?? "ALL", days) as Promise<AdminDailyStat[]>,
-  });
-  // 코호트·가입 경로는 공통(게임 없음)일 때만
-  const cohortQuery = useQuery({
-    queryKey: ["admin-cohort-survival", 8],
-    queryFn: () => adminApi.getCohortSurvival(8) as Promise<AdminCohort[]>,
-    enabled: !game,
-  });
-  const sourcesQuery = useQuery({
-    queryKey: ["admin-signup-sources", days],
-    queryFn: () =>
-      adminApi.getSignupSources(days) as Promise<AdminSignupSource[]>,
-    enabled: !game,
-  });
-  const rows = seriesQuery.data ?? null;
-  const failed = seriesQuery.isError;
-  const cohorts = cohortQuery.data ?? null;
-  const sources = sourcesQuery.data ?? null;
+/** 공통(유저) 추이에 그리는 선 */
+export const USER_LINES: Line[] = [
+  {
+    key: "active1d",
+    label: "일간 활성",
+    stroke: "stroke-accent-primary",
+    dot: "bg-accent-primary",
+  },
+  {
+    key: "active7d",
+    label: "주간 활성",
+    stroke: "stroke-text-secondary",
+    dot: "bg-text-secondary",
+  },
+  {
+    key: "active30d",
+    label: "월간 활성",
+    stroke: "stroke-text-muted",
+    dot: "bg-text-muted",
+  },
+];
 
-  const userLines: Line[] = [
-    {
-      key: "active1d",
-      label: "일간 활성",
-      stroke: "stroke-accent-primary",
-      dot: "bg-accent-primary",
-    },
-    {
-      key: "active7d",
-      label: "주간 활성",
-      stroke: "stroke-text-secondary",
-      dot: "bg-text-secondary",
-    },
-    {
-      key: "active30d",
-      label: "월간 활성",
-      stroke: "stroke-text-muted",
-      dot: "bg-text-muted",
-    },
-  ];
-  const gameLines: Line[] = [
+/** 게임별 추이에 그리는 선 */
+export function gameLines(game: GameTitle): Line[] {
+  return [
     {
       key: "roomsEnded",
       label: "끝난 방",
@@ -198,7 +273,39 @@ export function TrendCards({ game }: { game: GameTitle | null }) {
       dot: "bg-text-secondary",
     },
   ];
-  const lines = game ? gameLines : userLines;
+}
+
+/**
+ * 추이 카드. `game` 이 없으면 공통(유저 활성·가입), 있으면 그 게임의 방·기록.
+ * 일별 기록(rows)과 기간(days)은 통계 탭이 받아서 넘긴다 — 같은 기록으로 위의 요약 숫자도 계산한다.
+ */
+export function TrendCards({
+  game,
+  days,
+  rows,
+  failed,
+}: {
+  game: GameTitle | null;
+  days: number;
+  rows: AdminDailyStat[] | null;
+  failed: boolean;
+}) {
+  // 코호트·가입 경로는 공통(게임 없음)일 때만
+  const cohortQuery = useQuery({
+    queryKey: ["admin-cohort-survival", 8],
+    queryFn: () => adminApi.getCohortSurvival(8) as Promise<AdminCohort[]>,
+    enabled: !game,
+  });
+  const sourcesQuery = useQuery({
+    queryKey: ["admin-signup-sources", days],
+    queryFn: () =>
+      adminApi.getSignupSources(days) as Promise<AdminSignupSource[]>,
+    enabled: !game,
+  });
+  const cohorts = cohortQuery.data ?? null;
+  const sources = sourcesQuery.data ?? null;
+
+  const lines = game ? gameLines(game) : USER_LINES;
 
   const hasData =
     rows?.some((r) => lines.some((l) => r[l.key] !== null)) ?? false;
@@ -213,37 +320,9 @@ export function TrendCards({ game }: { game: GameTitle | null }) {
               <TrendingUp className="h-4 w-4 text-accent-primary" />
               {game ? "일별 추이" : "활성 유저 추이"}
             </CardTitle>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() =>
-                  adminApi
-                    .downloadExport("daily-stats", {
-                      gameTitle: game ?? undefined,
-                      days,
-                    })
-                    .catch(() => undefined)
-                }
-                className="mr-1 rounded-md bg-bg-tertiary px-2.5 py-1 text-xs font-medium text-text-secondary hover:text-text-primary"
-                title="이 기간의 일별 지표를 CSV 로 저장"
-              >
-                CSV
-              </button>
-              {DAY_OPTIONS.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDays(d)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-                    days === d
-                      ? "bg-accent-primary text-accent-on"
-                      : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  {d}일
-                </button>
-              ))}
-            </div>
+            <span className="text-xs text-text-muted">
+              최근 {days}일 · 그래프에 마우스를 올리면 그날 수치
+            </span>
           </div>
         </CardHeader>
         <CardContent>

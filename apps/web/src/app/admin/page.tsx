@@ -17,12 +17,11 @@ import { ClansTab } from "@/components/admin/game/ClansTab";
 import { RoomsTab } from "@/components/admin/game/RoomsTab";
 import { MatchesTab } from "@/components/admin/game/MatchesTab";
 import { ScrimsTab } from "@/components/admin/game/ScrimsTab";
+import { StatsTab } from "@/components/admin/StatsTab";
 import {
+  AdminGameFilter,
   AdminGameScopeProvider,
-  AdminGameTabs,
-  useAdminGameScope,
 } from "@/components/admin/game-scope";
-import type { GameTitle } from "@nexus/types";
 import { DiscordGuildLinksTab } from "@/components/admin/system/DiscordGuildLinksTab";
 import { BotCleanupTab } from "@/components/admin/system/BotCleanupTab";
 import { AuditLogsTab } from "@/components/admin/system/AuditLogsTab";
@@ -47,11 +46,13 @@ import {
   ClipboardList,
   Trash2,
   Medal,
+  BarChart3,
 } from "lucide-react";
 import { useResetOn } from "@/hooks/useResetOn";
 
 type Tab =
   | "dashboard"
+  | "stats"
   | "users"
   | "reports"
   | "community"
@@ -75,24 +76,14 @@ interface TabItem {
   label: string;
   icon: React.ReactNode;
   /**
-   * 이 탭이 속한 곳.
+   * 화면 안에 게임 필터 칩(전체/롤/배그)을 띄우는가.
    *
-   * - `common`(기본): 게임과 무관한 운영(유저·신고·공지·시스템). 상단 "공통" 탭에서만 보인다.
-   * - `game`: 두 게임 모두에 있는 탭(방·클랜·커뮤니티 등). 게임 탭 안에서 그 게임 데이터만 보인다.
-   * - `LOL`/`PUBG`: 그 게임에만 있는 탭. 롤 내전(`Match`)과 배그 스크림(`Scrim`)은
-   *   진행 방식도 데이터도 달라 탭이 갈렸다.
-   *
-   * 대시보드는 `common` 이면서 게임 탭에서도 보여야 해서 `all` 로 둔다.
+   * 예전엔 맨 위 공통·롤·배그 탭을 먼저 골라야 사이드바 메뉴가 바뀌었다(메뉴가 사라졌다
+   * 나타나 헷갈렸다). 이제 메뉴는 기능별로 늘 같고, 두 게임 모두에 있는 화면(방·클랜·
+   * 커뮤니티·스트리머·통계)만 화면 안에서 게임으로 거른다. 한 게임 전용 화면(롤 내전·배그
+   * 스크림·경매 리허설)은 이름에 게임을 붙여 둔다.
    */
-  scope?: "common" | "game" | "all" | GameTitle;
-}
-
-/** 탭이 현재 게임 범위(`null` = 공통)에서 보이는가 */
-function isTabInScope(tab: TabItem, game: GameTitle | null): boolean {
-  const scope = tab.scope ?? "common";
-  if (scope === "all") return true;
-  if (game === null) return scope === "common";
-  return scope === "game" || scope === game;
+  gameFilter?: boolean;
 }
 
 /** 사이드바 그룹 — label이 null이면 헤더 없이 단독으로 표시한다. */
@@ -105,6 +96,7 @@ interface TabGroup {
 // 내전 기록은 조회 전용이라 매니저에게도 연다.
 const MODERATOR_TABS: Tab[] = [
   "dashboard",
+  "stats",
   "users",
   "reports",
   "community",
@@ -121,9 +113,14 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       {
         id: "dashboard",
-        scope: "all",
         label: "대시보드",
         icon: <Activity className="h-4 w-4" />,
+      },
+      {
+        id: "stats",
+        gameFilter: true,
+        label: "통계",
+        icon: <BarChart3 className="h-4 w-4" />,
       },
     ],
   },
@@ -145,7 +142,7 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       {
         id: "community",
-        scope: "game",
+        gameFilter: true,
         label: "커뮤니티",
         icon: <BookOpen className="h-4 w-4" />,
       },
@@ -156,7 +153,7 @@ const TAB_GROUPS: TabGroup[] = [
       },
       {
         id: "streamers",
-        scope: "game",
+        gameFilter: true,
         label: "스트리머",
         icon: <Radio className="h-4 w-4" />,
       },
@@ -173,26 +170,24 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       {
         id: "clans",
-        scope: "game",
+        gameFilter: true,
         label: "클랜 관리",
         icon: <Shield className="h-4 w-4" />,
       },
       {
         id: "rooms",
-        scope: "game",
+        gameFilter: true,
         label: "방 관리",
         icon: <Home className="h-4 w-4" />,
       },
       {
         id: "scrims",
-        scope: "PUBG",
-        label: "스크림 기록",
+        label: "배그 스크림 기록",
         icon: <Crosshair className="h-4 w-4" />,
       },
       {
         id: "matches",
-        scope: "LOL",
-        label: "내전 기록",
+        label: "롤 내전 기록",
         icon: <Swords className="h-4 w-4" />,
       },
     ],
@@ -222,8 +217,7 @@ const TAB_GROUPS: TabGroup[] = [
       },
       {
         id: "rehearsal",
-        scope: "LOL",
-        label: "경매 리허설",
+        label: "롤 경매 리허설",
         icon: <FlaskConical className="h-4 w-4" />,
       },
     ],
@@ -236,7 +230,6 @@ const isAdminTab = (value: string | null): value is Tab =>
   !!value && ALL_TABS.some((tab) => tab.id === value);
 
 function AdminPageInner() {
-  const { game, setGame } = useAdminGameScope();
   // 권한 가드는 admin/layout.tsx에서 처리 (미인증/USER → notFound)
   const { user } = useAuthStore();
   const { addToast } = useToast();
@@ -250,17 +243,15 @@ function AdminPageInner() {
 
   const isAdmin = user?.role === "ADMIN";
 
-  // 권한과 게임 범위로 탭을 걸러내고, 남은 탭이 없는 그룹은 통째로 숨긴다.
+  // 권한으로 탭을 걸러내고, 남은 탭이 없는 그룹은 통째로 숨긴다. 게임으로는 거르지 않는다.
   const visibleGroups = useMemo(() => {
     return TAB_GROUPS.map((group) => ({
       ...group,
       tabs: group.tabs.filter(
-        (tab) =>
-          (isAdmin || MODERATOR_TABS.includes(tab.id)) &&
-          isTabInScope(tab, game),
+        (tab) => isAdmin || MODERATOR_TABS.includes(tab.id),
       ),
     })).filter((group) => group.tabs.length > 0);
-  }, [isAdmin, game]);
+  }, [isAdmin]);
 
   const visibleTabIds = useMemo(
     () => visibleGroups.flatMap((group) => group.tabs.map((tab) => tab.id)),
@@ -294,23 +285,14 @@ function AdminPageInner() {
       : "dashboard";
   const activeTab: Tab = pendingTab ?? urlTab;
 
+  // 모르는 탭·권한 밖 탭으로 들어오면 주소를 대시보드로 고친다
   useEffect(() => {
     const tab = searchParams.get("tab");
-    // 옛 링크(`?tab=matches`)는 게임 없이 들어온다. 그 탭이 한 게임 전용이면
-    // 그 게임으로 범위를 맞춰 준다. 안 그러면 공통 범위에서 탭이 사라져 대시보드로 튕긴다.
-    const requested = ALL_TABS.find((t) => t.id === tab);
-    if (
-      requested &&
-      game === null &&
-      (requested.scope === "LOL" || requested.scope === "PUBG")
-    ) {
-      setGame(requested.scope);
-      return;
-    }
     if (tab && tab !== urlTab) {
       router.replace(buildHref("dashboard"), { scroll: false });
     }
-  }, [searchParams, router, urlTab, buildHref, game, setGame]);
+  }, [searchParams, router, urlTab, buildHref]);
+  const activeTabItem = ALL_TABS.find((tab) => tab.id === activeTab);
 
   const handleTabChange = useCallback(
     (tab: Tab) => {
@@ -322,8 +304,6 @@ function AdminPageInner() {
 
   return (
     <div className="flex h-[calc(100vh-64px)] flex-col">
-      {/* 상단 게임 탭. 공통 / 롤 / 배그 — 고른 게임의 메뉴만 아래 사이드바에 뜬다. */}
-      <AdminGameTabs />
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* 사이드바 — 모바일에서는 상단 가로 스크롤 탭바, 데스크톱에서는 세로 사이드바 */}
         <aside className="flex flex-shrink-0 flex-col border-b border-bg-tertiary bg-bg-secondary md:w-52 md:border-b-0 md:border-r">
@@ -375,7 +355,21 @@ function AdminPageInner() {
 
         {/* 메인 콘텐츠 */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          {activeTab === "dashboard" && <DashboardTab addToast={addToast} />}
+          {/* 두 게임 모두에 있는 화면만 게임으로 거른다 */}
+          {activeTabItem?.gameFilter && (
+            <div className="mb-4 flex items-center gap-2">
+              <span className="text-xs text-text-muted">게임</span>
+              <AdminGameFilter />
+            </div>
+          )}
+          {activeTab === "dashboard" && (
+            <DashboardTab
+              addToast={addToast}
+              onNavigate={handleTabChange}
+              canOpen={(tab) => visibleTabIds.includes(tab)}
+            />
+          )}
+          {activeTab === "stats" && <StatsTab />}
           {activeTab === "users" && (
             <UsersTab
               addToast={addToast}
