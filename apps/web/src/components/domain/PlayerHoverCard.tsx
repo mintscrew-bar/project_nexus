@@ -13,6 +13,7 @@ import { useCurrentGame } from "@/hooks/useCurrentGame";
 import { PUBG_PLATFORM_LABELS } from "@nexus/types";
 import { findCosmetic } from "@/components/cosmetics/catalog";
 import { CosmeticEffect } from "@/components/cosmetics/effects";
+import { LiveBanner } from "@/components/cosmetics/live-banner";
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
 import { useCosmeticLoadouts } from "@/components/cosmetics/useCosmeticLoadouts";
 import { UserName } from "@/components/cosmetics/UserName";
@@ -193,7 +194,9 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
   });
   // 장착한 꾸미기 — 카드 장식은 헤더 뒤 무대로, 아바타 장식은 사진 둘레에 (Task 22)
   const loadouts = useCosmeticLoadouts([userId]);
-  const cardFx = findCosmetic(loadouts[userId]?.CARD_FRAME)?.effect;
+  const cardItem = findCosmetic(loadouts[userId]?.CARD_FRAME);
+  const cardFx = cardItem?.effect;
+  const cardVideo = cardItem?.cardVideo;
   const avatarFx = findCosmetic(loadouts[userId]?.AVATAR_FRAME)?.avatarEffect;
 
   const TOOLTIP_OFFSET = 8;
@@ -250,9 +253,10 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
           {/* 아바타 장식(왕관·고양이 귀 등)은 사진 위로 솟아서, 장착했으면 위 여백을 더 둔다 */}
           <div className={`relative overflow-hidden px-4 pb-3 ${avatarFx ? "pt-7" : "pt-4"}`}>
             {/* 카드 장식 — 헤더 뒤에 깔고, 글자가 묻히지 않게 글자 쪽은 바탕색으로 눌러 둔다 */}
-            {cardFx && (
+            {(cardFx || cardVideo) && (
               <>
-                <CosmeticEffect code={cardFx} px={2.5} />
+                {cardVideo && <LiveBanner code={cardVideo} />}
+                {cardFx && <CosmeticEffect code={cardFx} px={2.5} />}
                 {/* 아바타 자리(왼쪽 30%)는 그대로 보이고, 이름이 시작되는 곳부터는 거의 가린다 */}
                 <div
                   className="cfx-deco pointer-events-none absolute inset-0"

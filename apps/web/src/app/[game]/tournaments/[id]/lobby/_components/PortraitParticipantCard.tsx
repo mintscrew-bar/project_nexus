@@ -15,6 +15,7 @@ import { getRoleTier } from "@/lib/role-tier";
 import { cn } from "@/lib/utils";
 import { findCosmetic } from "@/components/cosmetics/catalog";
 import { CosmeticEffect } from "@/components/cosmetics/effects";
+import { LiveBanner } from "@/components/cosmetics/live-banner";
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
 import { UserName } from "@/components/cosmetics/UserName";
 import { PositionIcon } from "./icons";
@@ -295,6 +296,7 @@ export function PortraitParticipantCard({
     >
       {/* 무대 — 준비 띠 위 전체. 카드 장식 효과가 이름 줄 뒤까지 깔린다 */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
+        {frame?.cardVideo && <LiveBanner code={frame.cardVideo} />}
         {frame?.effect && (
           <CosmeticEffect
             code={frame.effect}
@@ -331,14 +333,14 @@ export function PortraitParticipantCard({
 
           {/* 이름·티어·라인 — 장식 효과 위에서도 읽히게 아래로 갈수록 어두운 막을 깐다 */}
           <div className="relative w-full flex-shrink-0">
-            {frame?.effect && (
-              <div className="cfx-deco absolute inset-0 bg-gradient-to-t from-black/70 via-black/45 to-transparent" />
+            {(frame?.effect || frame?.cardVideo) && (
+              <div className="cfx-deco absolute inset-0 bg-gradient-to-t from-black/85 via-black/65 to-transparent" />
             )}
             <div
               className={cn(
                 "relative flex flex-col items-center px-1.5",
                 size === "lg" ? "gap-1 py-2" : "gap-0.5 py-1.5",
-                frame?.effect &&
+                (frame?.effect || frame?.cardVideo) &&
                   "[&_span]:drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)]",
               )}
             >
