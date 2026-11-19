@@ -31,8 +31,8 @@ export const LIVE_BANNERS = {
     webm: "/cosmetics/banners/ink_swordsman/loop.webm",
     mp4: "/cosmetics/banners/ink_swordsman/loop.mp4",
     poster: "/cosmetics/banners/ink_swordsman/poster.webp",
-    size: [1536, 640],
-    focusY: 0.55,
+    size: [1280, 736],
+    focusY: 0.5,
   },
 } satisfies Record<string, LiveBannerDef>;
 
@@ -110,8 +110,7 @@ export function LiveBanner({
         aria-hidden
         disablePictureInPicture
       >
-        {/* 수묵 검객은 mp4(h264)가 webm(vp9)보다 가벼웠다(0.96MB vs 1.1MB). mp4 를 먼저,
-            h264 를 못 쓰는 브라우저(오픈소스 Chromium 등)는 webm 으로 */}
+        {/* H.264 MP4 우선, 미지원 환경에서는 WebM 대체 재생 */}
         <source src={def.mp4} type="video/mp4" />
         <source src={def.webm} type="video/webm" />
       </video>
