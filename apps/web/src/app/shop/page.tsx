@@ -9,10 +9,6 @@ import { PortraitParticipantCard } from "@/app/[game]/tournaments/[id]/lobby/_co
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
 import { StyledName } from "@/components/cosmetics/name-styles";
 import {
-  LiveBanner,
-  liveBannerAspect,
-} from "@/components/cosmetics/live-banner";
-import {
   COSMETICS,
   MEDAL_LABEL,
   RARITY_LABEL,
@@ -27,6 +23,11 @@ import { useToast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/auth-store";
 import { shopApi, type ShopItemState } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { CosmeticPreview } from "@/components/cosmetics/CosmeticPreview";
+import {
+  LiveBanner,
+  liveBannerAspect,
+} from "@/components/cosmetics/live-banner";
 
 type ShopSlot = "CARD_FRAME" | "AVATAR_FRAME" | "NAME_STYLE" | "PROFILE_BANNER";
 const SLOTS: ShopSlot[] = [
@@ -43,6 +44,15 @@ const RARITY_STYLE: Record<CosmeticItem["rarity"], string> = {
   COMMON: "bg-sky-500/15 text-sky-300",
   PREMIUM: "bg-violet-500/20 text-violet-300",
   RARE: "bg-amber-500/20 text-amber-300",
+};
+
+/** 등급별 상품 칸 — 희귀는 금빛, 고급은 보라, 일반·입문은 차분하게 */
+const RARITY_TILE: Record<CosmeticItem["rarity"], string> = {
+  STARTER: "border-bg-tertiary bg-bg-tertiary/30 hover:border-text-tertiary/50",
+  COMMON: "border-sky-400/20 bg-bg-tertiary/30 hover:border-sky-300/50",
+  PREMIUM:
+    "border-violet-400/35 bg-[linear-gradient(180deg,rgba(139,92,246,0.10),rgba(0,0,0,0)_60%)] hover:border-violet-300/70",
+  RARE: "border-amber-400/50 bg-[linear-gradient(180deg,rgba(251,191,36,0.14),rgba(0,0,0,0)_60%)] shadow-[0_0_18px_rgba(251,191,36,0.12)] hover:border-amber-300/80",
 };
 
 const noop = () => {};
@@ -84,6 +94,13 @@ export default function ShopPage() {
   // 입어 보는 중인 상품 — 자리별로 따로
   const [trying, setTrying] = useState<Partial<Record<ShopSlot, string>>>({});
   const [confirm, setConfirm] = useState<CosmeticItem | null>(null);
+  // 오른쪽 패널에 자세히 보여 줄 상품(마지막으로 누른 것)
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  // 정렬·거르기
+  const [sort, setSort] = useState<"RECOMMENDED" | "PRICE_ASC" | "PRICE_DESC">(
+    "RECOMMENDED",
+  );
+  const [affordableOnly, setAffordableOnly] = useState(false);
 
   const stateByCode = useMemo(() => {
     const map = new Map<string, ShopItemState>();
@@ -148,6 +165,9 @@ export default function ShopPage() {
   const shownCard = trying.CARD_FRAME ?? loadout.CARD_FRAME;
   const shownAvatar = trying.AVATAR_FRAME ?? loadout.AVATAR_FRAME;
   const shownName = trying.NAME_STYLE ?? loadout.NAME_STYLE;
+  const shownBanner = findCosmetic(
+    trying.PROFILE_BANNER ?? loadout.PROFILE_BANNER,
+  )?.liveBanner;
   const shownNameStyle = findCosmetic(shownName)?.nameStyle;
   const avatarSrc = user?.avatar || AVATAR_FALLBACK;
   const me = {
@@ -159,7 +179,10 @@ export default function ShopPage() {
     isReady: true,
   };
   const isTrying = Boolean(
-    trying.CARD_FRAME || trying.AVATAR_FRAME || trying.NAME_STYLE,
+    trying.CARD_FRAME ||
+    trying.AVATAR_FRAME ||
+    trying.NAME_STYLE ||
+    trying.PROFILE_BANNER,
   );
   // 진열할 상품 — 보관함이면 산 것 전부(자리 순서대로), 아니면 그 자리 상품
   // 서버 상품표(관리자가 바꾼 이름·설명·가격·순서·할인)를 그림 정의에 덮어 진열한다
@@ -182,11 +205,127 @@ export default function ShopPage() {
     )
     .filter((item) =>
       tab === "OWNED" ? stateByCode.get(item.code)!.owned : item.slot === tab,
+    )
+    // 살 수 있는 것만 — 가진 것은 늘 보인다
+    .filter(
+      (item) =>
+        !affordableOnly ||
+        stateByCode.get(item.code)!.owned ||
+        item.price <= (data?.balance ?? 0),
+    )
+    .sort((a, b) =>
+      sort === "PRICE_ASC"
+        ? a.price - b.price
+        : sort === "PRICE_DESC"
+          ? b.price - a.price
+          : 0,
     );
+  type ShownItem = (typeof shown)[number];
+  // 진행 중 할인 — 가장 큰 할인율과 가장 먼저 끝나는 시각
+  const discounted = (data?.items ?? []).filter(
+    (it) => (it.discountPercent ?? 0) > 0,
+  );
+  const maxDiscount = Math.max(
+    0,
+    ...discounted.map((it) => it.discountPercent ?? 0),
+  );
+  const discountEnds = discounted
+    .map((it) => it.discountEndsAt)
+    .filter((d): d is string => Boolean(d))
+    .sort()[0];
+  const selected =
+    shown.find((it) => it.code === selectedCode) ??
+    (selectedCode
+      ? (() => {
+          // 탭을 바꿔 목록에 없어도 패널에는 남긴다
+          const base = COSMETICS.find((c) => c.code === selectedCode);
+          const st = stateByCode.get(selectedCode);
+          return base && st
+            ? {
+                ...base,
+                name: st.name ?? base.name,
+                description: st.description ?? base.description,
+                price: st.price,
+                rarity: st.rarity,
+                basePrice: st.basePrice ?? st.price,
+                discountPercent: st.discountPercent ?? 0,
+              }
+            : null;
+        })()
+      : null);
+  const pick = (item: ShownItem) => {
+    setSelectedCode(item.code);
+    // 입어 보기는 자리마다 따로 — 같은 상품을 다시 누르면 벗는다
+    setTrying((t) => ({
+      ...t,
+      [item.slot]:
+        t[item.slot as ShopSlot] === item.code ? undefined : item.code,
+    }));
+  };
   const ownedCount = data?.items.filter((it) => it.owned).length ?? 0;
 
+  /** 사기·장착·해제 버튼 — 상품 상태에 따라 하나 */
+  const actionFor = (item: ShownItem, size: "sm" | "lg") => {
+    const state = stateByCode.get(item.code)!;
+    const h = size === "lg" ? "h-11 text-sm" : "h-9 text-xs";
+    if (state.owned) {
+      return state.equipped ? (
+        <button
+          type="button"
+          disabled={equip.isPending}
+          onClick={() =>
+            equip.mutate({ slot: item.slot as ShopSlot, code: null })
+          }
+          className={cn(
+            "flex w-full items-center justify-center gap-1.5 rounded-lg bg-bg-tertiary font-black text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary",
+            h,
+          )}
+        >
+          장착 해제
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={equip.isPending}
+          onClick={() =>
+            equip.mutate({ slot: item.slot as ShopSlot, code: item.code })
+          }
+          className={cn(
+            "flex w-full items-center justify-center rounded-lg bg-accent-primary font-black text-accent-on transition hover:brightness-110",
+            h,
+          )}
+        >
+          장착하기
+        </button>
+      );
+    }
+    const short = balance < item.price;
+    return (
+      <button
+        type="button"
+        disabled={short}
+        onClick={() => setConfirm(item)}
+        className={cn(
+          "flex w-full items-center justify-center gap-1.5 rounded-lg font-black transition",
+          h,
+          short
+            ? "cursor-not-allowed bg-bg-tertiary text-text-tertiary"
+            : "bg-accent-primary text-accent-on hover:brightness-110",
+        )}
+      >
+        <Medal className="h-4 w-4" />
+        {item.price.toLocaleString()} {MEDAL_LABEL}에 사기
+        {short && (
+          <span className="font-bold">
+            · {(item.price - balance).toLocaleString()} 부족
+          </span>
+        )}
+      </button>
+    );
+  };
+
   return (
-    <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6 md:px-6">
+    <div className="container mx-auto max-w-7xl space-y-5 px-4 py-6 md:px-6">
       {/* 제목 + 잔액 */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -194,15 +333,15 @@ export default function ShopPage() {
             {MEDAL_LABEL} 상점
           </h1>
           <p className="mt-1 text-sm text-text-secondary">
-            내전을 끝까지 하면 {MEDAL_LABEL}을 받아요. 로비 카드와 프로필을 꾸며
-            보세요.
+            내전을 끝까지 하고 매일 출석하면 {MEDAL_LABEL}을 받아요. 상품을
+            누르면 오른쪽에서 입어 볼 수 있어요.
           </p>
         </div>
         {/* 잔액 — 누르면 메달 내역 전체 화면 */}
         <Link
           href="/shop/medals"
           title={`${MEDAL_LABEL} 내역 보기`}
-          className="flex items-center gap-2 rounded-xl bg-amber-400/10 px-4 py-2.5 transition-colors hover:bg-amber-400/15"
+          className="flex items-center gap-2 rounded-lg bg-amber-400/10 px-4 py-2.5 transition-colors hover:bg-amber-400/15"
         >
           <Medal className="h-5 w-5 text-amber-300" />
           <span className="text-xl font-black tabular-nums text-text-primary">
@@ -214,291 +353,265 @@ export default function ShopPage() {
         </Link>
       </div>
 
-      {/* 내 모습 미리보기 */}
-      <section className="flex flex-col gap-6 rounded-2xl bg-bg-secondary p-5 sm:flex-row sm:items-center">
-        <div className="w-[200px] flex-shrink-0">
-          <div className="mb-2 text-xs font-bold text-text-tertiary">
-            로비 카드
-          </div>
-          <PortraitParticipantCard
-            {...PREVIEW_CARD_PROPS}
-            p={me}
-            frameCode={shownCard}
-            avatarFrameCode={shownAvatar}
-            nameStyleCode={shownName ?? null}
-          />
-        </div>
-        <div className="flex-shrink-0">
-          <div className="mb-2 text-xs font-bold text-text-tertiary">
-            프로필 아바타·닉네임
-          </div>
-          <div className="flex h-[210px] w-[200px] flex-col items-center justify-center gap-3">
-            <AvatarDecoration
-              code={findCosmetic(shownAvatar)?.avatarEffect}
-              size={96}
-            >
-              <div className="relative h-24 w-24 overflow-hidden rounded-full bg-bg-tertiary">
-                <Image
-                  src={avatarSrc}
-                  alt=""
-                  fill
-                  unoptimized
-                  className="object-cover"
-                />
-              </div>
-            </AvatarDecoration>
-            {/* 프로필 이름 크기로 닉네임 글꼴을 입혀 본다 */}
-            <div className="max-w-full truncate text-xl font-black text-text-primary">
-              <StyledName code={shownNameStyle}>{me.username}</StyledName>
-            </div>
-          </div>
-        </div>
-        <div className="min-w-0 flex-1 text-sm text-text-secondary">
-          {isTrying ? (
-            <>
-              <div className="flex items-center gap-1.5 font-bold text-text-primary">
-                <Sparkles className="h-4 w-4 text-amber-300" />
-                입어 보는 중
-              </div>
-              <p className="mt-1">
-                상품을 누르면 여기 입혀 봐요. 사기 전엔 나에게만 보여요.
-              </p>
-              <button
-                type="button"
-                onClick={() => setTrying({})}
-                className="mt-3 rounded-lg bg-bg-tertiary px-3 py-1.5 text-xs font-bold text-text-secondary hover:bg-bg-elevated"
-              >
-                장착한 모습으로 되돌리기
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="font-bold text-text-primary">지금 내 모습</div>
-              <p className="mt-1">
-                상품을 누르면 여기에 입혀 볼 수 있어요. 산 상품은 로비의 다른
-                참가자와 프로필 방문자에게도 보여요.
-              </p>
-            </>
-          )}
-        </div>
-      </section>
-
-      {/* 자리 탭 */}
-      <div className="flex flex-wrap gap-2">
-        {[...SLOTS, "OWNED" as const].map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={cn(
-              "h-10 rounded-lg px-4 text-sm font-black transition-colors",
-              tab === t
-                ? "bg-accent-primary text-accent-on"
-                : "bg-bg-tertiary/60 text-text-secondary hover:bg-bg-tertiary",
-            )}
-          >
-            {t === "OWNED" ? `보관함 ${ownedCount}` : SLOT_LABEL[t]}
-          </button>
-        ))}
-      </div>
-
-      {/* 상품 진열 */}
-      {isLoading ? (
-        <div className="py-20 text-center text-sm text-text-tertiary">
-          불러오는 중…
-        </div>
-      ) : tab === "OWNED" && shown.length === 0 ? (
-        <div className="rounded-xl bg-bg-secondary py-16 text-center text-sm text-text-tertiary">
-          아직 산 꾸미기가 없어요.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {shown.map((item, i) => {
-            const state = stateByCode.get(item.code)!;
-            const slot = item.slot as ShopSlot;
-            const selected = trying[slot] === item.code;
-            const short = balance < item.price;
-            return (
-              <div
-                key={item.code}
-                className={cn(
-                  "flex flex-col gap-3 rounded-xl p-4 transition-colors",
-                  // 프로필 배경은 가로로 긴 배너라 두 칸을 쓴다
-                  item.slot === "PROFILE_BANNER" && "sm:col-span-2",
-                  selected
-                    ? "bg-accent-primary/10 ring-1 ring-inset ring-accent-primary/50"
-                    : "bg-bg-tertiary/40",
-                )}
-              >
-                {/* 누르면 위 미리보기에 입혀 본다 */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setTrying((t) => ({
-                      ...t,
-                      [slot]: selected ? undefined : item.code,
-                    }))
-                  }
-                  className="text-left"
-                  aria-label={`${item.name} 입어 보기`}
-                >
-                  {item.slot === "PROFILE_BANNER" && item.liveBanner ? (
-                    // 프로필 배경 — 프로필 배너와 같이 영상 비율 그대로(잘림 없이) 보여 준다
-                    <div
-                      className="relative w-full overflow-hidden rounded-lg bg-bg-tertiary"
-                      style={{ aspectRatio: liveBannerAspect(item.liveBanner) }}
-                    >
-                      <LiveBanner code={item.liveBanner} />
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg-secondary/80 to-transparent" />
-                    </div>
-                  ) : item.slot === "NAME_STYLE" ? (
-                    // 닉네임 글꼴 — 프로필·로비 카드·채팅 크기로 함께 보여 준다
-                    <div className="flex h-[180px] flex-col items-center justify-center gap-3 rounded-lg bg-bg-secondary/60 px-2">
-                      <div className="max-w-full truncate text-2xl font-black text-text-primary">
-                        <StyledName code={item.nameStyle}>
-                          {me.username}
-                        </StyledName>
-                      </div>
-                      <div className="max-w-full truncate rounded-md bg-bg-tertiary/70 px-2 py-1 text-sm font-black text-text-primary">
-                        <StyledName code={item.nameStyle}>
-                          {me.username}
-                        </StyledName>
-                      </div>
-                      <div className="max-w-full truncate text-[13px] text-text-secondary">
-                        <span className="font-bold text-text-primary">
-                          <StyledName code={item.nameStyle}>
-                            {me.username}
-                          </StyledName>
-                        </span>
-                        : 다음 판 미드 갑니다
-                      </div>
-                    </div>
-                  ) : item.slot === "AVATAR_FRAME" ? (
-                    <div className="flex h-[180px] items-center justify-center">
-                      <AvatarDecoration code={item.avatarEffect} size={88}>
-                        <div className="relative h-[88px] w-[88px] overflow-hidden rounded-full bg-bg-tertiary">
-                          <Image
-                            src={avatarSrc}
-                            alt=""
-                            fill
-                            unoptimized
-                            className="object-cover"
-                          />
-                        </div>
-                      </AvatarDecoration>
-                    </div>
-                  ) : (
-                    <div className="mx-auto w-[180px]">
-                      <PortraitParticipantCard
-                        {...PREVIEW_CARD_PROPS}
-                        p={{ ...me, id: `preview-${i}` }}
-                        frameCode={item.code}
-                        avatarFrameCode={shownAvatar}
-                        nameStyleCode={shownName ?? null}
-                      />
-                    </div>
-                  )}
-                </button>
-
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-black text-text-primary">
-                      {item.name}
-                    </span>
-                    <span
-                      className={cn(
-                        "rounded px-1.5 py-0.5 text-[10px] font-bold",
-                        RARITY_STYLE[item.rarity],
-                      )}
-                    >
-                      {RARITY_LABEL[item.rarity]}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-text-tertiary">
-                    {tab === "OWNED" && (
-                      <span className="mr-1 font-bold text-text-secondary">
-                        {SLOT_LABEL[item.slot]} ·
-                      </span>
-                    )}
-                    {item.description}
-                  </p>
-                </div>
-
-                <div className="mt-auto">
-                  {state.owned ? (
-                    state.equipped ? (
-                      <button
-                        type="button"
-                        disabled={equip.isPending}
-                        onClick={() =>
-                          equip.mutate({
-                            slot: item.slot as ShopSlot,
-                            code: null,
-                          })
-                        }
-                        className="group/eq flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-accent-success/60 text-sm font-black text-white transition-colors hover:bg-bg-elevated hover:text-text-secondary"
-                      >
-                        <span className="flex items-center gap-1.5 group-hover/eq:hidden">
-                          <Check className="h-4 w-4" strokeWidth={3} />
-                          장착 중
-                        </span>
-                        <span className="hidden group-hover/eq:inline">
-                          장착 해제
-                        </span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={equip.isPending}
-                        onClick={() =>
-                          equip.mutate({
-                            slot: item.slot as ShopSlot,
-                            code: item.code,
-                          })
-                        }
-                        className="flex h-10 w-full items-center justify-center rounded-lg bg-bg-elevated text-sm font-black text-text-primary transition-colors hover:bg-accent-primary hover:text-accent-on"
-                      >
-                        장착하기
-                      </button>
-                    )
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={short}
-                      onClick={() => setConfirm(item)}
-                      className={cn(
-                        "flex h-10 w-full items-center justify-center gap-1.5 rounded-lg text-sm font-black transition-colors",
-                        short
-                          ? "cursor-not-allowed bg-bg-elevated/60 text-text-tertiary"
-                          : "bg-accent-primary text-accent-on hover:brightness-110",
-                      )}
-                    >
-                      <Medal className="h-4 w-4" />
-                      {/* 기간 할인 중이면 원래 가격을 지우고 할인율을 붙인다 */}
-                      {item.discountPercent > 0 && (
-                        <span className="text-xs font-bold line-through opacity-60">
-                          {item.basePrice.toLocaleString()}
-                        </span>
-                      )}
-                      {item.price.toLocaleString()} {MEDAL_LABEL}
-                      {item.discountPercent > 0 && (
-                        <span className="rounded bg-red-500/90 px-1 text-[10px] font-black text-white">
-                          -{item.discountPercent}%
-                        </span>
-                      )}
-                      {short && (
-                        <span className="ml-1 text-xs font-bold">
-                          · {(item.price - balance).toLocaleString()} 부족
-                        </span>
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+      {/* 진행 중 할인 띠 */}
+      {maxDiscount > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-red-500/10 px-4 py-2.5 text-sm">
+          <span className="rounded bg-red-500 px-1.5 py-0.5 text-xs font-black text-white">
+            할인 중
+          </span>
+          <span className="font-bold text-text-primary">
+            최대 {maxDiscount}% 할인
+          </span>
+          <span className="text-text-secondary">
+            {discounted.length}개 상품
+            {discountEnds &&
+              ` · ${new Date(discountEnds).toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "numeric" })}까지`}
+          </span>
         </div>
       )}
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        {/* ── 왼쪽: 자리 탭 · 정렬 · 상품 ── */}
+        <div className="min-w-0 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-1.5">
+              {[...SLOTS, "OWNED" as const].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className={cn(
+                    "h-9 rounded-lg px-3.5 text-sm font-bold transition-colors",
+                    tab === t
+                      ? "bg-accent-primary text-accent-on"
+                      : "bg-bg-tertiary/60 text-text-secondary hover:bg-bg-tertiary",
+                  )}
+                >
+                  {t === "OWNED" ? `보관함 ${ownedCount}` : SLOT_LABEL[t]}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <label className="flex cursor-pointer items-center gap-1.5 text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={affordableOnly}
+                  onChange={(e) => setAffordableOnly(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-[var(--accent-primary)]"
+                />
+                살 수 있는 것만
+              </label>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as typeof sort)}
+                className="h-8 rounded-lg bg-bg-tertiary px-2 text-text-primary focus:outline-none"
+              >
+                <option value="RECOMMENDED">추천순</option>
+                <option value="PRICE_ASC">가격 낮은순</option>
+                <option value="PRICE_DESC">가격 높은순</option>
+              </select>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="py-20 text-center text-sm text-text-tertiary">
+              불러오는 중…
+            </div>
+          ) : shown.length === 0 ? (
+            <div className="rounded-lg bg-bg-secondary py-16 text-center text-sm text-text-tertiary">
+              {tab === "OWNED"
+                ? "아직 산 꾸미기가 없어요."
+                : "조건에 맞는 상품이 없어요."}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+              {shown.map((item) => {
+                const state = stateByCode.get(item.code)!;
+                const isSelected = selectedCode === item.code;
+                return (
+                  <button
+                    key={item.code}
+                    type="button"
+                    onClick={() => pick(item)}
+                    aria-pressed={isSelected}
+                    aria-label={`${item.name} 입어 보기`}
+                    className={cn(
+                      "group relative flex flex-col overflow-hidden rounded-lg border text-left transition-colors",
+                      // 프로필 배경은 가로로 긴 배너라 두 칸을 쓴다
+                      item.slot === "PROFILE_BANNER" && "col-span-2",
+                      RARITY_TILE[item.rarity],
+                      isSelected && "ring-2 ring-accent-primary",
+                    )}
+                  >
+                    {/* 그림 — 그 상품만(내 장착 장식은 섞지 않는다) */}
+                    <div className="relative">
+                      <CosmeticPreview
+                        item={item}
+                        username={me.username}
+                        avatar={avatarSrc}
+                        // 카드 장식은 세로로 긴 로비 카드가 다 들어가게 조금 더 높게
+                        height={item.slot === "CARD_FRAME" ? 236 : 200}
+                      />
+                      <span
+                        className={cn(
+                          "absolute left-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-black",
+                          RARITY_STYLE[item.rarity],
+                        )}
+                      >
+                        {RARITY_LABEL[item.rarity]}
+                      </span>
+                      {state.equipped ? (
+                        <span className="absolute right-2 top-2 flex items-center gap-0.5 rounded bg-accent-success px-1.5 py-0.5 text-[10px] font-black text-white">
+                          <Check className="h-3 w-3" strokeWidth={3} />
+                          장착 중
+                        </span>
+                      ) : state.owned ? (
+                        <span className="absolute right-2 top-2 rounded bg-bg-primary/80 px-1.5 py-0.5 text-[10px] font-black text-text-secondary">
+                          보유
+                        </span>
+                      ) : item.discountPercent > 0 ? (
+                        <span className="absolute right-2 top-2 rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+                          -{item.discountPercent}%
+                        </span>
+                      ) : null}
+                    </div>
+                    {/* 이름 + 가격 */}
+                    <div className="flex items-center justify-between gap-2 border-t border-white/5 bg-bg-secondary/80 px-3 py-2">
+                      <span className="min-w-0 truncate text-sm font-bold text-text-primary">
+                        {item.name}
+                      </span>
+                      {state.owned ? (
+                        <span className="flex-shrink-0 text-[11px] font-bold text-text-tertiary">
+                          {tab === "OWNED" ? SLOT_LABEL[item.slot] : "가짐"}
+                        </span>
+                      ) : (
+                        <span className="flex flex-shrink-0 items-center gap-1 text-sm font-black tabular-nums text-amber-300">
+                          {item.discountPercent > 0 && (
+                            <span className="text-[11px] font-bold text-text-tertiary line-through">
+                              {item.basePrice.toLocaleString()}
+                            </span>
+                          )}
+                          <Medal className="h-3.5 w-3.5" />
+                          {item.price.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── 오른쪽: 내 모습 + 고른 상품 (화면을 따라다닌다) ── */}
+        <aside className="space-y-3 lg:sticky lg:top-20 lg:self-start">
+          <section className="rounded-lg bg-bg-secondary p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-sm font-bold text-text-primary">
+                {isTrying && <Sparkles className="h-4 w-4 text-amber-300" />}
+                {isTrying ? "입어 보는 중" : "지금 내 모습"}
+              </span>
+              {isTrying && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTrying({});
+                    setSelectedCode(null);
+                  }}
+                  className="text-xs font-bold text-text-tertiary hover:text-text-primary"
+                >
+                  되돌리기
+                </button>
+              )}
+            </div>
+            {/* 프로필 배경 — 입어 보거나 끼고 있으면 위에 띠로 */}
+            {shownBanner && (
+              <div
+                className="relative mb-3 w-full overflow-hidden rounded-md"
+                style={{ aspectRatio: liveBannerAspect(shownBanner) }}
+              >
+                <LiveBanner code={shownBanner} className="absolute inset-0" />
+              </div>
+            )}
+            <div className="flex items-start justify-center gap-4">
+              <div className="w-[136px] flex-shrink-0">
+                <PortraitParticipantCard
+                  {...PREVIEW_CARD_PROPS}
+                  p={me}
+                  frameCode={shownCard}
+                  avatarFrameCode={shownAvatar}
+                  nameStyleCode={shownName ?? null}
+                />
+              </div>
+              <div className="flex flex-col items-center gap-3 pt-6">
+                <AvatarDecoration
+                  code={findCosmetic(shownAvatar)?.avatarEffect}
+                  size={84}
+                >
+                  <div className="relative h-[84px] w-[84px] overflow-hidden rounded-full bg-bg-tertiary">
+                    <Image
+                      src={avatarSrc}
+                      alt=""
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
+                  </div>
+                </AvatarDecoration>
+                <div className="max-w-[120px] truncate text-base font-black text-text-primary">
+                  <StyledName code={shownNameStyle}>{me.username}</StyledName>
+                </div>
+              </div>
+            </div>
+            <p className="mt-3 text-[11px] text-text-tertiary">
+              입어 보는 모습은 나에게만 보여요. 산 상품은 로비의 다른 참가자와
+              프로필 방문자에게도 보여요.
+            </p>
+          </section>
+
+          {selected ? (
+            <section className="space-y-3 rounded-lg bg-bg-secondary p-4">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base font-black text-text-primary">
+                    {selected.name}
+                  </span>
+                  <span
+                    className={cn(
+                      "rounded px-1.5 py-0.5 text-[10px] font-bold",
+                      RARITY_STYLE[selected.rarity],
+                    )}
+                  >
+                    {RARITY_LABEL[selected.rarity]}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-text-tertiary">
+                  {SLOT_LABEL[selected.slot]}
+                </p>
+                <p className="mt-2 text-sm text-text-secondary">
+                  {selected.description}
+                </p>
+              </div>
+              {!stateByCode.get(selected.code)?.owned &&
+                selected.discountPercent > 0 && (
+                  <p className="text-xs text-text-secondary">
+                    <span className="mr-1 line-through">
+                      {selected.basePrice.toLocaleString()}
+                    </span>
+                    <span className="font-black text-red-400">
+                      -{selected.discountPercent}% 할인 중
+                    </span>
+                  </p>
+                )}
+              {actionFor(selected, "lg")}
+            </section>
+          ) : (
+            <section className="rounded-lg border border-dashed border-bg-tertiary p-4 text-center text-sm text-text-tertiary">
+              왼쪽에서 상품을 누르면 여기서 입어 보고 살 수 있어요.
+            </section>
+          )}
+        </aside>
+      </div>
 
       {/* 구매 확인 */}
       <Modal
