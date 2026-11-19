@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
 import { MobileMenu } from "@/components/MobileMenu";
 import { DiscordIcon } from "@/components/icons/DiscordIcon";
-import { Users, Shield } from "lucide-react";
+import { Users } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useFriendStore } from "@/stores/friend-store";
 import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
@@ -135,42 +135,28 @@ export function Header() {
         </ul>
       </nav>
 
-      {/* Right: Friends + Theme Toggle + Auth */}
+      {/* 오른쪽: 배경음악 · 메달(출석) · 친구 · 알림 · 프로필 */}
       <div className="flex shrink-0 items-center gap-1.5 md:gap-3">
-        <a
-          href={NEXUS_DISCORD_INVITE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hidden items-center gap-2 rounded-lg border border-[#5865F2]/30 bg-[#5865F2]/10 px-3 py-2 text-sm font-semibold text-[#5865F2] transition-colors duration-150 hover:bg-[#5865F2]/20 dark:border-[#5865F2]/20 dark:text-[#8EA1FF] dark:hover:text-[#C7D2FE] nav:inline-flex"
-          title="Discord 커뮤니티"
-          aria-label="Discord 커뮤니티"
-        >
-          <DiscordIcon className="h-5 w-5" />
-          <span>Discord</span>
-        </a>
+        {/*
+          Discord 는 로그인 전에만 헤더에 둔다. 로그인하면 프로필 메뉴 안으로 들어간다
+          (헤더 정리 — 바깥엔 배경음악·메달·친구·알림·프로필만).
+        */}
+        {!clientIsAuthenticated && (
+          <a
+            href={NEXUS_DISCORD_INVITE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden min-h-11 min-w-11 items-center justify-center rounded-lg text-[#5865F2] transition-colors duration-150 hover:bg-[#5865F2]/10 dark:text-[#8EA1FF] nav:inline-flex"
+            title="Discord 커뮤니티"
+            aria-label="Discord 커뮤니티"
+          >
+            <DiscordIcon className="h-5 w-5" />
+          </a>
+        )}
         {/* 배경음악 토글: 경매·드래프트 중에도 바로 끌 수 있게 모든 너비에서 노출 */}
         <BgmToggle />
-        {/* 어드민/모더레이터 전용 링크: 마운트 후에만 표시하여 hydration 불일치 방지 */}
-        {clientIsAuthenticated &&
-          (clientUser?.role === "ADMIN" ||
-            clientUser?.role === "MODERATOR") && (
-            <>
-              <Link
-                href="/admin"
-                className={cn(
-                  // 좁은 데스크톱까지는 햄버거 메뉴로 이동 → 넓은 데스크톱에서만 노출
-                  "hidden min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary nav:inline-flex",
-                  pathname.startsWith("/admin")
-                    ? "bg-accent-primary/10 text-accent-primary"
-                    : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
-                )}
-                title="관리자 패널"
-                aria-label="관리자 패널"
-              >
-                <Shield className="h-5 w-5" />
-              </Link>
-            </>
-          )}
+        {/* 가진 메달 — 늘 보이게. 새로 받으면 「+N」이 떠오르고, 오늘 출석 전이면 점이 뜬다 */}
+        {clientIsAuthenticated && <MedalChip />}
         {/* 친구 목록 버튼: 마운트 후에만 표시하여 뱃지 카운트 hydration 불일치 방지 */}
         {clientIsAuthenticated && (
           <button
@@ -197,13 +183,13 @@ export function Header() {
           친구·클랜 관련은 친구창이 맡는다(운영자 결정, 2026-09-22).
           마운트 후에만 그려 배지 hydration 불일치를 막는다.
         */}
-        {/* 가진 메달 — 늘 보이게. 새로 받으면 「+N」이 떠오른다 */}
-        {clientIsAuthenticated && <MedalChip />}
         {clientIsAuthenticated && <NotificationBell />}
-        {/* 테마 토글: 좁은 데스크톱까지는 햄버거 메뉴로 이동 → 넓은 데스크톱에서만 노출 */}
-        <div className="hidden nav:block">
-          <ThemeToggle />
-        </div>
+        {/* 테마 토글은 로그인 전에만 — 로그인하면 프로필 메뉴 안에 있다 */}
+        {!clientIsAuthenticated && (
+          <div className="hidden nav:block">
+            <ThemeToggle />
+          </div>
+        )}
         <UserMenu />
       </div>
     </header>

@@ -2481,7 +2481,37 @@ export const shopApi = {
 };
 
 /** 메달 — 잔액과 내역 (리텐션 기획서 7절) */
+/** 출석 현황 (GET /medals/me/attendance) */
+export interface AttendanceStatus {
+  /** 오늘(KST) YYYY-MM-DD */
+  today: string;
+  checkedToday: boolean;
+  /** 연속 출석 일수 — 오늘 안 했으면 어제까지 */
+  streak: number;
+  /** 이번 달 출석한 날 */
+  monthDays: string[];
+  reward: number;
+  streakEvery: number;
+  streakBonus: number;
+  /** 다음 보너스까지 남은 날 (0 이면 오늘 받으면 보너스) */
+  daysToBonus: number;
+}
+
 export const medalApi = {
+  /** 출석 현황 */
+  getAttendance: async (): Promise<AttendanceStatus> => {
+    const response = await apiClient.get("/medals/me/attendance");
+    return response.data;
+  },
+
+  /** 오늘 출석 — 이미 했으면 granted 0 */
+  checkIn: async (): Promise<
+    AttendanceStatus & { granted: number; bonus: number }
+  > => {
+    const response = await apiClient.post("/medals/me/attendance");
+    return response.data;
+  },
+
   getMine: async (): Promise<{ balance: number }> => {
     const response = await apiClient.get("/medals/me");
     return response.data;

@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { Medal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { medalApi, type MedalHistoryItem } from "@/lib/api-client";
 import { MEDAL_LABEL } from "./catalog";
+import { ATTENDANCE_QUERY_KEY, AttendanceCard } from "./AttendanceCard";
 
 /** 원장 사유 → 화면 이름 */
 export const REASON_LABEL: Record<string, string> = {
@@ -25,6 +26,8 @@ export const REASON_LABEL: Record<string, string> = {
   PURCHASE: "구매",
   REFUND: "환불",
   ADMIN_ADJUST: "운영자 지급",
+  ATTENDANCE: "출석",
+  ATTENDANCE_STREAK: "연속 출석 보너스",
 };
 
 /** 메달 쿼리 키 — 경기·칭찬이 끝난 곳에서 이 키를 무효화하면 칩이 새로 읽는다 */
@@ -98,6 +101,16 @@ export function MedalChip() {
     staleTime: 30 * 1000,
   });
   const balance = data?.balance;
+  const queryClient = useQueryClient();
+  // 출석 현황 — 오늘 안 했으면 칩에 점을 띄운다. 자정을 넘기면 창으로 돌아올 때 다시 읽는다
+  const attendance = useQuery({
+    queryKey: ATTENDANCE_QUERY_KEY,
+    queryFn: medalApi.getAttendance,
+    enabled: isAuthenticated && Boolean(userId),
+    refetchOnWindowFocus: true,
+    staleTime: 60 * 1000,
+  });
+  const needsCheckIn = attendance.data ? !attendance.data.checkedToday : false;
 
   const [open, setOpen] = useState(false);
   const [gain, setGain] = useState<{
@@ -173,8 +186,8 @@ export function MedalChip() {
           setOpen((v) => !v);
           setGain(null);
         }}
-        title={`가진 ${MEDAL_LABEL}`}
-        aria-label={`가진 ${MEDAL_LABEL} ${balance.toLocaleString()}개`}
+        title={needsCheckIn ? "오늘 출석하고 메달 받기" : `가진 ${MEDAL_LABEL}`}
+        aria-label={`가진 ${MEDAL_LABEL} ${balance.toLocaleString()}개${needsCheckIn ? ", 오늘 출석 전" : ""}`}
         className={cn(
           "relative inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-black tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary",
           open || gain
@@ -184,6 +197,13 @@ export function MedalChip() {
       >
         <Medal className="h-4 w-4 text-amber-300" />
         {balance.toLocaleString()}
+        {/* 오늘 출석 전 — 눌러서 받으라는 점 */}
+        {needsCheckIn && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-60" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-300" />
+          </span>
+        )}
         {/* 받은 순간 칩 위로 떠오르는 숫자 */}
         <AnimatePresence>
           {gain && (
@@ -236,6 +256,18 @@ export function MedalChip() {
             exit={{ opacity: 0, y: -6 }}
             className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl bg-bg-secondary p-4 shadow-xl ring-1 ring-white/5"
           >
+            {attendance.data && (
+              <div className="mb-3">
+                <AttendanceCard
+                  status={attendance.data}
+                  onGranted={() =>
+                    void queryClient.invalidateQueries({
+                      queryKey: MEDAL_QUERY_KEY,
+                    })
+                  }
+                />
+              </div>
+            )}
             <div className="text-xs font-bold text-text-tertiary">
               가진 {MEDAL_LABEL}
             </div>
@@ -244,7 +276,7 @@ export function MedalChip() {
               {balance.toLocaleString()}
             </div>
             <p className="mt-1 text-xs text-text-tertiary">
-              내전을 끝까지 하면 받아요.
+              매일 출석하고, 내전을 끝까지 하면 받아요.
             </p>
             <Link
               href="/shop"

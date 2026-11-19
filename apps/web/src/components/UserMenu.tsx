@@ -3,7 +3,19 @@
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { Avatar } from "./ui/Avatar";
-import { BookOpen, LogOut, User, Settings, ChevronDown } from "lucide-react";
+import {
+  BookOpen,
+  LogOut,
+  User,
+  Settings,
+  ChevronDown,
+  Shield,
+  Sun,
+  Moon,
+} from "lucide-react";
+import { DiscordIcon } from "@/components/icons/DiscordIcon";
+import { NEXUS_DISCORD_INVITE_URL } from "@/lib/constants";
+import { usePersistentTheme } from "@/hooks/usePersistentTheme";
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { resetOnboardingGuides } from "@/lib/onboarding";
@@ -17,6 +29,8 @@ export function UserMenu() {
   // 메뉴에 롤/배그 프로필을 따로 만들지 않는다.
   const gameInPath = useNavigationGame();
   const [isOpen, setIsOpen] = useState(false);
+  // 헤더에 따로 있던 테마 버튼을 메뉴 안으로 옮겼다(헤더 정리)
+  const { resolvedTheme, toggleTheme } = usePersistentTheme();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -115,6 +129,47 @@ export function UserMenu() {
               <BookOpen className="h-4 w-4" />
               <span>사용 가이드 다시 보기</span>
             </button>
+          </div>
+
+          {/*
+            헤더 정리 — 자주 안 누르는 테마·관리자·Discord 는 헤더 아이콘에서 이 메뉴로 옮겼다.
+            헤더 바깥에는 배경음악·메달(출석)·친구·알림만 남는다.
+          */}
+          <div className="p-1 border-t border-bg-tertiary">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex w-full items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
+            >
+              {resolvedTheme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+              <span>
+                {resolvedTheme === "dark" ? "밝은 화면으로" : "어두운 화면으로"}
+              </span>
+            </button>
+            {(user.role === "ADMIN" || user.role === "MODERATOR") && (
+              <Link
+                href="/admin"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
+              >
+                <Shield className="h-4 w-4" />
+                <span>관리자 패널</span>
+              </Link>
+            )}
+            <a
+              href={NEXUS_DISCORD_INVITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 px-3 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-lg transition-colors"
+            >
+              <DiscordIcon className="h-4 w-4" />
+              <span>Discord 커뮤니티</span>
+            </a>
           </div>
 
           <div className="p-1 border-t border-bg-tertiary">

@@ -2245,6 +2245,8 @@ enum MedalReason {
   PURCHASE // 상점 구매
   REFUND // 구매 환불
   ADMIN_ADJUST // 관리자 지급·회수
+  ATTENDANCE // 출석 체크 (하루 1회)
+  ATTENDANCE_STREAK // 연속 출석 보너스 (7일마다)
 }
 
 /// 메달 잔액. 원장(MedalLedger)과 같은 트랜잭션에서만 바뀐다.

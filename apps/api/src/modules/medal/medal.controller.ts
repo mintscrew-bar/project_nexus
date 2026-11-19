@@ -24,6 +24,7 @@ import {
   VoidMatchMedalDto,
 } from "./dto/adjust-medal.dto";
 import { ShopService } from "./shop.service";
+import { AttendanceService } from "./attendance.service";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   CAPPED_REASONS,
@@ -39,7 +40,23 @@ export class MedalController {
     private readonly matchMedals: MatchMedalService,
     private readonly shopService: ShopService,
     private readonly prisma: PrismaService,
+    private readonly attendance: AttendanceService,
   ) {}
+
+  /** 내 출석 현황 — 오늘 했는지, 연속 일수, 이번 달 출석한 날 */
+  @Get("me/attendance")
+  @UseGuards(JwtAuthGuard)
+  async getMyAttendance(@CurrentUser("sub") userId: string) {
+    return this.attendance.getStatus(userId);
+  }
+
+  /** 오늘 출석 — 하루 한 번 메달(7일 연속마다 보너스). 이미 했으면 granted 0 */
+  @Post("me/attendance")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async checkInAttendance(@CurrentUser("sub") userId: string) {
+    return this.attendance.checkIn(userId);
+  }
 
   /** 내 메달 잔액 */
   @Get("me")
