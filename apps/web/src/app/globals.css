@@ -1631,3 +1631,14 @@ html.cfx-off .nfx-root {
   text-shadow: none !important;
   animation: none !important;
 }
+
+/* 유료 꾸미기 미디어: 이미지·비디오의 선택 및 드래그 저장 UI 억제.
+   브라우저 네트워크에서 미디어를 추출하는 행위까지 차단하는 보안 장치는 아니다. */
+.cfx-root video,
+.cfx-root img,
+.cfx-root picture {
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}

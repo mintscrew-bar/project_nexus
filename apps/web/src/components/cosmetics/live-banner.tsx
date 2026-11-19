@@ -109,6 +109,8 @@ export function LiveBanner({
         preload="auto"
         aria-hidden
         disablePictureInPicture
+        controlsList="nodownload noplaybackrate"
+        draggable={false}
       >
         {/* 수묵 검객은 mp4(h264)가 webm(vp9)보다 가벼웠다(0.96MB vs 1.1MB). mp4 를 먼저,
             h264 를 못 쓰는 브라우저(오픈소스 Chromium 등)는 webm 으로 */}
