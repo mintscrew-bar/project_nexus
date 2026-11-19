@@ -336,9 +336,9 @@ const COSMETIC_DEFS: CosmeticItem[] = [
   {
     code: "BN_INK_SWORDSMAN",
     slot: "PROFILE_BANNER",
-    name: "수묵 검객",
+    name: "적월의 검객",
     description:
-      "붉은 해 앞의 먹빛 흑룡과 검객 — 머리칼과 붉은 끈이 바람에 날리고 안개가 흐른다",
+      "핏빛 달 아래 검은 용이 하늘을 가르고, 검객의 머리칼과 붉은 비단이 바람에 흩날린다",
     price: 2500,
     rarity: "RARE",
     className: "",
