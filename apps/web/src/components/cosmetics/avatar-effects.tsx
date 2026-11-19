@@ -12,16 +12,15 @@
  */
 
 import type { CSSProperties, ReactNode } from "react";
+import { InkDragonVideo } from "./ink-dragon-video";
 import { cn } from "@/lib/utils";
-import { Burst, Frames, outline, PixelArt, SPARK } from "./effects";
+import { Burst, outline, PixelArt, SPARK } from "./effects";
 import { PixelFire } from "./pixel-fire";
 import {
   CROWN,
   CROWN_PAL,
   EAR,
   EAR_PAL,
-  INK_DRAGON_AVATAR,
-  INK_DRAGON_PAL,
   MOON,
   MOON_PAL,
   SWORD,
@@ -343,61 +342,23 @@ function TwinSwordsFx({ px, size }: FxProps) {
  * 그림의 머리가 시계 방향을 보므로 고리도 시계 방향으로 돌린다(머리가 앞장서게).
  */
 function DragonOrbitFx({ size }: FxProps) {
-  // 격자(92칸)에서 아바타 반지름은 약 30칸 — 아바타 지름에 맞춰 한 칸 크기를 정한다
-  const cell = size / 60;
-  const box = 92 * cell;
-  const ring = box * 0.98;
+  const diameter = size * 1.72;
   return (
-    <>
-      {/* 아바타 뒤 한지 고리 — 먹빛 용이 어두운 화면에서도 수묵화처럼 보이게 */}
-      <div
-        className="absolute rounded-full"
-        style={{
-          ...BACK,
-          left: size / 2 - ring / 2,
-          top: size / 2 - ring / 2,
-          width: ring,
-          height: ring,
-          background:
-            "radial-gradient(circle, rgba(238,234,224,0.95) 52%, rgba(238,234,224,0.7) 62%, rgba(238,234,224,0) 72%)",
-        }}
-      />
-      <div
-        className="cfx-spin absolute"
-        style={{
-          ...FRONT,
-          left: size / 2 - box / 2,
-          top: size / 2 - box / 2,
-          width: box,
-          height: box,
-          animationDuration: "18s",
-        }}
-      >
-        <Frames
-          frames={INK_DRAGON_AVATAR}
-          palette={INK_DRAGON_PAL}
-          px={cell}
-          duration={0.9}
-        />
-      </div>
-      {/* 낙관 — 붉은 도장 */}
-      <div
-        className="absolute flex items-center justify-center rounded-[3px] font-black text-[#f6e9e4]"
-        style={{
-          ...FRONT,
-          right: -size * 0.12,
-          bottom: -size * 0.06,
-          width: size * 0.17,
-          height: size * 0.17,
-          fontSize: size * 0.12,
-          lineHeight: 1,
-          background: "#b3121b",
-          boxShadow: "0 0 0 1px rgba(80,0,0,0.6)",
-        }}
-      >
-        龍
-      </div>
-    </>
+    <div
+      className="absolute overflow-hidden rounded-full"
+      style={{
+        ...FRONT,
+        left: (size - diameter) / 2,
+        top: (size - diameter) / 2,
+        width: diameter,
+        height: diameter,
+        maskImage: "radial-gradient(circle, transparent 0 31%, black 38% 67%, transparent 75%)",
+        WebkitMaskImage: "radial-gradient(circle, transparent 0 31%, black 38% 67%, transparent 75%)",
+        backgroundColor: "#f3f0e9",
+      }}
+    >
+      <InkDragonVideo variant="avatar" className="absolute inset-0 h-full w-full" />
+    </div>
   );
 }
 

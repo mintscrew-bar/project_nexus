@@ -11,6 +11,7 @@
  * 것들(`.cfx-travel`)은 숨긴다.
  */
 
+import { InkDragonVideo } from "./ink-dragon-video";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { PixelFire } from "./pixel-fire";
@@ -628,6 +629,13 @@ export function CosmeticEffect({
   code: CosmeticEffectCode;
   px: number;
 }) {
+  if (code === "dragon") {
+    return (
+      <div aria-hidden className="cfx-root cfx-deco pointer-events-none absolute inset-0 overflow-hidden bg-[#ece7dd]">
+        <InkDragonVideo variant="card" className="absolute inset-0 h-full w-full" />
+      </div>
+    );
+  }
   const Fx = EFFECTS[code];
   return (
     <div

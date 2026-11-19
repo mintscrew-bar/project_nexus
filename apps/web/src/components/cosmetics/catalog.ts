@@ -162,8 +162,8 @@ const COSMETIC_DEFS: CosmeticItem[] = [
   {
     code: "FX_DRAGON",
     slot: "CARD_FRAME",
-    name: "흑룡",
-    description: "수묵화 흑룡이 한지 바탕을 번지며 초상화를 헤엄쳐 지나간다",
+    name: "묵룡의 윤무 · 카드",
+    description: "흑백 수묵 용이 원형으로 유영하는 움직이는 카드 배경",
     price: 1800,
     rarity: "RARE",
     className: "bg-[#7a561a]",
@@ -244,8 +244,8 @@ const COSMETIC_DEFS: CosmeticItem[] = [
   {
     code: "AV_DRAGON",
     slot: "AVATAR_FRAME",
-    name: "휘감는 흑룡",
-    description: "한지 고리 위로 수묵화 흑룡이 아바타를 휘감아 돈다",
+    name: "묵룡의 윤무 · 아바타",
+    description: "먹빛 용이 아바타 둘레를 감싸고 연무가 흘러가는 영상 프레임",
     price: 1800,
     rarity: "RARE",
     className: "",
