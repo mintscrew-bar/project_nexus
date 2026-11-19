@@ -17,6 +17,7 @@ import {
   Moon,
   Sun,
   BookOpen,
+  ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -144,6 +145,8 @@ export function MobileMenu({ className }: MobileMenuProps) {
       icon: MessageSquare,
     },
     { href: gamePath(currentGame, "/guide"), label: "가이드", icon: BookOpen },
+    // 메달 상점 — 게임과 무관한 화면이라 프리픽스 없이
+    { href: "/shop", label: "상점", icon: ShoppingBag },
   ];
 
   const sidebarItems = [

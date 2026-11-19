@@ -72,7 +72,9 @@ export function LandingBannerCarousel() {
 
   return (
     <div
-      className="relative aspect-[3/2] w-full overflow-hidden rounded-panel"
+      // 배너 글자·배치는 화면 폭이 아니라 이 틀의 폭을 따른다(컨테이너 쿼리) —
+      // 홈에서 3분의 1 폭으로 줄였을 때 큰 화면용 글자가 넘치지 않게
+      className="relative aspect-[3/2] w-full overflow-hidden rounded-panel [container-type:inline-size]"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >

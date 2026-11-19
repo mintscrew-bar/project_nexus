@@ -43,16 +43,17 @@ export function CreatorBanner({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_28%,rgba(139,92,246,0.12),transparent_34%)]" />
 
       <div
-        className="relative z-10 flex h-full max-w-[86%] flex-col justify-center px-6 py-7 sm:max-w-[58%] sm:px-10 md:max-w-[52%] md:px-14"
+        // 그림 속 인물이 오른쪽 절반에 있어 글은 늘 왼쪽 절반 안에 둔다(좁은 틀에서 겹치지 않게)
+        className="relative z-10 flex h-full max-w-[46%] flex-col justify-center px-4 py-6 [@container(min-width:480px)]:max-w-[58%] [@container(min-width:480px)]:px-10 [@container(min-width:640px)]:max-w-[52%] [@container(min-width:640px)]:px-14"
         style={{ fontFamily: KKUKKKUK_FONT }}
       >
         {/* ⚠ 이 문구를 바꾸면 scripts/subset-banner-font.sh로 폰트 서브셋을 재생성해야 한다.
             서브셋에 없는 글자는 조용히 폴백 폰트로 렌더되어 글씨체가 섞여 보인다. */}
-        <p className="max-w-[560px] text-2xl font-black leading-[1.18] text-zinc-950 sm:text-4xl lg:text-5xl">
+        <p className="max-w-[560px] text-lg font-black leading-[1.18] text-zinc-950 [@container(min-width:480px)]:text-4xl [@container(min-width:900px)]:text-5xl">
           NEXUS와 함께 성장할
-          <br className="hidden sm:block" />
+          <br />
           <span className="text-violet-600">스트리머, 클랜</span>을
-          <br className="hidden sm:block" />
+          <br />
           찾고 있어요
         </p>
       </div>

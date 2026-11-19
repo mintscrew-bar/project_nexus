@@ -151,12 +151,12 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
       />
 
       {/* ── 메인 콘텐츠: 모바일 세로 / md 이상 좌우 분할 ── */}
-      <div className="relative z-10 flex flex-col md:flex-row h-full">
+      <div className="relative z-10 flex flex-col [@container(min-width:640px)]:flex-row h-full">
         {/* ── 좌측 — DRAFT 뱃지 + 큰 후크 + 입찰가 (모바일: 전체 너비) ── */}
-        <div className="flex flex-col justify-center px-[5%] py-[5%] md:px-[6%] w-full md:w-[54%] h-full md:h-auto">
+        <div className="flex flex-col justify-center px-[5%] py-[5%] [@container(min-width:640px)]:px-[6%] w-full [@container(min-width:640px)]:w-[54%] h-full [@container(min-width:640px)]:h-auto">
           {/* DRAFT 뱃지 */}
           <span
-            className="inline-block w-fit px-2.5 py-0.5 rounded-chip text-[10px] font-bold tracking-wider mb-2 md:mb-2.5"
+            className="inline-block w-fit px-2.5 py-0.5 rounded-chip text-[10px] font-bold tracking-wider mb-2 [@container(min-width:640px)]:mb-2.5"
             style={bannerBadgeStyle(VIOLET_GLOW)}
           >
             DRAFT
@@ -164,7 +164,7 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
 
           {/* 큰 후크 타이틀 — 호버 시 미세 슬라이드 */}
           <h3
-            className="text-lg sm:text-xl md:text-2xl font-black text-white mb-1.5 transition-transform duration-500 ease-out"
+            className="text-lg [@container(min-width:480px)]:text-xl [@container(min-width:640px)]:text-2xl font-black text-white mb-1.5 transition-transform duration-500 ease-out"
             style={{
               transform: isHovered ? "translateX(4px)" : "translateX(0)",
             }}
@@ -175,7 +175,7 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
 
           {/* 부제목 — 호버 시 약간 더 이동 */}
           <p
-            className="text-[11px] sm:text-xs text-white/55 mb-2 md:mb-3.5 transition-transform duration-500 ease-out"
+            className="text-[11px] [@container(min-width:480px)]:text-xs text-white/55 mb-2 [@container(min-width:640px)]:mb-3.5 transition-transform duration-500 ease-out"
             style={{
               transform: isHovered ? "translateX(8px)" : "translateX(0)",
             }}
@@ -194,7 +194,7 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
               현재 입찰
             </span>
             <span
-              className="text-lg md:text-xl font-black tabular-nums transition-all duration-300"
+              className="text-lg [@container(min-width:640px)]:text-xl font-black tabular-nums transition-all duration-300"
               style={{
                 color: GOLD,
                 textShadow: isHovered
@@ -210,14 +210,14 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
 
         {/* 세로 구분선 — 모바일에서 숨김 */}
         <div
-          className="hidden md:block w-px self-stretch my-6 shrink-0"
+          className="hidden [@container(min-width:640px)]:block w-px self-stretch my-6 shrink-0"
           style={{
             background: `linear-gradient(180deg, transparent, ${VIOLET}30, transparent)`,
           }}
         />
 
         {/* ── 우측 — 5v5 슬롯 시각화 (모바일에서 숨김) ── */}
-        <div className="hidden md:flex flex-1 items-center justify-center gap-2 md:gap-3 px-[3%] py-[5%]">
+        <div className="hidden [@container(min-width:640px)]:flex flex-1 items-center justify-center gap-2 [@container(min-width:640px)]:gap-3 px-[3%] py-[5%]">
           {/* 블루팀 */}
           <div className="flex flex-col gap-1">
             <p
@@ -261,7 +261,7 @@ export function AuctionBanner({ isActive = true }: { isActive?: boolean }) {
           </div>
 
           {/* 입찰 로그 (데스크톱만) */}
-          <div className="hidden lg:flex flex-col gap-1 ml-1 w-20">
+          <div className="hidden [@container(min-width:900px)]:flex flex-col gap-1 ml-1 w-20">
             <p className="text-[9px] text-white/25 tracking-wider mb-1">
               입찰 로그
             </p>
@@ -333,7 +333,7 @@ function SlotCell({ slot, teamColor }: { slot: TeamSlot; teamColor: string }) {
     // 낙찰 완료 — 포지션 + 포인트 표시
     return (
       <div
-        className="flex items-center gap-1.5 px-2 py-0.5 rounded-md min-w-[72px] md:min-w-[82px]"
+        className="flex items-center gap-1.5 px-2 py-0.5 rounded-md min-w-[72px] [@container(min-width:640px)]:min-w-[82px]"
         style={{
           background: `${teamColor}15`,
           border: `1px solid ${teamColor}30`,
@@ -361,7 +361,7 @@ function SlotCell({ slot, teamColor }: { slot: TeamSlot; teamColor: string }) {
     // 입찰 진행 중 — 깜빡이는 보더 + 포지션
     return (
       <div
-        className="flex items-center gap-1.5 px-2 py-0.5 rounded-md min-w-[72px] md:min-w-[82px]"
+        className="flex items-center gap-1.5 px-2 py-0.5 rounded-md min-w-[72px] [@container(min-width:640px)]:min-w-[82px]"
         style={{
           background: `${VIOLET}10`,
           border: `1px solid ${VIOLET}40`,
@@ -392,7 +392,7 @@ function SlotCell({ slot, teamColor }: { slot: TeamSlot; teamColor: string }) {
   // empty — 비어있는 슬롯
   return (
     <div
-      className="flex items-center gap-1.5 px-2 py-0.5 rounded-md min-w-[72px] md:min-w-[82px]"
+      className="flex items-center gap-1.5 px-2 py-0.5 rounded-md min-w-[72px] [@container(min-width:640px)]:min-w-[82px]"
       style={{
         background: "rgba(255,255,255,0.02)",
         border: "1px dashed rgba(255,255,255,0.08)",

@@ -53,6 +53,8 @@ export function Header() {
       label: "커뮤니티",
     },
     { href: gamePath(currentGame, "/guide"), label: "가이드" },
+    // 메달 상점 — 게임과 무관한 화면이라 프리픽스 없이
+    { href: "/shop", label: "상점" },
   ];
   const { isAuthenticated, user } = useAuthStore();
   const {

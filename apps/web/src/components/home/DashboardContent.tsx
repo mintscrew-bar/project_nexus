@@ -1,7 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { medalApi } from "@/lib/api-client";
+import {
+  ATTENDANCE_QUERY_KEY,
+  AttendanceCard,
+} from "@/components/cosmetics/AttendanceCard";
+import { MEDAL_QUERY_KEY } from "@/components/cosmetics/MedalChip";
+import {
+  COSMETICS,
+  MEDAL_LABEL,
+  SLOT_LABEL,
+  type CosmeticSlot,
+} from "@/components/cosmetics/catalog";
+import {
+  LiveBanner,
+  liveBannerAspect,
+} from "@/components/cosmetics/live-banner";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
@@ -39,6 +56,8 @@ import {
   Crosshair,
   UserRound,
   PenLine,
+  ShoppingBag,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGamePrefix, useLastGamePrefix } from "@/hooks/useCurrentGame";
@@ -143,31 +162,28 @@ const CATEGORY_CONFIG = {
 
 function CardHeader({
   icon: Icon,
-  iconColor,
   title,
   actionLabel,
   onAction,
 }: {
   icon: React.ElementType;
-  iconColor: string;
+  /** 예전 색 아이콘 칸 색 — 장식을 줄이며 쓰지 않는다(부르는 곳 호환용) */
+  iconColor?: string;
   title: string;
   actionLabel?: string;
   onAction?: () => void;
 }) {
+  // 제목은 평범하게 — 색 칸 안의 흰 아이콘·대문자 자간은 "만든 티" 가 나서 뺐다(2026-11-19)
   return (
     <div className="flex items-center justify-between px-5 py-4">
-      <div className="flex items-center gap-3">
-        <div className={cn("p-2 rounded-control", iconColor)}>
-          <Icon className="h-4 w-4 text-white" />
-        </div>
-        <h2 className="text-sm font-semibold text-text-primary tracking-wide uppercase">
-          {title}
-        </h2>
-      </div>
+      <h2 className="flex items-center gap-2 text-sm font-bold text-text-primary">
+        <Icon className="h-4 w-4 text-text-tertiary" />
+        {title}
+      </h2>
       {actionLabel && onAction && (
         <button
           onClick={onAction}
-          className="text-xs text-text-tertiary hover:text-violet-400 transition-colors flex items-center gap-1 group"
+          className="text-xs text-text-tertiary hover:text-text-primary transition-colors flex items-center gap-1 group"
         >
           {actionLabel}
           <ChevronRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
@@ -191,8 +207,8 @@ function GlassCard({
   return (
     <div
       className={cn(
-        "rounded-panel border border-white/[0.06] bg-bg-secondary/60 backdrop-blur-sm overflow-hidden",
-        "hover:border-violet-500/10 transition-colors duration-300",
+        // 반투명·흐림·호버 광 없이 단색 판 — 장식을 줄였다(2026-11-19)
+        "rounded-panel border border-bg-tertiary bg-bg-secondary overflow-hidden",
         className,
       )}
     >
@@ -273,69 +289,20 @@ export function DashboardHero({
   return (
     <section
       className={cn(
-        "relative isolate overflow-hidden rounded-panel px-5 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-10",
-        /* 롤은 떠 있는 판 — 부드러운 그림자와 보라 광원.
-           배그는 바닥에 놓인 판 — 그림자 없이 선 하나로 끊는다. */
+        "relative overflow-hidden rounded-panel px-5 py-6 sm:px-7 sm:py-7",
+        // 격자·광원·큰 그림자는 걷었다 — 단색 판 위에 할 일만(2026-11-19)
         isPubg
           ? "border border-white/[0.14] bg-[#0e0e0e]"
-          : "border border-white/[0.09] bg-[#0b0c11] shadow-[0_35px_100px_rgba(0,0,0,0.28)]",
+          : "border border-white/[0.09] bg-[#0b0c11]",
       )}
     >
-      {/* 격자. 배그는 눈금이 굵고 촘촘해 계측기처럼 읽힌다. */}
-      <div
-        aria-hidden="true"
-        className={cn(
-          "absolute inset-0 -z-20",
-          isPubg
-            ? "opacity-80 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:22px_22px]"
-            : "opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:44px_44px]",
-        )}
-      />
-      {/* 광원. 배그 테마는 "흑백 + 노랑 하나"라 보라·시안을 쓰면 그 규칙이
-          이 자리에서만 깨진다. 노랑 하나만, 그것도 아주 옅게 깐다. */}
-      {isPubg ? (
-        <div
-          aria-hidden="true"
-          className="absolute -right-20 -top-24 -z-10 h-80 w-80 rounded-full bg-accent-primary/[0.07] blur-[130px]"
-        />
-      ) : (
-        <>
-          <div
-            aria-hidden="true"
-            className="absolute -left-24 -top-32 -z-10 h-96 w-96 rounded-full bg-violet-500/20 blur-[120px]"
-          />
-          <div
-            aria-hidden="true"
-            className="absolute -bottom-40 right-0 -z-10 h-96 w-96 rounded-full bg-cyan-400/10 blur-[120px]"
-          />
-        </>
-      )}
-
       <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-end lg:gap-12">
         <div>
-          <h1
-            className={cn(
-              "max-w-3xl font-black text-white",
-              /* 롤은 넓고 부드럽게, 배그는 좁고 단단하게. 같은 문장인데
-                 자간과 행간만으로도 톤이 갈린다. */
-              isPubg
-                ? "text-3xl uppercase leading-[1.02] tracking-[-0.055em] sm:text-4xl lg:text-5xl"
-                : "text-3xl leading-[1.08] tracking-[-0.045em] sm:text-4xl lg:text-5xl",
-            )}
-          >
-            {getTimeGreeting()}
-            <br />
-            {/* 배그는 그라디언트 글자를 쓰지 않는다 — 보라·시안이 들어가면
-                "흑백 + 노랑 하나" 규칙이 깨지고, 노랑 그라디언트는 탁해진다. */}
-            {isPubg ? (
-              <span className="text-accent-primary">{username}님</span>
-            ) : (
-              <span className="bg-gradient-to-r from-violet-200 via-white to-cyan-200 bg-clip-text text-transparent">
-                {username}님
-              </span>
-            )}
+          <h1 className="text-2xl font-black text-white sm:text-3xl">
+            {getTimeGreeting()},{" "}
+            <span className="text-accent-primary">{username}님</span>
           </h1>
-          <p className="mt-5 max-w-xl text-sm leading-6 text-white/45 sm:text-base sm:leading-7">
+          <p className="mt-3 max-w-xl text-sm leading-6 text-white/55">
             {rooms.length > 0
               ? `${rooms.length}개의 ${matchWord}이 참가자를 기다리고 있습니다. 로비에 합류하거나 직접 새로 시작해보세요.`
               : isPubg
@@ -343,7 +310,7 @@ export function DashboardHero({
                 : "현재 모집 중인 내전이 없습니다. 새 로비를 열고 오늘의 경기를 시작해보세요."}
           </p>
 
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
             <button
               type="button"
               onClick={() => router.push(`${gamePrefix}/tournaments`)}
@@ -374,61 +341,33 @@ export function DashboardHero({
             </button>
           </div>
 
-          <div className="mt-7 flex flex-wrap gap-2">
+          {/* 클랜은 오른쪽 「내 현황」에 있어 칩을 뺐다. Riot 계정은 안 했을 때만 권한다 */}
+          {!isPubg && !primaryAccount && (
             <button
               type="button"
               onClick={() =>
                 router.push(`/settings/game-accounts${gamePrefix}`)
               }
-              className="inline-flex items-center gap-2 rounded-chip border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80"
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-white/50 underline-offset-4 transition-colors hover:text-white/80 hover:underline"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-              {primaryAccount
-                ? `${primaryAccount.gameName} #${primaryAccount.tagLine}`
-                : "Riot 계정 연결하기"}
+              Riot 계정을 연결하면 전적이 쌓여요
+              <ChevronRight className="h-3 w-3" />
             </button>
-            <button
-              type="button"
-              onClick={() => router.push(clanHref)}
-              className="inline-flex items-center gap-2 rounded-chip border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/50 transition-colors hover:text-white/80"
-            >
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: clan?.accentColor || "#a78bfa" }}
-              />
-              {clan ? `[${clan.tag}] ${clan.name}` : "클랜 찾기"}
-            </button>
-          </div>
+          )}
         </div>
 
-        <div className="w-full overflow-hidden rounded-panel border border-white/[0.08] bg-black/20 backdrop-blur-sm lg:max-w-[560px] lg:justify-self-end">
-          <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3">
-            <div>
-              <p
-                className={cn(
-                  "text-[9px] font-bold uppercase text-white/25",
-                  isPubg ? "tracking-[0.3em]" : "tracking-[0.18em]",
-                )}
-              >
-                {isPubg ? "Status board" : "Today at nexus"}
-              </p>
-              <p className="mt-0.5 text-xs font-semibold text-white/70">
-                지금 확인할 항목
-              </p>
-            </div>
-            <Activity className="h-4 w-4 text-emerald-300/70" />
-          </div>
+        <div className="w-full overflow-hidden rounded-panel border border-white/[0.08] bg-black/20 lg:max-w-[560px] lg:justify-self-end">
+          <p className="border-b border-white/[0.07] px-4 py-2.5 text-xs font-bold text-white/60">
+            내 현황
+          </p>
           <div className="divide-y divide-white/[0.06]">
-            {metrics.map((metric, index) => (
+            {metrics.map((metric) => (
               <button
                 key={metric.label}
                 type="button"
                 onClick={() => router.push(metric.href)}
-                className="group grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.035]"
+                className="group grid w-full grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.035]"
               >
-                <span className="font-figure text-[10px] font-bold tabular-nums text-white/20">
-                  0{index + 1}
-                </span>
                 <span className="min-w-0">
                   <span className="flex items-center gap-2 text-xs font-semibold text-white/65">
                     <metric.icon className="h-3.5 w-3.5 text-accent-primary" />
@@ -453,79 +392,53 @@ export function DashboardHero({
   );
 }
 
-function QuickActions({
-  clan,
-  gameTitle,
-}: {
-  clan: ClanSummary | null;
-  gameTitle?: "LOL" | "PUBG";
-}) {
+function QuickActions({ gameTitle }: { gameTitle?: "LOL" | "PUBG" }) {
   const router = useRouter();
-  // 내전·전적은 게임별 화면이다. 프리픽스 없이 두면 배그를 보다가 눌러도
-  // 롤 화면으로 넘어간다(맨 경로는 308 로 기본 게임에 붙는다).
   // 홈은 경로로 게임을 알 수 없다. 마지막으로 본 게임을 따라간다 —
   // 기본 게임으로 두면 배그만 하는 사람의 링크가 전부 롤로 간다.
   const gamePrefix = useDashboardGamePrefix();
-  const clanHref = `/clans?game=${gameTitle === "PUBG" ? "pubg" : "lol"}`;
+  // 위 히어로에 이미 있는 것(방 만들기·내 클랜·내 전적)은 빼고, 거기 없는 곳으로만 보낸다.
+  // 아이콘마다 다른 색 칸을 두던 것도 걷었다 — 같은 무게의 바로가기 넷이다(2026-11-19).
   const actions = [
     {
-      label: gameTitle === "PUBG" ? "스크림 만들기" : "내전 만들기",
+      label: "상점",
+      description: "메달로 장식을 사고 장착해요",
+      icon: ShoppingBag,
+      href: "/shop",
+    },
+    {
+      label: "랭킹",
       description:
         gameTitle === "PUBG"
-          ? "새 스크림을 열고 스쿼드를 모집하세요"
-          : "새 로비를 열고 참가자를 모집하세요",
-      icon: Plus,
-      href: `${gamePrefix}/tournaments?create=true`,
-      tone: "text-amber-300 bg-amber-300/[0.08] border-amber-300/10",
-    },
-    {
-      label: clan
-        ? gameTitle === "PUBG"
-          ? "내 배그 클랜"
-          : "내 롤 클랜"
-        : gameTitle === "PUBG"
-          ? "배그 클랜 찾기"
-          : "클랜 찾기",
-      description: clan
-        ? `[${clan.tag}] ${clan.name}으로 이동`
-        : "함께할 팀을 찾아보세요",
-      icon: Users,
-      href: clanHref,
-      tone: "text-violet-300 bg-violet-300/[0.08] border-violet-300/10",
-    },
-    {
-      label: "내 전적",
-      description: "경기 기록과 플레이 성향을 확인하세요",
-      icon: UserRound,
-      href: `/me?game=${gamePrefix.slice(1)}`,
-      tone: "text-cyan-300 bg-cyan-300/[0.08] border-cyan-300/10",
+          ? "스크림 순위를 확인해요"
+          : "내전 순위를 확인해요",
+      icon: Trophy,
+      href: `${gamePrefix}/ranking`,
     },
     {
       label: "글쓰기",
-      description: "커뮤니티에 새로운 이야기를 남겨보세요",
+      description: "커뮤니티에 이야기를 남겨요",
       icon: PenLine,
       href: `/community/write?game=${gamePrefix.slice(1)}`,
-      tone: "text-emerald-300 bg-emerald-300/[0.08] border-emerald-300/10",
+    },
+    {
+      label: "가이드",
+      description: "처음이라면 진행 방법부터",
+      icon: BookOpen,
+      href: `${gamePrefix}/guide`,
     },
   ];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
       {actions.map((action) => (
         <button
           key={action.label}
           type="button"
           onClick={() => router.push(action.href)}
-          className="group flex items-center gap-3 rounded-panel border border-white/[0.06] bg-bg-secondary/55 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-violet-400/20 hover:bg-bg-secondary"
+          className="group flex items-center gap-3 rounded-panel border border-bg-tertiary bg-bg-secondary px-4 py-3 text-left transition-colors hover:bg-bg-tertiary/60"
         >
-          <span
-            className={cn(
-              "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-control border",
-              action.tone,
-            )}
-          >
-            <action.icon className="h-5 w-5" />
-          </span>
+          <action.icon className="h-5 w-5 flex-shrink-0 text-text-secondary" />
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-bold text-text-primary">
               {action.label}
@@ -534,9 +447,110 @@ function QuickActions({
               {action.description}
             </span>
           </span>
-          <ChevronRight className="h-4 w-4 flex-shrink-0 text-text-tertiary transition-transform group-hover:translate-x-0.5 group-hover:text-violet-400" />
+          <ChevronRight className="h-4 w-4 flex-shrink-0 text-text-tertiary transition-transform group-hover:translate-x-0.5" />
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * 출석 + 상점 미리보기 + 배너를 한 줄에.
+ *
+ * 배너(3:2 그림)는 예전엔 맨 아래에서 폭 전체를 써 화면 높이를 거의 다 차지했다. 높이만 줄이면
+ * 그림이 잘리므로 폭을 3분의 1로 줄여 출석·상점 옆에 둔다(2026-11-19).
+ */
+function MedalRow() {
+  const queryClient = useQueryClient();
+  const attendance = useQuery({
+    queryKey: ATTENDANCE_QUERY_KEY,
+    queryFn: medalApi.getAttendance,
+    staleTime: 60 * 1000,
+  });
+  // 상점 미리보기 — 프로필 배경(움직이는 그림)이 가장 눈에 띄어 하나를 크게 보여 준다
+  const featured = COSMETICS.find((item) => item.liveBanner);
+  const slotCounts = (Object.keys(SLOT_LABEL) as CosmeticSlot[]).map(
+    (slot) => ({
+      slot,
+      count: COSMETICS.filter((item) => item.slot === slot).length,
+    }),
+  );
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-3">
+      <GlassCard className="p-4">
+        {attendance.data ? (
+          <AttendanceCard
+            status={attendance.data}
+            onGranted={() =>
+              void queryClient.invalidateQueries({ queryKey: MEDAL_QUERY_KEY })
+            }
+          />
+        ) : (
+          <Skeleton className="h-56 w-full rounded-lg" />
+        )}
+      </GlassCard>
+
+      <GlassCard className="flex flex-col p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-text-primary">
+            <ShoppingBag className="h-4 w-4 text-text-tertiary" />
+            {MEDAL_LABEL} 상점
+          </h2>
+          <Link
+            href="/shop"
+            className="flex items-center gap-1 text-xs text-text-tertiary transition-colors hover:text-text-primary"
+          >
+            전체
+            <ChevronRight className="h-3 w-3" />
+          </Link>
+        </div>
+        {featured?.liveBanner && (
+          <Link
+            href="/shop"
+            className="group block overflow-hidden rounded-lg border border-bg-tertiary"
+          >
+            <div
+              className="relative w-full"
+              style={{ aspectRatio: liveBannerAspect(featured.liveBanner) }}
+            >
+              <LiveBanner
+                code={featured.liveBanner}
+                className="absolute inset-0"
+              />
+            </div>
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold text-text-primary">
+                  {featured.name}
+                </span>
+                <span className="text-[11px] text-text-tertiary">
+                  {SLOT_LABEL[featured.slot]}
+                </span>
+              </span>
+              <span className="flex-shrink-0 text-sm font-black tabular-nums text-amber-300">
+                {featured.price.toLocaleString()}
+              </span>
+            </div>
+          </Link>
+        )}
+        <div className="mt-3 grid grid-cols-2 gap-1.5 text-xs">
+          {slotCounts.map(({ slot, count }) => (
+            <Link
+              key={slot}
+              href="/shop"
+              className="flex items-center justify-between rounded-md bg-bg-tertiary/50 px-2.5 py-1.5 text-text-secondary transition-colors hover:text-text-primary"
+            >
+              {SLOT_LABEL[slot]}
+              <span className="tabular-nums text-text-tertiary">{count}</span>
+            </Link>
+          ))}
+        </div>
+      </GlassCard>
+
+      <ErrorBoundary>
+        <BannerCarousel />
+      </ErrorBoundary>
     </div>
   );
 }
@@ -618,7 +632,9 @@ function BannerCarousel() {
   return (
     // 모든 배너는 3:2 고정 비율로 통일 — 새 배너 추가 시 1536x1024 기준
     <div
-      className="relative aspect-[3/2] w-full overflow-hidden rounded-panel"
+      // 배너 글자·배치는 화면 폭이 아니라 이 틀의 폭을 따른다(컨테이너 쿼리) —
+      // 홈에서 3분의 1 폭으로 줄였을 때 큰 화면용 글자가 넘치지 않게
+      className="relative aspect-[3/2] w-full overflow-hidden rounded-panel [container-type:inline-size]"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -638,18 +654,18 @@ function BannerCarousel() {
         </div>
       ))}
 
-      {/* 좌우 화살표 — 좁은 폭에서는 콘텐츠와 겹치므로 데스크톱에서만 노출 */}
+      {/* 좌우 화살표 — 좁은 틀에서는 글과 겹치므로 틀이 넓을 때만(지금 홈에서는 점으로만 넘긴다) */}
       <button
         onClick={() => goTo((current - 1 + TOTAL_SLIDES) % TOTAL_SLIDES)}
         aria-label="이전 슬라이드"
-        className="hidden lg:block absolute left-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/5 text-white/45 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
+        className="hidden [@container(min-width:640px)]:block absolute left-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/5 text-white/45 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
       >
         <ChevronLeft className="h-3.5 w-3.5" />
       </button>
       <button
         onClick={() => goTo((current + 1) % TOTAL_SLIDES)}
         aria-label="다음 슬라이드"
-        className="hidden lg:block absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/5 text-white/45 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
+        className="hidden [@container(min-width:640px)]:block absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/5 text-white/45 hover:bg-white/10 hover:text-white transition-all z-20 backdrop-blur-sm"
       >
         <ChevronRight className="h-3.5 w-3.5" />
       </button>
@@ -1452,7 +1468,7 @@ export function DashboardContent({
         clan={myClan}
       />
 
-      <QuickActions clan={myClan} gameTitle={gameTitle} />
+      <QuickActions gameTitle={gameTitle} />
 
       {/* 방송 중인 스트리머가 있을 때만 나타나는 섹션 */}
       <ErrorBoundary>
@@ -1461,6 +1477,9 @@ export function DashboardContent({
 
       {/* 모집중인 내전 */}
       <ActiveRoomsCard rooms={rooms} />
+
+      {/* 출석 · 상점 · 배너 */}
+      <MedalRow />
 
       {/* 내 전적 */}
       <div data-tour="home-my-stats">
@@ -1481,11 +1500,6 @@ export function DashboardContent({
         <PopularPostsCard posts={popularPosts} />
         <NoticePostsCard posts={noticePosts} />
       </div>
-
-      {/* 프로모션은 핵심 작업을 방해하지 않도록 대시보드 하단에 배치한다. */}
-      <ErrorBoundary>
-        <BannerCarousel />
-      </ErrorBoundary>
     </div>
   );
 }

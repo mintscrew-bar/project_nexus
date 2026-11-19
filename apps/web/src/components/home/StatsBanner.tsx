@@ -116,16 +116,19 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
     >
       {/* ── 배경: 좌우 분할 (좌 60% 어두운 인디고, 우 40% 약간 밝은 인디고) ── */}
       <div className="absolute inset-0 flex">
-        <div className="w-full md:w-[60%]" style={{ background: BG_LEFT }} />
         <div
-          className="hidden md:block w-[40%]"
+          className="w-full [@container(min-width:640px)]:w-[60%]"
+          style={{ background: BG_LEFT }}
+        />
+        <div
+          className="hidden [@container(min-width:640px)]:block w-[40%]"
           style={{ background: BG_RIGHT }}
         />
       </div>
 
       {/* 좌측 배경 장식 — 미니 차트 실루엣 (우측 하단, 희미하게) */}
       <svg
-        className="absolute right-[42%] md:right-[42%] bottom-2 w-28 h-20 md:w-36 md:h-24 pointer-events-none"
+        className="absolute right-[42%] [@container(min-width:640px)]:right-[42%] bottom-2 w-28 h-20 [@container(min-width:640px)]:w-36 [@container(min-width:640px)]:h-24 pointer-events-none"
         viewBox="0 0 140 80"
         fill="none"
         style={{
@@ -160,7 +163,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
 
       {/* 세로 구분선 — indigo glow */}
       <div
-        className="absolute top-0 bottom-0 left-[60%] w-px pointer-events-none hidden md:block"
+        className="absolute top-0 bottom-0 left-[60%] w-px pointer-events-none hidden [@container(min-width:640px)]:block"
         style={{
           background: `linear-gradient(180deg, transparent, ${INDIGO}50, transparent)`,
           boxShadow: isHovered ? `0 0 8px ${INDIGO}40` : "none",
@@ -170,7 +173,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
 
       {/* 우측 패널 배경 — 미세한 도트 그리드 */}
       <div
-        className="absolute top-0 bottom-0 left-[60%] right-0 opacity-[0.05] pointer-events-none hidden md:block"
+        className="absolute top-0 bottom-0 left-[60%] right-0 opacity-[0.05] pointer-events-none hidden [@container(min-width:640px)]:block"
         style={{
           backgroundImage: `radial-gradient(${INDIGO}60 1px, transparent 1px)`,
           backgroundSize: "20px 20px",
@@ -179,7 +182,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
 
       {/* 호버 시 우측 패널 전체 밝아지는 오버레이 */}
       <div
-        className="absolute top-0 bottom-0 left-[60%] right-0 pointer-events-none transition-opacity duration-500 hidden md:block"
+        className="absolute top-0 bottom-0 left-[60%] right-0 pointer-events-none transition-opacity duration-500 hidden [@container(min-width:640px)]:block"
         style={{
           background: `${INDIGO}08`,
           opacity: isHovered ? 1 : 0,
@@ -187,13 +190,13 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
       />
 
       {/* ── 메인 컨텐츠: 좌우 분할 ── */}
-      <div className="relative z-10 flex flex-col md:flex-row h-full">
+      <div className="relative z-10 flex flex-col [@container(min-width:640px)]:flex-row h-full">
         {/* ── 좌측 60% — 타이틀 영역 ── */}
         {/* 좌측 — 타이틀 영역 (모바일: 전체 너비, 패딩 축소) */}
-        <div className="w-full md:w-[60%] flex flex-col justify-center px-[5%] py-[5%] md:px-[7%] h-full md:h-auto">
+        <div className="w-full [@container(min-width:640px)]:w-[60%] flex flex-col justify-center px-[5%] py-[5%] [@container(min-width:640px)]:px-[7%] h-full [@container(min-width:640px)]:h-auto">
           {/* UPDATE 뱃지 */}
           <span
-            className="inline-block w-fit px-3 py-1 rounded-chip text-[11px] font-bold tracking-wider mb-1.5 md:mb-3"
+            className="inline-block w-fit px-3 py-1 rounded-chip text-[11px] font-bold tracking-wider mb-1.5 [@container(min-width:640px)]:mb-3"
             style={bannerBadgeStyle(INDIGO_LIGHT)}
           >
             UPDATE
@@ -201,7 +204,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
 
           {/* 큰 타이틀 — 호버 시 미세 슬라이드 */}
           <h3
-            className="text-xl sm:text-2xl md:text-3xl font-black text-white mb-1.5 md:mb-2 transition-transform duration-500 ease-out"
+            className="text-xl [@container(min-width:480px)]:text-2xl [@container(min-width:640px)]:text-3xl font-black text-white mb-1.5 [@container(min-width:640px)]:mb-2 transition-transform duration-500 ease-out"
             style={{
               transform: isHovered ? "translateX(4px)" : "translateX(0)",
             }}
@@ -213,18 +216,18 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
 
           {/* 설명 텍스트 — 호버 시 약간 더 이동 */}
           <p
-            className="text-xs sm:text-sm md:text-base text-white/60 leading-relaxed mb-2 md:mb-5 transition-transform duration-500 ease-out"
+            className="text-xs [@container(min-width:480px)]:text-sm [@container(min-width:640px)]:text-base text-white/60 leading-relaxed mb-2 [@container(min-width:640px)]:mb-5 transition-transform duration-500 ease-out"
             style={{
               transform: isHovered ? "translateX(8px)" : "translateX(0)",
             }}
           >
             KDA, 모스트, 주포지션. 숨길 수 없는 당신의 데이터.
-            <br className="hidden sm:block" />
+            <br className="hidden [@container(min-width:480px)]:block" />
             &ldquo;나 잘했는데?&rdquo; 이제 데이터로 증명하세요.
           </p>
 
           {/* 모바일 전용 미니 스탯 — md 이상에서는 우측 패널이 담당 */}
-          <div className="flex md:hidden items-center gap-4">
+          <div className="flex [@container(min-width:640px)]:hidden items-center gap-4">
             {STATS.map((stat, i) => (
               <div key={stat.label} className="flex items-baseline gap-1">
                 <span className="text-[10px] text-white/35">{stat.label}</span>
@@ -245,7 +248,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
         </div>
 
         {/* ── 우측 — 스탯 패널 (모바일에서 숨김) ── */}
-        <div className="hidden md:flex w-full md:w-[40%] flex-col justify-center px-[4%] py-[5%] md:px-[6%]">
+        <div className="hidden [@container(min-width:640px)]:flex w-full [@container(min-width:640px)]:w-[40%] flex-col justify-center px-[4%] py-[5%] [@container(min-width:640px)]:px-[6%]">
           {/* 시즌 헤더 */}
           <p className="text-[10px] text-white/30 tracking-wider font-bold mb-4 uppercase">
             이번 시즌
@@ -261,7 +264,7 @@ export function StatsBanner({ isActive = true }: { isActive?: boolean }) {
                     {stat.label}
                   </span>
                   <span
-                    className="text-2xl md:text-3xl font-black tabular-nums"
+                    className="text-2xl [@container(min-width:640px)]:text-3xl font-black tabular-nums"
                     style={{ color: INDIGO_LIGHT }}
                   >
                     {stat.decimals > 0

@@ -114,11 +114,11 @@ export function DiscordBanner() {
       {/* 메인 컨텐츠 */}
       <div
         ref={containerRef}
-        className="relative z-10 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-10 h-full py-[5%] px-[5%] md:px-[8%]"
+        className="relative z-10 flex flex-col [@container(min-width:640px)]:flex-row items-center justify-center [@container(min-width:640px)]:justify-start gap-2 [@container(min-width:640px)]:gap-10 h-full py-[5%] px-[5%] [@container(min-width:640px)]:px-[8%]"
       >
         {/* 왼쪽 — Nexus 로고 (모바일에서 숨김 — 높이 180px에서 공간 부족) */}
         <div
-          className="hidden md:block shrink-0 w-14 h-14 md:w-20 md:h-20 transition-all duration-500 ease-out"
+          className="hidden [@container(min-width:640px)]:block shrink-0 w-14 h-14 [@container(min-width:640px)]:w-20 [@container(min-width:640px)]:h-20 transition-all duration-500 ease-out"
           style={{
             transform: isHovered
               ? `translateY(-8px) rotate(-3deg) scale(1.05)`
@@ -138,20 +138,20 @@ export function DiscordBanner() {
         </div>
 
         {/* 중앙 — 멘트 */}
-        <div className="md:flex-1 text-center md:text-left">
+        <div className="[@container(min-width:640px)]:flex-1 text-center [@container(min-width:640px)]:text-left">
           {/* 타이틀 — 모바일에서 폰트 축소 */}
           <p
-            className="text-base sm:text-xl md:text-3xl font-bold text-white mb-1.5 md:mb-2 transition-all duration-500 ease-out"
+            className="text-base [@container(min-width:480px)]:text-xl [@container(min-width:640px)]:text-3xl font-bold text-white mb-1.5 [@container(min-width:640px)]:mb-2 transition-all duration-500 ease-out"
             style={{
               transform: isHovered ? "translateX(6px)" : "translateX(0)",
             }}
           >
             솔랭은 잠깐 쉬고,
-            <br className="hidden sm:block" />{" "}
+            <br className="hidden [@container(min-width:480px)]:block" />{" "}
             <span style={{ color: DISCORD_LIGHT }}>진짜 내전</span> 한 판 어때?
           </p>
           <p
-            className="text-xs sm:text-sm md:text-base text-white/60 mb-2 md:mb-3 transition-all duration-500 ease-out"
+            className="text-xs [@container(min-width:480px)]:text-sm [@container(min-width:640px)]:text-base text-white/60 mb-2 [@container(min-width:640px)]:mb-3 transition-all duration-500 ease-out"
             style={{
               transform: isHovered ? "translateX(10px)" : "translateX(0)",
             }}
@@ -161,7 +161,7 @@ export function DiscordBanner() {
 
           {/* 봇 기능 칩 — 모바일에서 숨김 (180px 높이에서 공간 부족) */}
           <div
-            className="hidden sm:flex flex-wrap justify-center md:justify-start gap-2 transition-all duration-500 ease-out"
+            className="hidden [@container(min-width:480px)]:flex flex-wrap justify-center [@container(min-width:640px)]:justify-start gap-2 transition-all duration-500 ease-out"
             style={{
               transform: isHovered ? "translateX(10px)" : "translateX(0)",
             }}
@@ -189,7 +189,7 @@ export function DiscordBanner() {
 
         {/* 오른쪽 — Discord 참가 버튼 (모바일에서 패딩 축소) */}
         <div
-          className="shrink-0 flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-control px-3 py-2 md:px-5 md:py-3 transition-all duration-500 ease-out"
+          className="shrink-0 flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-control px-3 py-2 [@container(min-width:640px)]:px-5 [@container(min-width:640px)]:py-3 transition-all duration-500 ease-out"
           style={{
             transform: isHovered
               ? "translateX(4px) scale(1.03)"
@@ -211,7 +211,7 @@ export function DiscordBanner() {
           >
             <path d="M60.1 4.9A58.5 58.5 0 0045.4.2a.2.2 0 00-.2.1 40.8 40.8 0 00-1.8 3.7 54 54 0 00-16.2 0A37.4 37.4 0 0025.4.3a.2.2 0 00-.2-.1A58.4 58.4 0 0010.5 4.9a.2.2 0 00-.1.1C1.5 18.7-.9 32.2.3 45.5v.2a58.9 58.9 0 0017.7 9a.2.2 0 00.3-.1 42.1 42.1 0 003.6-5.9.2.2 0 00-.1-.3 38.8 38.8 0 01-5.5-2.7.2.2 0 01 0-.4l1.1-.9a.2.2 0 01.2 0 42 42 0 0035.6 0 .2.2 0 01.2 0l1.1.9a.2.2 0 010 .3 36.4 36.4 0 01-5.5 2.7.2.2 0 00-.1.4 47.2 47.2 0 003.6 5.9.2.2 0 00.3.1A58.7 58.7 0 0070.5 45.7v-.2c1.4-15-2.3-28-9.8-39.6a.2.2 0 00-.1 0zM23.7 37.3c-3.4 0-6.3-3.2-6.3-7s2.8-7 6.3-7 6.3 3.1 6.3 7-2.8 7-6.3 7zm23.2 0c-3.4 0-6.3-3.2-6.3-7s2.8-7 6.3-7 6.4 3.1 6.3 7-2.8 7-6.3 7z" />
           </svg>
-          <span className="text-white font-semibold text-xs md:text-sm lg:text-base whitespace-nowrap">
+          <span className="text-white font-semibold text-xs [@container(min-width:640px)]:text-sm [@container(min-width:900px)]:text-base whitespace-nowrap">
             Discord 참가하기
           </span>
           {/* 화살표 — 호버 시 오른쪽으로 이동 */}
