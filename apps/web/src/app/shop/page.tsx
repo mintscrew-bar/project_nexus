@@ -46,13 +46,23 @@ const RARITY_STYLE: Record<CosmeticItem["rarity"], string> = {
   RARE: "bg-amber-500/20 text-amber-300",
 };
 
-/** 등급별 상품 칸 — 희귀는 금빛, 고급은 보라, 일반·입문은 차분하게 */
+/**
+ * 등급별 상품 칸 — 판은 모두 같게 두고 희귀만 옅은 금빛 테두리로 구분한다.
+ * 색 테두리·빛을 등급마다 다르게 주니 어수선했다(2026-11-19 운영자: "좀 더 정갈").
+ */
 const RARITY_TILE: Record<CosmeticItem["rarity"], string> = {
-  STARTER: "border-bg-tertiary bg-bg-tertiary/30 hover:border-text-tertiary/50",
-  COMMON: "border-sky-400/20 bg-bg-tertiary/30 hover:border-sky-300/50",
-  PREMIUM:
-    "border-violet-400/35 bg-[linear-gradient(180deg,rgba(139,92,246,0.10),rgba(0,0,0,0)_60%)] hover:border-violet-300/70",
-  RARE: "border-amber-400/50 bg-[linear-gradient(180deg,rgba(251,191,36,0.14),rgba(0,0,0,0)_60%)] shadow-[0_0_18px_rgba(251,191,36,0.12)] hover:border-amber-300/80",
+  STARTER: "border-white/[0.06] hover:border-white/20",
+  COMMON: "border-white/[0.06] hover:border-white/20",
+  PREMIUM: "border-white/[0.06] hover:border-white/20",
+  RARE: "border-amber-300/25 hover:border-amber-300/50",
+};
+
+/** 등급 글자 색 — 칸 아래 글자 줄에서만 쓴다 */
+const RARITY_TEXT: Record<CosmeticItem["rarity"], string> = {
+  STARTER: "text-text-tertiary",
+  COMMON: "text-sky-300/80",
+  PREMIUM: "text-violet-300/90",
+  RARE: "text-amber-300",
 };
 
 const noop = () => {};
@@ -355,10 +365,8 @@ export default function ShopPage() {
 
       {/* 진행 중 할인 띠 */}
       {maxDiscount > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-red-500/10 px-4 py-2.5 text-sm">
-          <span className="rounded bg-red-500 px-1.5 py-0.5 text-xs font-black text-white">
-            할인 중
-          </span>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/[0.06] px-4 py-2.5 text-sm">
+          <span className="text-xs font-bold text-red-400">할인 중</span>
           <span className="font-bold text-text-primary">
             최대 {maxDiscount}% 할인
           </span>
@@ -436,7 +444,7 @@ export default function ShopPage() {
                     aria-pressed={isSelected}
                     aria-label={`${item.name} 입어 보기`}
                     className={cn(
-                      "group relative flex flex-col overflow-hidden rounded-lg border text-left transition-colors",
+                      "group relative flex flex-col overflow-hidden rounded-lg border bg-bg-secondary text-left transition-colors",
                       // 프로필 배경은 가로로 긴 배너라 두 칸을 쓴다
                       item.slot === "PROFILE_BANNER" && "col-span-2",
                       RARITY_TILE[item.rarity],
@@ -452,49 +460,45 @@ export default function ShopPage() {
                         // 카드 장식은 세로로 긴 로비 카드가 다 들어가게 조금 더 높게
                         height={item.slot === "CARD_FRAME" ? 236 : 200}
                       />
-                      <span
-                        className={cn(
-                          "absolute left-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-black",
-                          RARITY_STYLE[item.rarity],
-                        )}
-                      >
-                        {RARITY_LABEL[item.rarity]}
-                      </span>
-                      {state.equipped ? (
-                        <span className="absolute right-2 top-2 flex items-center gap-0.5 rounded bg-accent-success px-1.5 py-0.5 text-[10px] font-black text-white">
+                      {state.equipped && (
+                        <span className="absolute right-2 top-2 flex items-center gap-0.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-bold text-white">
                           <Check className="h-3 w-3" strokeWidth={3} />
                           장착 중
                         </span>
-                      ) : state.owned ? (
-                        <span className="absolute right-2 top-2 rounded bg-bg-primary/80 px-1.5 py-0.5 text-[10px] font-black text-text-secondary">
-                          보유
-                        </span>
-                      ) : item.discountPercent > 0 ? (
-                        <span className="absolute right-2 top-2 rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white">
-                          -{item.discountPercent}%
-                        </span>
-                      ) : null}
-                    </div>
-                    {/* 이름 + 가격 */}
-                    <div className="flex items-center justify-between gap-2 border-t border-white/5 bg-bg-secondary/80 px-3 py-2">
-                      <span className="min-w-0 truncate text-sm font-bold text-text-primary">
-                        {item.name}
-                      </span>
-                      {state.owned ? (
-                        <span className="flex-shrink-0 text-[11px] font-bold text-text-tertiary">
-                          {tab === "OWNED" ? SLOT_LABEL[item.slot] : "가짐"}
-                        </span>
-                      ) : (
-                        <span className="flex flex-shrink-0 items-center gap-1 text-sm font-black tabular-nums text-amber-300">
-                          {item.discountPercent > 0 && (
-                            <span className="text-[11px] font-bold text-text-tertiary line-through">
-                              {item.basePrice.toLocaleString()}
-                            </span>
-                          )}
-                          <Medal className="h-3.5 w-3.5" />
-                          {item.price.toLocaleString()}
-                        </span>
                       )}
+                    </div>
+                    {/* 이름 / 등급 · 가격 — 두 줄로 차분하게 */}
+                    <div className="space-y-0.5 border-t border-white/[0.06] px-3 py-2.5">
+                      <p className="truncate text-sm font-bold text-text-primary">
+                        {item.name}
+                      </p>
+                      <p className="flex items-center justify-between gap-2 text-xs">
+                        <span className={RARITY_TEXT[item.rarity]}>
+                          {tab === "OWNED"
+                            ? SLOT_LABEL[item.slot]
+                            : RARITY_LABEL[item.rarity]}
+                        </span>
+                        {state.owned ? (
+                          <span className="text-text-tertiary">보유</span>
+                        ) : (
+                          <span className="flex items-center gap-1 tabular-nums">
+                            {item.discountPercent > 0 && (
+                              <>
+                                <span className="text-text-tertiary line-through">
+                                  {item.basePrice.toLocaleString()}
+                                </span>
+                                <span className="font-bold text-red-400">
+                                  {item.discountPercent}%
+                                </span>
+                              </>
+                            )}
+                            <span className="font-bold text-text-primary">
+                              {item.price.toLocaleString()}
+                            </span>
+                            <Medal className="h-3 w-3 text-amber-300" />
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </button>
                 );
