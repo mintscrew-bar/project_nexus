@@ -1387,6 +1387,30 @@ body.scroll-locked {
 }
 .cfx-twinkle { animation: cfx-twinkle 2.6s ease-in-out infinite; }
 
+/* 아바타 장식(벡터, avatar-frames.tsx) — 위치는 SVG 속성, 움직임만 여기서 (2026-11-19) */
+@keyframes cfx-av-twitch {
+  0%, 80%, 100% { transform: rotate(0deg); }
+  84% { transform: rotate(-12deg); }
+  88% { transform: rotate(3deg); }
+  92% { transform: rotate(-7deg); }
+}
+.cfx-av-twitch { animation: cfx-av-twitch 2.6s ease-in-out infinite; }
+@keyframes cfx-av-sway {
+  0%, 100% { transform: rotate(-10deg); }
+  50% { transform: rotate(14deg); }
+}
+.cfx-av-sway { animation: cfx-av-sway 1.6s ease-in-out infinite; }
+@keyframes cfx-av-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-5px) rotate(-4deg); }
+}
+.cfx-av-bob { animation: cfx-av-bob 1.8s ease-in-out infinite; }
+@keyframes cfx-av-flap-r {
+  0%, 100% { transform: rotate(0deg) scaleY(1); }
+  50% { transform: rotate(-18deg) scaleY(0.82); }
+}
+.cfx-av-flap-r { animation: cfx-av-flap-r 1.6s ease-in-out infinite; }
+
 /* 고양이 귀 — 가만히 있다가 가끔 쫑긋 */
 @keyframes cfx-ear-l {
   0%, 82%, 100% { transform: rotate(-24deg); }
