@@ -16,7 +16,6 @@ import { InkDragonVideo } from "./ink-dragon-video";
 import { cn } from "@/lib/utils";
 import { Burst } from "./effects";
 import { PixelFire } from "./pixel-fire";
-import { INK_DRAGON_AVATAR, INK_DRAGON_PAL } from "./sprites";
 import {
   BatWingsFrame,
   CatEarsFrame,
