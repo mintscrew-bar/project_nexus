@@ -121,6 +121,8 @@ export function LiveBanner({
         preload="auto"
         aria-hidden
         disablePictureInPicture
+        controlsList="nodownload noplaybackrate"
+        draggable={false}
       >
         {/* H.264 MP4 우선, 미지원 환경에서는 WebM 대체 재생 */}
         <source src={def.mp4} type="video/mp4" />

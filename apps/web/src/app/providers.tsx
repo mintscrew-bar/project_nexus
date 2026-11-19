@@ -11,6 +11,7 @@ import { BgmPlayer } from "@/components/bgm/BgmPlayer";
 import { useSfxStore } from "@/stores/sfx-store";
 import { useCosmeticFxStore } from "@/stores/cosmetic-fx-store";
 import { GameNavigationProvider } from "@/components/GameNavigationProvider";
+import { CosmeticMediaProtection } from "@/components/cosmetics/CosmeticMediaProtection";
 
 function SfxSettingsInitializer() {
   const hydrate = useSfxStore((state) => state.hydrate);
@@ -54,6 +55,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <SfxSettingsInitializer />
+          <CosmeticMediaProtection />
           <KeyboardShortcutsProvider>
             <AuthInitializer>
               <GameNavigationProvider>
