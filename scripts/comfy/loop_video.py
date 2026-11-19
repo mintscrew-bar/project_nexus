@@ -14,6 +14,10 @@ i2v.py --loop 로 만든 영상은 끝이 처음과 같아서 --blend 0 이면 �
 얼굴·몸통·칼을 첫 장면으로 덮어도 어색하지 않다. 가장자리는 마스크에서 흐리게 둔다.
 단, 영상이 통째로 흘러내리면(카메라 드리프트) 고정한 칼과 실제 칼이 두 개로 보인다 — --stabilize 와 함께 쓴다.
 
+--pixel <팔레트.png> --grid W H: 픽셀아트 재픽셀화 (pixel_art.py). 영상 모델이 뭉갠 도트 경계를
+격자 칸 가운데 색 + 원본 팔레트로 다시 각지게 만든다. 흔들림 보정 뒤·이음매 섞기 전에 한다
+(섞인 중간색도 팔레트 색으로 떨어지게 하려면 섞은 뒤에 한 번 더 — 아래 main 참고).
+
 --stabilize: 프레임마다 첫 장면과의 어긋남(평행 이동)을 위상 상관으로 재서 되돌린다.
 "카메라 고정" 이라고 써도 LTX 는 3초 동안 25px 쯤 아래로 흘렀고, 끝과 처음을 섞는 구간에
 인물이 두 겹으로 보였다(2026-11-18). 되돌린 뒤 가장자리 빈 곳이 안 보이게 조금 확대한다.
@@ -24,6 +28,8 @@ import os
 import av
 import numpy as np
 from PIL import Image
+
+from pixel_art import snap
 
 
 def shift_of(ref, img):
@@ -85,7 +91,16 @@ def main():
     ap.add_argument("--fps", type=int, default=24)
     ap.add_argument("--freeze", default=None)
     ap.add_argument("--stabilize", action="store_true")
+    ap.add_argument("--pixel", default=None, help="pixel_art.py 가 만든 팔레트 png")
+    ap.add_argument("--grid", type=int, nargs=2, default=[448, 256], metavar=("W", "H"))
     a = ap.parse_args()
+    pal = Image.open(a.pixel) if a.pixel else None
+
+    def repixel(arr):
+        """프레임 하나를 원래 크기 그대로 재픽셀화 (격자 배율은 정수여야 한다)"""
+        h_, w_ = arr.shape[:2]
+        assert w_ % a.grid[0] == 0 and w_ // a.grid[0] == h_ // a.grid[1], "영상 크기가 격자의 정수배가 아니다"
+        return np.asarray(snap(Image.fromarray(arr), a.grid, pal, w_ // a.grid[0]))
 
     frames = [f.to_ndarray(format="rgb24") for f in av.open(a.src).decode(video=0)]
     if a.stabilize:
@@ -112,6 +127,9 @@ def main():
             out.append(mix.round().astype(np.uint8))
         else:
             out.append(frames[j])
+    if pal is not None:
+        # 섞은 구간까지 포함해 마지막에 한 번 — 모든 프레임이 같은 격자·같은 팔레트
+        out = [repixel(f) for f in out]
     h, w = out[0].shape[:2]
     os.makedirs(a.outdir, exist_ok=True)
 

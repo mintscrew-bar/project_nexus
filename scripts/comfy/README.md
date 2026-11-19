@@ -15,6 +15,17 @@
    ```
    → `loop.mp4`·`loop.webm`·`poster.webp`. 화면 부품은 `apps/web/src/components/cosmetics/live-banner.tsx`.
 
+## 픽셀아트 배경 (픽셀 기사, 2026-11-19)
+
+영상 모델은 도트 경계를 뭉갠다 → 넣기 전엔 그대로, 나온 뒤에 격자·팔레트로 다시 깎는다.
+
+1. `pixel_art.py <원본> pixel_knight_input.png` → 모델 입력(1344x768) · `.palette.png`(128색) · `.snap.png`(미리보기)
+   - 원본을 미리 격자로 깎으면 외곽선·창문 불빛이 뭉개졌다 → 비율만 맞춘다
+2. `workflows/minimax_h3_pixel_knight.json` (Comfy Cloud) — 입력 그림을 `pixel_knight_input.png` 로 올리고 실행.
+   1344x768, 6초. 프롬프트에 *crisp hard-edged pixels, no anti-aliasing, stepped sprite motion* + 움직일 것 목록.
+3. `loop_video.py <영상> <출력> --blend 0 --pixel <팔레트.png> --grid 448 256` (필요하면 `--stabilize`)
+   - 칸 가운데 색 샘플 + 고정 팔레트(디더 없음) → 프레임마다 색이 출렁이지 않는다. 면적 평균은 흐려서 안 씀
+
 ## 로컬 대안 (LTX-Video 2B, GTX 1080)
 
 - `i2v.py` — 그림 → 영상. 3초 약 4분. `workflows/넥서스_그림을_영상으로.json` 은 같은 설정의 ComfyUI 화면용(`make_ui_workflow.py` 로 생성).
