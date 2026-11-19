@@ -40,3 +40,17 @@
 - Animagine XL 4.0: CreativeML Open RAIL++-M (상업 이용 허용)
 - LTX-Video 0.9.8: Open Weights License 0.X (연 매출 1천만 달러 미만 무료, 출력물 권리 주장 없음)
 - MiniMax H3: Comfy Cloud 이용 약관을 따른다 — 판매 전 확인 필요
+
+## 아바타 장식 — 흑룡 (2026-11-19)
+
+코드로 그린 용(픽셀·벡터)은 붓맛이 안 나서 그림 모델로 만든다.
+
+1. 그림: `cosmetic_art.py avatar <폴더> [--thin]` — 고리 밑그림 + Animagine XL 그림→그림.
+   머리만 고치기는 `cosmetic_art.py head <폴더> --src <_raw.png> --ellipse CX CY RX RY`.
+2. 움직임(갈기·먹 흩날림): **MiniMax H3 (Comfy Cloud)** `workflows/minimax_h3_ink_dragon_avatar.json`
+   — 입력 그림을 `ink_dragon_avatar_input.png`(768×768, 종이째)로 올리고 실행. 6초.
+   - 로컬 LTX 2B 는 실패: "부드럽게·형태 유지" 면 거의 정지(프레임당 0.05), 세게 시키면 고리가 뭉개짐.
+     고리 회전은 어떤 프롬프트로도 안 됐다 → 회전은 사이트에서 CSS 로 돌린다.
+3. 후처리: `avatar_video.py <영상> <폴더> --name ink_dragon --blend 12`
+   → 종이 걷기(색을 알파로) · 고리 띠만 남기기 · 앞뒤 이음 · VP9+알파 webm 384² + 첫 장면 png.
+   크롬·엣지·파이어폭스는 투명 영상, 사파리는 png 로 대신한다.
