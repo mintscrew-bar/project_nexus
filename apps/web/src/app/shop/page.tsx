@@ -162,10 +162,27 @@ export default function ShopPage() {
     trying.CARD_FRAME || trying.AVATAR_FRAME || trying.NAME_STYLE,
   );
   // 진열할 상품 — 보관함이면 산 것 전부(자리 순서대로), 아니면 그 자리 상품
-  const shown = COSMETICS.filter((item) => stateByCode.has(item.code)).filter(
-    (item) =>
+  // 서버 상품표(관리자가 바꾼 이름·설명·가격·순서·할인)를 그림 정의에 덮어 진열한다
+  const serverOrder = new Map(data?.items.map((it, i) => [it.code, i]) ?? []);
+  const shown = COSMETICS.filter((item) => stateByCode.has(item.code))
+    .map((item) => {
+      const st = stateByCode.get(item.code)!;
+      return {
+        ...item,
+        name: st.name ?? item.name,
+        description: st.description ?? item.description,
+        price: st.price,
+        rarity: st.rarity,
+        basePrice: st.basePrice ?? st.price,
+        discountPercent: st.discountPercent ?? 0,
+      };
+    })
+    .sort(
+      (a, b) => (serverOrder.get(a.code) ?? 0) - (serverOrder.get(b.code) ?? 0),
+    )
+    .filter((item) =>
       tab === "OWNED" ? stateByCode.get(item.code)!.owned : item.slot === tab,
-  );
+    );
   const ownedCount = data?.items.filter((it) => it.owned).length ?? 0;
 
   return (
@@ -457,7 +474,18 @@ export default function ShopPage() {
                       )}
                     >
                       <Medal className="h-4 w-4" />
+                      {/* 기간 할인 중이면 원래 가격을 지우고 할인율을 붙인다 */}
+                      {item.discountPercent > 0 && (
+                        <span className="text-xs font-bold line-through opacity-60">
+                          {item.basePrice.toLocaleString()}
+                        </span>
+                      )}
                       {item.price.toLocaleString()} {MEDAL_LABEL}
+                      {item.discountPercent > 0 && (
+                        <span className="rounded bg-red-500/90 px-1 text-[10px] font-black text-white">
+                          -{item.discountPercent}%
+                        </span>
+                      )}
                       {short && (
                         <span className="ml-1 text-xs font-bold">
                           · {(item.price - balance).toLocaleString()} 부족

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { medalApi } from "@/lib/api-client";
+import { medalApi, shopApi } from "@/lib/api-client";
 import {
   ATTENDANCE_QUERY_KEY,
   AttendanceCard,
@@ -500,8 +500,36 @@ function ShopCarousel() {
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  // 상점 화면과 같은 서버 상품표 — 관리자가 바꾼 이름·가격·순서·숨김·할인을 따른다.
+  // 받기 전에는 코드 기본값으로 그린다(가진 것만 보이는 숨긴 상품은 진열에서 뺀다)
+  const { data: shop } = useQuery({
+    queryKey: ["shop"],
+    queryFn: shopApi.getShop,
+    staleTime: 60 * 1000,
+  });
+  const items = shop
+    ? shop.items
+        .filter((st) => st.onSale)
+        .map((st) => {
+          const item = COSMETICS.find((c) => c.code === st.code);
+          return item
+            ? {
+                ...item,
+                name: st.name ?? item.name,
+                price: st.price,
+                basePrice: st.basePrice ?? st.price,
+                discountPercent: st.discountPercent ?? 0,
+              }
+            : null;
+        })
+        .filter((v): v is NonNullable<typeof v> => v !== null)
+    : COSMETICS.map((item) => ({
+        ...item,
+        basePrice: item.price,
+        discountPercent: 0,
+      }));
   // 넓은 화면(3칸) 기준으로 마지막 칸이 끝에 닿으면 처음으로
-  const last = Math.max(0, COSMETICS.length - 3);
+  const last = Math.max(0, items.length - 3);
 
   useEffect(() => {
     if (paused) return;
@@ -533,7 +561,7 @@ function ShopCarousel() {
             className="flex transition-transform duration-500 ease-out"
             style={{ transform: `translateX(calc(${-index} * var(--tile)))` }}
           >
-            {COSMETICS.map((item) => (
+            {items.map((item) => (
               <Link
                 key={item.code}
                 href="/shop"
@@ -555,6 +583,11 @@ function ShopCarousel() {
                       </span>
                     </span>
                     <span className="flex-shrink-0 text-sm font-black tabular-nums text-amber-300">
+                      {item.discountPercent > 0 && (
+                        <span className="mr-1 text-[11px] font-bold text-text-tertiary line-through">
+                          {item.basePrice.toLocaleString()}
+                        </span>
+                      )}
                       {item.price.toLocaleString()}
                     </span>
                   </div>

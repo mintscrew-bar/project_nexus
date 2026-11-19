@@ -2430,12 +2430,92 @@ export interface MedalSummary {
 export interface ShopItemState {
   code: string;
   slot: CosmeticSlot;
+  /** 지금 살 가격(관리자가 바꾼 가격·걸린 할인 반영) */
   price: number;
+  /** 할인 전 가격 */
+  basePrice?: number;
+  /** 할인율(%) — 없으면 0 */
+  discountPercent?: number;
+  discountEndsAt?: string | null;
   rarity: "STARTER" | "COMMON" | "PREMIUM" | "RARE";
   onSale: boolean;
+  /** 관리자가 바꾼 이름·설명 — null 이면 화면 기본 문구 */
+  name?: string | null;
+  description?: string | null;
   owned: boolean;
   equipped: boolean;
 }
+
+/** 관리자 상점 관리 — 상품 한 줄(상품표 + 판매 현황) */
+export interface AdminShopItem {
+  code: string;
+  slot: CosmeticSlot;
+  price: number;
+  basePrice: number;
+  discountPercent: number;
+  discountEndsAt: string | null;
+  rarity: "STARTER" | "COMMON" | "PREMIUM" | "RARE";
+  onSale: boolean;
+  hidden: boolean;
+  name: string | null;
+  description: string | null;
+  sortOrder: number;
+  stats: {
+    sold: number;
+    medals: number;
+    refunds: number;
+    owners: number;
+    granted: number;
+    equipped: number;
+  };
+}
+
+export interface AdminShopDiscount {
+  id: string;
+  name: string;
+  percent: number;
+  itemCodes: string[];
+  startsAt: string;
+  endsAt: string;
+  active: boolean;
+  createdAt: string;
+  status: "LIVE" | "SCHEDULED" | "ENDED" | "OFF";
+}
+
+/** 관리자 상점 관리 (ADMIN) */
+export const adminShopApi = {
+  listItems: async (): Promise<AdminShopItem[]> =>
+    (await apiClient.get("/shop/admin/items")).data,
+  updateItem: async (
+    code: string,
+    patch: Partial<{
+      name: string | null;
+      description: string | null;
+      price: number | null;
+      rarity: AdminShopItem["rarity"] | null;
+      onSale: boolean | null;
+      hidden: boolean;
+      sortOrder: number | null;
+    }>,
+  ) => (await apiClient.patch(`/shop/admin/items/${code}`, patch)).data,
+  grant: async (userId: string, itemCode: string, memo: string) =>
+    (await apiClient.post("/shop/admin/grant", { userId, itemCode, memo }))
+      .data,
+  revoke: async (userId: string, itemCode: string, memo: string) =>
+    (await apiClient.post("/shop/admin/revoke", { userId, itemCode, memo }))
+      .data,
+  listDiscounts: async (): Promise<AdminShopDiscount[]> =>
+    (await apiClient.get("/shop/admin/discounts")).data,
+  createDiscount: async (input: {
+    name: string;
+    percent: number;
+    itemCodes: string[];
+    startsAt: string;
+    endsAt: string;
+  }) => (await apiClient.post("/shop/admin/discounts", input)).data,
+  stopDiscount: async (id: string) =>
+    (await apiClient.post(`/shop/admin/discounts/${id}/stop`)).data,
+};
 
 export type CosmeticLoadoutState = Partial<Record<CosmeticSlot, string>>;
 

@@ -13,6 +13,7 @@ import { CommunityTab } from "@/components/admin/content/CommunityTab";
 import { AnnouncementsTab } from "@/components/admin/content/AnnouncementsTab";
 import { StreamersTab } from "@/components/admin/content/StreamersTab";
 import { MedalsTab } from "@/components/admin/content/MedalsTab";
+import { ShopTab } from "@/components/admin/content/ShopTab";
 import { ClansTab } from "@/components/admin/game/ClansTab";
 import { RoomsTab } from "@/components/admin/game/RoomsTab";
 import { MatchesTab } from "@/components/admin/game/MatchesTab";
@@ -47,6 +48,7 @@ import {
   Trash2,
   Medal,
   BarChart3,
+  ShoppingBag,
 } from "lucide-react";
 import { useResetOn } from "@/hooks/useResetOn";
 
@@ -64,6 +66,7 @@ type Tab =
   | "announcements"
   | "streamers"
   | "medals"
+  | "shop"
   | "appeals"
   | "discord"
   | "errors"
@@ -162,6 +165,11 @@ const TAB_GROUPS: TabGroup[] = [
         id: "medals",
         label: "메달·원장",
         icon: <Medal className="h-4 w-4" />,
+      },
+      {
+        id: "shop",
+        label: "상점 관리",
+        icon: <ShoppingBag className="h-4 w-4" />,
       },
     ],
   },
@@ -391,6 +399,7 @@ function AdminPageInner() {
           )}
           {activeTab === "streamers" && <StreamersTab addToast={addToast} />}
           {activeTab === "medals" && <MedalsTab addToast={addToast} />}
+          {activeTab === "shop" && <ShopTab addToast={addToast} />}
           {activeTab === "clans" && <ClansTab addToast={addToast} />}
           {activeTab === "rooms" && <RoomsTab addToast={addToast} />}
           {activeTab === "scrims" && (
