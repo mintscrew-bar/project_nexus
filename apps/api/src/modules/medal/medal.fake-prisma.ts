@@ -9,6 +9,8 @@ export function createFakePrisma() {
   let audit: any[] = [];
   let cosmetics: any[] = [];
   let loadouts: any[] = [];
+  const overrides: any[] = [];
+  const discounts: any[] = [];
   const users = new Set(["u1", "u2", "admin"]);
 
   const api: any = {
@@ -173,8 +175,53 @@ export function createFakePrisma() {
     },
     user: {
       findUnique: jest.fn(async ({ where }: any) =>
-        users.has(where.id) ? { id: where.id } : null,
+        users.has(where.id) ? { id: where.id, username: where.id } : null,
       ),
+    },
+    // 상점 관리 — 상품 덮어쓰기·기간 할인
+    shopItemOverride: {
+      findMany: jest.fn(async () => overrides),
+      findUnique: jest.fn(
+        async ({ where }: any) =>
+          overrides.find((o) => o.code === where.code) ?? null,
+      ),
+      upsert: jest.fn(async ({ where, create, update }: any) => {
+        const row = overrides.find((o) => o.code === where.code);
+        if (row) {
+          Object.assign(row, update);
+          return row;
+        }
+        const created = { hidden: false, ...create };
+        overrides.push(created);
+        return created;
+      }),
+    },
+    shopDiscount: {
+      findMany: jest.fn(async ({ where }: any = {}) =>
+        discounts.filter(
+          (d) =>
+            !where ||
+            ((where.active === undefined || d.active === where.active) &&
+              (!where.startsAt || d.startsAt <= where.startsAt.lte) &&
+              (!where.endsAt || d.endsAt > where.endsAt.gt)),
+        ),
+      ),
+      create: jest.fn(async ({ data }: any) => {
+        const row = {
+          id: `d${discounts.length + 1}`,
+          active: true,
+          itemCodes: [],
+          ...data,
+        };
+        discounts.push(row);
+        return row;
+      }),
+      update: jest.fn(async ({ where, data }: any) => {
+        const row = discounts.find((d) => d.id === where.id);
+        if (!row) throw new Error("not found");
+        Object.assign(row, data);
+        return row;
+      }),
     },
     // 지갑 행 잠금(SELECT ... FOR UPDATE) — 메모리에선 할 일이 없다
     $executeRaw: jest.fn(async () => 1),

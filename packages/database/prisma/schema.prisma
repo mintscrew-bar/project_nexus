@@ -1946,6 +1946,10 @@ enum AdminAction {
   BOT_CLEANUP
   MEDAL_ADJUST
   MEDAL_REFUND // 상점 구매 환불 (Task 17)
+  SHOP_ITEM_UPDATE // 상점 상품 수정(가격·판매·숨김 등)
+  SHOP_GRANT // 상점 상품 지급(선물)
+  SHOP_REVOKE // 상점 상품 회수(메달 돌려주지 않음)
+  SHOP_DISCOUNT // 상점 기간 할인 만들기·끄기
 }
 
 enum VoteType {
@@ -2324,4 +2328,39 @@ model UserCosmeticLoadout {
 
   @@id([userId, slot])
   @@map("user_cosmetic_loadouts")
+}
+
+/// 상점 상품 덮어쓰기 — 상품 원본(이름·가격·판매 여부)은 코드(@nexus/types)에 있고,
+/// 관리자가 바꾼 값만 여기 남긴다. null 이면 원본 값을 쓴다. hidden 은 "삭제"(진열·구매 불가,
+/// 이미 산 사람은 계속 쓴다).
+model ShopItemOverride {
+  code        String   @id
+  name        String?
+  description String?
+  price       Int?
+  rarity      String?
+  onSale      Boolean?
+  hidden      Boolean  @default(false)
+  sortOrder   Int?
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("shop_item_overrides")
+}
+
+/// 상점 기간 할인 — itemCodes 가 비면 전체 상품. 기간 안이고 active 일 때만 적용,
+/// 한 상품에 여러 할인이 겹치면 가장 큰 할인 하나만 쓴다.
+model ShopDiscount {
+  id          String   @id @default(cuid())
+  name        String
+  percent     Int
+  itemCodes   String[] @default([])
+  startsAt    DateTime
+  endsAt      DateTime
+  active      Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([startsAt, endsAt])
+  @@map("shop_discounts")
 }

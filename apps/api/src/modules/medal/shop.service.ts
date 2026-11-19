@@ -6,7 +6,6 @@ import {
 } from "@nestjs/common";
 import { MedalReason } from "@nexus/database";
 import {
-  COSMETIC_SHOP_ITEMS,
   COSMETIC_SLOTS,
   findCosmeticShopItem,
   type CosmeticLoadout,
@@ -14,6 +13,7 @@ import {
 } from "@nexus/types";
 import { PrismaService } from "../prisma/prisma.service";
 import { MedalService } from "./medal.service";
+import { ShopCatalogService } from "./shop-catalog.service";
 
 /** 한 번에 장착 상태를 물어볼 수 있는 최대 인원 (로비 100인 방 기준) */
 const LOADOUT_LOOKUP_MAX = 100;
@@ -30,11 +30,17 @@ export class ShopService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly medalService: MedalService,
+    private readonly catalog: ShopCatalogService,
   ) {}
 
-  /** 상점 진열 — 내 잔액과 상품별 보유·장착 여부 */
+  /**
+   * 상점 진열 — 내 잔액과 상품별 보유·장착 여부.
+   * 상품표는 코드 원본 + 관리자 덮어쓰기 + 지금 걸린 할인(ShopCatalogService).
+   * 숨긴(삭제한) 상품·판매를 내린 상품은 가진 사람에게만 보인다.
+   */
   async getShop(userId: string) {
-    const [balance, owned, loadout] = await Promise.all([
+    const [items, balance, owned, loadout] = await Promise.all([
+      this.catalog.getItems(),
       this.medalService.getBalance(userId),
       this.prisma.userCosmetic.findMany({
         where: { userId },
@@ -47,13 +53,24 @@ export class ShopService {
     return {
       balance,
       loadout,
-      items: COSMETIC_SHOP_ITEMS.filter(
-        (item) => item.onSale || ownedSet.has(item.code),
-      ).map((item) => ({
-        ...item,
-        owned: ownedSet.has(item.code),
-        equipped: equipped.has(item.code),
-      })),
+      items: items
+        .filter(
+          (item) => (item.onSale && !item.hidden) || ownedSet.has(item.code),
+        )
+        .map((item) => ({
+          code: item.code,
+          slot: item.slot,
+          price: item.price,
+          basePrice: item.basePrice,
+          discountPercent: item.discountPercent,
+          discountEndsAt: item.discountEndsAt,
+          rarity: item.rarity,
+          onSale: item.onSale && !item.hidden,
+          name: item.name,
+          description: item.description,
+          owned: ownedSet.has(item.code),
+          equipped: equipped.has(item.code),
+        })),
     };
   }
 
@@ -62,9 +79,10 @@ export class ShopService {
    * 이미 가진 상품·판매 중이 아닌 상품·메달 부족은 거절한다.
    */
   async purchase(userId: string, code: string, equip = false) {
-    const item = findCosmeticShopItem(code);
+    // 가격은 지금 상품표(관리자가 바꾼 가격·걸린 할인 반영)를 따른다
+    const item = await this.catalog.find(code);
     if (!item) throw new NotFoundException("없는 상품이에요.");
-    if (!item.onSale)
+    if (!item.onSale || item.hidden)
       throw new BadRequestException("지금은 팔지 않는 상품이에요.");
 
     const already = await this.prisma.userCosmetic.findUnique({
@@ -92,7 +110,13 @@ export class ShopService {
           reason: MedalReason.PURCHASE,
           idempotencyKey: purchaseKey,
           sourceId: code,
-          metadata: { itemCode: code, price: item.price },
+          metadata: {
+            itemCode: code,
+            price: item.price,
+            basePrice: item.basePrice,
+            discountPercent: item.discountPercent,
+            discountId: item.discountId,
+          },
         });
         await tx.userCosmetic.create({
           data: {

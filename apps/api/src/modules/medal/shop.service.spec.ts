@@ -6,6 +6,7 @@ import {
 import { MedalReason } from "@nexus/database";
 import { InsufficientMedalsError, MedalService } from "./medal.service";
 import { ShopService } from "./shop.service";
+import { ShopCatalogService } from "./shop-catalog.service";
 import { createFakePrisma } from "./medal.fake-prisma";
 
 describe("ShopService", () => {
@@ -14,7 +15,11 @@ describe("ShopService", () => {
 
   beforeEach(() => {
     db = createFakePrisma();
-    shop = new ShopService(db.api, new MedalService(db.api));
+    shop = new ShopService(
+      db.api,
+      new MedalService(db.api),
+      new ShopCatalogService(db.api),
+    );
   });
 
   describe("purchase", () => {
