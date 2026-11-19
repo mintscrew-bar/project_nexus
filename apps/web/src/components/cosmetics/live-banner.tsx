@@ -27,6 +27,18 @@ export interface LiveBannerDef {
 }
 
 export const LIVE_BANNERS = {
+  ember_knight_card: {
+    webm: "/cosmetics/banners/ember_knight/card.webm",
+    mp4: "/cosmetics/banners/ember_knight/card.mp4",
+    poster: "/cosmetics/banners/ember_knight/card.webp",
+    size: [440, 420], focusY: 0.5,
+  },
+  ember_knight_banner: {
+    webm: "/cosmetics/banners/ember_knight/banner.webm",
+    mp4: "/cosmetics/banners/ember_knight/banner.mp4",
+    poster: "/cosmetics/banners/ember_knight/banner.webp",
+    size: [1536, 640], focusY: 0.5,
+  },
   ink_swordsman: {
     webm: "/cosmetics/banners/ink_swordsman/loop.webm",
     mp4: "/cosmetics/banners/ink_swordsman/loop.mp4",

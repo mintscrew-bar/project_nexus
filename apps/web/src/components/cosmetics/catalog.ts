@@ -59,6 +59,8 @@ export interface CosmeticItem {
   layerClassName?: string;
   /** CARD_FRAME 전용 — 초상화 위에서 움직이는 장식 (effects.tsx) */
   effect?: CosmeticEffectCode;
+  /** CARD_FRAME — 영상형 카드 배경 */
+  cardVideo?: LiveBannerCode;
   /** AVATAR_FRAME 전용 — 아바타 둘레 장식 (avatar-effects.tsx) */
   avatarEffect?: AvatarEffectCode;
   /** NAME_STYLE 전용 — 닉네임 글꼴·효과 (name-styles.tsx) */
@@ -169,6 +171,11 @@ const COSMETIC_DEFS: CosmeticItem[] = [
     className: "bg-[#7a561a]",
     layerClassName: "cosmetic-orbit-gold",
     effect: "dragon",
+  },
+  {
+    code: "FX_EMBER_KNIGHT", slot: "CARD_FRAME", name: "잿불의 기사 · 카드",
+    description: "모닥불 곁에서 밤을 지키는 기사 — 움직이는 픽셀아트 카드 배경",
+    price: 2000, rarity: "RARE", className: "bg-[#30263b]", cardVideo: "ember_knight_card",
   },
   // ── 아바타 장식 (프로필) ──
   {
@@ -343,6 +350,11 @@ const COSMETIC_DEFS: CosmeticItem[] = [
     rarity: "RARE",
     className: "",
     liveBanner: "ink_swordsman",
+  },
+  {
+    code: "BN_EMBER_KNIGHT", slot: "PROFILE_BANNER", name: "잿불의 기사 · 풍경",
+    description: "달빛 아래 모닥불을 지키는 기사 — 움직이는 픽셀아트 프로필 배경",
+    price: 2500, rarity: "RARE", className: "", liveBanner: "ember_knight_banner",
   },
 ];
 

@@ -96,6 +96,7 @@ export const COSMETIC_SHOP_ITEMS: CosmeticShopItem[] = [
     rarity: "RARE",
     onSale: true,
   },
+  { code: "FX_EMBER_KNIGHT", slot: "CARD_FRAME", price: 2000, rarity: "RARE", onSale: true },
   // 아바타 장식 (프로필)
   {
     code: "AV_CAT_EARS",
@@ -218,6 +219,7 @@ export const COSMETIC_SHOP_ITEMS: CosmeticShopItem[] = [
     rarity: "RARE",
     onSale: true,
   },
+  { code: "BN_EMBER_KNIGHT", slot: "PROFILE_BANNER", price: 2500, rarity: "RARE", onSale: true },
 ];
 
 export function findCosmeticShopItem(
