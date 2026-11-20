@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>[업데이트] 방송 오버레이 대개편 — 내 방송에 맞게 꾸미기, 진영 결정 중계, 결과 연출</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, "Malgun Gothic", sans-serif; max-width: 860px; margin: 24px auto; padding: 0 16px; line-height: 1.7; background: #fff; color: #111; }
+  @media (prefers-color-scheme: dark) { body { background: #161616; color: #eee; } .bar { background: #222 !important; } }
+  .bar { position: sticky; top: 0; background: #f3f3f3; padding: 12px; border-radius: 10px; margin-bottom: 20px; z-index: 1; }
+  .bar button { font-size: 15px; padding: 8px 14px; margin-right: 6px; border-radius: 8px; border: 0; background: #5b6cff; color: #fff; cursor: pointer; }
+  .bar small { display: block; margin-top: 8px; opacity: .75; }
+  .pic { padding: 10px 12px 10px 12px; border: 2px dashed #e0a800; border-radius: 8px; font-weight: 600;
+          min-height: 160px; background-repeat: no-repeat; background-size: auto 140px; background-position: right 10px center; }
+  blockquote { border-left: 3px solid #999; margin-left: 0; padding-left: 12px; opacity: .9; }
+  #ok { margin-left: 8px; color: #2a2; font-weight: 600; }
+</style></head><body>
+<div class="bar">
+  <button onclick="copyText('title')">제목 복사</button>
+  <button onclick="copyText('body')">본문 복사</button><span id="ok"></span>
+  <small>본문 복사 → 글쓰기 본문에 붙여 넣기 → 노란 「▶ 사진」 줄마다 그 자리에 사진을 끌어다 놓거나 사진 버튼으로 올린 뒤, 표시 줄은 지우세요.<br>
+  사진 폴더: <code>\\wsl.localhost\Ubuntu-24.04\home\haru\projects\nexus\docs\blog\images\2026-11-notices</code></small>
+</div>
+<h1 id="title">[업데이트] 방송 오버레이 대개편 — 내 방송에 맞게 꾸미기, 진영 결정 중계, 결과 연출</h1>
+<div id="body">
+<p>내전을 방송하는 스트리머·운영자분들을 위해 OBS 오버레이와 방송 조작 패널을 크게 바꿨습니다.</p>
+<p>이번 업데이트의 목표는 두 가지입니다. <strong>방송마다 다른 얼굴을 가질 수 있게</strong> 하는 것, 그리고 <strong>방송 화면만 봐도 지금 내전이 어디까지 왔는지</strong> 알 수 있게 하는 것입니다.</p>
+<hr>
+<h2>방송 조작 패널</h2>
+<p>방송 설정에서 여는 <strong>방송 조작 패널</strong>을 방송 장비 느낌의 어두운 콘솔로 다시 만들었습니다.</p>
+<h3>송출 미리보기</h3>
+<p>지금 OBS로 <strong>나가고 있는 화면을 패널 안에서 그대로</strong> 볼 수 있습니다. 장면을 바꿨을 때 실제로 어떻게 나가는지 OBS를 따로 보지 않아도 확인할 수 있습니다. (미리보기에서는 효과음이 나오지 않습니다.)</p>
+<h3>단계별 장면</h3>
+<p>방 진행 단계(<strong>모집 → 경매 → 라인 선택 → 경기 → 종료</strong>)에 맞는 장면 버튼이 크게 보이고, 나머지 장면은 &quot;다른 장면&quot;으로 정리됩니다. 지금 띄워야 할 장면을 고민할 필요가 줄어듭니다.</p>
+<h3>즉석 연출</h3>
+<p>방송 중에 바로 쓸 수 있는 버튼들입니다.</p>
+<ul><li><p><strong>결과 다시 보기</strong> — 경기 결과 연출을 처음부터 다시 재생</p></li><li><p><strong>선수 카드 띄우기</strong> — 특정 선수의 카드를 12초 동안 띄우기 / 내리기</p></li><li><p><strong>휴식 카운트다운</strong> — 3 · 5 · 10 · 15분</p></li><li><p><strong>공지 프리셋</strong> — 자주 쓰는 공지 문구를 저장해 두고 한 번에 띄우기</p></li></ul>
+<hr>
+<h2>내 방송에 맞게 꾸미기</h2>
+<p><strong>방송 설정</strong>에서 오버레이를 방송인마다 다르게 꾸밀 수 있습니다. 저장하면 송출 중인 오버레이에 <strong>바로 반영</strong>됩니다.</p>
+<ul><li><p><strong>색 · 로고 · 문구</strong> — 방송 로고를 올리고 대표 색을 고를 수 있습니다.</p></li><li><p><strong>요소 켜고 끄기 · 크기 · 글꼴</strong></p></li><li><p><strong>대기 / 휴식 화면 문구</strong></p></li><li><p><strong>이름 표시 방식</strong></p></li><li><p><strong>효과음</strong></p></li></ul>
+<h3>배경</h3>
+<p>기본 배경 외에 <strong>움직이는 배경 프리셋</strong> 여러 개가 추가되었고, <strong>직접 만든 이미지를 배경으로 올릴</strong> 수도 있습니다. 기존에 쓰던 배경은 그대로 기본값으로 남겨 두었습니다.</p>
+<h3>장면 전환</h3>
+<p>장면이 바뀔 때 나오는 <strong>전환 효과</strong>를 고를 수 있고, 설정 화면에서 미리 볼 수 있습니다. 전환용 영상을 직접 올려서 쓸 수도 있습니다.</p>
+<hr>
+<h2>경매 · 로스터 화면</h2>
+<p class="pic" data-img="05-auction-overlay.png">▶ 사진: 05-auction-overlay.png (경매 오버레이)</p>
+<p>경매 장면의 매물 카드에 <strong>라인별 티어와 선호 챔피언, 내전 기록(승률·칭찬·KDA·킬관여·피해량·CS·시야·골드)</strong>이 함께 나옵니다. 시청자도 &quot;이 선수가 왜 비싼지&quot; 바로 볼 수 있습니다.</p>
+<h3>라인 맞대결</h3>
+<p class="pic" data-img="05-lineup.png">▶ 사진: 05-lineup.png (라인 맞대결 로스터)</p>
+<p>자동 밸런스로 2팀을 짠 경우, 로스터 화면이 <strong>같은 라인끼리 마주 보는 맞대결 배치</strong>로 바뀝니다.</p>
+<ul><li><p>카드마다 배정 라인 티어(없으면 솔로랭크), 선호 챔피언 3명, 라인 점수</p></li><li><p>양 끝에 팀 이름과 <strong>팀 점수</strong></p></li><li><p>선수 배지: <strong>랭킹 순위</strong>, <strong>받은 칭찬 수와 대표 태그</strong></p></li><li><p>교체된 라인 카드는 팀 색으로 번쩍여서 어디가 바뀌었는지 보입니다</p></li></ul>
+<p>3팀 이상일 때는 마주 볼 상대가 없으므로 라인 순서대로 팀 칸에 정리됩니다.</p>
+<hr>
+<h2>진영 결정 중계</h2>
+<p class="pic" data-img="05-side.png">▶ 사진: 05-side.png (진영 확정 장면)</p>
+<p>1세트 진영을 정하는 <strong>팀장 가위바위보</strong>가 이제 방송에도 나옵니다.</p>
+<ol><li><p>양 팀장 제출 대기</p></li><li><p>손 공개 (비기면 다시)</p></li><li><p>이긴 팀 팀장이 진영을 고르는 중</p></li><li><p><strong>블루 / 레드 확정</strong>을 5초 동안 보여 준 뒤 원래 장면으로</p></li></ol>
+<p>다전제에서 2세트부터는 진 팀이 진영을 고르므로, 세트 사이에 <strong>두 팀이 자리를 바꾸는 진영 교대 장면</strong>이 나옵니다.</p>
+<hr>
+<h2>결과 연출</h2>
+<p class="pic" data-img="05-result.png">▶ 사진: 05-result.png (최종 승리 장면)</p>
+<p>경기가 끝나면 결과가 <strong>순서대로</strong> 연출됩니다.</p>
+<ul><li><p>승리 팀 발표, 세트 스코어, 킬 스코어, 경기 시간</p></li><li><p>Riot 기록이 수집된 판이면 <strong>자동 MVP·ACE</strong>, 진영별 킬·골드·포탑·드래곤·바론·전령, <strong>골드 차이 그래프</strong>까지 보여 줍니다</p></li><li><p>시리즈가 끝나면 <strong>최종 승리</strong> 화면이 나옵니다</p></li></ul>
+<p>놓쳤다면 조작 패널의 「결과 다시 보기」로 처음부터 다시 틀 수 있습니다.</p>
+<hr>
+<h2>마무리</h2>
+<p>방송 오버레이는 설정에서 OBS용 링크를 복사해 브라우저 소스로 넣으면 바로 쓸 수 있습니다. 써 보시고 &quot;이런 장면이 있었으면 좋겠다&quot; 하는 것이 있으면 알려 주세요. 방송하는 분들의 의견을 가장 먼저 반영하겠습니다.</p>
+</div>
+<script>
+  // 사진 자리 옆에 그림을 배경으로 띄운다 — 배경이라 복사엔 실리지 않는다
+  document.querySelectorAll('.pic').forEach(function (el) {
+    el.style.backgroundImage = "url('../../images/2026-11-notices/" + el.dataset.img + "')";
+  });
+  // 선택 영역을 잡아 복사 — HTML 서식째 클립보드에 올라간다
+  function copyText(id) {
+    var el = document.getElementById(id);
+    var r = document.createRange(); r.selectNodeContents(el);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    var ok = document.execCommand('copy'); s.removeAllRanges();
+    document.getElementById('ok').textContent = ok ? (id === 'title' ? '제목 복사됨' : '본문 복사됨') : '복사 실패 — 직접 드래그해 주세요';
+  }
+</script>
+</body></html>

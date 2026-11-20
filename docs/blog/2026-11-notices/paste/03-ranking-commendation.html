@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>[업데이트] 랭킹 개편 · 별점 대신 &quot;칭찬&quot; · MVP는 기록으로 자동</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, "Malgun Gothic", sans-serif; max-width: 860px; margin: 24px auto; padding: 0 16px; line-height: 1.7; background: #fff; color: #111; }
+  @media (prefers-color-scheme: dark) { body { background: #161616; color: #eee; } .bar { background: #222 !important; } }
+  .bar { position: sticky; top: 0; background: #f3f3f3; padding: 12px; border-radius: 10px; margin-bottom: 20px; z-index: 1; }
+  .bar button { font-size: 15px; padding: 8px 14px; margin-right: 6px; border-radius: 8px; border: 0; background: #5b6cff; color: #fff; cursor: pointer; }
+  .bar small { display: block; margin-top: 8px; opacity: .75; }
+  .pic { padding: 10px 12px 10px 12px; border: 2px dashed #e0a800; border-radius: 8px; font-weight: 600;
+          min-height: 160px; background-repeat: no-repeat; background-size: auto 140px; background-position: right 10px center; }
+  blockquote { border-left: 3px solid #999; margin-left: 0; padding-left: 12px; opacity: .9; }
+  #ok { margin-left: 8px; color: #2a2; font-weight: 600; }
+</style></head><body>
+<div class="bar">
+  <button onclick="copyText('title')">제목 복사</button>
+  <button onclick="copyText('body')">본문 복사</button><span id="ok"></span>
+  <small>본문 복사 → 글쓰기 본문에 붙여 넣기 → 노란 「▶ 사진」 줄마다 그 자리에 사진을 끌어다 놓거나 사진 버튼으로 올린 뒤, 표시 줄은 지우세요.<br>
+  사진 폴더: <code>\\wsl.localhost\Ubuntu-24.04\home\haru\projects\nexus\docs\blog\images\2026-11-notices</code></small>
+</div>
+<h1 id="title">[업데이트] 랭킹 개편 · 별점 대신 &quot;칭찬&quot; · MVP는 기록으로 자동</h1>
+<div id="body">
+<p>랭킹을 누구나 오를 수 있게 바꾸고, 평판 시스템을 <strong>경기 후 칭찬</strong>으로 새로 만들었습니다.</p>
+<hr>
+<h2>랭킹</h2>
+<p class="pic" data-img="03-ranking.png">▶ 사진: 03-ranking.png (랭킹 화면)</p>
+<h3>1판만 해도 등록</h3>
+<p>지금까지는 내전을 <strong>10판</strong> 이상 해야 랭킹에 올라갔습니다. 대부분의 분들이 랭킹에 이름조차 없었기 때문에, 이제 <strong>내전 1판만 해도 등록</strong>됩니다.</p>
+<h3>점수 = 보정 승률</h3>
+<p>1판만 해도 등록되면 &quot;1승 0패 = 승률 100%&quot;인 사람이 맨 위로 올라가는 문제가 생깁니다. 그래서 순위는 단순 승률이 아니라 <strong>보정 승률 점수</strong>로 매깁니다.</p>
+<blockquote><p>모든 사람에게 <strong>5판 분량의 50% 승률</strong>을 미리 깔고 계산합니다.</p><p>점수 = (승 + 2.5) ÷ (판수 + 5) × 100</p></blockquote>
+<p>예를 들면 이렇습니다.</p>
+<ul><li><p><strong>1승 0패</strong> — 100% · 58.3</p></li><li><p><strong>3승 0패</strong> — 100% · 68.8</p></li><li><p><strong>10승 5패</strong> — 66.7% · 62.5</p></li><li><p><strong>20승 10패</strong> — 66.7% · 64.3</p></li></ul>
+<p>몇 판 안 하고 전승한 사람보다, <strong>많이 뛰고 많이 이긴 사람</strong>이 위로 옵니다. 점수가 같으면 판수가 많은 사람이 앞섭니다.</p>
+<h3>라인별 랭킹</h3>
+<p><strong>종합 · 탑 · 정글 · 미드 · 원딜 · 서포터</strong> 탭이 생겼습니다. 라인 탭은 내전에서 <strong>그 라인으로 배정되어 뛴 경기</strong>만 모아 순위를 매깁니다. &quot;우리 서버 최고의 서포터&quot;를 찾을 수 있습니다.</p>
+<h3>표에 보이는 것</h3>
+<ul><li><p><strong>주력 챔피언</strong> 3명</p></li><li><p><strong>평균 KDA</strong> (상세 기록이 수집된 내전 기준)</p></li><li><p><strong>MVP 횟수</strong></p></li><li><p><strong>받은 칭찬</strong> 수</p></li><li><p>승률(승패)과 점수</p></li></ul>
+<h3>검색</h3>
+<p>랭킹 상단에서 <strong>닉네임이나 소환사명으로 검색</strong>할 수 있습니다. 배그 랭킹에도 닉네임 검색이 들어갔습니다.</p>
+<h3>그 밖에</h3>
+<ul><li><p>테스트 봇, 그리고 봇이 낀 판은 랭킹과 전적에서 제외됩니다.</p></li><li><p>랭킹에 오른 사람은 프로필에 <strong>순위 배지</strong>가 표시됩니다.</p></li></ul>
+<hr>
+<h2>칭찬 — 별점 평가를 대신합니다</h2>
+<p class="pic" data-img="03-commend.png">▶ 사진: 03-commend.png (경기 후 칭찬 창)</p>
+<p>기존의 별점 평가(실력·태도·소통)는 거의 쓰이지 않았고, 낮은 점수를 주는 것 자체가 부담이라는 의견이 많았습니다. 그래서 <strong>좋았던 사람만 골라 칭찬하는 방식</strong>으로 바꿨습니다.</p>
+<h3>이렇게 동작합니다</h3>
+<ol><li><p>내전이 끝나면 <strong>&quot;같이 뛴 사람 칭찬하기&quot;</strong> 창이 뜹니다.</p></li><li><p>먼저 <strong>우리 팀</strong>, 다음으로 <strong>상대 팀</strong>에서 좋았던 사람을 고릅니다. 한 경기에서 <strong>최대 3명</strong>까지 칭찬할 수 있습니다.</p></li><li><p>고른 사람에게 태그를 붙일 수 있습니다.</p></li></ol>
+<blockquote><p>매너 좋음 · 콜 잘함 · 캐리 · 팀워크 · 멘탈 강함</p></blockquote>
+<ol><li><p>칭찬할 사람이 없으면 <strong>건너뛰기</strong>를 누르면 됩니다.</p></li></ol>
+<ul><li><p>칭찬 창은 경기가 끝난 뒤 <strong>48시간</strong> 동안 열려 있습니다. 바로 못 했더라도 사이트에 다시 들어오면 뜹니다.</p></li><li><p>같은 사람을 한 경기에서 두 번 칭찬할 수 없고, 그 경기에 같이 뛴 사람만 칭찬할 수 있습니다.</p></li><li><p>칭찬은 좋은 것만 남깁니다. <strong>불편한 일이 있었다면 프로필에서 신고</strong>해 주세요.</p></li><li><p>칭찬을 받으면 메달 +1, 칭찬 창을 마치면 메달 +1을 받습니다.</p></li></ul>
+<h3>어디에 보이나요</h3>
+<p>받은 칭찬 수와 <strong>가장 많이 받은 태그</strong>가 프로필, 플레이어 호버 카드, 랭킹, 그리고 <strong>경매 매물 카드</strong>에 표시됩니다. 경매에서 &quot;이 사람은 콜을 잘한다&quot; 같은 정보를 볼 수 있게 됩니다.</p>
+<hr>
+<h2>MVP · ACE는 기록으로 자동 결정</h2>
+<p>MVP 투표를 없앴습니다. 투표 결과와 실제 기록이 엇갈리면 &quot;기록으론 저 사람이 MVP인데?&quot;라는 말만 나왔기 때문입니다.</p>
+<p>이제 <strong>Riot 기록이 수집된 판</strong>은 기록으로 MVP와 ACE를 정합니다.</p>
+<blockquote><p>점수 = 킬 × 3 + 어시스트 + 챔피언 피해량 ÷ 1000</p><p><strong>이긴 팀 1위 → MVP</strong>, <strong>진 팀 1위 → ACE</strong></p></blockquote>
+<p>Riot 기록이 없는 판(코드 없는 사설방 등)은 MVP 없이 둡니다. MVP는 메달 +5, ACE는 메달 +3을 받습니다.</p>
+<hr>
+<h2>마무리</h2>
+<p>랭킹은 &quot;오래, 많이 이긴 사람&quot;이, 평판은 &quot;같이 하고 싶은 사람&quot;이 드러나도록 바꿨습니다. 내전이 끝나면 고마웠던 한 명에게 칭찬 하나 눌러 주세요.</p>
+</div>
+<script>
+  // 사진 자리 옆에 그림을 배경으로 띄운다 — 배경이라 복사엔 실리지 않는다
+  document.querySelectorAll('.pic').forEach(function (el) {
+    el.style.backgroundImage = "url('../../images/2026-11-notices/" + el.dataset.img + "')";
+  });
+  // 선택 영역을 잡아 복사 — HTML 서식째 클립보드에 올라간다
+  function copyText(id) {
+    var el = document.getElementById(id);
+    var r = document.createRange(); r.selectNodeContents(el);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    var ok = document.execCommand('copy'); s.removeAllRanges();
+    document.getElementById('ok').textContent = ok ? (id === 'title' ? '제목 복사됨' : '본문 복사됨') : '복사 실패 — 직접 드래그해 주세요';
+  }
+</script>
+</body></html>

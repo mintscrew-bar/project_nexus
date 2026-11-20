@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>[업데이트] 로비 · 경매 · 대진표 화면 개편과 진행 편의 개선</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, "Malgun Gothic", sans-serif; max-width: 860px; margin: 24px auto; padding: 0 16px; line-height: 1.7; background: #fff; color: #111; }
+  @media (prefers-color-scheme: dark) { body { background: #161616; color: #eee; } .bar { background: #222 !important; } }
+  .bar { position: sticky; top: 0; background: #f3f3f3; padding: 12px; border-radius: 10px; margin-bottom: 20px; z-index: 1; }
+  .bar button { font-size: 15px; padding: 8px 14px; margin-right: 6px; border-radius: 8px; border: 0; background: #5b6cff; color: #fff; cursor: pointer; }
+  .bar small { display: block; margin-top: 8px; opacity: .75; }
+  .pic { padding: 10px 12px 10px 12px; border: 2px dashed #e0a800; border-radius: 8px; font-weight: 600;
+          min-height: 160px; background-repeat: no-repeat; background-size: auto 140px; background-position: right 10px center; }
+  blockquote { border-left: 3px solid #999; margin-left: 0; padding-left: 12px; opacity: .9; }
+  #ok { margin-left: 8px; color: #2a2; font-weight: 600; }
+</style></head><body>
+<div class="bar">
+  <button onclick="copyText('title')">제목 복사</button>
+  <button onclick="copyText('body')">본문 복사</button><span id="ok"></span>
+  <small>본문 복사 → 글쓰기 본문에 붙여 넣기 → 노란 「▶ 사진」 줄마다 그 자리에 사진을 끌어다 놓거나 사진 버튼으로 올린 뒤, 표시 줄은 지우세요.<br>
+  사진 폴더: <code>\\wsl.localhost\Ubuntu-24.04\home\haru\projects\nexus\docs\blog\images\2026-11-notices</code></small>
+</div>
+<h1 id="title">[업데이트] 로비 · 경매 · 대진표 화면 개편과 진행 편의 개선</h1>
+<div id="body">
+<p>내전을 진행하는 화면들을 전반적으로 다시 손봤습니다. 로비는 카드형으로, 경매는 FHD 한 화면에 들어오도록, 대진표는 &quot;지금 내 경기&quot;가 바로 보이도록 바꿨습니다.</p>
+<hr>
+<h2>로비</h2>
+<p class="pic" data-img="04-lobby-cards.png">▶ 사진: 04-lobby-cards.png (로비 참가자 카드)</p>
+<h3>초상화 카드 + 오른쪽 방 정보 칸</h3>
+<p>PC 로비가 <strong>참가자 초상화 카드</strong> 배치로 바뀌었습니다.</p>
+<ul><li><p>카드마다 <strong>원형 프로필 사진</strong>, 이름, 티어, 주·부 라인이 보이고, 아래 띠로 <strong>준비 완료 / 대기 중</strong>을 구분합니다.</p></li><li><p>메달 상점에서 산 <strong>카드 장식·아바타 장식</strong>이 카드에 그대로 보입니다.</p></li><li><p>방 정보와 버튼은 <strong>오른쪽 칸</strong>으로 모았습니다.</p></li><li><p><strong>준비</strong> 버튼은 상태에 따라 꽉 찬 색으로 바뀌고, <strong>나가기</strong> 버튼은 실수로 누르지 않게 눈에 띄는 위험 버튼 모양으로 통일했습니다.</p></li><li><p>참가자 이름에 마우스를 올리면 뜨는 <strong>호버 카드</strong>에도 꾸미기와 칭찬 정보가 보입니다.</p></li></ul>
+<h3>자동 밸런스 화면</h3>
+<p>자동 밸런스에서 유저 칸을 <strong>카드형</strong>으로 바꿨습니다. 사진, 라인별 티어, 선호 챔피언, 라인 선호 배지를 한 칸에서 볼 수 있습니다.</p>
+<blockquote><p>자동 밸런스 버튼이 &quot;서버에 연결되어 있지 않습니다&quot;로 실패하던 문제도 고쳤습니다.</p></blockquote>
+<h3>방장이 나가면 방 해산 (선택)</h3>
+<p>방 만들기와 방 설정에 <strong>&quot;방장 퇴장 시 해산&quot;</strong> 옵션이 생겼습니다. (기본은 꺼짐)</p>
+<ul><li><p>켜 두면 <strong>대기실 단계에서</strong> 방장이 나갔을 때 방을 넘기지 않고 해산합니다. 직접 나가기, 다른 방 입장, 연결이 끊긴 뒤 자동 퇴장 모두 해당합니다.</p></li><li><p>경기가 시작된 뒤에는 지금처럼 방장이 다른 사람에게 넘어갑니다.</p></li><li><p>남아 있던 참가자에게는 <strong>알림(🔔) + 안내 메시지</strong>가 뜨고 내전 목록으로 이동합니다.</p></li></ul>
+<h3>디스코드 음성 채널</h3>
+<ul><li><p><strong>대기실 음성 채널의 인원 제한을 없앴습니다.</strong></p></li><li><p><strong>팀 음성 채널 정원</strong>을 팀 인원 + 2자리로 늘렸습니다(롤 7자리, 배그 6자리). 관전자나 운영진이 팀 채널에 들어가 인터뷰할 수 있습니다.</p></li></ul>
+<h3>그 밖에</h3>
+<ul><li><p>방 인원 표시와 초대 가능 여부를 <strong>선수만</strong> 세도록 통일했습니다. 관전자 때문에 방이 꽉 찬 것처럼 보이던 문제가 사라졌습니다.</p></li><li><p>방장 본인이 막고 있을 때 DM 호출이 &quot;부를 사람 없음&quot;으로 뜨던 문제를 고쳤습니다.</p></li><li><p>방 만들기 창의 토글 칸에서 이름이 세로로 밀리던 문제를 고쳤습니다.</p></li></ul>
+<hr>
+<h2>경매</h2>
+<p class="pic" data-img="04-auction.png">▶ 사진: 04-auction.png (경매 화면)</p>
+<h3>FHD 한 화면에</h3>
+<p>1920×1080 모니터에서 매물 카드가 눌리고 팀 요약이 스크롤되던 문제를 정리했습니다. <strong>채팅은 오른쪽</strong>으로 옮겼습니다.</p>
+<h3>카운트다운은 매물 카드 맨 위에</h3>
+<p>남은 시간이 <strong>매물 카드 머리 띠</strong>에 큰 숫자와 <strong>줄어드는 막대</strong>로 표시됩니다. 입찰하면서도 시간이 한눈에 들어옵니다.</p>
+<h3>매물 카드에 내전 지표</h3>
+<p>매물 카드에 해당 선수의 <strong>내전 지표 여덟 칸</strong>이 들어갑니다.</p>
+<blockquote><p>내전 승률 · 칭찬 · 평균 KDA · 평균 킬관여 · 평균 피해량 · 평균 CS · 평균 시야 · 평균 골드</p></blockquote>
+<p>오른쪽 라인 줄마다 티어 옆에 <strong>라인별 밸런스 점수</strong>(자동 밸런스 기준)가 표시됩니다. &quot;이 사람이 어느 라인에서 가장 쓸 만한가&quot;를 바로 비교할 수 있습니다.</p>
+<hr>
+<h2>역할 선택</h2>
+<ul><li><p>역할 선택 <strong>제한 시간이 5분</strong>으로 바뀌었습니다.</p></li><li><p>팀장 버튼 문구를 <strong>「팀 역할 확정」</strong>으로 정리했습니다.</p></li></ul>
+<hr>
+<h2>대진표</h2>
+<p class="pic" data-img="04-bracket.png">▶ 사진: 04-bracket.png (대진표 화면)</p>
+<h3>새 대진표 화면</h3>
+<ul><li><p>상단 <strong>머리글</strong>에 대회 이름과 <strong>경기 진행률</strong>이 보입니다.</p></li><li><p>배경에 현재 단계(준결승·결승 등)가 크게 흐릅니다.</p></li><li><p>경기 카드를 <strong>타일형</strong>으로 바꿨습니다. 다전제면 <code>BO3</code> 표시, 세트 스코어, 몇 세트째인지가 함께 보입니다.</p></li><li><p>화면 아래 <strong>「내 경기」 바</strong>에서 지금 내 경기의 스코어를 보고 바로 <strong>경기 열기</strong>로 들어갈 수 있습니다.</p></li><li><p>경기가 끝나는 순간 승리 효과가 나옵니다.</p></li><li><p><strong>간략히 / 자세히</strong> 보기와 확대·축소·맞춤을 고를 수 있습니다.</p></li></ul>
+<h3>내전 종료는 &quot;길게 눌러서&quot;</h3>
+<p>내전 종료 버튼이 처음부터 잘 보이는 빨간 버튼으로 바뀌었고, <strong>길게 눌러야 실행</strong>됩니다. 확인 창 없이도 실수로 끝나지 않습니다. 대진표뿐 아니라 경매·스네이크 드래프트·역할 선택 화면의 내전 종료도 같은 방식입니다.</p>
+<blockquote><p>상대가 아직 정해지지 않은 대진(TBD)에 우승 트로피가 뜨던 문제도 고쳤습니다.</p></blockquote>
+<hr>
+<h2>운영 공지 팝업</h2>
+<p>중요한 운영 공지는 이제 <strong>화면 가운데 팝업</strong>으로도 뜹니다.</p>
+<ul><li><p>알림(🔔)에도 함께 남습니다.</p></li><li><p>「확인」이나 「자세히 보기」를 누르면 다시 뜨지 않습니다. X로 닫으면 이번 접속에서만 숨깁니다.</p></li><li><p>경매·드래프트·라인 선택·로비·방송 화면에서는 진행을 방해하지 않도록 뜨지 않습니다.</p></li></ul>
+<hr>
+<h2>기타 수정</h2>
+<ul><li><p>로비·경매처럼 진행 중인 화면에서는 광고를 불러오지 않습니다.</p></li><li><p>모바일에서 메뉴로 이동한 페이지가 스크롤되지 않던 문제를 고쳤습니다.</p></li><li><p>전적 검색 자동완성이 잘리던 문제를 고쳤습니다.</p></li><li><p>링크를 공유할 때 미리보기 이미지가 빠지던 15개 페이지를 고쳤습니다.</p></li></ul>
+</div>
+<script>
+  // 사진 자리 옆에 그림을 배경으로 띄운다 — 배경이라 복사엔 실리지 않는다
+  document.querySelectorAll('.pic').forEach(function (el) {
+    el.style.backgroundImage = "url('../../images/2026-11-notices/" + el.dataset.img + "')";
+  });
+  // 선택 영역을 잡아 복사 — HTML 서식째 클립보드에 올라간다
+  function copyText(id) {
+    var el = document.getElementById(id);
+    var r = document.createRange(); r.selectNodeContents(el);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    var ok = document.execCommand('copy'); s.removeAllRanges();
+    document.getElementById('ok').textContent = ok ? (id === 'title' ? '제목 복사됨' : '본문 복사됨') : '복사 실패 — 직접 드래그해 주세요';
+  }
+</script>
+</body></html>
