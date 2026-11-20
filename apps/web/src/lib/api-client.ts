@@ -2692,6 +2692,26 @@ export interface AdminMedalUser {
 }
 
 /** 관리자 메달 운영 — 원장 조회·사용자 상세·지급/회수·환불 (ADMIN, Task 17) */
+/** 일괄 보상 지급 설정 — 받는 양 = base + perMatch × min(완주 경기 수, matchCap) */
+export interface MedalCampaignInput {
+  key: string;
+  title: string;
+  base: number;
+  perMatch: number;
+  matchCap: number;
+  notify: boolean;
+}
+
+export interface MedalCampaignPreview {
+  users: number;
+  activeUsers: number;
+  total: number;
+  min: number;
+  max: number;
+  alreadyGranted: number;
+  top: { username: string; matches: number; amount: number }[];
+}
+
 export const adminMedalApi = {
   ledger: async (params: {
     userId?: string;
@@ -2721,6 +2741,26 @@ export const adminMedalApi = {
     const response = await apiClient.post("/medals/admin/refund", body);
     return response.data as { balance: number; refunded: number };
   },
+  /** 일괄 보상 지급 미리보기 — 쓰지 않는다 */
+  campaignPreview: async (
+    body: MedalCampaignInput,
+  ): Promise<MedalCampaignPreview> =>
+    (await apiClient.post("/medals/admin/campaign/preview", body)).data,
+  /** 일괄 보상 지급 — 같은 이름표로 다시 눌러도 이미 받은 사람은 건너뛴다 */
+  campaignRun: async (
+    body: MedalCampaignInput,
+  ): Promise<{
+    granted: number;
+    skipped: number;
+    failed: number;
+    total: number;
+  }> =>
+    (
+      await apiClient.post("/medals/admin/campaign", body, {
+        // 가입자 수백 명을 한 줄씩 기록한다 — 기본 시간 제한보다 넉넉히
+        timeout: 300_000,
+      })
+    ).data,
 };
 
 export const notificationApi = {

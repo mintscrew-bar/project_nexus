@@ -19,12 +19,14 @@ import { MedalService } from "./medal.service";
 import {
   AdjustMedalDto,
   AdminLedgerQueryDto,
+  MedalCampaignDto,
   RefundCosmeticDto,
   RetroMedalDto,
   VoidMatchMedalDto,
 } from "./dto/adjust-medal.dto";
 import { ShopService } from "./shop.service";
 import { AttendanceService } from "./attendance.service";
+import { MedalCampaignService } from "./medal-campaign.service";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   CAPPED_REASONS,
@@ -41,6 +43,7 @@ export class MedalController {
     private readonly shopService: ShopService,
     private readonly prisma: PrismaService,
     private readonly attendance: AttendanceService,
+    private readonly campaigns: MedalCampaignService,
   ) {}
 
   /** 내 출석 현황 — 오늘 했는지, 연속 일수, 이번 달 출석한 날 */
@@ -101,6 +104,32 @@ export class MedalController {
     @Body() dto: AdjustMedalDto,
   ) {
     return this.medalService.adminAdjust({ adminId, ...dto });
+  }
+
+  /**
+   * 일괄 지급 미리보기 — 쓰지 않고 몇 명·총 얼마·상위 받는 사람·이미 받은 수를 돌려준다.
+   */
+  @Post("admin/campaign/preview")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  campaignPreview(@Body() dto: MedalCampaignDto) {
+    return this.campaigns.preview(dto);
+  }
+
+  /**
+   * 일괄 지급 — 가입자 전체에게 기본 + 완주 경기 수 비례 메달. 같은 이름표로 다시 눌러도
+   * 이미 받은 사람은 건너뛴다(원장 키).
+   */
+  @Post("admin/campaign")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  campaignRun(
+    @CurrentUser("sub") adminId: string,
+    @Body() dto: MedalCampaignDto,
+  ) {
+    return this.campaigns.run(adminId, dto);
   }
 
   /**

@@ -101,3 +101,41 @@ export class AdminLedgerQueryDto {
   @IsString()
   limit?: string;
 }
+
+/**
+ * POST medals/admin/campaign(/preview) (ADMIN) — 가입자 전체 일괄 지급.
+ * 받는 양 = base + perMatch × min(완주 경기 수, matchCap). 서비스가 범위를 다시 검사한다.
+ */
+export class MedalCampaignDto {
+  @IsString()
+  @IsNotEmpty({ message: "이름표를 적어주세요." })
+  @MaxLength(40)
+  key!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: "받는 사람에게 보일 제목을 적어주세요." })
+  @MaxLength(60)
+  title!: string;
+
+  @KeepRaw()
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  base!: number;
+
+  @KeepRaw()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  perMatch!: number;
+
+  @KeepRaw()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  matchCap!: number;
+
+  @KeepRaw()
+  @IsBoolean()
+  notify!: boolean;
+}

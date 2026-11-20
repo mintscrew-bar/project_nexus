@@ -8,6 +8,7 @@ import { AttendanceService } from "./attendance.service";
 import { ShopCatalogService } from "./shop-catalog.service";
 import { ShopAdminService } from "./shop-admin.service";
 import { ShopAdminController } from "./shop-admin.controller";
+import { MedalCampaignService } from "./medal-campaign.service";
 import { UploadModule } from "../upload/upload.module";
 
 /**
@@ -25,6 +26,7 @@ import { UploadModule } from "../upload/upload.module";
     AttendanceService,
     ShopCatalogService,
     ShopAdminService,
+    MedalCampaignService,
   ],
   exports: [MedalService, ShopService, MatchMedalService],
 })

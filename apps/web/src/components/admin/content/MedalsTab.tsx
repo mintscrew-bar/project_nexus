@@ -29,6 +29,7 @@ import { cn, getApiErrorMessage } from "@/lib/utils";
 import { REASON_LABEL } from "@/components/cosmetics/MedalChip";
 import { SLOT_LABEL, findCosmetic } from "@/components/cosmetics/catalog";
 import { useConfirm } from "../ConfirmDialog";
+import { MedalCampaignPanel } from "./MedalCampaignPanel";
 import type { AddToast } from "../shared";
 
 const AVATAR_FALLBACK = "/images/placeholders/non-avatar-256.png";
@@ -144,8 +145,11 @@ export function MedalsTab({ addToast }: { addToast: AddToast }) {
   const loadError = ledger.error ?? detailQuery.error;
 
   // 지급·회수·환불 뒤 — 이 탭의 조회(사람 상세·원장)를 전부 새로 읽는다
-  const refreshAll = () =>
+  const refreshAll = () => {
     void queryClient.invalidateQueries({ queryKey: ["admin-medal"] });
+    // 나 자신에게 줬을 때 헤더 메달 칩도 바로(남에게 준 건 소켓 알림으로 그 사람 화면이 바뀐다)
+    void queryClient.invalidateQueries({ queryKey: ["medals"] });
+  };
 
   /* ── 지급·회수 ── */
   const [amount, setAmount] = useState("");
@@ -276,6 +280,9 @@ export function MedalsTab({ addToast }: { addToast: AddToast }) {
           남습니다.
         </p>
       </div>
+
+      {/* 가입자 전체 일괄 보상 */}
+      <MedalCampaignPanel addToast={addToast} confirm={confirm} />
 
       {/* 사용자 고르기 */}
       <Card>
