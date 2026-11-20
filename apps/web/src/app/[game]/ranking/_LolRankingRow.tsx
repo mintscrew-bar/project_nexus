@@ -16,6 +16,13 @@ import {
 import { cn } from "@/lib/utils";
 import { UserName } from "@/components/cosmetics/UserName";
 import { UserAvatarDecoration } from "@/components/cosmetics/UserAvatarDecoration";
+import { useCosmeticLoadouts } from "@/components/cosmetics/useCosmeticLoadouts";
+import {
+  findCosmetic,
+  useCosmeticCatalog,
+} from "@/components/cosmetics/catalog";
+import { LiveBanner } from "@/components/cosmetics/live-banner";
+import { CosmeticEffect } from "@/components/cosmetics/effects";
 
 /** API(GET /ranking/global) 한 행. 종합·라인별이 같은 모양이다. */
 export interface LolRankingEntry {
@@ -358,7 +365,10 @@ const PODIUM_STYLE: Record<
   },
 };
 
-/** 시상대 카드 한 장 — 1위는 크게(아바타·점수) */
+/**
+ * 시상대 카드 한 장 — 1위는 크게(아바타·점수).
+ * 상점에서 산 카드 장식을 장착했으면 카드 바탕에 깔고, 닉네임 글꼴·아바타 장식도 입힌다.
+ */
 function PodiumCard({
   entry,
   href,
@@ -375,103 +385,123 @@ function PodiumCard({
   // 좁은 화면은 작게 — 세 칸이 한 줄에 들어가게
   const isNarrow = useIsNarrow();
   const avatar = isNarrow ? (first ? 52 : 42) : first ? 76 : 60;
+  // 장착한 카드 장식 — 영상 배경(cardVideo)이나 움직이는 효과(effect)를 카드 바탕에 깐다
+  useCosmeticCatalog();
+  const loadouts = useCosmeticLoadouts([entry.userId]);
+  const frame = findCosmetic(loadouts[entry.userId]?.CARD_FRAME);
+  const decorated = Boolean(frame?.cardVideo || frame?.effect);
   return (
     <Link
       id={`rank-row-${entry.userId}`}
       href={href}
       className={cn(
-        "group flex scroll-mt-24 flex-col items-center rounded-xl border px-2 text-center transition-colors hover:brightness-110 sm:px-4",
+        "group relative flex scroll-mt-24 flex-col items-center overflow-hidden rounded-xl border px-2 text-center transition-colors hover:brightness-110 sm:px-4",
         s.card,
         first
           ? "pb-4 pt-4 sm:pb-5 sm:pt-7"
           : "mt-4 pb-3 pt-3 sm:mt-6 sm:pb-4 sm:pt-5",
       )}
     >
-      <span
-        className={cn(
-          "mb-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-black sm:mb-3 sm:px-2.5 sm:text-xs",
-          s.chip,
-        )}
-      >
-        {first ? (
-          <Crown className="h-3.5 w-3.5" />
-        ) : (
-          <Medal className="h-3.5 w-3.5" />
-        )}
-        {s.label}
-        {mine && <span className="ml-0.5 opacity-80">· 나</span>}
-      </span>
-
-      {/* 아바타 — 장착한 아바타 장식까지 */}
-      <UserAvatarDecoration userId={entry.userId} size={avatar}>
-        <Avatar entry={entry} size={avatar} />
-      </UserAvatarDecoration>
-
-      <p
-        className={cn(
-          "mt-2 max-w-full truncate font-bold text-text-primary sm:mt-3",
-          first ? "text-sm sm:text-lg" : "text-sm sm:text-base",
-        )}
-      >
-        <UserName userId={entry.userId}>{entry.user.username}</UserName>
-      </p>
-      <RiotLine
-        entry={entry}
-        className="hidden max-w-full justify-center sm:flex"
-      />
-
-      <p
-        className={cn(
-          "mt-2 font-black leading-none tabular-nums sm:mt-3",
-          s.text,
-          first ? "text-2xl sm:text-4xl" : "text-xl sm:text-3xl",
-        )}
-      >
-        {entry.score.toFixed(1)}
-      </p>
-      <p className="mt-1 text-[11px] text-text-tertiary">점수</p>
-
-      {/* 좁은 화면은 승률만 */}
-      <p
-        className={cn(
-          "mt-1.5 text-[11px] font-bold tabular-nums sm:hidden",
-          winRateColor(entry.winRate),
-        )}
-      >
-        {entry.winRate.toFixed(1)}%
-      </p>
-      <div className="mt-3 hidden flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs sm:flex">
+      {decorated && frame && (
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          {frame.cardVideo && <LiveBanner code={frame.cardVideo} />}
+          {frame.effect && (
+            <CosmeticEffect code={frame.effect} px={isNarrow ? 1.5 : 2.5} />
+          )}
+          {/* 글자가 읽히게 아래쪽을 어둡게 — 「장식 숨기기」 설정이면 같이 빠진다 */}
+          <div className="cfx-deco absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/20" />
+        </div>
+      )}
+      <div className="relative z-10 flex w-full flex-col items-center">
         <span
-          className={cn("font-bold tabular-nums", winRateColor(entry.winRate))}
+          className={cn(
+            "mb-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-black sm:mb-3 sm:px-2.5 sm:text-xs",
+            s.chip,
+          )}
+        >
+          {first ? (
+            <Crown className="h-3.5 w-3.5" />
+          ) : (
+            <Medal className="h-3.5 w-3.5" />
+          )}
+          {s.label}
+          {mine && <span className="ml-0.5 opacity-80">· 나</span>}
+        </span>
+
+        {/* 아바타 — 장착한 아바타 장식까지 */}
+        <UserAvatarDecoration userId={entry.userId} size={avatar}>
+          <Avatar entry={entry} size={avatar} />
+        </UserAvatarDecoration>
+
+        <p
+          className={cn(
+            "mt-2 max-w-full truncate font-bold text-text-primary sm:mt-3",
+            first ? "text-sm sm:text-lg" : "text-sm sm:text-base",
+          )}
+        >
+          <UserName userId={entry.userId}>{entry.user.username}</UserName>
+        </p>
+        <RiotLine
+          entry={entry}
+          className="hidden max-w-full justify-center sm:flex"
+        />
+
+        <p
+          className={cn(
+            "mt-2 font-black leading-none tabular-nums sm:mt-3",
+            s.text,
+            first ? "text-2xl sm:text-4xl" : "text-xl sm:text-3xl",
+          )}
+        >
+          {entry.score.toFixed(1)}
+        </p>
+        <p className="mt-1 text-[11px] text-text-tertiary">점수</p>
+
+        {/* 좁은 화면은 승률만 */}
+        <p
+          className={cn(
+            "mt-1.5 text-[11px] font-bold tabular-nums sm:hidden",
+            winRateColor(entry.winRate),
+          )}
         >
           {entry.winRate.toFixed(1)}%
-        </span>
-        <span className="tabular-nums text-text-tertiary">
-          {entry.wins}승 {entry.losses}패
-        </span>
-        {stats?.kda != null && stats.statGames > 0 && (
-          <span className="tabular-nums text-text-secondary">
-            KDA {stats.kda.toFixed(2)}
+        </p>
+        <div className="mt-3 hidden flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs sm:flex">
+          <span
+            className={cn(
+              "font-bold tabular-nums",
+              winRateColor(entry.winRate),
+            )}
+          >
+            {entry.winRate.toFixed(1)}%
           </span>
-        )}
-        {stats?.mvpCount ? (
-          <span className="inline-flex items-center gap-0.5 font-semibold text-accent-gold">
-            <Star className="h-3 w-3" />
-            {stats.mvpCount}
+          <span className="tabular-nums text-text-tertiary">
+            {entry.wins}승 {entry.losses}패
           </span>
-        ) : null}
-        {stats?.commendations.total ? (
-          <span className="inline-flex items-center gap-0.5 text-text-secondary">
-            <ThumbsUp className="h-3 w-3 text-accent-primary" />
-            {stats.commendations.total}
-          </span>
+          {stats?.kda != null && stats.statGames > 0 && (
+            <span className="tabular-nums text-text-secondary">
+              KDA {stats.kda.toFixed(2)}
+            </span>
+          )}
+          {stats?.mvpCount ? (
+            <span className="inline-flex items-center gap-0.5 font-semibold text-accent-gold">
+              <Star className="h-3 w-3" />
+              {stats.mvpCount}
+            </span>
+          ) : null}
+          {stats?.commendations.total ? (
+            <span className="inline-flex items-center gap-0.5 text-text-secondary">
+              <ThumbsUp className="h-3 w-3 text-accent-primary" />
+              {stats.commendations.total}
+            </span>
+          ) : null}
+        </div>
+        {stats?.topChampions.length ? (
+          <div className="mt-3 hidden sm:block">
+            <Champions list={stats.topChampions} size={first ? 28 : 24} />
+          </div>
         ) : null}
       </div>
-      {stats?.topChampions.length ? (
-        <div className="mt-3 hidden sm:block">
-          <Champions list={stats.topChampions} size={first ? 28 : 24} />
-        </div>
-      ) : null}
     </Link>
   );
 }
