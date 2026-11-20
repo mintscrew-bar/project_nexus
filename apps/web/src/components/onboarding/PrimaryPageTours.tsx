@@ -59,9 +59,9 @@ const RANKING_STEPS: GuidedTourStep[] = [
   {
     selector: '[data-tour="ranking-tabs"]',
     eyebrow: "랭킹 가이드",
-    title: "개인 랭킹과 클랜 랭킹을 구분해 보세요",
+    title: "종합과 라인별 순위를 골라 보세요",
     description:
-      "글로벌 탭은 내전 기록이 10경기 이상인 참가자를 기준으로 집계하며, 클랜 탭에서는 클랜 경쟁으로 이동할 수 있습니다.",
+      "종합은 내전을 한 판만 해도 올라가고, 라인 탭은 그 라인으로 뛴 경기만 따로 줄 세웁니다. 오른쪽에서 내 순위와 점수 계산법을 볼 수 있어요.",
   },
   {
     selector: '[data-tour="ranking-results"]',
