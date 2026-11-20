@@ -23,7 +23,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/auth-store";
 import { shopApi, type ShopItemState } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { NameHuePicker } from "@/components/cosmetics/NameHuePicker";
+import { NameTintPicker } from "@/components/cosmetics/NameTintPicker";
 import { CosmeticPreview } from "@/components/cosmetics/CosmeticPreview";
 import {
   LiveBanner,
@@ -468,7 +468,7 @@ export default function ShopPage() {
                         username={me.username}
                         avatar={avatarSrc}
                         // 가진 닉네임 글꼴은 내가 고른 색으로
-                        hue={stateByCode.get(item.code)?.hue}
+                        tint={stateByCode.get(item.code)?.tint}
                         // 카드 장식은 세로로 긴 로비 카드가 다 들어가게 조금 더 높게
                         height={item.slot === "CARD_FRAME" ? 236 : 200}
                       />
@@ -557,7 +557,7 @@ export default function ShopPage() {
                   frameCode={shownCard}
                   avatarFrameCode={shownAvatar}
                   nameStyleCode={shownName ?? null}
-                  nameHue={shownName ? stateByCode.get(shownName)?.hue : null}
+                  nameTint={shownName ? stateByCode.get(shownName)?.tint : null}
                 />
               </div>
               <div className="flex flex-col items-center gap-3 pt-6">
@@ -578,7 +578,7 @@ export default function ShopPage() {
                 <div className="max-w-[120px] truncate text-base font-black text-text-primary">
                   <StyledName
                     code={shownNameStyle}
-                    hue={shownName ? stateByCode.get(shownName)?.hue : null}
+                    tint={shownName ? stateByCode.get(shownName)?.tint : null}
                   >
                     {me.username}
                   </StyledName>
@@ -634,9 +634,9 @@ export default function ShopPage() {
                     <p className="mb-2 text-xs font-semibold text-text-secondary">
                       닉네임 색
                     </p>
-                    <NameHuePicker
+                    <NameTintPicker
                       code={selected.code}
-                      hue={stateByCode.get(selected.code)?.hue}
+                      tint={stateByCode.get(selected.code)?.tint}
                       username={me.username}
                     />
                   </div>

@@ -138,8 +138,7 @@ export function createFakePrisma() {
           where.OR
             ? where.OR.some(
                 (o: any) => o.userId === c.userId && o.itemCode === c.itemCode,
-              ) &&
-              (where.hue?.not !== null || c.hue != null)
+              )
             : c.userId === where.userId,
         ),
       ),

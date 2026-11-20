@@ -9,7 +9,9 @@ import {
   MaxLength,
   Min,
   ValidateIf,
+  ValidateNested,
 } from "class-validator";
+import { Type } from "class-transformer";
 import { COSMETIC_SLOTS, type CosmeticSlot } from "@nexus/types";
 import { KeepRaw } from "../../../common/keep-raw.decorator";
 
@@ -46,16 +48,35 @@ export class EquipCosmeticDto {
   code!: string | null;
 }
 
-/** PUT shop/name-hue — 닉네임 글꼴 색(색상 회전 0~359도). null 이면 원래 색 */
-export class NameHueDto {
+/** 고른 색 세 값 — 서비스가 범위를 다시 검사한다 */
+export class NameTintValueDto {
+  @KeepRaw()
+  @IsInt()
+  @Min(0)
+  @Max(359)
+  hue!: number;
+
+  @KeepRaw()
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  saturation!: number;
+
+  @KeepRaw()
+  @IsInt()
+  @Min(50)
+  @Max(150)
+  brightness!: number;
+}
+
+/** PUT shop/name-tint — 닉네임 글꼴 색·채도·밝기. tint 가 null 이면 원래 색 */
+export class NameTintDto {
   @IsString()
   @MaxLength(64)
   code!: string;
 
-  @KeepRaw()
   @ValidateIf((_, v) => v !== null)
-  @IsInt()
-  @Min(0)
-  @Max(359)
-  hue!: number | null;
+  @ValidateNested()
+  @Type(() => NameTintValueDto)
+  tint!: NameTintValueDto | null;
 }

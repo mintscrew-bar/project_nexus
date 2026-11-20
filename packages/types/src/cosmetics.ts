@@ -229,11 +229,35 @@ export function findCosmeticShopItem(
 }
 
 /**
+ * 닉네임 글꼴에 산 사람이 고른 색 (2026-11-20).
+ * 원래 색에서 색상을 몇 도 돌리고(hue), 채도(saturation %)·밝기(brightness %)를 얼마로 할지.
+ */
+export interface NameTint {
+  /** 색상 회전 0~359도 (0 = 원래 색) */
+  hue: number;
+  /** 채도 % 0~200 (100 = 원래) */
+  saturation: number;
+  /** 밝기 % 50~150 (100 = 원래) */
+  brightness: number;
+}
+
+export const NAME_TINT_LIMITS = {
+  hue: [0, 359],
+  saturation: [0, 200],
+  brightness: [50, 150],
+} as const;
+
+/** 원래 색 그대로인가 */
+export function isDefaultNameTint(t: NameTint | null | undefined): boolean {
+  return !t || (t.hue === 0 && t.saturation === 100 && t.brightness === 100);
+}
+
+/**
  * 한 사람이 장착한 꾸미기 — 자리별 상품 코드.
- * `nameHue` 는 장착한 닉네임 글꼴에 그 사람이 고른 색(색상 회전 0~359도) — 안 골랐으면 없다.
+ * `nameTint` 는 장착한 닉네임 글꼴에 그 사람이 고른 색 — 안 골랐으면 없다.
  */
 export type CosmeticLoadout = Partial<Record<CosmeticSlot, string>> & {
-  nameHue?: number;
+  nameTint?: NameTint;
 };
 
 /**

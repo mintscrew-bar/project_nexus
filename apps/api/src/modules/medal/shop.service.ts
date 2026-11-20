@@ -7,12 +7,30 @@ import {
 import { MedalReason } from "@nexus/database";
 import {
   COSMETIC_SLOTS,
+  NAME_TINT_LIMITS,
+  isDefaultNameTint,
   type CosmeticLoadout,
+  type NameTint,
   type CosmeticSlot,
 } from "@nexus/types";
 import { PrismaService } from "../prisma/prisma.service";
 import { MedalService } from "./medal.service";
 import { ShopCatalogService } from "./shop-catalog.service";
+
+/** 저장된 세 값 → 고른 색. 아무것도 안 골랐으면 null (빈 값은 원래 값으로 채운다) */
+function toTint(row: {
+  hue: number | null;
+  saturation: number | null;
+  brightness: number | null;
+}): NameTint | null {
+  if (row.hue == null && row.saturation == null && row.brightness == null)
+    return null;
+  return {
+    hue: row.hue ?? 0,
+    saturation: row.saturation ?? 100,
+    brightness: row.brightness ?? 100,
+  };
+}
 
 /** 한 번에 장착 상태를 물어볼 수 있는 최대 인원 (로비 100인 방 기준) */
 const LOADOUT_LOOKUP_MAX = 100;
@@ -43,12 +61,17 @@ export class ShopService {
       this.medalService.getBalance(userId),
       this.prisma.userCosmetic.findMany({
         where: { userId },
-        select: { itemCode: true, hue: true },
+        select: {
+          itemCode: true,
+          hue: true,
+          saturation: true,
+          brightness: true,
+        },
       }),
       this.getLoadout(userId),
     ]);
     const ownedSet = new Set(owned.map((o) => o.itemCode));
-    const hueBy = new Map(owned.map((o) => [o.itemCode, o.hue]));
+    const tintBy = new Map(owned.map((o) => [o.itemCode, toTint(o)]));
     const equipped = new Set(Object.values(loadout));
     return {
       balance,
@@ -71,7 +94,7 @@ export class ShopService {
           owned: ownedSet.has(item.code),
           equipped: equipped.has(item.code),
           // 내가 고른 색(닉네임 글꼴) — 안 골랐으면 null
-          hue: hueBy.get(item.code) ?? null,
+          tint: tintBy.get(item.code) ?? null,
         })),
     };
   }
@@ -321,12 +344,18 @@ export class ShopService {
   }
 
   /**
-   * 닉네임 글꼴 색 고르기 (2026-11-20) — 가진 닉네임 글꼴에 색상 회전(0~359도)을 저장한다.
-   * null 이면 원래 색. 상품마다 따로 기억해서 글꼴을 바꿔 끼워도 고른 색이 남는다.
+   * 닉네임 글꼴 색 고르기 (2026-11-20) — 가진 닉네임 글꼴에 색(색상 회전)·채도·밝기를 저장한다.
+   * null 이거나 원래 값(0·100·100)이면 원래 색. 상품마다 따로 기억해서 글꼴을 바꿔 끼워도 남는다.
    */
-  async setNameHue(userId: string, code: string, hue: number | null) {
-    if (hue !== null && (!Number.isInteger(hue) || hue < 0 || hue > 359)) {
-      throw new BadRequestException("색은 0~359 사이로 골라 주세요.");
+  async setNameTint(userId: string, code: string, tint: NameTint | null) {
+    if (tint) {
+      for (const key of ["hue", "saturation", "brightness"] as const) {
+        const [min, max] = NAME_TINT_LIMITS[key];
+        const v = tint[key];
+        if (!Number.isInteger(v) || v < min || v > max) {
+          throw new BadRequestException("고른 색 값이 범위를 벗어났어요.");
+        }
+      }
     }
     const item = await this.catalog.find(code);
     if (!item) throw new NotFoundException("없는 상품이에요.");
@@ -338,12 +367,18 @@ export class ShopService {
       select: { id: true },
     });
     if (!owned) throw new BadRequestException("가지고 있지 않은 상품이에요.");
+    const plain = isDefaultNameTint(tint);
     await this.prisma.userCosmetic.update({
       where: { id: owned.id },
-      // 0도는 원래 색과 같으니 null 로 남긴다
-      data: { hue: hue || null },
+      data: plain
+        ? { hue: null, saturation: null, brightness: null }
+        : {
+            hue: tint!.hue,
+            saturation: tint!.saturation,
+            brightness: tint!.brightness,
+          },
     });
-    return { code, hue: hue || null };
+    return { code, tint: plain ? null : tint };
   }
 
   /** 한 사람의 장착 상태 */
@@ -375,15 +410,15 @@ export class ShopService {
     // 장착한 닉네임 글꼴에 고른 색이 있으면 함께 싣는다(로비·호버·프로필이 그대로 그린다)
     const named = rows.filter((r) => r.slot === "NAME_STYLE");
     if (named.length) {
-      const hues = await this.prisma.userCosmetic.findMany({
+      const owned = await this.prisma.userCosmetic.findMany({
         where: {
           OR: named.map((r) => ({ userId: r.userId, itemCode: r.itemCode })),
-          hue: { not: null },
         },
-        select: { userId: true, hue: true },
+        select: { userId: true, hue: true, saturation: true, brightness: true },
       });
-      for (const h of hues) {
-        if (h.hue != null && result[h.userId]) result[h.userId].nameHue = h.hue;
+      for (const o of owned) {
+        const tint = toTint(o);
+        if (tint && result[o.userId]) result[o.userId].nameTint = tint;
       }
     }
     return result;

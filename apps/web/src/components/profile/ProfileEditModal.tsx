@@ -27,7 +27,7 @@ import { shopApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { useCosmeticCatalog } from "@/components/cosmetics/catalog";
 import { LiveBanner } from "@/components/cosmetics/live-banner";
-import { NameHuePicker } from "@/components/cosmetics/NameHuePicker";
+import { NameTintPicker } from "@/components/cosmetics/NameTintPicker";
 import {
   LOADOUT_QUERY_KEY,
   useCosmeticLoadouts,
@@ -386,9 +386,9 @@ export function ProfileEditModal({
               <span className="mb-1.5 block text-xs font-semibold text-text-secondary">
                 닉네임 색
               </span>
-              <NameHuePicker
+              <NameTintPicker
                 code={equippedName.code}
-                hue={equippedName.hue}
+                tint={equippedName.tint}
                 username={username.trim() || user.username}
               />
             </div>

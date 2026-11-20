@@ -15,7 +15,7 @@ import { ShopService } from "./shop.service";
 import { ShopCatalogService } from "./shop-catalog.service";
 import {
   EquipCosmeticDto,
-  NameHueDto,
+  NameTintDto,
   PurchaseCosmeticDto,
 } from "./dto/shop.dto";
 
@@ -65,11 +65,11 @@ export class ShopController {
     return this.shopService.equip(userId, dto.slot, dto.code);
   }
 
-  /** 닉네임 글꼴 색 고르기 — hue 가 null 이면 원래 색 */
-  @Put("name-hue")
+  /** 닉네임 글꼴 색·채도·밝기 고르기 — tint 가 null 이면 원래 색 */
+  @Put("name-tint")
   @UseGuards(JwtAuthGuard)
-  setNameHue(@CurrentUser("sub") userId: string, @Body() dto: NameHueDto) {
-    return this.shopService.setNameHue(userId, dto.code, dto.hue);
+  setNameTint(@CurrentUser("sub") userId: string, @Body() dto: NameTintDto) {
+    return this.shopService.setNameTint(userId, dto.code, dto.tint);
   }
 
   /**

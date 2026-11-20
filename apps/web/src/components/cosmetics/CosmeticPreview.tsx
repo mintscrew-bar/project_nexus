@@ -6,6 +6,7 @@ import { AvatarDecoration } from "./avatar-effects";
 import { StyledName } from "./name-styles";
 import { LiveBanner } from "./live-banner";
 import type { CosmeticItem } from "./catalog";
+import type { NameTint } from "@nexus/types";
 
 const AVATAR_FALLBACK = "/images/placeholders/non-avatar-256.png";
 const noop = () => {};
@@ -33,11 +34,11 @@ export function CosmeticPreview({
   username,
   avatar,
   height = 216,
-  hue,
+  tint,
 }: {
   item: CosmeticItem;
   /** 닉네임 글꼴에 고른 색(가진 상품) */
-  hue?: number | null;
+  tint?: NameTint | null;
   username: string;
   avatar?: string | null;
   height?: number;
@@ -58,13 +59,13 @@ export function CosmeticPreview({
         style={{ height }}
       >
         <div className="max-w-full truncate text-2xl font-black text-text-primary">
-          <StyledName code={item.nameStyle} hue={hue}>
+          <StyledName code={item.nameStyle} tint={tint}>
             {username}
           </StyledName>
         </div>
         <div className="max-w-full truncate text-[13px] text-text-secondary">
           <span className="font-bold text-text-primary">
-            <StyledName code={item.nameStyle} hue={hue}>
+            <StyledName code={item.nameStyle} tint={tint}>
               {username}
             </StyledName>
           </span>

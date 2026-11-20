@@ -1,5 +1,6 @@
 "use client";
 
+import { isDefaultNameTint, type NameTint } from "@nexus/types";
 import { useEffect, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -107,20 +108,26 @@ export function isNameStyleTintable(code?: NameStyleCode | null): boolean {
 }
 
 /**
- * 고를 수 있는 색 — 원래 색에서 몇 도 돌릴지(색상 회전). 0 은 원래 색.
- * 미리 정한 칸 외에 슬라이더로 아무 값이나 고를 수도 있다.
+ * 미리 정한 색 칸 — 원래 색에서 몇 도 돌릴지(색상 회전). 0 은 원래 색.
+ * 칸 말고도 슬라이더로 색·채도·밝기를 아무 값이나 고를 수 있다.
  */
 export const NAME_HUE_PRESETS = [0, 30, 60, 120, 165, 200, 250, 300] as const;
 
+/** 고른 색 → CSS filter. 원래 색이면 null */
+export function nameTintFilter(t: NameTint | null | undefined): string | null {
+  if (isDefaultNameTint(t) || !t) return null;
+  return `hue-rotate(${t.hue}deg) saturate(${t.saturation}%) brightness(${t.brightness}%)`;
+}
+
 export function StyledName({
   code,
-  hue,
+  tint,
   className,
   children,
 }: {
   code?: NameStyleCode | null;
-  /** 산 사람이 고른 색(색상 회전 도) — 색을 고를 수 있는 글꼴에만 적용 */
-  hue?: number | null;
+  /** 산 사람이 고른 색·채도·밝기 — 색을 고를 수 있는 글꼴에만 적용 */
+  tint?: NameTint | null;
   className?: string;
   children: ReactNode;
 }) {
@@ -145,9 +152,10 @@ export function StyledName({
   );
   // 고른 색 — 바깥 껍데기에 색상 회전을 건다. 글꼴 자체의 filter(그림자)·애니메이션과
   // 겹치지 않게 따로 감싼다. 「장식 숨기기」 설정이면 globals.css 가 꺼 준다(.nfx-tint)
-  if (!hue || !def.tintable) return styled;
+  const filter = def.tintable ? nameTintFilter(tint) : null;
+  if (!filter) return styled;
   return (
-    <span className="nfx-tint" style={{ filter: `hue-rotate(${hue}deg)` }}>
+    <span className="nfx-tint" style={{ filter }}>
       {styled}
     </span>
   );

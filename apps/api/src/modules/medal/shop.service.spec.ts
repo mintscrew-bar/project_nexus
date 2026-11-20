@@ -156,34 +156,40 @@ describe("ShopService", () => {
     });
   });
 
-  describe("setNameHue (닉네임 색 고르기)", () => {
+  describe("setNameTint (닉네임 색·채도·밝기 고르기)", () => {
+    const tint = { hue: 200, saturation: 140, brightness: 80 };
+
     it("가진 닉네임 글꼴에 색을 저장하고 장착 정보에 실린다", async () => {
       db.setBalance("u1", 1000);
       await shop.purchase("u1", "NM_GOLD", true);
-      await shop.setNameHue("u1", "NM_GOLD", 200);
+      await shop.setNameTint("u1", "NM_GOLD", tint);
       expect(await shop.getLoadouts(["u1"])).toEqual({
-        u1: { NAME_STYLE: "NM_GOLD", nameHue: 200 },
+        u1: { NAME_STYLE: "NM_GOLD", nameTint: tint },
       });
       const view = await shop.getShop("u1");
-      expect(view.items.find((i) => i.code === "NM_GOLD")?.hue).toBe(200);
-      // null(또는 0)이면 원래 색
-      await shop.setNameHue("u1", "NM_GOLD", null);
+      expect(view.items.find((i) => i.code === "NM_GOLD")?.tint).toEqual(tint);
+      // 원래 값(0·100·100)이나 null 이면 원래 색
+      await shop.setNameTint("u1", "NM_GOLD", {
+        hue: 0,
+        saturation: 100,
+        brightness: 100,
+      });
       expect(await shop.getLoadouts(["u1"])).toEqual({
         u1: { NAME_STYLE: "NM_GOLD" },
       });
     });
 
-    it("가지지 않은 상품·닉네임 글꼴이 아닌 상품·범위 밖 색은 거절한다", async () => {
+    it("가지지 않은 상품·닉네임 글꼴이 아닌 상품·범위 밖 값은 거절한다", async () => {
       db.setBalance("u1", 1000);
       await shop.purchase("u1", "FX_SLIME");
       await expect(
-        shop.setNameHue("u1", "NM_GOLD", 100),
+        shop.setNameTint("u1", "NM_GOLD", tint),
       ).rejects.toBeInstanceOf(BadRequestException);
       await expect(
-        shop.setNameHue("u1", "FX_SLIME", 100),
+        shop.setNameTint("u1", "FX_SLIME", tint),
       ).rejects.toBeInstanceOf(BadRequestException);
       await expect(
-        shop.setNameHue("u1", "FX_SLIME", 400),
+        shop.setNameTint("u1", "FX_SLIME", { ...tint, brightness: 10 }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });

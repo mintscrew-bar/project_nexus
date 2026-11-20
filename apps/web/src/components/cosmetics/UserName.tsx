@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { NameTint } from "@nexus/types";
 import { findCosmetic, useCosmeticCatalog } from "./catalog";
 import { StyledName } from "./name-styles";
 import { useUserLoadout } from "./useCosmeticLoadouts";
@@ -16,7 +17,7 @@ import { useUserLoadout } from "./useCosmeticLoadouts";
 export function UserName({
   userId,
   styleCode,
-  hue,
+  tint,
   className,
   children,
 }: {
@@ -24,7 +25,7 @@ export function UserName({
   /** 이미 아는 NAME_STYLE 상품 코드 — 있으면 userId 로 묻지 않는다 */
   styleCode?: string | null;
   /** 이미 아는 닉네임 색(styleCode 와 함께 넘긴다) */
-  hue?: number | null;
+  tint?: NameTint | null;
   className?: string;
   children: ReactNode;
 }) {
@@ -32,12 +33,12 @@ export function UserName({
   useCosmeticCatalog();
   const loadout = useUserLoadout(styleCode === undefined ? userId : null);
   const code = styleCode === undefined ? loadout.NAME_STYLE : styleCode;
-  // 고른 색 — styleCode 를 넘겼으면 hue 도 넘긴 값, 아니면 장착 정보의 nameHue
-  const shownHue = styleCode === undefined ? loadout.nameHue : hue;
+  // 고른 색 — styleCode 를 넘겼으면 tint 도 넘긴 값, 아니면 장착 정보의 nameTint
+  const shownTint = styleCode === undefined ? loadout.nameTint : tint;
   return (
     <StyledName
       code={findCosmetic(code)?.nameStyle}
-      hue={shownHue}
+      tint={shownTint}
       className={className}
     >
       {children}

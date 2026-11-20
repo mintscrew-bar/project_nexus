@@ -6,6 +6,7 @@ import type {
   CosmeticMedia,
   CosmeticSlot,
   GameTitle,
+  NameTint,
   ShopCatalogEntry,
 } from "@nexus/types";
 
@@ -2451,7 +2452,7 @@ export interface ShopItemState {
   owned: boolean;
   equipped: boolean;
   /** 내가 고른 색(닉네임 글꼴, 색상 회전 도) — 안 골랐으면 null */
-  hue?: number | null;
+  tint?: NameTint | null;
 }
 
 /** 관리자 상점 관리 — 상품 한 줄(상품표 + 판매 현황) */
@@ -2560,9 +2561,9 @@ export const adminShopApi = {
   },
 };
 
-/** 장착 상태 — 자리별 코드 + 닉네임 글꼴에 고른 색(nameHue) */
+/** 장착 상태 — 자리별 코드 + 닉네임 글꼴에 고른 색(nameTint) */
 export type CosmeticLoadoutState = Partial<Record<CosmeticSlot, string>> & {
-  nameHue?: number;
+  nameTint?: NameTint;
 };
 
 /** 메달 상점 — 진열·구매·장착 */
@@ -2594,9 +2595,9 @@ export const shopApi = {
     return response.data;
   },
 
-  /** 닉네임 글꼴 색 고르기 — hue 가 null 이면 원래 색 */
-  setNameHue: async (code: string, hue: number | null) =>
-    (await apiClient.put("/shop/name-hue", { code, hue })).data,
+  /** 닉네임 글꼴 색·채도·밝기 고르기 — tint 가 null 이면 원래 색 */
+  setNameTint: async (code: string, tint: NameTint | null) =>
+    (await apiClient.put("/shop/name-tint", { code, tint })).data,
 
   /** 장착·해제 (code 가 null 이면 해제) */
   equip: async (
