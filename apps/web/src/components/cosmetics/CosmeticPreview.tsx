@@ -33,8 +33,11 @@ export function CosmeticPreview({
   username,
   avatar,
   height = 216,
+  hue,
 }: {
   item: CosmeticItem;
+  /** 닉네임 글꼴에 고른 색(가진 상품) */
+  hue?: number | null;
   username: string;
   avatar?: string | null;
   height?: number;
@@ -55,11 +58,15 @@ export function CosmeticPreview({
         style={{ height }}
       >
         <div className="max-w-full truncate text-2xl font-black text-text-primary">
-          <StyledName code={item.nameStyle}>{username}</StyledName>
+          <StyledName code={item.nameStyle} hue={hue}>
+            {username}
+          </StyledName>
         </div>
         <div className="max-w-full truncate text-[13px] text-text-secondary">
           <span className="font-bold text-text-primary">
-            <StyledName code={item.nameStyle}>{username}</StyledName>
+            <StyledName code={item.nameStyle} hue={hue}>
+              {username}
+            </StyledName>
           </span>
           : 다음 판 미드 갑니다
         </div>

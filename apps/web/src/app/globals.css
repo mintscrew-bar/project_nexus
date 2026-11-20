@@ -1646,6 +1646,9 @@ html.cfx-off .cfx-deco,
 html.cfx-off .cfx-layer {
   display: none !important;
 }
+html.cfx-off .nfx-tint {
+  filter: none !important;
+}
 html.cfx-off .nfx-root {
   font-family: inherit !important;
   font-size: inherit !important;

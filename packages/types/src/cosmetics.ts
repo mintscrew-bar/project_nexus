@@ -228,8 +228,13 @@ export function findCosmeticShopItem(
   return COSMETIC_SHOP_ITEMS.find((item) => item.code === code);
 }
 
-/** 한 사람이 장착한 꾸미기 — 자리별 상품 코드 */
-export type CosmeticLoadout = Partial<Record<CosmeticSlot, string>>;
+/**
+ * 한 사람이 장착한 꾸미기 — 자리별 상품 코드.
+ * `nameHue` 는 장착한 닉네임 글꼴에 그 사람이 고른 색(색상 회전 0~359도) — 안 골랐으면 없다.
+ */
+export type CosmeticLoadout = Partial<Record<CosmeticSlot, string>> & {
+  nameHue?: number;
+};
 
 /**
  * 관리자가 올린 상품 파일 (상점 관리 2단계).

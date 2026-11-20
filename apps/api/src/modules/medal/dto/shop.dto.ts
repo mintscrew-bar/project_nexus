@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   ValidateIf,
@@ -43,4 +44,18 @@ export class EquipCosmeticDto {
   @IsString()
   @MaxLength(64)
   code!: string | null;
+}
+
+/** PUT shop/name-hue — 닉네임 글꼴 색(색상 회전 0~359도). null 이면 원래 색 */
+export class NameHueDto {
+  @IsString()
+  @MaxLength(64)
+  code!: string;
+
+  @KeepRaw()
+  @ValidateIf((_, v) => v !== null)
+  @IsInt()
+  @Min(0)
+  @Max(359)
+  hue!: number | null;
 }

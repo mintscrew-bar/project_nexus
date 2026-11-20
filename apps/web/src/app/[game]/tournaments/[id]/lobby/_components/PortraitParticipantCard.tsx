@@ -113,6 +113,7 @@ export function PortraitParticipantCard({
   frameCode,
   avatarFrameCode,
   nameStyleCode,
+  nameHue,
 }: {
   p: any;
   size: PortraitCardSize;
@@ -134,6 +135,8 @@ export function PortraitParticipantCard({
   avatarFrameCode?: string | null;
   /** 장착한 닉네임 글꼴 상품 코드 (NAME_STYLE) */
   nameStyleCode?: string | null;
+  /** 닉네임 글꼴에 고른 색(색상 회전 도) */
+  nameHue?: number | null;
 }) {
   // 관리자가 추가한 상품의 그림 정의가 들어오면 다시 그린다
   useCosmeticCatalog();
@@ -225,7 +228,9 @@ export function PortraitParticipantCard({
         )}
       >
         {/* 장착한 닉네임 글꼴 — 로비 목록이 모아 읽은 코드를 받는다 */}
-        <UserName styleCode={nameStyleCode ?? null}>{displayName}</UserName>
+        <UserName styleCode={nameStyleCode ?? null} hue={nameHue}>
+          {displayName}
+        </UserName>
       </span>
       {isSelf && (
         <span className="flex-shrink-0 text-[10px] font-bold text-accent-primary">
@@ -264,7 +269,7 @@ export function PortraitParticipantCard({
               <Crown className="h-3 w-3 flex-shrink-0 text-accent-gold" />
             )}
             <span className="truncate text-xs font-bold text-text-primary">
-              <UserName styleCode={nameStyleCode ?? null}>
+              <UserName styleCode={nameStyleCode ?? null} hue={nameHue}>
                 {displayName}
               </UserName>
             </span>

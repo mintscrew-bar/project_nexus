@@ -27,6 +27,7 @@ import { shopApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { useCosmeticCatalog } from "@/components/cosmetics/catalog";
 import { LiveBanner } from "@/components/cosmetics/live-banner";
+import { NameHuePicker } from "@/components/cosmetics/NameHuePicker";
 import {
   LOADOUT_QUERY_KEY,
   useCosmeticLoadouts,
@@ -67,6 +68,10 @@ export function ProfileEditModal({
   });
   // 코드 상품 + 관리자가 추가한 상품
   const allCosmetics = useCosmeticCatalog();
+  // 장착한 닉네임 글꼴 — 있으면 아래에서 색을 바꿀 수 있다
+  const equippedName = shop?.items.find(
+    (it) => it.slot === "NAME_STYLE" && it.equipped,
+  );
   const ownedBanners = allCosmetics.filter(
     (item) =>
       item.slot === "PROFILE_BANNER" &&
@@ -375,6 +380,19 @@ export function ProfileEditModal({
               className="w-full rounded-lg border border-bg-elevated bg-bg-tertiary px-3 py-2 text-sm text-text-primary outline-none focus:border-accent-primary"
             />
           </label>
+          {/* 닉네임 색 — 장착한 닉네임 글꼴의 색을 언제든 바꾼다(바로 적용, 저장 버튼과 따로) */}
+          {equippedName && user && (
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold text-text-secondary">
+                닉네임 색
+              </span>
+              <NameHuePicker
+                code={equippedName.code}
+                hue={equippedName.hue}
+                username={username.trim() || user.username}
+              />
+            </div>
+          )}
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-text-secondary">
               소개

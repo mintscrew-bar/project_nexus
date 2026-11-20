@@ -134,8 +134,21 @@ export function createFakePrisma() {
           ) ?? null,
       ),
       findMany: jest.fn(async ({ where }: any) =>
-        cosmetics.filter((c) => c.userId === where.userId),
+        cosmetics.filter((c) =>
+          where.OR
+            ? where.OR.some(
+                (o: any) => o.userId === c.userId && o.itemCode === c.itemCode,
+              ) &&
+              (where.hue?.not !== null || c.hue != null)
+            : c.userId === where.userId,
+        ),
       ),
+      update: jest.fn(async ({ where, data }: any) => {
+        const row = cosmetics.find((c) => c.id === where.id);
+        if (!row) throw new Error("not found");
+        Object.assign(row, data);
+        return row;
+      }),
       delete: jest.fn(async ({ where }: any) => {
         const row = cosmetics.find((c) => c.id === where.id);
         cosmetics = cosmetics.filter((c) => c.id !== where.id);

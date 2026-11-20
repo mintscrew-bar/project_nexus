@@ -13,7 +13,11 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { ShopService } from "./shop.service";
 import { ShopCatalogService } from "./shop-catalog.service";
-import { EquipCosmeticDto, PurchaseCosmeticDto } from "./dto/shop.dto";
+import {
+  EquipCosmeticDto,
+  NameHueDto,
+  PurchaseCosmeticDto,
+} from "./dto/shop.dto";
 
 @Controller("shop")
 export class ShopController {
@@ -59,6 +63,13 @@ export class ShopController {
   @UseGuards(JwtAuthGuard)
   equip(@CurrentUser("sub") userId: string, @Body() dto: EquipCosmeticDto) {
     return this.shopService.equip(userId, dto.slot, dto.code);
+  }
+
+  /** 닉네임 글꼴 색 고르기 — hue 가 null 이면 원래 색 */
+  @Put("name-hue")
+  @UseGuards(JwtAuthGuard)
+  setNameHue(@CurrentUser("sub") userId: string, @Body() dto: NameHueDto) {
+    return this.shopService.setNameHue(userId, dto.code, dto.hue);
   }
 
   /**

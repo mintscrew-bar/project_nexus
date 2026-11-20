@@ -156,6 +156,38 @@ describe("ShopService", () => {
     });
   });
 
+  describe("setNameHue (닉네임 색 고르기)", () => {
+    it("가진 닉네임 글꼴에 색을 저장하고 장착 정보에 실린다", async () => {
+      db.setBalance("u1", 1000);
+      await shop.purchase("u1", "NM_GOLD", true);
+      await shop.setNameHue("u1", "NM_GOLD", 200);
+      expect(await shop.getLoadouts(["u1"])).toEqual({
+        u1: { NAME_STYLE: "NM_GOLD", nameHue: 200 },
+      });
+      const view = await shop.getShop("u1");
+      expect(view.items.find((i) => i.code === "NM_GOLD")?.hue).toBe(200);
+      // null(또는 0)이면 원래 색
+      await shop.setNameHue("u1", "NM_GOLD", null);
+      expect(await shop.getLoadouts(["u1"])).toEqual({
+        u1: { NAME_STYLE: "NM_GOLD" },
+      });
+    });
+
+    it("가지지 않은 상품·닉네임 글꼴이 아닌 상품·범위 밖 색은 거절한다", async () => {
+      db.setBalance("u1", 1000);
+      await shop.purchase("u1", "FX_SLIME");
+      await expect(
+        shop.setNameHue("u1", "NM_GOLD", 100),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        shop.setNameHue("u1", "FX_SLIME", 100),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        shop.setNameHue("u1", "FX_SLIME", 400),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
   describe("getLoadouts", () => {
     it("여러 사람의 장착 상태를 한 번에 준다", async () => {
       db.setBalance("u1", 600);

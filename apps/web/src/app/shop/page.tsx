@@ -23,6 +23,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/auth-store";
 import { shopApi, type ShopItemState } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { NameHuePicker } from "@/components/cosmetics/NameHuePicker";
 import { CosmeticPreview } from "@/components/cosmetics/CosmeticPreview";
 import {
   LiveBanner,
@@ -466,6 +467,8 @@ export default function ShopPage() {
                         item={item}
                         username={me.username}
                         avatar={avatarSrc}
+                        // 가진 닉네임 글꼴은 내가 고른 색으로
+                        hue={stateByCode.get(item.code)?.hue}
                         // 카드 장식은 세로로 긴 로비 카드가 다 들어가게 조금 더 높게
                         height={item.slot === "CARD_FRAME" ? 236 : 200}
                       />
@@ -554,6 +557,7 @@ export default function ShopPage() {
                   frameCode={shownCard}
                   avatarFrameCode={shownAvatar}
                   nameStyleCode={shownName ?? null}
+                  nameHue={shownName ? stateByCode.get(shownName)?.hue : null}
                 />
               </div>
               <div className="flex flex-col items-center gap-3 pt-6">
@@ -572,7 +576,12 @@ export default function ShopPage() {
                   </div>
                 </AvatarDecoration>
                 <div className="max-w-[120px] truncate text-base font-black text-text-primary">
-                  <StyledName code={shownNameStyle}>{me.username}</StyledName>
+                  <StyledName
+                    code={shownNameStyle}
+                    hue={shownName ? stateByCode.get(shownName)?.hue : null}
+                  >
+                    {me.username}
+                  </StyledName>
                 </div>
               </div>
             </div>
@@ -617,6 +626,21 @@ export default function ShopPage() {
                   </p>
                 )}
               {actionFor(selected, "lg")}
+              {/* 보관함 — 가진 닉네임 글꼴은 여기서 언제든 색을 바꾼다(프로필 편집에도 있다) */}
+              {tab === "OWNED" &&
+                selected.slot === "NAME_STYLE" &&
+                stateByCode.get(selected.code)?.owned && (
+                  <div className="border-t border-bg-tertiary pt-3">
+                    <p className="mb-2 text-xs font-semibold text-text-secondary">
+                      닉네임 색
+                    </p>
+                    <NameHuePicker
+                      code={selected.code}
+                      hue={stateByCode.get(selected.code)?.hue}
+                      username={me.username}
+                    />
+                  </div>
+                )}
             </section>
           ) : (
             <section className="rounded-lg border border-dashed border-bg-tertiary p-4 text-center text-sm text-text-tertiary">

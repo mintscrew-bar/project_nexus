@@ -43,11 +43,12 @@ export class ShopService {
       this.medalService.getBalance(userId),
       this.prisma.userCosmetic.findMany({
         where: { userId },
-        select: { itemCode: true },
+        select: { itemCode: true, hue: true },
       }),
       this.getLoadout(userId),
     ]);
     const ownedSet = new Set(owned.map((o) => o.itemCode));
+    const hueBy = new Map(owned.map((o) => [o.itemCode, o.hue]));
     const equipped = new Set(Object.values(loadout));
     return {
       balance,
@@ -69,6 +70,8 @@ export class ShopService {
           description: item.description,
           owned: ownedSet.has(item.code),
           equipped: equipped.has(item.code),
+          // 내가 고른 색(닉네임 글꼴) — 안 골랐으면 null
+          hue: hueBy.get(item.code) ?? null,
         })),
     };
   }
@@ -317,6 +320,32 @@ export class ShopService {
     };
   }
 
+  /**
+   * 닉네임 글꼴 색 고르기 (2026-11-20) — 가진 닉네임 글꼴에 색상 회전(0~359도)을 저장한다.
+   * null 이면 원래 색. 상품마다 따로 기억해서 글꼴을 바꿔 끼워도 고른 색이 남는다.
+   */
+  async setNameHue(userId: string, code: string, hue: number | null) {
+    if (hue !== null && (!Number.isInteger(hue) || hue < 0 || hue > 359)) {
+      throw new BadRequestException("색은 0~359 사이로 골라 주세요.");
+    }
+    const item = await this.catalog.find(code);
+    if (!item) throw new NotFoundException("없는 상품이에요.");
+    if (item.slot !== "NAME_STYLE") {
+      throw new BadRequestException("닉네임 글꼴만 색을 바꿀 수 있어요.");
+    }
+    const owned = await this.prisma.userCosmetic.findUnique({
+      where: { userId_itemCode: { userId, itemCode: code } },
+      select: { id: true },
+    });
+    if (!owned) throw new BadRequestException("가지고 있지 않은 상품이에요.");
+    await this.prisma.userCosmetic.update({
+      where: { id: owned.id },
+      // 0도는 원래 색과 같으니 null 로 남긴다
+      data: { hue: hue || null },
+    });
+    return { code, hue: hue || null };
+  }
+
   /** 한 사람의 장착 상태 */
   async getLoadout(userId: string): Promise<CosmeticLoadout> {
     const map = await this.getLoadouts([userId]);
@@ -342,6 +371,20 @@ export class ShopService {
     const result: Record<string, CosmeticLoadout> = {};
     for (const row of rows) {
       (result[row.userId] ??= {})[row.slot as CosmeticSlot] = row.itemCode;
+    }
+    // 장착한 닉네임 글꼴에 고른 색이 있으면 함께 싣는다(로비·호버·프로필이 그대로 그린다)
+    const named = rows.filter((r) => r.slot === "NAME_STYLE");
+    if (named.length) {
+      const hues = await this.prisma.userCosmetic.findMany({
+        where: {
+          OR: named.map((r) => ({ userId: r.userId, itemCode: r.itemCode })),
+          hue: { not: null },
+        },
+        select: { userId: true, hue: true },
+      });
+      for (const h of hues) {
+        if (h.hue != null && result[h.userId]) result[h.userId].nameHue = h.hue;
+      }
     }
     return result;
   }
