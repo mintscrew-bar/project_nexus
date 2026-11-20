@@ -103,6 +103,25 @@ describe("ShopAdminService (관리자 상점 관리 1단계)", () => {
       expect(res.balance).toBe(1000 - 150);
     });
 
+    it("화면에서 본 가격과 지금 가격이 다르면 사지 않는다", async () => {
+      const now = Date.now();
+      db.setBalance("u1", 1000);
+      // 할인 전 가격(250)을 보고 있었는데 그 사이 40% 할인이 걸렸다 → 거절, 다시 확인하게
+      await admin.createDiscount("admin", {
+        name: "슬라임 40%",
+        percent: 40,
+        itemCodes: ["FX_SLIME"],
+        startsAt: new Date(now - HOUR),
+        endsAt: new Date(now + HOUR),
+      });
+      await expect(
+        shop.purchase("u1", "FX_SLIME", false, 250),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(db.balance("u1")).toBe(1000);
+      const res = await shop.purchase("u1", "FX_SLIME", false, 150);
+      expect(res.balance).toBe(850);
+    });
+
     it("기간 밖·끈 할인은 걸리지 않는다", async () => {
       const now = Date.now();
       await admin.createDiscount("admin", {
@@ -178,6 +197,18 @@ describe("ShopAdminService (관리자 상점 관리 1단계)", () => {
       expect(db.audit()[db.audit().length - 1]).toMatchObject({
         action: "SHOP_REVOKE",
       });
+    });
+
+    it("회수당한 상품을 다시 살 수 있다 (구매 키 회차는 지난 구매 수로)", async () => {
+      db.setBalance("u1", 1000);
+      await shop.purchase("u1", "FX_SLIME");
+      await admin.revoke("admin", "u1", "FX_SLIME", "부정 구매");
+      const again = await shop.purchase("u1", "FX_SLIME");
+      expect(again.balance).toBe(1000 - 250 - 250);
+      expect(db.ledger().map((l: any) => l.idempotencyKey)).toEqual([
+        "purchase:u1:FX_SLIME",
+        "purchase:u1:FX_SLIME:1",
+      ]);
     });
   });
 });

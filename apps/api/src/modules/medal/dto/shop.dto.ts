@@ -1,10 +1,12 @@
 import {
   IsBoolean,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
+  Min,
   ValidateIf,
 } from "class-validator";
 import { COSMETIC_SLOTS, type CosmeticSlot } from "@nexus/types";
@@ -22,6 +24,13 @@ export class PurchaseCosmeticDto {
   @IsOptional()
   @IsBoolean()
   equip?: boolean;
+
+  /** 화면에서 본 가격 — 지금 가격과 다르면 409 로 거절한다(안 넘기면 확인하지 않음) */
+  @KeepRaw()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  expectedPrice?: number;
 }
 
 /** PUT shop/loadout — code 가 null 이면 그 자리를 비운다 */

@@ -126,10 +126,11 @@ export default function ShopPage() {
   };
 
   const purchase = useMutation({
-    mutationFn: (code: string) => shopApi.purchase(code, true),
-    onSuccess: (_res, code) => {
-      const item = findCosmetic(code);
-      addToast(`「${item?.name ?? code}」을 사서 바로 장착했어요`, "success");
+    // 확인 창에 띄운 가격을 같이 보낸다 — 그 사이 할인이 끝나거나 값이 바뀌면 서버가 거절
+    mutationFn: (item: CosmeticItem) =>
+      shopApi.purchase(item.code, true, item.price),
+    onSuccess: (_res, item) => {
+      addToast(`「${item.name}」을 사서 바로 장착했어요`, "success");
       setConfirm(null);
       refresh();
     },
@@ -138,6 +139,11 @@ export default function ShopPage() {
         err?.response?.data?.message || "사지 못했어요. 다시 시도해 주세요.",
         "error",
       );
+      // 가격이 바뀐 경우(409) — 새 가격으로 다시 보여 주고 확인 창은 닫는다
+      if (err?.response?.status === 409) {
+        setConfirm(null);
+        refresh();
+      }
     },
   });
 
@@ -647,7 +653,7 @@ export default function ShopPage() {
                 취소
               </Button>
               <Button
-                onClick={() => purchase.mutate(confirm.code)}
+                onClick={() => purchase.mutate(confirm)}
                 disabled={purchase.isPending}
               >
                 사기

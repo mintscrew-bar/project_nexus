@@ -2534,8 +2534,14 @@ export const shopApi = {
   purchase: async (
     code: string,
     equip = true,
+    /** 화면에서 본 가격 — 그 사이 바뀌었으면 서버가 409 로 거절한다 */
+    expectedPrice?: number,
   ): Promise<{ balance: number; itemCode: string; equipped: boolean }> => {
-    const response = await apiClient.post("/shop/purchase", { code, equip });
+    const response = await apiClient.post("/shop/purchase", {
+      code,
+      equip,
+      expectedPrice,
+    });
     return response.data;
   },
 

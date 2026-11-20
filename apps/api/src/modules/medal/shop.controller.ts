@@ -33,7 +33,12 @@ export class ShopController {
     @CurrentUser("sub") userId: string,
     @Body() dto: PurchaseCosmeticDto,
   ) {
-    return this.shopService.purchase(userId, dto.code, dto.equip ?? true);
+    return this.shopService.purchase(
+      userId,
+      dto.code,
+      dto.equip ?? true,
+      dto.expectedPrice,
+    );
   }
 
   /** 장착·해제 */

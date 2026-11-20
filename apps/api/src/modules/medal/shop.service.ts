@@ -77,13 +77,26 @@ export class ShopService {
   /**
    * 구매. `equip` 이면 산 즉시 그 자리에 장착한다.
    * 이미 가진 상품·판매 중이 아닌 상품·메달 부족은 거절한다.
+   * `expectedPrice` 는 사는 사람이 화면에서 본 가격 — 넘기면 지금 가격과 같을 때만 산다.
    */
-  async purchase(userId: string, code: string, equip = false) {
+  async purchase(
+    userId: string,
+    code: string,
+    equip = false,
+    expectedPrice?: number,
+  ) {
     // 가격은 지금 상품표(관리자가 바꾼 가격·걸린 할인 반영)를 따른다
     const item = await this.catalog.find(code);
     if (!item) throw new NotFoundException("없는 상품이에요.");
     if (!item.onSale || item.hidden)
       throw new BadRequestException("지금은 팔지 않는 상품이에요.");
+    // 화면에서 본 값과 지금 값이 다르면 사지 않는다 — 상점을 열어 둔 사이 할인이 끝나거나
+    // 관리자가 가격을 올렸을 때, 본 것보다 많이 깎이는 일을 막는다
+    if (expectedPrice !== undefined && expectedPrice !== item.price) {
+      throw new ConflictException(
+        `가격이 바뀌었어요 (지금 ${item.price.toLocaleString()}). 다시 확인해 주세요.`,
+      );
+    }
 
     const already = await this.prisma.userCosmetic.findUnique({
       where: { userId_itemCode: { userId, itemCode: code } },
@@ -91,15 +104,18 @@ export class ShopService {
     });
     if (already) throw new ConflictException("이미 가진 상품이에요.");
 
-    // 환불받은 적 있는 상품을 다시 사면 회차 키를 쓴다 — 첫 구매 키(`purchase:<사람>:<상품>`)는
-    // 원장에 이미 있어서 그대로 쓰면 유니크 제약에 걸려 영영 다시 못 산다(Task 17)
-    const refunds = await this.prisma.medalLedger.count({
-      where: { userId, reason: MedalReason.REFUND, sourceId: code },
+    // 전에 산 적 있는 상품을 다시 사면 회차 키를 쓴다 — 첫 구매 키(`purchase:<사람>:<상품>`)는
+    // 원장에 이미 있어서 그대로 쓰면 유니크 제약에 걸려 영영 다시 못 산다(Task 17).
+    // 회차는 "지난 구매 줄 수"로 센다. 예전엔 환불 줄 수로 셌는데, 관리자 회수(메달 안 돌려줌)는
+    // 환불 줄이 없어서 회수당한 사람이 같은 상품을 다시 사려 하면 늘 "이미 가진 상품"으로 막혔다.
+    // 환불만 있던 기존 데이터에선 구매 줄 수 = 환불 줄 수라 키가 그대로 이어진다.
+    const prevPurchases = await this.prisma.medalLedger.count({
+      where: { userId, reason: MedalReason.PURCHASE, sourceId: code },
     });
     const purchaseKey =
-      refunds === 0
+      prevPurchases === 0
         ? `purchase:${userId}:${code}`
-        : `purchase:${userId}:${code}:${refunds}`;
+        : `purchase:${userId}:${code}:${prevPurchases}`;
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
