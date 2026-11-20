@@ -8,12 +8,15 @@ import { AttendanceService } from "./attendance.service";
 import { ShopCatalogService } from "./shop-catalog.service";
 import { ShopAdminService } from "./shop-admin.service";
 import { ShopAdminController } from "./shop-admin.controller";
+import { UploadModule } from "../upload/upload.module";
 
 /**
  * 메달 — 원장·잔액·관리자 조정(Task 3)과 꾸미기 상점 구매·장착(Task 8·9).
  * 경기 메달 지급(Task 21)은 MatchMedalService — 경기·칭찬 모듈이 정산을 부른다.
  */
 @Module({
+  // 상점 관리 2단계 — 새 상품 파일을 R2 에 올린다
+  imports: [UploadModule],
   controllers: [MedalController, ShopController, ShopAdminController],
   providers: [
     MedalService,

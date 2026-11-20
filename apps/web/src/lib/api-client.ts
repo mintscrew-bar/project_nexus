@@ -1,7 +1,13 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import type { CommendationSummary } from "@/lib/commendation";
 import { getDdragonVersion } from "./ddragon";
-import type { BroadcastSettings, CosmeticSlot, GameTitle } from "@nexus/types";
+import type {
+  BroadcastSettings,
+  CosmeticMedia,
+  CosmeticSlot,
+  GameTitle,
+  ShopCatalogEntry,
+} from "@nexus/types";
 
 // 보이지 않는 유니코드 문자 제거 (복사-붙여넣기 시 포함되는 bidirectional formatting 등)
 const stripInvisibleChars = (str: string): string =>
@@ -2460,6 +2466,10 @@ export interface AdminShopItem {
   name: string | null;
   description: string | null;
   sortOrder: number;
+  /** 관리자가 추가한 상품인가 (2단계) — 이것만 지울 수 있다 */
+  custom: boolean;
+  baseCode: string | null;
+  media: CosmeticMedia | null;
   stats: {
     sold: number;
     medals: number;
@@ -2515,12 +2525,46 @@ export const adminShopApi = {
   }) => (await apiClient.post("/shop/admin/discounts", input)).data,
   stopDiscount: async (id: string) =>
     (await apiClient.post(`/shop/admin/discounts/${id}/stop`)).data,
+  /** 새 상품 추가 — 그림은 baseCode 또는 올린 파일(posterUrl 필수) */
+  createItem: async (input: {
+    slot: CosmeticSlot;
+    name: string;
+    description: string | null;
+    price: number;
+    rarity: AdminShopItem["rarity"];
+    onSale: boolean;
+    baseCode: string | null;
+    videoUrl: string | null;
+    mp4Url: string | null;
+    posterUrl: string | null;
+  }): Promise<AdminShopItem> =>
+    (await apiClient.post("/shop/admin/items", input)).data,
+  /** 관리자 상품 지우기(가진 사람이 없을 때만) */
+  deleteItem: async (code: string) =>
+    (await apiClient.delete(`/shop/admin/items/${code}`)).data,
+  /** 상품 파일 올리기 — video: WebM, mp4: MP4, image: WebP·PNG */
+  uploadMedia: async (
+    file: File,
+    kind: "video" | "mp4" | "image",
+  ): Promise<string> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await apiClient.post(`/shop/admin/media?kind=${kind}`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+      // 20MB 영상 — 기본 시간 제한보다 넉넉히
+      timeout: 120_000,
+    });
+    return res.data.url;
+  },
 };
 
 export type CosmeticLoadoutState = Partial<Record<CosmeticSlot, string>>;
 
 /** 메달 상점 — 진열·구매·장착 */
 export const shopApi = {
+  /** 상품 그림 정의(관리자가 추가한 상품 포함) — 로그인 없이 */
+  catalog: async (): Promise<ShopCatalogEntry[]> =>
+    (await apiClient.get("/shop/catalog")).data,
   getShop: async (): Promise<{
     balance: number;
     loadout: CosmeticLoadoutState;

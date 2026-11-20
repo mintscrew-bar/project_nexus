@@ -6,6 +6,7 @@ import { useState, type ReactNode, useEffect } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import { RiotAccountChecker } from "@/components/RiotAccountChecker";
 import { ToastProvider } from "@/components/ui/Toast";
+import { CosmeticCatalogLoader } from "@/components/cosmetics/CosmeticCatalogLoader";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcuts";
 import { BgmPlayer } from "@/components/bgm/BgmPlayer";
 import { useSfxStore } from "@/stores/sfx-store";
@@ -54,6 +55,8 @@ export function Providers({ children }: { children: ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <SfxSettingsInitializer />
+          {/* 관리자가 추가한 상점 상품의 그림 정의 — 남의 장식을 그리려면 필요 */}
+          <CosmeticCatalogLoader />
           <KeyboardShortcutsProvider>
             <AuthInitializer>
               <GameNavigationProvider>

@@ -12,11 +12,24 @@ import {
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { ShopService } from "./shop.service";
+import { ShopCatalogService } from "./shop-catalog.service";
 import { EquipCosmeticDto, PurchaseCosmeticDto } from "./dto/shop.dto";
 
 @Controller("shop")
 export class ShopController {
-  constructor(private readonly shopService: ShopService) {}
+  constructor(
+    private readonly shopService: ShopService,
+    private readonly catalog: ShopCatalogService,
+  ) {}
+
+  /**
+   * 상품 그림 정의 — 관리자가 추가한 상품까지(로그인 없이).
+   * 로비 카드·프로필이 남이 낀 장식을 그리려면 비로그인도 알아야 한다.
+   */
+  @Get("catalog")
+  getCatalog() {
+    return this.catalog.getPublicCatalog();
+  }
 
   /** 상점 진열 — 잔액·보유·장착 */
   @Get()

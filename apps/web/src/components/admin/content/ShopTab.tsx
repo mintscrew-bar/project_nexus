@@ -8,7 +8,9 @@ import {
   Gift,
   Pencil,
   Percent,
+  Plus,
   Search,
+  Trash2,
   Undo2,
 } from "lucide-react";
 import {
@@ -25,23 +27,24 @@ import {
   Modal,
 } from "@/components/ui";
 import {
-  COSMETICS,
   MEDAL_LABEL,
   RARITY_LABEL,
   SLOT_LABEL,
+  findCosmetic,
+  useCosmeticCatalog,
   type CosmeticSlot,
 } from "@/components/cosmetics/catalog";
 import { cn } from "@/lib/utils";
 import { RowActions, StatCard, type AddToast } from "../shared";
 import { useConfirm } from "../ConfirmDialog";
+import { ShopCreateItemModal } from "./ShopCreateItemModal";
 
 type Rarity = AdminShopItem["rarity"];
 const RARITIES: Rarity[] = ["STARTER", "COMMON", "PREMIUM", "RARE"];
 const SLOTS = Object.keys(SLOT_LABEL) as CosmeticSlot[];
 
 /** 코드에 정의된 기본 이름(관리자가 바꾸지 않았을 때 보이는 이름) */
-const defaultName = (code: string) =>
-  COSMETICS.find((c) => c.code === code)?.name ?? code;
+const defaultName = (code: string) => findCosmetic(code)?.name ?? code;
 const shownName = (item: AdminShopItem) => item.name ?? defaultName(item.code);
 
 const errMsg = (e: unknown, fallback: string) =>
@@ -70,9 +73,12 @@ const STATUS_LABEL: Record<AdminShopDiscount["status"], string> = {
 /**
  * 관리자 「상점 관리」 — 1단계(2026-11-19): 상품별 판매 현황, 상품 수정(이름·설명·가격·등급·
  * 순서), 판매 켜기/끄기, 숨기기(삭제), 상품 지급·회수, 기간 할인.
- * 상품 추가·번들은 2단계. 그림·자리는 코드 원본이라 여기서 바꾸지 않는다.
+ * 2단계(2026-11-20): 새 상품 추가(기존 그림 쓰기·파일 올리기), 가진 사람 없는 새 상품 지우기.
+ * 기본 상품의 그림·자리는 코드 원본이라 여기서 바꾸지 않는다. 번들은 아직.
  */
 export function ShopTab({ addToast }: { addToast: AddToast }) {
+  // 관리자가 추가한 상품의 그림 정의가 들어오면 다시 그린다
+  useCosmeticCatalog();
   const queryClient = useQueryClient();
   const { confirm, dialog } = useConfirm();
   const itemsQuery = useQuery({
@@ -123,17 +129,34 @@ export function ShopTab({ addToast }: { addToast: AddToast }) {
   });
 
   const [editing, setEditing] = useState<AdminShopItem | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  // 새 상품 지우기 — 가진 사람이 있으면 서버가 거절한다(숨기기를 쓰게)
+  const remove = useMutation({
+    mutationFn: (code: string) => adminShopApi.deleteItem(code),
+    onSuccess: () => {
+      addToast("상품을 지웠어요.", "success");
+      refresh();
+    },
+    onError: (e) => addToast(errMsg(e, "지우지 못했어요."), "error"),
+  });
 
   return (
     <div className="space-y-6">
       {dialog}
-      <div>
-        <h2 className="text-lg font-semibold text-text-primary">상점 관리</h2>
-        <p className="mt-1 text-xs text-text-tertiary">
-          상품의 그림·자리는 코드가 원본이고, 여기서 바꾼 이름·가격·판매 여부는
-          바로 상점과 홈에 반영됩니다. 숨기면 진열·구매에서 빠지고 이미 산
-          사람은 계속 씁니다.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary">상점 관리</h2>
+          <p className="mt-1 text-xs text-text-tertiary">
+            여기서 바꾼 이름·가격·판매 여부는 바로 상점과 홈에 반영됩니다.
+            숨기면 진열·구매에서 빠지고 이미 산 사람은 계속 씁니다. 새로 추가한
+            상품은 가진 사람이 없을 때만 지울 수 있어요.
+          </p>
+        </div>
+        <Button size="sm" onClick={() => setCreating(true)}>
+          <Plus className="mr-1 h-3.5 w-3.5" />
+          상품 추가
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -214,7 +237,12 @@ export function ShopTab({ addToast }: { addToast: AddToast }) {
                       <td className="px-4 py-2.5">
                         <p className="font-medium text-text-primary">
                           {shownName(item)}
-                          {item.name && (
+                          {item.custom && (
+                            <span className="ml-1.5 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">
+                              새 상품
+                            </span>
+                          )}
+                          {item.name && !item.custom && (
                             <span className="ml-1.5 text-[10px] text-text-muted">
                               (원래 {defaultName(item.code)})
                             </span>
@@ -338,6 +366,34 @@ export function ShopTab({ addToast }: { addToast: AddToast }) {
                               </>
                             )}
                           </Button>
+                          {item.custom && item.stats.owners === 0 && (
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              disabled={remove.isPending}
+                              onClick={async () => {
+                                if (
+                                  !(await confirm({
+                                    title: "새 상품 지우기",
+                                    message: (
+                                      <>
+                                        「{shownName(item)}」을 완전히 지웁니다.
+                                        가진 사람이 없어 아무도 영향을 받지
+                                        않아요. 되돌릴 수 없어요.
+                                      </>
+                                    ),
+                                    confirmLabel: "지우기",
+                                    danger: true,
+                                  }))
+                                )
+                                  return;
+                                remove.mutate(item.code);
+                              }}
+                            >
+                              <Trash2 className="mr-1 h-3.5 w-3.5" />
+                              지우기
+                            </Button>
+                          )}
                         </RowActions>
                       </td>
                     </tr>
@@ -363,6 +419,17 @@ export function ShopTab({ addToast }: { addToast: AddToast }) {
           onDone={refresh}
         />
       </div>
+
+      {creating && (
+        <ShopCreateItemModal
+          addToast={addToast}
+          onClose={() => setCreating(false)}
+          onCreated={() => {
+            setCreating(false);
+            refresh();
+          }}
+        />
+      )}
 
       {editing && (
         <EditItemModal
@@ -398,7 +465,7 @@ function EditItemModal({
   const [price, setPrice] = useState(String(item.basePrice));
   const [rarity, setRarity] = useState<Rarity>(item.rarity);
   const [sortOrder, setSortOrder] = useState(String(item.sortOrder));
-  const base = COSMETICS.find((c) => c.code === item.code);
+  const base = findCosmetic(item.code);
 
   return (
     <Modal

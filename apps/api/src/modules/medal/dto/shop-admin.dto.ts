@@ -13,6 +13,7 @@ import {
   Min,
   ValidateIf,
 } from "class-validator";
+import { COSMETIC_SLOTS, type CosmeticSlot } from "@nexus/types";
 import { KeepRaw } from "../../../common/keep-raw.decorator";
 
 const RARITIES = ["STARTER", "COMMON", "PREMIUM", "RARE"] as const;
@@ -116,4 +117,71 @@ export class CreateShopDiscountDto {
 
   @IsDateString()
   endsAt!: string;
+}
+
+/** POST shop/admin/items (ADMIN) — 새 상품. 그림은 baseCode 또는 올린 파일(posterUrl) */
+export class CreateShopItemDto {
+  @IsIn(COSMETIC_SLOTS)
+  slot!: CosmeticSlot;
+
+  @KeepRaw()
+  @IsString()
+  @IsNotEmpty({ message: "이름을 적어 주세요." })
+  @MaxLength(40)
+  name!: string;
+
+  @KeepRaw()
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(200)
+  description?: string | null;
+
+  @KeepRaw()
+  @IsInt()
+  @Min(1)
+  @Max(100000)
+  price!: number;
+
+  @IsIn(RARITIES)
+  rarity!: (typeof RARITIES)[number];
+
+  @KeepRaw()
+  @IsOptional()
+  @IsBoolean()
+  onSale?: boolean;
+
+  @KeepRaw()
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(64)
+  baseCode?: string | null;
+
+  @KeepRaw()
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(500)
+  videoUrl?: string | null;
+
+  @KeepRaw()
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(500)
+  mp4Url?: string | null;
+
+  @KeepRaw()
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(500)
+  posterUrl?: string | null;
+}
+
+/** POST shop/admin/media?kind= (ADMIN) — 상품 파일 종류 */
+export class UploadShopMediaQueryDto {
+  @IsIn(["video", "mp4", "image"])
+  kind!: "video" | "mp4" | "image";
 }

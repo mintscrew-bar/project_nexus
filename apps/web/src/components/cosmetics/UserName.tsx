@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { findCosmetic } from "./catalog";
+import { findCosmetic, useCosmeticCatalog } from "./catalog";
 import { StyledName } from "./name-styles";
 import { useUserLoadout } from "./useCosmeticLoadouts";
 
@@ -25,6 +25,8 @@ export function UserName({
   className?: string;
   children: ReactNode;
 }) {
+  // 관리자가 추가한 상품의 그림 정의가 들어오면 다시 그린다
+  useCosmeticCatalog();
   const loadout = useUserLoadout(styleCode === undefined ? userId : null);
   const code = styleCode === undefined ? loadout.NAME_STYLE : styleCode;
   return (

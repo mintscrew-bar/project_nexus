@@ -7,7 +7,6 @@ import {
 import { MedalReason } from "@nexus/database";
 import {
   COSMETIC_SLOTS,
-  findCosmeticShopItem,
   type CosmeticLoadout,
   type CosmeticSlot,
 } from "@nexus/types";
@@ -173,7 +172,8 @@ export class ShopService {
       return this.getLoadout(userId);
     }
 
-    const item = findCosmeticShopItem(code);
+    // 관리자가 추가한 상품도 있어서 상품표(코드 + DB)에서 찾는다. 숨긴 상품도 가진 사람은 낀다
+    const item = await this.catalog.find(code);
     if (!item) throw new NotFoundException("없는 상품이에요.");
     if (item.slot !== slot) {
       throw new BadRequestException("이 자리에 낄 수 없는 상품이에요.");
@@ -277,13 +277,15 @@ export class ShopService {
    * 관리자 사용자 상세 (Task 17) — 가진 상품(얻은 경로·구매 원장)과 장착 상태
    */
   async adminUserCosmetics(userId: string) {
-    const [owned, loadout] = await Promise.all([
+    const [owned, loadout, items] = await Promise.all([
       this.prisma.userCosmetic.findMany({
         where: { userId },
         orderBy: { acquiredAt: "desc" },
       }),
       this.getLoadout(userId),
+      this.catalog.getItems(),
     ]);
+    const slotByCode = new Map(items.map((i) => [i.code, i.slot]));
     const ledgerIds = owned
       .map((o) => o.ledgerId)
       .filter((id): id is string => !!id);
@@ -298,11 +300,10 @@ export class ShopService {
     return {
       loadout,
       items: owned.map((o) => {
-        const item = findCosmeticShopItem(o.itemCode);
         const p = o.ledgerId ? byId.get(o.ledgerId) : undefined;
         return {
           itemCode: o.itemCode,
-          slot: item?.slot ?? null,
+          slot: slotByCode.get(o.itemCode) ?? null,
           source: o.source,
           acquiredAt: o.acquiredAt,
           paid: p ? -p.amount : null,

@@ -14,11 +14,17 @@
  * - 움직이는 상품은 `prefers-reduced-motion` 에서 멈춘다(globals.css).
  */
 
-import { findCosmeticShopItem } from "@nexus/types";
-import type { AvatarEffectCode } from "./avatar-effects";
+import { useMemo } from "react";
+import {
+  COSMETIC_MEDIA_SIZE,
+  findCosmeticShopItem,
+  type ShopCatalogEntry,
+} from "@nexus/types";
+import { useCosmeticCatalogStore } from "@/stores/cosmetic-catalog-store";
+import type { AvatarEffectSource } from "./avatar-effects";
 import type { CosmeticEffectCode } from "./effects";
 import type { NameStyleCode } from "./name-styles";
-import type { LiveBannerCode } from "./live-banner";
+import type { LiveBannerSource } from "./live-banner";
 
 /** 화면에 보이는 재화 이름 — 이름을 바꾸면 여기 한 곳만 고친다 */
 export const MEDAL_LABEL = "메달";
@@ -59,14 +65,16 @@ export interface CosmeticItem {
   layerClassName?: string;
   /** CARD_FRAME 전용 — 초상화 위에서 움직이는 장식 (effects.tsx) */
   effect?: CosmeticEffectCode;
-  /** CARD_FRAME — 영상형 카드 배경 */
-  cardVideo?: LiveBannerCode;
-  /** AVATAR_FRAME 전용 — 아바타 둘레 장식 (avatar-effects.tsx) */
-  avatarEffect?: AvatarEffectCode;
+  /** CARD_FRAME — 영상형 카드 배경 (코드 배경 이름 또는 올린 파일) */
+  cardVideo?: LiveBannerSource;
+  /** AVATAR_FRAME 전용 — 아바타 둘레 장식 (avatar-effects.tsx, 코드 장식 또는 올린 파일) */
+  avatarEffect?: AvatarEffectSource;
   /** NAME_STYLE 전용 — 닉네임 글꼴·효과 (name-styles.tsx) */
   nameStyle?: NameStyleCode;
-  /** PROFILE_BANNER 전용 — 움직이는 프로필 배경 (live-banner.tsx) */
-  liveBanner?: LiveBannerCode;
+  /** PROFILE_BANNER 전용 — 움직이는 프로필 배경 (live-banner.tsx, 코드 배경 또는 올린 파일) */
+  liveBanner?: LiveBannerSource;
+  /** 관리자가 추가한 상품인가 (상점 관리 2단계) */
+  custom?: boolean;
 }
 
 export const RARITY_LABEL: Record<CosmeticRarity, string> = {
@@ -371,7 +379,107 @@ export const COSMETICS: CosmeticItem[] = COSMETIC_DEFS.map((def) => {
   return shared ? { ...def, price: shared.price, rarity: shared.rarity } : def;
 });
 
+/* ───────── 관리자가 추가한 상품 (상점 관리 2단계, 2026-11-20) ───────── */
+
+/**
+ * 서버 상품표 항목 → 화면 정의.
+ * - 그림 빌리기(baseCode): 그 코드 상품의 그림을 그대로 쓰고 이름·가격·등급만 바꾼다.
+ * - 올린 파일: 자리별로 카드 영상 배경 · 아바타 투명 장식 · 프로필 배경으로 그린다.
+ * 그릴 수 없는 항목(빌린 상품이 사라졌거나 파일이 없음)은 null — 기본 모습으로 보인다.
+ */
+export function buildCustomCosmetic(e: ShopCatalogEntry): CosmeticItem | null {
+  const common = {
+    code: e.code,
+    slot: e.slot,
+    price: e.price,
+    rarity: e.rarity,
+    custom: true,
+  };
+  if (e.baseCode) {
+    const base = COSMETICS.find((c) => c.code === e.baseCode);
+    if (!base || base.slot !== e.slot) return null;
+    return {
+      ...base,
+      ...common,
+      name: e.name ?? base.name,
+      description: e.description ?? base.description,
+    };
+  }
+  const m = e.media;
+  if (!m) return null;
+  const item: CosmeticItem = {
+    ...common,
+    name: e.name ?? e.code,
+    description: e.description ?? "",
+    className: "",
+  };
+  if (e.slot === "CARD_FRAME") {
+    // 카드 둘레 틀은 어두운 무채색 — 영상이 주인공
+    item.className = "bg-[#2a2a2e]";
+    item.cardVideo = {
+      webm: m.video,
+      mp4: m.mp4,
+      poster: m.poster,
+      size: COSMETIC_MEDIA_SIZE.CARD_FRAME,
+      focusY: 0.5,
+    };
+  } else if (e.slot === "AVATAR_FRAME") {
+    item.avatarEffect = { video: m.video, poster: m.poster };
+  } else if (e.slot === "PROFILE_BANNER") {
+    item.liveBanner = {
+      webm: m.video,
+      mp4: m.mp4,
+      poster: m.poster,
+      size: COSMETIC_MEDIA_SIZE.PROFILE_BANNER,
+      focusY: 0.5,
+    };
+  } else {
+    return null;
+  }
+  return item;
+}
+
+// 저장소의 상품표가 바뀔 때만 다시 만든다(같은 객체면 캐시 그대로)
+let builtFor: Record<string, ShopCatalogEntry> | null = null;
+let builtCustom = new Map<string, CosmeticItem>();
+let builtAll: CosmeticItem[] = COSMETICS;
+
+function built() {
+  const entries = useCosmeticCatalogStore.getState().entries;
+  if (entries !== builtFor) {
+    builtFor = entries;
+    builtCustom = new Map();
+    for (const e of Object.values(entries)) {
+      if (!e.custom) continue;
+      const item = buildCustomCosmetic(e);
+      if (item) builtCustom.set(item.code, item);
+    }
+    builtAll = [...COSMETICS, ...builtCustom.values()];
+  }
+  return { custom: builtCustom, all: builtAll };
+}
+
+/**
+ * 코드 → 화면 정의. 코드 상품이 먼저, 없으면 관리자가 추가한 상품.
+ * 관리자 상품은 서버 상품표를 받은 뒤에 보이므로, 렌더에서 쓰는 컴포넌트는
+ * useCosmeticCatalog() 를 한 번 불러 상품표가 들어올 때 다시 그려지게 한다.
+ */
 export function findCosmetic(code?: string | null): CosmeticItem | undefined {
   if (!code) return undefined;
-  return COSMETICS.find((item) => item.code === code);
+  return (
+    COSMETICS.find((item) => item.code === code) ?? built().custom.get(code)
+  );
+}
+
+/**
+ * 전체 상품(코드 상품 + 관리자 상품)을 돌려주고, 서버 상품표가 들어오거나 바뀌면 다시 그린다.
+ * findCosmetic 을 렌더에서 쓰는 컴포넌트도 이 훅을 불러 두면 함께 갱신된다.
+ */
+export function useCosmeticCatalog(): CosmeticItem[] {
+  const entries = useCosmeticCatalogStore((s) => s.entries);
+  // entries 가 바뀌어야만 새 배열 — 쓰는 쪽 useMemo 가 헛돌지 않게
+  return useMemo(() => {
+    void entries;
+    return built().all;
+  }, [entries]);
 }

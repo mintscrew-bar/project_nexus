@@ -11,7 +11,9 @@
  * 픽셀 한 칸 크기는 아바타 지름에 비례한다(96px 일 때 2px).
  */
 
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useCosmeticFxStore } from "@/stores/cosmetic-fx-store";
+import { useIsClient } from "@/hooks/useIsClient";
 import { InkDragonVideo } from "./ink-dragon-video";
 import { cn } from "@/lib/utils";
 import { Burst } from "./effects";
@@ -165,6 +167,98 @@ function DragonOrbitFx({ size }: FxProps) {
   );
 }
 
+/* ───────── 관리자가 올린 아바타 장식 (상점 관리 2단계) ───────── */
+
+/** 올린 파일 — 투명 WebM(없으면 정지 그림만) + 투명 WebP */
+export interface AvatarMediaDef {
+  video: string | null;
+  poster: string;
+}
+
+/** 장식 지정 — 코드에 있는 장식 이름, 또는 올린 파일 */
+export type AvatarEffectSource = AvatarEffectCode | AvatarMediaDef;
+
+/**
+ * 올린 장식 — 규격이 384×384 상자 가운데 지름 192 원(아바타 자리)이라 상자는 아바타 지름의 2배.
+ * 사파리는 투명 WebM 을 못 틀어 투명 정지 그림으로 대신한다(흑룡과 같은 방식).
+ */
+function MediaAvatarFx({ size, media }: FxProps & { media: AvatarMediaDef }) {
+  const box = size * 2;
+  const ref = useRef<HTMLVideoElement>(null);
+  const mode = useCosmeticFxStore((state) => state.mode);
+  const isClient = useIsClient();
+  const safari =
+    isClient &&
+    /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
+  const useVideo = Boolean(media.video) && !safari;
+
+  // 움직임 설정·화면 밖·탭 숨김이면 멈춘다(라이브 배경과 같은 규칙)
+  useEffect(() => {
+    const video = ref.current;
+    if (!video) return;
+    const reduce =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const still = mode !== "full" || reduce;
+    let inView = true;
+    const sync = () => {
+      if (still || !inView || document.hidden) {
+        video.pause();
+        if (still) video.currentTime = 0;
+      } else {
+        void video.play().catch(() => {});
+      }
+    };
+    const io = new IntersectionObserver(([e]) => {
+      inView = e.isIntersecting;
+      sync();
+    });
+    io.observe(video);
+    document.addEventListener("visibilitychange", sync);
+    sync();
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", sync);
+    };
+  }, [mode, useVideo, media.video]);
+
+  return (
+    <div
+      className="absolute"
+      style={{
+        ...FRONT,
+        left: (size - box) / 2,
+        top: (size - box) / 2,
+        width: box,
+        height: box,
+      }}
+    >
+      {useVideo ? (
+        <video
+          ref={ref}
+          aria-hidden
+          muted
+          loop
+          playsInline
+          disablePictureInPicture
+          preload="metadata"
+          poster={media.poster}
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+        >
+          <source src={media.video!} type="video/webm" />
+        </video>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- 올린 투명 그림을 그대로 쓴다
+        <img
+          aria-hidden
+          alt=""
+          src={media.poster}
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+        />
+      )}
+    </div>
+  );
+}
+
 const AVATAR_EFFECTS: Record<AvatarEffectCode, (p: FxProps) => ReactNode> = {
   cat_ears: CatEarsFx,
   moon: MoonFx,
@@ -186,14 +280,15 @@ export function AvatarDecoration({
   className,
   children,
 }: {
-  code?: AvatarEffectCode | null;
+  code?: AvatarEffectSource | null;
   /** 아바타 지름(px) */
   size: number;
   className?: string;
   children: ReactNode;
 }) {
   if (!code) return <>{children}</>;
-  const Fx = AVATAR_EFFECTS[code];
+  // 올린 파일이면 그 영상·그림을, 아니면 코드에 있는 장식을 그린다
+  const Fx = typeof code === "string" ? AVATAR_EFFECTS[code] : null;
   return (
     <div
       className={cn("cfx-root relative isolate flex-shrink-0", className)}
@@ -208,7 +303,15 @@ export function AvatarDecoration({
       </div>
       {/* cfx-deco — 「숨기기」 설정이면 장식만 빠지고 아바타는 남는다 */}
       <div aria-hidden className="cfx-deco pointer-events-none">
-        <Fx px={size / 48} size={size} />
+        {Fx ? (
+          <Fx px={size / 48} size={size} />
+        ) : (
+          <MediaAvatarFx
+            px={size / 48}
+            size={size}
+            media={code as AvatarMediaDef}
+          />
+        )}
       </div>
     </div>
   );

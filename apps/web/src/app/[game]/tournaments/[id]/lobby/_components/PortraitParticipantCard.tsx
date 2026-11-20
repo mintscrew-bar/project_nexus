@@ -13,7 +13,10 @@ import {
 import { TierBadge } from "@/components/domain/TierBadge";
 import { getRoleTier } from "@/lib/role-tier";
 import { cn } from "@/lib/utils";
-import { findCosmetic } from "@/components/cosmetics/catalog";
+import {
+  findCosmetic,
+  useCosmeticCatalog,
+} from "@/components/cosmetics/catalog";
 import { CosmeticEffect } from "@/components/cosmetics/effects";
 import { LiveBanner } from "@/components/cosmetics/live-banner";
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
@@ -132,6 +135,8 @@ export function PortraitParticipantCard({
   /** 장착한 닉네임 글꼴 상품 코드 (NAME_STYLE) */
   nameStyleCode?: string | null;
 }) {
+  // 관리자가 추가한 상품의 그림 정의가 들어오면 다시 그린다
+  useCosmeticCatalog();
   const frame = findCosmetic(frameCode);
   const avatarFx = findCosmetic(avatarFrameCode)?.avatarEffect;
   const cardRef = useRef<HTMLDivElement>(null);

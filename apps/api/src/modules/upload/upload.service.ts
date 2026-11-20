@@ -203,9 +203,65 @@ export class UploadService {
     return this.toPublicUrl(key);
   }
 
+  /**
+   * 상점 상품 파일 (관리자 상점 관리 2단계) — 다 만들어 온 파일을 손대지 않고 그대로 올린다.
+   * 투명 영상(VP9+알파)·투명 WebP 를 다시 인코딩하면 알파가 깨지므로 변환하지 않는다.
+   * 형식은 선언된 MIME 이 아니라 파일 첫 바이트로 가린다.
+   * - video: WebM(EBML) 20MB · mp4: MP4(ftyp) 20MB · image: WebP·PNG 5MB
+   */
+  async uploadCosmeticMedia(
+    file: Express.Multer.File,
+    kind: "video" | "mp4" | "image",
+  ): Promise<string> {
+    const data = file?.buffer;
+    const MB = 1024 * 1024;
+    const fail = (msg: string): never => {
+      throw new BadRequestException(msg);
+    };
+    if (!data || data.length < 16) fail("빈 파일이에요.");
+    let ext: ".webm" | ".mp4" | ".webp" | ".png";
+    let mime: string;
+    if (kind === "video") {
+      if (data.length > 20 * MB) fail("영상은 20MB 이하만 올릴 수 있어요.");
+      if (data.readUInt32BE(0) !== 0x1a45dfa3) fail("WebM 영상이 아니에요.");
+      ext = ".webm";
+      mime = "video/webm";
+    } else if (kind === "mp4") {
+      if (data.length > 20 * MB) fail("영상은 20MB 이하만 올릴 수 있어요.");
+      if (data.subarray(4, 8).toString("latin1") !== "ftyp")
+        fail("MP4 영상이 아니에요.");
+      ext = ".mp4";
+      mime = "video/mp4";
+    } else {
+      if (data.length > 5 * MB) fail("그림은 5MB 이하만 올릴 수 있어요.");
+      const isWebp =
+        data.subarray(0, 4).toString("latin1") === "RIFF" &&
+        data.subarray(8, 12).toString("latin1") === "WEBP";
+      const isPng = data.readUInt32BE(0) === 0x89504e47;
+      if (!isWebp && !isPng) fail("WebP·PNG 그림만 올릴 수 있어요.");
+      ext = isWebp ? ".webp" : ".png";
+      mime = isWebp ? "image/webp" : "image/png";
+    }
+    const key = this.createObjectKey("cosmetics", ext!);
+    if (this.driver === "r2") await this.putR2Object(key, data, mime!);
+    else await this.writeLocalObject(key, data);
+    return this.toPublicUrl(key);
+  }
+
+  /** 우리가 올린 상점 상품 파일 주소인가 — 아무 바깥 주소나 상품 그림으로 박히지 않게 */
+  isOwnCosmeticUrl(url: string): boolean {
+    const base = this.driver === "r2" ? `${this.publicBaseUrl}/` : "/uploads/";
+    return (
+      !!url &&
+      url.startsWith(`${base}cosmetics/`) &&
+      !url.includes("..") &&
+      /^[\w\-./:]+$/.test(url)
+    );
+  }
+
   private createObjectKey(
     directory: string,
-    ext: ".gif" | ".webp" | ".webm",
+    ext: ".gif" | ".webp" | ".webm" | ".mp4" | ".png",
   ): string {
     const now = new Date();
     const year = String(now.getUTCFullYear());

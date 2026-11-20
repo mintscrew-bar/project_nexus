@@ -11,7 +11,10 @@ import { RoleTierBadges } from "@/components/domain/RoleTierBadges";
 import { RoleBalanceScores } from "@/components/domain/RoleBalanceScores";
 import { useCurrentGame } from "@/hooks/useCurrentGame";
 import { PUBG_PLATFORM_LABELS } from "@nexus/types";
-import { findCosmetic } from "@/components/cosmetics/catalog";
+import {
+  findCosmetic,
+  useCosmeticCatalog,
+} from "@/components/cosmetics/catalog";
 import { CosmeticEffect } from "@/components/cosmetics/effects";
 import { LiveBanner } from "@/components/cosmetics/live-banner";
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
@@ -193,6 +196,8 @@ export function PlayerHoverCard({ userId, anchorRect, onOpenProfile, onMouseEnte
     enabled: Boolean(userId),
   });
   // 장착한 꾸미기 — 카드 장식은 헤더 뒤 무대로, 아바타 장식은 사진 둘레에 (Task 22)
+  // 관리자가 추가한 상품의 그림 정의가 들어오면 다시 그린다
+  useCosmeticCatalog();
   const loadouts = useCosmeticLoadouts([userId]);
   const cardItem = findCosmetic(loadouts[userId]?.CARD_FRAME);
   const cardFx = cardItem?.effect;

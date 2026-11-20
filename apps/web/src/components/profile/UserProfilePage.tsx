@@ -75,7 +75,10 @@ import {
   LiveBanner,
   liveBannerAspect,
 } from "@/components/cosmetics/live-banner";
-import { findCosmetic } from "@/components/cosmetics/catalog";
+import {
+  findCosmetic,
+  useCosmeticCatalog,
+} from "@/components/cosmetics/catalog";
 import { useCosmeticLoadouts } from "@/components/cosmetics/useCosmeticLoadouts";
 import { useProfileTarget } from "@/components/profile/ProfileTargetContext";
 import { myProfilePath, userProfilePath } from "@/lib/profile-routes";
@@ -268,6 +271,8 @@ export default function UserProfilePage() {
   const [editOpen, setEditOpen] = useState(false);
   // 장착한 프로필 배경 장식(Task 22) — 있으면 올린 배경 이미지 대신 움직이는 배경을 보인다.
   // 올린 이미지는 지우지 않아서, 상점에서 해제하면 바로 다시 보인다
+  // 관리자가 추가한 상품의 그림 정의가 들어오면 다시 그린다
+  useCosmeticCatalog();
   const loadouts = useCosmeticLoadouts([profile?.id]);
   const bannerFx = profile
     ? findCosmetic(loadouts[profile.id]?.PROFILE_BANNER)?.liveBanner

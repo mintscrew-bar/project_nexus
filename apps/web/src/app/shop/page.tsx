@@ -9,11 +9,11 @@ import { PortraitParticipantCard } from "@/app/[game]/tournaments/[id]/lobby/_co
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
 import { StyledName } from "@/components/cosmetics/name-styles";
 import {
-  COSMETICS,
   MEDAL_LABEL,
   RARITY_LABEL,
   SLOT_LABEL,
   findCosmetic,
+  useCosmeticCatalog,
   type CosmeticItem,
 } from "@/components/cosmetics/catalog";
 import { LOADOUT_QUERY_KEY } from "@/components/cosmetics/useCosmeticLoadouts";
@@ -100,6 +100,8 @@ export default function ShopPage() {
     enabled: isAuthenticated,
   });
 
+  // 코드 상품 + 관리자가 추가한 상품(서버 상품표가 들어오면 다시 그린다)
+  const allCosmetics = useCosmeticCatalog();
   const [tab, setTab] = useState<ShopTab>("CARD_FRAME");
   // 입어 보는 중인 상품 — 자리별로 따로
   const [trying, setTrying] = useState<Partial<Record<ShopSlot, string>>>({});
@@ -203,7 +205,8 @@ export default function ShopPage() {
   // 진열할 상품 — 보관함이면 산 것 전부(자리 순서대로), 아니면 그 자리 상품
   // 서버 상품표(관리자가 바꾼 이름·설명·가격·순서·할인)를 그림 정의에 덮어 진열한다
   const serverOrder = new Map(data?.items.map((it, i) => [it.code, i]) ?? []);
-  const shown = COSMETICS.filter((item) => stateByCode.has(item.code))
+  const shown = allCosmetics
+    .filter((item) => stateByCode.has(item.code))
     .map((item) => {
       const st = stateByCode.get(item.code)!;
       return {
@@ -254,7 +257,7 @@ export default function ShopPage() {
     (selectedCode
       ? (() => {
           // 탭을 바꿔 목록에 없어도 패널에는 남긴다
-          const base = COSMETICS.find((c) => c.code === selectedCode);
+          const base = findCosmetic(selectedCode);
           const st = stateByCode.get(selectedCode);
           return base && st
             ? {

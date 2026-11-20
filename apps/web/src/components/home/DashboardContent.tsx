@@ -10,9 +10,10 @@ import {
 } from "@/components/cosmetics/AttendanceCard";
 import { MEDAL_QUERY_KEY } from "@/components/cosmetics/MedalChip";
 import {
-  COSMETICS,
   MEDAL_LABEL,
   SLOT_LABEL,
+  findCosmetic,
+  useCosmeticCatalog,
 } from "@/components/cosmetics/catalog";
 import { CosmeticPreview } from "@/components/cosmetics/CosmeticPreview";
 import { usePathname, useRouter } from "next/navigation";
@@ -496,6 +497,8 @@ const SHOP_ROTATE_MS = 4000;
  * 한 칸 폭은 CSS 변수(--tile)로 화면 폭마다 정하고, 밀어낼 거리는 그 칸 수만큼이다.
  */
 function ShopCarousel() {
+  // 코드 상품 + 관리자가 추가한 상품
+  const allCosmetics = useCosmeticCatalog();
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
   const [index, setIndex] = useState(0);
@@ -511,7 +514,7 @@ function ShopCarousel() {
     ? shop.items
         .filter((st) => st.onSale)
         .map((st) => {
-          const item = COSMETICS.find((c) => c.code === st.code);
+          const item = findCosmetic(st.code);
           return item
             ? {
                 ...item,
@@ -523,7 +526,7 @@ function ShopCarousel() {
             : null;
         })
         .filter((v): v is NonNullable<typeof v> => v !== null)
-    : COSMETICS.map((item) => ({
+    : allCosmetics.map((item) => ({
         ...item,
         basePrice: item.price,
         discountPercent: 0,

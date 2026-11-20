@@ -1950,6 +1950,8 @@ enum AdminAction {
   SHOP_GRANT // 상점 상품 지급(선물)
   SHOP_REVOKE // 상점 상품 회수(메달 돌려주지 않음)
   SHOP_DISCOUNT // 상점 기간 할인 만들기·끄기
+  SHOP_ITEM_CREATE // 상점 새 상품 추가(관리자 2단계)
+  SHOP_ITEM_DELETE // 상점 새 상품 지우기(가진 사람 없을 때만)
 }
 
 enum VoteType {
@@ -2346,6 +2348,31 @@ model ShopItemOverride {
   updatedAt   DateTime @updatedAt
 
   @@map("shop_item_overrides")
+}
+
+/// 관리자가 추가한 상점 상품 (상점 관리 2단계, 2026-11-20).
+/// 코드에 정의된 상품(@nexus/types COSMETIC_SHOP_ITEMS)과 같은 상품표에 섞여 나간다.
+/// 그림은 둘 중 하나 — baseCode(기존 상품의 그림을 빌려 쓴다) 또는 올린 파일(영상·정지 그림).
+/// 가격·판매·숨김을 나중에 바꾸는 건 코드 상품과 똑같이 ShopItemOverride 로 한다.
+model ShopCustomItem {
+  code        String   @id // CX_ 로 시작 — 코드 상품과 겹치지 않게
+  slot        String // CARD_FRAME · AVATAR_FRAME · NAME_STYLE · PROFILE_BANNER
+  name        String
+  description String   @default("")
+  price       Int
+  rarity      String
+  onSale      Boolean  @default(true)
+  /// 그림을 빌려 쓸 기존 상품 코드 — 있으면 아래 파일은 쓰지 않는다
+  baseCode    String?
+  /// 올린 파일(R2 공개 주소) — WebM 영상, H.264 MP4(사파리용, 선택), 정지 그림(WebP·PNG)
+  videoUrl    String?
+  mp4Url      String?
+  posterUrl   String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("shop_custom_items")
 }
 
 /// 상점 기간 할인 — itemCodes 가 비면 전체 상품. 기간 안이고 active 일 때만 적용,

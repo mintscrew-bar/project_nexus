@@ -17,8 +17,9 @@ import { cn } from "@/lib/utils";
 import { useCosmeticFxStore } from "@/stores/cosmetic-fx-store";
 
 export interface LiveBannerDef {
-  webm: string;
-  mp4: string;
+  /** 관리자가 올린 상품은 영상 없이 정지 그림만 있을 수 있다 */
+  webm: string | null;
+  mp4: string | null;
   poster: string;
   /** 영상 원본 크기 — 프로필 배너를 이 비율로 키워 잘림 없이 다 보여 준다 */
   size: [number, number];
@@ -50,9 +51,18 @@ export const LIVE_BANNERS = {
 
 export type LiveBannerCode = keyof typeof LIVE_BANNERS;
 
+/**
+ * 배경 지정 — 코드에 있는 배경 이름, 또는 관리자가 올린 파일로 만든 정의(상점 관리 2단계).
+ */
+export type LiveBannerSource = LiveBannerCode | LiveBannerDef;
+
+export function resolveLiveBanner(src: LiveBannerSource): LiveBannerDef {
+  return typeof src === "string" ? LIVE_BANNERS[src] : src;
+}
+
 /** 그 배경의 가로:세로 비율 (CSS aspect-ratio 값) — 배너·미리보기 칸을 영상과 같은 비율로 */
-export function liveBannerAspect(code: LiveBannerCode): string {
-  const [w, h] = LIVE_BANNERS[code].size;
+export function liveBannerAspect(code: LiveBannerSource): string {
+  const [w, h] = resolveLiveBanner(code).size;
   return `${w} / ${h}`;
 }
 
@@ -60,10 +70,10 @@ export function LiveBanner({
   code,
   className,
 }: {
-  code: LiveBannerCode;
+  code: LiveBannerSource;
   className?: string;
 }) {
-  const def: LiveBannerDef = LIVE_BANNERS[code];
+  const def: LiveBannerDef = resolveLiveBanner(code);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fxMode = useCosmeticFxStore((s) => s.mode);
 
@@ -123,8 +133,8 @@ export function LiveBanner({
         disablePictureInPicture
       >
         {/* H.264 MP4 우선, 미지원 환경에서는 WebM 대체 재생 */}
-        <source src={def.mp4} type="video/mp4" />
-        <source src={def.webm} type="video/webm" />
+        {def.mp4 && <source src={def.mp4} type="video/mp4" />}
+        {def.webm && <source src={def.webm} type="video/webm" />}
       </video>
     </div>
   );

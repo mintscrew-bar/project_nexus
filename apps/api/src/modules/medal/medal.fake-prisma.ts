@@ -11,6 +11,7 @@ export function createFakePrisma() {
   let loadouts: any[] = [];
   const overrides: any[] = [];
   const discounts: any[] = [];
+  let customs: any[] = [];
   const users = new Set(["u1", "u2", "admin"]);
 
   const api: any = {
@@ -116,6 +117,14 @@ export function createFakePrisma() {
       }),
     },
     userCosmetic: {
+      count: jest.fn(
+        async ({ where }: any) =>
+          cosmetics.filter(
+            (c) =>
+              (where.itemCode === undefined || c.itemCode === where.itemCode) &&
+              (where.userId === undefined || c.userId === where.userId),
+          ).length,
+      ),
       findUnique: jest.fn(
         async ({ where }: any) =>
           cosmetics.find(
@@ -195,6 +204,39 @@ export function createFakePrisma() {
         overrides.push(created);
         return created;
       }),
+      deleteMany: jest.fn(async ({ where }: any) => {
+        const before = overrides.length;
+        for (let i = overrides.length - 1; i >= 0; i--)
+          if (overrides[i].code === where.code) overrides.splice(i, 1);
+        return { count: before - overrides.length };
+      }),
+    },
+    // 상점 관리 2단계 — 관리자가 추가한 상품
+    shopCustomItem: {
+      findMany: jest.fn(async () => customs),
+      findUnique: jest.fn(
+        async ({ where }: any) =>
+          customs.find((c) => c.code === where.code) ?? null,
+      ),
+      create: jest.fn(async ({ data }: any) => {
+        const row = {
+          description: "",
+          onSale: true,
+          baseCode: null,
+          videoUrl: null,
+          mp4Url: null,
+          posterUrl: null,
+          createdAt: new Date(),
+          ...data,
+        };
+        customs.push(row);
+        return row;
+      }),
+      delete: jest.fn(async ({ where }: any) => {
+        const row = customs.find((c) => c.code === where.code);
+        customs = customs.filter((c) => c.code !== where.code);
+        return row;
+      }),
     },
     shopDiscount: {
       findMany: jest.fn(async ({ where }: any = {}) =>
@@ -255,6 +297,7 @@ export function createFakePrisma() {
     audit: () => audit,
     cosmetics: () => cosmetics,
     loadouts: () => loadouts,
+    customs: () => customs,
     /** 다른 요청이 먼저 넣은 원장 줄을 흉내 낸다 */
     insertLedger: (row: any) => ledger.push(row),
     setBalance: (userId: string, balance: number) =>

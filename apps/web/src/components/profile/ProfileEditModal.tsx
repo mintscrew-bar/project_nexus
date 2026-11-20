@@ -25,7 +25,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ImageIcon } from "lucide-react";
 import { shopApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { COSMETICS } from "@/components/cosmetics/catalog";
+import { useCosmeticCatalog } from "@/components/cosmetics/catalog";
 import { LiveBanner } from "@/components/cosmetics/live-banner";
 import {
   LOADOUT_QUERY_KEY,
@@ -65,7 +65,9 @@ export function ProfileEditModal({
     queryFn: shopApi.getShop,
     enabled: isOpen && Boolean(user?.id),
   });
-  const ownedBanners = COSMETICS.filter(
+  // 코드 상품 + 관리자가 추가한 상품
+  const allCosmetics = useCosmeticCatalog();
+  const ownedBanners = allCosmetics.filter(
     (item) =>
       item.slot === "PROFILE_BANNER" &&
       item.liveBanner &&

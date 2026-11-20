@@ -11,7 +11,7 @@ import { createFakePrisma } from "./medal.fake-prisma";
 
 const HOUR = 60 * 60 * 1000;
 
-describe("ShopAdminService (관리자 상점 관리 1단계)", () => {
+describe("ShopAdminService (관리자 상점 관리)", () => {
   let db: ReturnType<typeof createFakePrisma>;
   let catalog: ShopCatalogService;
   let shop: ShopService;
@@ -21,7 +21,11 @@ describe("ShopAdminService (관리자 상점 관리 1단계)", () => {
     db = createFakePrisma();
     catalog = new ShopCatalogService(db.api);
     shop = new ShopService(db.api, new MedalService(db.api), catalog);
-    admin = new ShopAdminService(db.api, catalog);
+    // 올린 파일 주소 검사만 흉내 낸다(로컬 저장 드라이버 기준)
+    const upload = {
+      isOwnCosmeticUrl: (url: string) => url.startsWith("/uploads/cosmetics/"),
+    };
+    admin = new ShopAdminService(db.api, catalog, upload as any);
   });
 
   describe("상품 수정", () => {
@@ -209,6 +213,131 @@ describe("ShopAdminService (관리자 상점 관리 1단계)", () => {
         "purchase:u1:FX_SLIME",
         "purchase:u1:FX_SLIME:1",
       ]);
+    });
+  });
+
+  describe("새 상품 추가·지우기 (2단계)", () => {
+    const media = {
+      videoUrl: "/uploads/cosmetics/2026/11/a.webm",
+      posterUrl: "/uploads/cosmetics/2026/11/a.webp",
+    };
+
+    it("올린 파일로 만든 상품을 사고 장착할 수 있다", async () => {
+      const item = await admin.createItem("admin", {
+        slot: "CARD_FRAME",
+        name: "벚꽃 달밤",
+        price: 800,
+        rarity: "PREMIUM",
+        ...media,
+      });
+      expect(item?.code).toMatch(/^CX_[0-9A-F]{6}$/);
+      expect(item).toMatchObject({
+        custom: true,
+        name: "벚꽃 달밤",
+        media: { video: media.videoUrl, mp4: null, poster: media.posterUrl },
+      });
+      db.setBalance("u1", 1000);
+      const res = await shop.purchase("u1", item!.code, true);
+      expect(res.balance).toBe(200);
+      expect(await shop.getLoadout("u1")).toEqual({ CARD_FRAME: item!.code });
+      // 그리는 데 필요한 정의가 공개 상품표에 실린다
+      const pub = await catalog.getPublicCatalog();
+      expect(pub.find((e) => e.code === item!.code)).toMatchObject({
+        custom: true,
+        media: { poster: media.posterUrl },
+      });
+      expect(db.audit().some((a: any) => a.action === "SHOP_ITEM_CREATE")).toBe(
+        true,
+      );
+    });
+
+    it("기존 상품 그림을 빌린 상품은 파일을 쓰지 않는다", async () => {
+      const item = await admin.createItem("admin", {
+        slot: "NAME_STYLE",
+        name: "금빛 이벤트판",
+        price: 100,
+        rarity: "COMMON",
+        baseCode: "NM_GOLD",
+        ...media,
+      });
+      expect(item).toMatchObject({ baseCode: "NM_GOLD", media: null });
+    });
+
+    it("잘못된 그림 지정은 거절한다", async () => {
+      const base = { name: "x", price: 100, rarity: "COMMON" as const };
+      // 다른 자리 상품 그림
+      await expect(
+        admin.createItem("admin", {
+          ...base,
+          slot: "CARD_FRAME",
+          baseCode: "NM_GOLD",
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      // 닉네임 글꼴은 파일로 못 만든다
+      await expect(
+        admin.createItem("admin", { ...base, slot: "NAME_STYLE", ...media }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      // 정지 그림 없음
+      await expect(
+        admin.createItem("admin", {
+          ...base,
+          slot: "CARD_FRAME",
+          videoUrl: media.videoUrl,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      // 바깥 주소
+      await expect(
+        admin.createItem("admin", {
+          ...base,
+          slot: "CARD_FRAME",
+          posterUrl: "https://evil.example/x.webp",
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(db.customs()).toHaveLength(0);
+    });
+
+    it("가진 사람이 있으면 지우지 못하고, 없으면 지운다", async () => {
+      const item = await admin.createItem("admin", {
+        slot: "PROFILE_BANNER",
+        name: "밤바다",
+        price: 2000,
+        rarity: "RARE",
+        ...media,
+      });
+      await admin.grant("admin", "u1", item!.code, "테스트");
+      await expect(
+        admin.deleteItem("admin", item!.code),
+      ).rejects.toBeInstanceOf(ConflictException);
+      await admin.revoke("admin", "u1", item!.code, "테스트");
+      await admin.deleteItem("admin", item!.code);
+      expect(await catalog.find(item!.code)).toBeNull();
+      // 코드 상품은 지울 수 없다
+      await expect(
+        admin.deleteItem("admin", "FX_SLIME"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("관리자 상품도 가격 수정·할인이 그대로 걸린다", async () => {
+      const item = await admin.createItem("admin", {
+        slot: "AVATAR_FRAME",
+        name: "물안개",
+        price: 1000,
+        rarity: "RARE",
+        ...media,
+        mp4Url: "/uploads/cosmetics/2026/11/a.mp4",
+      });
+      // 아바타 장식은 MP4 를 쓰지 않는다
+      expect(item?.media?.mp4).toBeNull();
+      await admin.updateItem("admin", item!.code, { price: 500 });
+      const now = Date.now();
+      await admin.createDiscount("admin", {
+        name: "새 상품 20%",
+        percent: 20,
+        itemCodes: [item!.code],
+        startsAt: new Date(now - HOUR),
+        endsAt: new Date(now + HOUR),
+      });
+      expect((await catalog.find(item!.code))?.price).toBe(400);
     });
   });
 });

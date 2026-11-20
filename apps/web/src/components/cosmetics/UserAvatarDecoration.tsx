@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { AvatarDecoration } from "./avatar-effects";
-import { findCosmetic } from "./catalog";
+import { findCosmetic, useCosmeticCatalog } from "./catalog";
 import { useCosmeticLoadouts } from "./useCosmeticLoadouts";
 
 /**
@@ -19,6 +19,8 @@ export function UserAvatarDecoration({
   size: number;
   children: ReactNode;
 }) {
+  // 관리자가 추가한 상품의 그림 정의가 들어오면 다시 그린다
+  useCosmeticCatalog();
   const loadouts = useCosmeticLoadouts([userId]);
   const code = userId
     ? findCosmetic(loadouts[userId]?.AVATAR_FRAME)?.avatarEffect

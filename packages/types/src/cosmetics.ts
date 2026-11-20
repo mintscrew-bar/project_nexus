@@ -230,3 +230,49 @@ export function findCosmeticShopItem(
 
 /** 한 사람이 장착한 꾸미기 — 자리별 상품 코드 */
 export type CosmeticLoadout = Partial<Record<CosmeticSlot, string>>;
+
+/**
+ * 관리자가 올린 상품 파일 (상점 관리 2단계).
+ * 영상이 없으면 정지 그림(poster)만 쓴다. 아바타 장식은 투명 WebM + 투명 WebP.
+ */
+export interface CosmeticMedia {
+  /** WebM 영상 — 아바타 장식은 VP9+알파(투명) */
+  video: string | null;
+  /** H.264 MP4 — 사파리용(선택). 아바타 장식은 쓰지 않는다 */
+  mp4: string | null;
+  /** 정지 그림(WebP·PNG) — 영상 첫 장면·사파리 아바타 대체·움직임 끔 설정 */
+  poster: string;
+}
+
+/**
+ * 자리별 파일 규격(px) — 이 크기로 만들어 올린다. 화면은 이 비율로 칸을 잡는다.
+ * 아바타 장식은 가운데 지름 192px 원이 아바타 자리(장식 상자 = 아바타 지름 × 2).
+ */
+export const COSMETIC_MEDIA_SIZE: Record<
+  Exclude<CosmeticSlot, "NAME_STYLE">,
+  [number, number]
+> = {
+  CARD_FRAME: [440, 420],
+  AVATAR_FRAME: [384, 384],
+  PROFILE_BANNER: [1536, 640],
+};
+
+/**
+ * 상품을 그리는 데 필요한 정의 — GET /shop/catalog 가 준다(로그인 없이).
+ * 코드 상품은 관리자가 바꾼 이름·설명만, 관리자가 추가한 상품(custom)은 그림까지 담는다.
+ */
+export interface ShopCatalogEntry {
+  code: string;
+  slot: CosmeticSlot;
+  rarity: CosmeticRarity;
+  price: number;
+  /** 관리자가 바꾼 이름·설명 — 코드 상품은 null 이면 화면 기본 문구 */
+  name: string | null;
+  description: string | null;
+  /** 관리자가 추가한 상품인가 */
+  custom: boolean;
+  /** 그림을 빌려 쓸 기존 상품 코드 (custom 전용) */
+  baseCode: string | null;
+  /** 올린 파일 (custom 전용) */
+  media: CosmeticMedia | null;
+}
