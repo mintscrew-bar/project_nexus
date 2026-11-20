@@ -2,10 +2,8 @@
 
 import { useEffect } from "react";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
-import Link from "@tiptap/extension-link";
 import { isRichTextDocument } from "@/lib/rich-text";
+import { baseExtensions, RICH_TEXT_CLASS } from "./rich-text/extensions";
 
 interface RichTextViewerProps {
   content: JSONContent | null | undefined;
@@ -13,25 +11,14 @@ interface RichTextViewerProps {
 
 export function RichTextViewer({ content }: RichTextViewerProps) {
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Link.configure({
-        openOnClick: true,
-        autolink: true,
-      }),
-      Image.configure({
-        HTMLAttributes: {
-          class: "rounded-md border border-bg-tertiary max-h-[720px] object-contain",
-        },
-      }),
-    ],
+    // 글쓰기와 같은 노드 목록(표·사진 자리 포함) — 사진 자리는 보기 화면에서 숨는다
+    extensions: baseExtensions({ editable: false }),
     content: isRichTextDocument(content) ? content : undefined,
     editable: false,
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class:
-          "prose prose-invert max-w-none focus:outline-none [&_img]:my-4 [&_a]:text-accent-primary [&_a]:underline [&_pre]:bg-bg-tertiary [&_pre]:rounded-md [&_blockquote]:border-l-accent-primary",
+        class: RICH_TEXT_CLASS,
       },
     },
   });
