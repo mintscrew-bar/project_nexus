@@ -1113,6 +1113,19 @@ export const notificationSocketHelpers = {
     notificationSocket?.on("unread-count", callback);
   },
 
+  /**
+   * 메달 잔액이 바뀜(운영자 지급·경기 정산 등) — 헤더 메달 칩이 듣는다.
+   * 알림 저장소가 소켓을 다시 만들면 리스너가 지워지므로, 부르는 쪽이 소켓이 바뀔 때 다시 붙인다.
+   * 반환값으로 떼어 낸다.
+   */
+  onMedalBalance: (callback: (data: { balance: number }) => void) => {
+    const socket = notificationSocket;
+    socket?.on("medal-balance", callback);
+    return () => {
+      socket?.off("medal-balance", callback);
+    };
+  },
+
   /** 친구가 보낸 내전 초대. 알림(종) 목록과는 따로다 */
   onRoomInvite: (callback: (invite: any) => void) => {
     notificationSocket?.on("room-invite", callback);

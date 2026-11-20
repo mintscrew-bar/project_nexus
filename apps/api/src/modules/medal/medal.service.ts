@@ -1,6 +1,10 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, Optional } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { MedalReason, Prisma } from "@nexus/database";
 import { PrismaService } from "../prisma/prisma.service";
+
+/** 잔액 변경 이벤트 이름 — NotificationGateway 가 받아 그 사람에게 소켓으로 보낸다 */
+export const MEDAL_BALANCE_EVENT = "medal.balance.changed";
 
 /**
  * 메달 원장 한 줄을 남기며 잔액을 바꾸는 요청.
@@ -68,7 +72,21 @@ const HISTORY_MAX = 50;
 
 @Injectable()
 export class MedalService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // 테스트처럼 이벤트 모듈이 없는 곳에서도 돌게 선택 주입
+    @Optional() private readonly events?: EventEmitter2,
+  ) {}
+
+  /**
+   * 잔액이 바뀌었다고 알린다 — 알림 소켓이 그 사람 헤더의 메달 칩에 바로 전한다.
+   * 관리자가 준 메달이 새로고침 없이 보이게(예전엔 1분 주기 확인까지 늦었다).
+   * 트랜잭션이 커밋된 뒤에만 부른다 — 먼저 알리면 화면이 옛 잔액을 다시 읽는다.
+   */
+  announceBalance(userId: string | null | undefined, balance: number) {
+    if (!userId) return;
+    this.events?.emit(MEDAL_BALANCE_EVENT, { userId, balance });
+  }
 
   /** 현재 잔액 — 지갑이 아직 없으면 0 */
   async getBalance(userId: string): Promise<number> {
@@ -164,6 +182,7 @@ export class MedalService {
       const entry = await this.prisma.$transaction((tx) =>
         this.recordInTx(tx, input),
       );
+      this.announceBalance(input.userId, entry.balanceAfter);
       return { entry, duplicated: false };
     } catch (err: any) {
       // 같은 키 두 요청이 동시에 들어와 한쪽이 유니크 제약에 걸린 경우 —
@@ -273,6 +292,7 @@ export class MedalService {
           },
         });
       });
+      this.announceBalance(input.userId, entry.balanceAfter);
       return { entry, duplicated: false };
     } catch (err: any) {
       if (err?.code === "P2002") {
@@ -346,6 +366,7 @@ export class MedalService {
         });
         return row;
       });
+      this.announceBalance(input.userId, entry.balanceAfter);
       return { entry, duplicated: false };
     } catch (err: any) {
       if (err?.code === "P2002") {

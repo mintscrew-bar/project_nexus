@@ -8,6 +8,8 @@ import { Server, Socket } from "socket.io";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { Logger } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
+import { MEDAL_BALANCE_EVENT } from "../medal/medal.service";
 
 @WebSocketGateway({
   namespace: "notification",
@@ -87,5 +89,16 @@ export class NotificationGateway
    */
   sendRoomInvite(userId: string, invite: unknown) {
     this.server.to(`user:${userId}`).emit("room-invite", invite);
+  }
+
+  /**
+   * 메달 잔액이 바뀌면(운영자 지급·일괄 지급·경기 정산·구매·환불) 그 사람에게 바로 알린다.
+   * 헤더 메달 칩이 받아 잔액·내역을 다시 읽는다 — 새로고침 없이 반영되게.
+   */
+  @OnEvent(MEDAL_BALANCE_EVENT)
+  sendMedalBalance(payload: { userId: string; balance: number }) {
+    this.server
+      ?.to(`user:${payload.userId}`)
+      .emit("medal-balance", { balance: payload.balance });
   }
 }

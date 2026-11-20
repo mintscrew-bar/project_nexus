@@ -8,6 +8,8 @@ import { Medal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { medalApi, type MedalHistoryItem } from "@/lib/api-client";
+import { notificationSocketHelpers } from "@/lib/socket-client";
+import { useNotificationStore } from "@/stores/notification-store";
 import { MEDAL_LABEL } from "./catalog";
 import { ATTENDANCE_QUERY_KEY, AttendanceCard } from "./AttendanceCard";
 
@@ -111,6 +113,17 @@ export function MedalChip() {
     staleTime: 60 * 1000,
   });
   const needsCheckIn = attendance.data ? !attendance.data.checkedToday : false;
+
+  // 잔액이 바뀌었다는 소켓 알림(운영자 지급·일괄 지급·경기 정산 등)을 받으면 바로 다시 읽는다.
+  // 1분 주기 확인만으로는 관리자가 준 메달이 새로고침 전까지 늦게 보였다.
+  // 알림 소켓이 다시 연결되면 리스너가 지워지므로 연결 상태가 바뀔 때마다 다시 붙인다
+  const socketReady = useNotificationStore((s) => s.isConnected);
+  useEffect(() => {
+    if (!socketReady || !userId) return;
+    return notificationSocketHelpers.onMedalBalance(() => {
+      void queryClient.invalidateQueries({ queryKey: ["medals"] });
+    });
+  }, [socketReady, userId, queryClient]);
 
   const [open, setOpen] = useState(false);
   const [gain, setGain] = useState<{

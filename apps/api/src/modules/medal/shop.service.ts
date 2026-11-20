@@ -150,6 +150,8 @@ export class ShopService {
         }
         return entry;
       });
+      // 다른 탭·기기의 헤더 메달 칩도 바로 바뀌게
+      this.medalService.announceBalance(userId, result.balanceAfter);
       return { balance: result.balanceAfter, itemCode: code, equipped: equip };
     } catch (err: any) {
       // 같은 상품을 동시에 두 번 산 경우 — 한쪽만 들어가고 다른 쪽은 통째로 되돌려졌다
@@ -270,6 +272,7 @@ export class ShopService {
         }
         throw err;
       });
+    this.medalService.announceBalance(input.userId, entry.balanceAfter);
     return { balance: entry.balanceAfter, refunded: price, ledgerId: entry.id };
   }
 
