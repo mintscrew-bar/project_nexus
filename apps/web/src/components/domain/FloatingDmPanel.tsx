@@ -9,6 +9,7 @@
  */
 
 import { UserAvatarDecoration } from "@/components/cosmetics/UserAvatarDecoration";
+import { UserName } from "@/components/cosmetics/UserName";
 import { X, Minus } from "lucide-react";
 import { useFriendStore } from "@/stores/friend-store";
 import { useDmStore } from "@/stores/dm-store";
@@ -63,7 +64,9 @@ export function FloatingDmPanel() {
             />
           </UserAvatarDecoration>
           <span className="font-semibold text-text-primary text-sm truncate">
-            {floatingDmTarget.username}
+            <UserName userId={floatingDmTarget.id}>
+              {floatingDmTarget.username}
+            </UserName>
           </span>
         </div>
         <div className="flex items-center gap-1">

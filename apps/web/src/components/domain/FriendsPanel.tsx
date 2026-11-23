@@ -1,6 +1,7 @@
 "use client";
 
 import { UserAvatarDecoration } from "@/components/cosmetics/UserAvatarDecoration";
+import { UserName } from "@/components/cosmetics/UserName";
 import { useQuery } from "@tanstack/react-query";
 import {
   useState,
@@ -197,7 +198,7 @@ function HoverTooltip({
         </UserAvatarDecoration>
         <div className="min-w-0">
           <p className="font-semibold text-text-primary text-sm truncate">
-            {username}
+            <UserName userId={friendId}>{username}</UserName>
           </p>
           {meta.nickname && (
             <p className="text-xs text-text-tertiary truncate">
@@ -314,7 +315,7 @@ function FriendItem({
       {/* Name */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-text-primary truncate">
-          {displayName}
+          <UserName userId={friendUser.id}>{displayName}</UserName>
         </p>
         <p className="text-xs text-text-tertiary truncate">
           {status?.status === "ONLINE"
@@ -818,7 +819,7 @@ function AddFriendModal({ onClose }: { onClose: () => void }) {
                 />
               </UserAvatarDecoration>
               <span className="flex-1 text-sm text-text-primary truncate">
-                {u.username}
+                <UserName userId={u.id}>{u.username}</UserName>
               </span>
               <button
                 disabled={sentIds.has(u.id)}
@@ -1105,7 +1106,9 @@ function ConversationList({
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-text-primary truncate">
-                {getDisplayName(conv.user.id, conv.user.username)}
+                <UserName userId={conv.user.id}>
+                  {getDisplayName(conv.user.id, conv.user.username)}
+                </UserName>
               </span>
               <span className="text-[10px] text-text-tertiary flex-shrink-0 ml-1">
                 {formatTime(conv.lastAt)}
@@ -1252,7 +1255,7 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
         />
       </UserAvatarDecoration>
       <span className="flex-1 text-sm font-medium text-text-primary truncate">
-        {user.username}
+        <UserName userId={user.id}>{user.username}</UserName>
       </span>
       {action}
     </div>
@@ -1319,7 +1322,7 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
       </UserAvatarDecoration>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-text-primary truncate">
-          {user.username}
+          <UserName userId={user.id}>{user.username}</UserName>
         </p>
         <p className="text-[11px] text-text-tertiary truncate">{clanText}</p>
       </div>
