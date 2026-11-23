@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Medal, Sparkles } from "lucide-react";
-import { PortraitParticipantCard } from "@/app/[game]/tournaments/[id]/lobby/_components/PortraitParticipantCard";
 import { AvatarDecoration } from "@/components/cosmetics/avatar-effects";
 import { StyledName } from "@/components/cosmetics/name-styles";
 import {
@@ -30,7 +29,10 @@ import {
 } from "@/components/cosmetics/medal-sync";
 import { cn } from "@/lib/utils";
 import { NameTintPicker } from "@/components/cosmetics/NameTintPicker";
-import { CosmeticPreview } from "@/components/cosmetics/CosmeticPreview";
+import {
+  CosmeticPreview,
+  RealSizeLobbyCard,
+} from "@/components/cosmetics/CosmeticPreview";
 import {
   LiveBanner,
   liveBannerAspect,
@@ -70,22 +72,6 @@ const RARITY_TEXT: Record<CosmeticItem["rarity"], string> = {
   COMMON: "text-sky-300/80",
   PREMIUM: "text-violet-300/90",
   RARE: "text-amber-300",
-};
-
-const noop = () => {};
-/** 미리보기 카드는 눌러도 아무 일 없게 — 로비 카드의 조작 버튼을 끈다 */
-const PREVIEW_CARD_PROPS = {
-  size: "lg" as const,
-  isCurrentUserHost: false,
-  isSelf: false,
-  isFriend: true,
-  isSent: false,
-  addingFriend: null,
-  setHoveredPlayer: noop,
-  scheduleHoverClose: noop,
-  cancelHoverClose: noop,
-  handleAddFriend: noop,
-  setKickTarget: noop,
 };
 
 const AVATAR_FALLBACK = "/images/placeholders/non-avatar-256.png";
@@ -207,6 +193,8 @@ export default function ShopPage() {
     trying.PROFILE_BANNER ?? loadout.PROFILE_BANNER,
   )?.liveBanner;
   const shownNameStyle = findCosmetic(shownName)?.nameStyle;
+  // 닉네임에 고른 색 — 가진 글꼴이면 저장된 값(입어 보는 중이어도 내 것이면 그 색)
+  const shownTint = shownName ? stateByCode.get(shownName)?.tint : null;
   const avatarSrc = user?.avatar || AVATAR_FALLBACK;
   const me = {
     id: "me",
@@ -559,50 +547,73 @@ export default function ShopPage() {
                 </button>
               )}
             </div>
-            {/* 프로필 배경 — 입어 보거나 끼고 있으면 위에 띠로 */}
-            {shownBanner && (
+            {/* 미니 프로필 — 실제 프로필 머리처럼 배경 위에 장식한 아바타가 걸치고 아래에 닉네임.
+                배경 장식이 없으면 올린 배경 이미지, 그것도 없으면 옅은 바탕 */}
+            <div className="overflow-hidden rounded-lg bg-bg-primary/60">
               <div
-                className="relative mb-3 w-full overflow-hidden rounded-md"
-                style={{ aspectRatio: liveBannerAspect(shownBanner) }}
+                className="relative w-full overflow-hidden bg-gradient-to-br from-accent-primary/25 to-accent-primary/5"
+                style={{ aspectRatio: liveBannerAspect() }}
               >
-                <LiveBanner code={shownBanner} className="absolute inset-0" />
+                {user?.profileBanner && (
+                  <Image
+                    src={user.profileBanner}
+                    alt=""
+                    fill
+                    unoptimized
+                    className="pointer-events-none object-cover"
+                  />
+                )}
+                {shownBanner && (
+                  <LiveBanner code={shownBanner} className="absolute inset-0" />
+                )}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg-secondary/90 to-transparent" />
               </div>
-            )}
-            <div className="flex items-start justify-center gap-4">
-              <div className="w-[136px] flex-shrink-0">
-                <PortraitParticipantCard
-                  {...PREVIEW_CARD_PROPS}
-                  p={me}
-                  frameCode={shownCard}
-                  avatarFrameCode={shownAvatar}
-                  nameStyleCode={shownName ?? null}
-                  nameTint={shownName ? stateByCode.get(shownName)?.tint : null}
-                />
-              </div>
-              <div className="flex flex-col items-center gap-3 pt-6">
-                <AvatarDecoration
-                  code={findCosmetic(shownAvatar)?.avatarEffect}
-                  size={84}
-                >
-                  <div className="relative h-[84px] w-[84px] overflow-hidden rounded-full bg-bg-tertiary">
-                    <Image
-                      src={avatarSrc}
-                      alt=""
-                      fill
-                      unoptimized
-                      className="object-cover"
-                    />
-                  </div>
-                </AvatarDecoration>
-                <div className="max-w-[120px] truncate text-base font-black text-text-primary">
-                  <StyledName
-                    code={shownNameStyle}
-                    tint={shownName ? stateByCode.get(shownName)?.tint : null}
+              <div className="relative flex items-end gap-3 px-3 pb-3">
+                {/* 아바타 — 배경에 반쯤 걸친다 */}
+                <div className="-mt-9 flex-shrink-0">
+                  <AvatarDecoration
+                    code={findCosmetic(shownAvatar)?.avatarEffect}
+                    size={64}
                   >
-                    {me.username}
-                  </StyledName>
+                    <div className="relative h-16 w-16 overflow-hidden rounded-full bg-bg-tertiary ring-4 ring-bg-secondary">
+                      <Image
+                        src={avatarSrc}
+                        alt=""
+                        fill
+                        unoptimized
+                        className="object-cover"
+                      />
+                    </div>
+                  </AvatarDecoration>
+                </div>
+                <div className="min-w-0 pb-0.5">
+                  <p className="truncate text-lg font-black text-text-primary">
+                    <StyledName code={shownNameStyle} tint={shownTint}>
+                      {me.username}
+                    </StyledName>
+                  </p>
+                  <p className="text-[11px] text-text-tertiary">프로필</p>
                 </div>
               </div>
+            </div>
+
+            {/* 로비 카드(실제 크기) + 채팅 한 줄 — 내전 방에서 남들이 보는 모습 */}
+            <div className="mt-3 flex justify-center">
+              <RealSizeLobbyCard
+                p={me}
+                frameCode={shownCard}
+                avatarFrameCode={shownAvatar}
+                nameStyleCode={shownName ?? null}
+                nameTint={shownTint}
+              />
+            </div>
+            <div className="mt-3 rounded-lg bg-bg-tertiary/60 px-2.5 py-2 text-xs leading-relaxed text-text-secondary">
+              <span className="font-bold text-text-primary">
+                <StyledName code={shownNameStyle} tint={shownTint}>
+                  {me.username}
+                </StyledName>
+              </span>
+              : 미드 갈게요
             </div>
             <p className="mt-3 text-[11px] text-text-tertiary">
               입어 보는 모습은 나에게만 보여요. 산 상품은 로비의 다른 참가자와

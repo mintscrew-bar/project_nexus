@@ -26,6 +26,49 @@ const PREVIEW_CARD_PROPS = {
 };
 
 /**
+ * 실제 로비 카드 크기(큰 카드) — 장식 규격 440×420 의 절반 폭. 높이는 준비 띠까지.
+ * 미리보기는 이 크기로 그린 뒤 비율 그대로 줄인다(폭만 좁히면 세로로 늘어 보인다).
+ */
+export const LOBBY_CARD_REAL: [number, number] = [220, 216];
+
+/** 로비 카드를 실제 크기로 그려 `scale` 배로 줄인다(zoom — 줄인 크기대로 자리를 차지한다) */
+export function RealSizeLobbyCard({
+  scale = 1,
+  p,
+  frameCode,
+  avatarFrameCode,
+  nameStyleCode = null,
+  nameTint,
+}: {
+  scale?: number;
+  p: {
+    id: string;
+    userId: string;
+    username: string;
+    avatar: string;
+    isHost: boolean;
+    isReady: boolean;
+  };
+  frameCode?: string | null;
+  avatarFrameCode?: string | null;
+  nameStyleCode?: string | null;
+  nameTint?: NameTint | null;
+}) {
+  return (
+    <div style={{ width: LOBBY_CARD_REAL[0], zoom: scale }}>
+      <PortraitParticipantCard
+        {...PREVIEW_CARD_PROPS}
+        p={p}
+        frameCode={frameCode}
+        avatarFrameCode={avatarFrameCode}
+        nameStyleCode={nameStyleCode}
+        nameTint={nameTint}
+      />
+    </div>
+  );
+}
+
+/**
  * 꾸미기 상품 하나를 실제로 입힌 모습 — 홈의 상점 줄처럼 같은 높이 칸에 나란히 둘 때 쓴다.
  * 상점 화면의 진열과 같은 그림(로비 카드·아바타·닉네임·프로필 배경)을 높이만 맞춰 그린다.
  */
@@ -91,28 +134,25 @@ export function CosmeticPreview({
       </div>
     );
   }
-  // 카드 장식 — 로비 카드에 입혀 보인다(폭 136px 이면 칸 높이 216px 안에 들어간다)
+  // 카드 장식 — 실제 로비 카드 크기(220×216)를 비율 그대로 칸 높이에 맞춰 줄인다.
+  // 예전엔 폭만 136px 로 좁혀 세로로 길쭉해 보였다(2026-11-24 「실제 크기랑 다르다」)
   return (
     <div
       className="flex items-center justify-center overflow-hidden"
       style={{ height }}
     >
-      <div className="w-[136px]">
-        <PortraitParticipantCard
-          {...PREVIEW_CARD_PROPS}
-          p={{
-            id: `preview-${item.code}`,
-            userId: "me",
-            username,
-            avatar: avatarSrc,
-            isHost: false,
-            isReady: true,
-          }}
-          frameCode={item.code}
-          avatarFrameCode={undefined}
-          nameStyleCode={null}
-        />
-      </div>
+      <RealSizeLobbyCard
+        scale={Math.min(1, (height - 12) / LOBBY_CARD_REAL[1])}
+        p={{
+          id: `preview-${item.code}`,
+          userId: "me",
+          username,
+          avatar: avatarSrc,
+          isHost: false,
+          isReady: true,
+        }}
+        frameCode={item.code}
+      />
     </div>
   );
 }
