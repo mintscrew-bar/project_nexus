@@ -1,5 +1,6 @@
 "use client";
 
+import { UserAvatarDecoration } from "@/components/cosmetics/UserAvatarDecoration";
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Input, Avatar } from '@/components/ui';
 import { cn, getRelativeTime } from '@/lib/utils';
@@ -92,7 +93,10 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
             const isOwn = msg.userId === currentUserId;
             return (
               <div key={msg.id} className={cn('flex min-w-0 gap-3 animate-fade-in', isOwn && 'flex-row-reverse')}>
-                <Avatar src={msg.avatar} alt={msg.username || '?'} fallback={msg.username?.[0] || '?'} size="sm" />
+                {/* 장착한 아바타 장식까지 */}
+                <UserAvatarDecoration userId={msg.userId} size={32}>
+                  <Avatar src={msg.avatar} alt={msg.username || '?'} fallback={msg.username?.[0] || '?'} size="sm" />
+                </UserAvatarDecoration>
                 <div className={cn('min-w-0 flex-1 max-w-[70%]', isOwn && 'flex flex-col items-end')}>
                   <div className="flex max-w-full items-baseline gap-2 mb-1">
                     <span className="text-sm font-medium text-text-primary">

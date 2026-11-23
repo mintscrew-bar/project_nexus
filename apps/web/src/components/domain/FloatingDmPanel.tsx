@@ -8,6 +8,7 @@
  * - 모바일: 전체 너비 바텀시트, 데스크탑: 320px 고정 팝업
  */
 
+import { UserAvatarDecoration } from "@/components/cosmetics/UserAvatarDecoration";
 import { X, Minus } from "lucide-react";
 import { useFriendStore } from "@/stores/friend-store";
 import { useDmStore } from "@/stores/dm-store";
@@ -52,13 +53,15 @@ export function FloatingDmPanel() {
       {/* 헤더 */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-bg-tertiary bg-bg-secondary/95 backdrop-blur-sm">
         <div className="flex items-center gap-2 min-w-0">
-          <Avatar
-            src={floatingDmTarget.avatar}
-            alt={floatingDmTarget.username}
-            fallback={floatingDmTarget.username}
-            size="sm"
-            className="[&>div]:h-7 [&>div]:w-7 [&>div]:text-[10px]"
-          />
+          <UserAvatarDecoration userId={floatingDmTarget.id} size={28}>
+            <Avatar
+              src={floatingDmTarget.avatar}
+              alt={floatingDmTarget.username}
+              fallback={floatingDmTarget.username}
+              size="sm"
+              className="[&>div]:h-7 [&>div]:w-7 [&>div]:text-[10px]"
+            />
+          </UserAvatarDecoration>
           <span className="font-semibold text-text-primary text-sm truncate">
             {floatingDmTarget.username}
           </span>

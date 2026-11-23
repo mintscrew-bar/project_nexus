@@ -1,5 +1,6 @@
 "use client";
 
+import { UserAvatarDecoration } from "@/components/cosmetics/UserAvatarDecoration";
 import { useQuery } from "@tanstack/react-query";
 import {
   useState,
@@ -186,12 +187,14 @@ function HoverTooltip({
       style={{ minWidth: 200 }}
     >
       <div className="flex items-center gap-3 mb-2">
-        <Avatar
-          src={friendship.friend?.avatar || friendship.user.avatar}
-          alt={username}
-          fallback={username}
-          size="md"
-        />
+        <UserAvatarDecoration userId={friendId} size={40}>
+          <Avatar
+            src={friendship.friend?.avatar || friendship.user.avatar}
+            alt={username}
+            fallback={username}
+            size="md"
+          />
+        </UserAvatarDecoration>
         <div className="min-w-0">
           <p className="font-semibold text-text-primary text-sm truncate">
             {username}
@@ -293,12 +296,14 @@ function FriendItem({
             {unread > 99 ? "99+" : unread}
           </span>
         )}
-        <Avatar
-          src={friendUser.avatar}
-          alt={displayName}
-          fallback={displayName}
-          size="sm"
-        />
+        <UserAvatarDecoration userId={friendUser.id} size={32}>
+          <Avatar
+            src={friendUser.avatar}
+            alt={displayName}
+            fallback={displayName}
+            size="sm"
+          />
+        </UserAvatarDecoration>
         <span
           className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-bg-secondary
             ${status?.status === "ONLINE" ? "bg-accent-success" : status?.status === "AWAY" ? "bg-accent-gold" : "bg-text-tertiary/40"}
@@ -804,12 +809,14 @@ function AddFriendModal({ onClose }: { onClose: () => void }) {
               key={u.id}
               className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-bg-tertiary transition-colors"
             >
-              <Avatar
-                src={u.avatar}
-                alt={u.username}
-                fallback={u.username}
-                size="sm"
-              />
+              <UserAvatarDecoration userId={u.id} size={32}>
+                <Avatar
+                  src={u.avatar}
+                  alt={u.username}
+                  fallback={u.username}
+                  size="sm"
+                />
+              </UserAvatarDecoration>
               <span className="flex-1 text-sm text-text-primary truncate">
                 {u.username}
               </span>
@@ -1087,12 +1094,14 @@ function ConversationList({
           onClick={() => onOpenChat(conv.user.id)}
           className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-bg-elevated/60 transition-colors text-left"
         >
-          <Avatar
-            src={conv.user.avatar}
-            alt={conv.user.username}
-            fallback={conv.user.username}
-            size="sm"
-          />
+          <UserAvatarDecoration userId={conv.user.id} size={32}>
+            <Avatar
+              src={conv.user.avatar}
+              alt={conv.user.username}
+              fallback={conv.user.username}
+              size="sm"
+            />
+          </UserAvatarDecoration>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-text-primary truncate">
@@ -1234,12 +1243,14 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
     action: React.ReactNode;
   }) => (
     <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-elevated transition-colors">
-      <Avatar
-        src={avatar}
-        alt={user.username}
-        fallback={user.username}
-        size="sm"
-      />
+      <UserAvatarDecoration userId={user.id} size={32}>
+        <Avatar
+          src={avatar}
+          alt={user.username}
+          fallback={user.username}
+          size="sm"
+        />
+      </UserAvatarDecoration>
       <span className="flex-1 text-sm font-medium text-text-primary truncate">
         {user.username}
       </span>
@@ -1298,12 +1309,14 @@ function PendingList({ currentUserId }: { currentUserId: string }) {
     action: React.ReactNode;
   }) => (
     <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-elevated transition-colors">
-      <Avatar
-        src={user.avatar}
-        alt={user.username}
-        fallback={user.username}
-        size="sm"
-      />
+      <UserAvatarDecoration userId={user.id} size={32}>
+        <Avatar
+          src={user.avatar}
+          alt={user.username}
+          fallback={user.username}
+          size="sm"
+        />
+      </UserAvatarDecoration>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-text-primary truncate">
           {user.username}

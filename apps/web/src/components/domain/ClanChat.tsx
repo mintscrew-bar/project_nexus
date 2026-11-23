@@ -1,5 +1,6 @@
 "use client";
 
+import { UserAvatarDecoration } from "@/components/cosmetics/UserAvatarDecoration";
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import Image from "next/image";
 import { useClanStore } from "@/stores/clan-store";
@@ -460,6 +461,11 @@ export function ClanChat({ clanId, myRole }: ClanChatProps) {
               >
                 {/* 아바타 (연속 메시지이거나 내 메시지면 숨김) */}
                 {!isMe && (
+                  // 장착한 아바타 장식 — 이어지는 메시지(사진 숨김)에는 씌우지 않는다
+                  <UserAvatarDecoration
+                    userId={showHeader ? msg.userId : null}
+                    size={32}
+                  >
                   <div
                     className={cn(
                       "relative w-8 h-8 rounded-full bg-bg-elevated overflow-hidden flex-shrink-0",
@@ -480,6 +486,7 @@ export function ClanChat({ clanId, myRole }: ClanChatProps) {
                       </div>
                     )}
                   </div>
+                  </UserAvatarDecoration>
                 )}
 
                 <div
