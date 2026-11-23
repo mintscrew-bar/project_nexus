@@ -45,7 +45,8 @@ export const LIVE_BANNERS = {
     mp4: "/cosmetics/banners/ink_swordsman/loop.mp4",
     poster: "/cosmetics/banners/ink_swordsman/poster.webp",
     size: [1280, 736],
-    focusY: 0.5,
+    // 12:5 칸에 맞추면 위아래 203px 이 잘린다 — 위쪽 35% 에서 잘라 달 꼭대기~칼까지 남긴다
+    focusY: 0.35,
   },
 } satisfies Record<string, LiveBannerDef>;
 
@@ -60,10 +61,14 @@ export function resolveLiveBanner(src: LiveBannerSource): LiveBannerDef {
   return typeof src === "string" ? LIVE_BANNERS[src] : src;
 }
 
-/** 그 배경의 가로:세로 비율 (CSS aspect-ratio 값) — 배너·미리보기 칸을 영상과 같은 비율로 */
-export function liveBannerAspect(code: LiveBannerSource): string {
-  const [w, h] = resolveLiveBanner(code).size;
-  return `${w} / ${h}`;
+/**
+ * 프로필 배경 칸 비율 (CSS aspect-ratio 값) — 모든 배경 장식이 같은 크기(규격 1536×640, 12:5).
+ * 예전엔 영상마다 제 비율로 칸을 잡아 검객(1280×736)이 기사(1536×640)보다 훨씬 높게 나왔다
+ * (2026-11-24). 규격과 다른 영상은 칸에 맞춰 잘리고, 잘리는 위치는 배경마다 focusY 로 정한다.
+ */
+export const PROFILE_BANNER_ASPECT = "1536 / 640";
+export function liveBannerAspect(_code?: LiveBannerSource): string {
+  return PROFILE_BANNER_ASPECT;
 }
 
 export function LiveBanner({
@@ -120,7 +125,10 @@ export function LiveBanner({
         className,
       )}
     >
+      {/* key — 배경을 바꾸면 영상 칸을 새로 만든다. <source> 주소만 바꾸면 브라우저가
+          영상을 다시 불러오지 않아 앞의 배경이 계속 재생됐다(2026-11-24 「바꿨는데 적용 안 됨」) */}
       <video
+        key={`${def.mp4 ?? ""}|${def.webm ?? ""}|${def.poster}`}
         ref={videoRef}
         className="absolute inset-0 h-full w-full object-cover"
         style={{ objectPosition: `50% ${def.focusY * 100}%` }}

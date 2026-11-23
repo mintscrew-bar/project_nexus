@@ -6,6 +6,7 @@ import { CalendarCheck, Check, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { medalApi, type AttendanceStatus } from "@/lib/api-client";
 import { MEDAL_LABEL } from "./catalog";
+import { refreshMedalViews } from "./medal-sync";
 
 /** 출석 현황 쿼리 키 — 메달 칩(점 표시)과 이 카드가 같이 본다 */
 export const ATTENDANCE_QUERY_KEY = ["medals", "attendance"] as const;
@@ -34,6 +35,8 @@ export function AttendanceCard({
     mutationFn: medalApi.checkIn,
     onSuccess: (res) => {
       queryClient.setQueryData(ATTENDANCE_QUERY_KEY, res);
+      // 받은 메달을 헤더 칩·상점 잔액에 바로 반영한다(부르는 쪽에 맡기지 않는다)
+      refreshMedalViews(queryClient);
       if (res.granted + res.bonus > 0) setJustGot(res.granted + res.bonus);
       onGranted?.();
     },

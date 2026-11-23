@@ -487,8 +487,9 @@ export default function UserProfilePage() {
             넓은 화면 기준 약 3:1(360px)로 키웠다. */}
         <Card className="mb-4 overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
           <div
-            // 배경 장식을 쓰면 배너를 영상 비율로 키운다 — 고정 높이(360px)면 2.4:1 영상의
-            // 위아래 35% 가 잘려 해·칼이 빠졌다(2026-11-18). 올린 이미지는 예전 높이 그대로
+            // 배경 장식을 쓰면 배너를 규격 비율(12:5)로 키운다 — 고정 높이(360px)면 2.4:1 영상의
+            // 위아래 35% 가 잘려 해·칼이 빠졌다(2026-11-18). 배경마다 높이가 달라지지 않게
+            // 모든 장식이 같은 비율을 쓴다(2026-11-24). 올린 이미지는 예전 높이 그대로
             className={cn(
               "relative w-full bg-bg-tertiary",
               !bannerFx && "h-52 sm:h-64 md:h-80 lg:h-[360px]",

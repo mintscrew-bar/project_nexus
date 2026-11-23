@@ -12,6 +12,7 @@ import { notificationSocketHelpers } from "@/lib/socket-client";
 import { useNotificationStore } from "@/stores/notification-store";
 import { MEDAL_LABEL } from "./catalog";
 import { ATTENDANCE_QUERY_KEY, AttendanceCard } from "./AttendanceCard";
+import { refreshMedalViews, setMedalBalance } from "./medal-sync";
 
 /** 원장 사유 → 화면 이름 */
 export const REASON_LABEL: Record<string, string> = {
@@ -120,8 +121,10 @@ export function MedalChip() {
   const socketReady = useNotificationStore((s) => s.isConnected);
   useEffect(() => {
     if (!socketReady || !userId) return;
-    return notificationSocketHelpers.onMedalBalance(() => {
-      void queryClient.invalidateQueries({ queryKey: ["medals"] });
+    return notificationSocketHelpers.onMedalBalance(({ balance }) => {
+      // 새 잔액을 바로 넣고(헤더·상점), 내역·상점 진열도 새로 읽는다
+      setMedalBalance(queryClient, balance);
+      refreshMedalViews(queryClient);
     });
   }, [socketReady, userId, queryClient]);
 

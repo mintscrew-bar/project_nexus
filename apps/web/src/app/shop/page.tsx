@@ -21,7 +21,13 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/auth-store";
-import { shopApi, type ShopItemState } from "@/lib/api-client";
+import { medalApi, shopApi, type ShopItemState } from "@/lib/api-client";
+import { MEDAL_QUERY_KEY } from "@/components/cosmetics/MedalChip";
+import {
+  applyLoadout,
+  refreshMedalViews,
+  setMedalBalance,
+} from "@/components/cosmetics/medal-sync";
 import { cn } from "@/lib/utils";
 import { NameTintPicker } from "@/components/cosmetics/NameTintPicker";
 import { CosmeticPreview } from "@/components/cosmetics/CosmeticPreview";
@@ -100,6 +106,13 @@ export default function ShopPage() {
     queryFn: shopApi.getShop,
     enabled: isAuthenticated,
   });
+  // 잔액은 헤더 메달 칩과 같은 쿼리를 본다 — 출석·운영자 지급 뒤 상점만 옛 값으로 남지 않게
+  const medal = useQuery({
+    queryKey: MEDAL_QUERY_KEY,
+    queryFn: medalApi.getMine,
+    enabled: isAuthenticated,
+    staleTime: 30 * 1000,
+  });
 
   // 코드 상품 + 관리자가 추가한 상품(서버 상품표가 들어오면 다시 그린다)
   const allCosmetics = useCosmeticCatalog();
@@ -122,19 +135,20 @@ export default function ShopPage() {
   }, [data]);
 
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["shop"] });
-    queryClient.invalidateQueries({ queryKey: ["medals"] });
-    // 로비 카드·프로필이 들고 있는 장착 상태도 새로 읽게
-    queryClient.invalidateQueries({ queryKey: [LOADOUT_QUERY_KEY] });
+    // 잔액(헤더 칩·상점)과 로비 카드·프로필이 들고 있는 장착 상태를 함께 새로 읽는다
+    refreshMedalViews(queryClient);
+    void queryClient.invalidateQueries({ queryKey: [LOADOUT_QUERY_KEY] });
   };
 
   const purchase = useMutation({
     // 확인 창에 띄운 가격을 같이 보낸다 — 그 사이 할인이 끝나거나 값이 바뀌면 서버가 거절
     mutationFn: (item: CosmeticItem) =>
       shopApi.purchase(item.code, true, item.price),
-    onSuccess: (_res, item) => {
+    onSuccess: (res, item) => {
       addToast(`「${item.name}」을 사서 바로 장착했어요`, "success");
       setConfirm(null);
+      // 깎인 잔액을 바로 넣고(다시 읽기 전에도 헤더·상점 숫자가 맞게) 새로 읽는다
+      setMedalBalance(queryClient, res.balance);
       refresh();
     },
     onError: (err: any) => {
@@ -153,7 +167,12 @@ export default function ShopPage() {
   const equip = useMutation({
     mutationFn: ({ slot, code }: { slot: ShopSlot; code: string | null }) =>
       shopApi.equip(slot, code),
-    onSuccess: refresh,
+    onSuccess: (loadout, { slot }) => {
+      // 서버가 돌려준 장착 상태를 바로 넣는다 — 다시 읽는 사이 옛 장착이 보이지 않게
+      applyLoadout(queryClient, loadout);
+      // 그 자리를 입어 보던 중이면 내려놓는다 — 미리보기가 실제 장착을 보이게
+      setTrying((t) => ({ ...t, [slot]: undefined }));
+    },
     onError: () => addToast("장착하지 못했어요.", "error"),
   });
 
@@ -178,7 +197,7 @@ export default function ShopPage() {
     );
   }
 
-  const balance = data?.balance ?? 0;
+  const balance = medal.data?.balance ?? data?.balance ?? 0;
   const loadout = data?.loadout ?? {};
   // 미리보기에 입힐 것: 고른 상품 > 장착한 상품
   const shownCard = trying.CARD_FRAME ?? loadout.CARD_FRAME;

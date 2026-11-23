@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { useCosmeticCatalog } from "@/components/cosmetics/catalog";
 import { LiveBanner } from "@/components/cosmetics/live-banner";
 import { NameTintPicker } from "@/components/cosmetics/NameTintPicker";
+import { applyLoadout } from "@/components/cosmetics/medal-sync";
 import {
   LOADOUT_QUERY_KEY,
   useCosmeticLoadouts,
@@ -84,17 +85,37 @@ export function ProfileEditModal({
   );
   const chosenBanner =
     pendingBanner === undefined ? equippedBanner : pendingBanner;
+  // 요청이 끝나기 전에 다른 배경을 누르면 두 요청이 엇갈려 앞의 것이 남곤 했다 —
+  // 마지막으로 누른 것만 보낸다(보내는 중에 누르면 끝난 뒤 그것을 이어서 보낸다)
+  const bannerBusy = useRef(false);
+  const bannerNext = useRef<string | null | undefined>(undefined);
   const chooseBanner = async (code: string | null) => {
     if (code === chosenBanner) return;
     setPendingBanner(code);
+    if (bannerBusy.current) {
+      bannerNext.current = code;
+      return;
+    }
+    bannerBusy.current = true;
+    let target: string | null | undefined = code;
     try {
-      await shopApi.equip("PROFILE_BANNER", code);
-      // 프로필·상점이 들고 있는 장착 상태를 새로 읽게 한다
-      await queryClient.invalidateQueries({ queryKey: [LOADOUT_QUERY_KEY] });
-      await queryClient.invalidateQueries({ queryKey: ["shop"] });
+      while (target !== undefined) {
+        bannerNext.current = undefined;
+        const loadout = await shopApi.equip("PROFILE_BANNER", target);
+        // 서버가 돌려준 장착 상태를 바로 넣는다(상점 진열·로비·프로필)
+        applyLoadout(queryClient, loadout);
+        queryClient.setQueryData(
+          [LOADOUT_QUERY_KEY, user?.id ?? ""],
+          (old: Record<string, unknown> | undefined) =>
+            user?.id ? { ...(old ?? {}), [user.id]: loadout } : old,
+        );
+        target = bannerNext.current;
+      }
     } catch {
       addToast("배경을 바꾸지 못했어요. 다시 시도해 주세요.", "error");
     } finally {
+      bannerBusy.current = false;
+      bannerNext.current = undefined;
       setPendingBanner(undefined);
     }
   };

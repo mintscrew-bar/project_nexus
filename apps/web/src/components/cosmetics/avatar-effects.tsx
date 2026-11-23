@@ -233,7 +233,9 @@ function MediaAvatarFx({ size, media }: FxProps & { media: AvatarMediaDef }) {
       }}
     >
       {useVideo ? (
+        // key — 다른 장식으로 바꾸면 영상 칸을 새로 만든다(<source> 만 바꾸면 앞 영상이 남는다)
         <video
+          key={media.video}
           ref={ref}
           aria-hidden
           muted

@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshMedalViews } from "@/components/cosmetics/medal-sync";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
@@ -113,7 +114,7 @@ function CommendationModal({
       }
       queryClient.invalidateQueries({ queryKey: ["pendingCommendation"] });
       // 칭찬 창까지 끝나면 그 경기 메달이 다 들어와 있다 — 헤더 칩이 「+N」을 띄운다
-      queryClient.invalidateQueries({ queryKey: ["medals"] });
+      refreshMedalViews(queryClient);
     },
     onError: (err: any) => {
       // 이미 끝낸 경기면(다른 탭에서 제출 등) 조용히 닫는다
