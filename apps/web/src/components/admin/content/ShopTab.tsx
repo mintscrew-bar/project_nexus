@@ -6,6 +6,7 @@ import {
   Eye,
   EyeOff,
   Gift,
+  Package,
   Pencil,
   Percent,
   Plus,
@@ -418,6 +419,7 @@ export function ShopTab({ addToast }: { addToast: AddToast }) {
           addToast={addToast}
           onDone={refresh}
         />
+        <BundlePanel items={all} addToast={addToast} onDone={refresh} />
       </div>
 
       {creating && (
@@ -923,6 +925,200 @@ function DiscountPanel({
                   </Button>
                 </RowActions>
               )}
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * 묶음(번들) 관리 (2026-11-24) — 상품 2~12개 + 할인율로 묶음을 만들고 판매를 켜고 끈다.
+ * 사는 사람은 이미 가진 상품을 빼고 나머지 값에 할인을 받는다. 지우지 않고 판매를 내린다.
+ */
+function BundlePanel({
+  items,
+  addToast,
+  onDone,
+}: {
+  items: AdminShopItem[];
+  addToast: AddToast;
+  onDone: () => void;
+}) {
+  const bundlesQuery = useQuery({
+    queryKey: ["admin-shop", "bundles"],
+    queryFn: adminShopApi.listBundles,
+  });
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [percent, setPercent] = useState("20");
+  const [codes, setCodes] = useState<string[]>([]);
+  const priceOf = (code: string) =>
+    items.find((i) => i.code === code)?.basePrice ?? 0;
+  const full = codes.reduce((s, c) => s + priceOf(c), 0);
+  const pct = Math.round(Number(percent)) || 0;
+  const bundlePrice = Math.max(1, Math.round((full * (100 - pct)) / 100));
+
+  const create = useMutation({
+    mutationFn: () =>
+      adminShopApi.createBundle({
+        name: name.trim(),
+        description: description.trim() || null,
+        itemCodes: codes,
+        percent: pct,
+        onSale: true,
+      }),
+    onSuccess: () => {
+      addToast("묶음을 만들었어요.", "success");
+      setName("");
+      setDescription("");
+      setCodes([]);
+      onDone();
+    },
+    onError: (e) => addToast(errMsg(e, "만들지 못했어요."), "error"),
+  });
+  const toggle = useMutation({
+    mutationFn: (b: { id: string; onSale: boolean }) =>
+      adminShopApi.updateBundle(b.id, { onSale: !b.onSale }),
+    onSuccess: () => onDone(),
+    onError: (e) => addToast(errMsg(e, "바꾸지 못했어요."), "error"),
+  });
+
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-4">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+          <Package className="h-4 w-4 text-text-tertiary" />
+          묶음 판매
+        </h3>
+        <div className="grid grid-cols-[1fr_88px] gap-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={40}
+            placeholder="묶음 이름 (예: 입문 세트)"
+            className="rounded-lg bg-bg-tertiary px-3 py-2 text-sm text-text-primary focus:outline-none"
+          />
+          <label className="flex items-center gap-1 rounded-lg bg-bg-tertiary px-3 text-sm">
+            <input
+              type="number"
+              min={1}
+              max={90}
+              value={percent}
+              onChange={(e) => setPercent(e.target.value)}
+              className="w-full bg-transparent tabular-nums text-text-primary focus:outline-none"
+            />
+            %
+          </label>
+        </div>
+        <input
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          maxLength={200}
+          placeholder="설명 (선택)"
+          className="w-full rounded-lg bg-bg-tertiary px-3 py-2 text-sm text-text-primary focus:outline-none"
+        />
+        <div>
+          <p className="mb-1 text-xs text-text-muted">
+            넣을 상품 — {codes.length}개
+            {codes.length >= 2 && (
+              <>
+                {" "}
+                · 합 {full.toLocaleString()} → 묶음{" "}
+                <b className="text-text-primary">
+                  {bundlePrice.toLocaleString()}
+                </b>{" "}
+                (아무것도 없는 사람 기준)
+              </>
+            )}
+          </p>
+          <div className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">
+            {items
+              .filter((i) => !i.hidden)
+              .map((i) => {
+                const on = codes.includes(i.code);
+                return (
+                  <button
+                    key={i.code}
+                    type="button"
+                    onClick={() =>
+                      setCodes((c) =>
+                        on ? c.filter((x) => x !== i.code) : [...c, i.code],
+                      )
+                    }
+                    className={cn(
+                      "rounded-md px-2 py-0.5 text-[11px]",
+                      on
+                        ? "bg-accent-primary text-accent-on"
+                        : "bg-bg-tertiary text-text-secondary hover:text-text-primary",
+                    )}
+                  >
+                    {shownName(i)}
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+        <Button
+          size="sm"
+          disabled={
+            !name.trim() ||
+            codes.length < 2 ||
+            codes.length > 12 ||
+            pct < 1 ||
+            pct > 90 ||
+            create.isPending
+          }
+          onClick={() => create.mutate()}
+        >
+          묶음 만들기
+        </Button>
+
+        <div className="space-y-1.5 border-t border-bg-tertiary pt-3">
+          {(bundlesQuery.data ?? []).length === 0 && (
+            <p className="text-xs text-text-muted">만든 묶음이 없어요.</p>
+          )}
+          {(bundlesQuery.data ?? []).map((b) => (
+            <div
+              key={b.id}
+              className={cn(
+                "group flex items-center justify-between gap-2 rounded-lg bg-bg-tertiary/40 px-3 py-2 text-xs",
+                !b.onSale && "opacity-60",
+              )}
+            >
+              <span className="min-w-0">
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "rounded px-1.5 py-0.5 text-[10px]",
+                      b.onSale
+                        ? "bg-green-500/15 text-green-400"
+                        : "bg-bg-tertiary text-text-muted",
+                    )}
+                  >
+                    {b.onSale ? "판매 중" : "내림"}
+                  </span>
+                  <span className="truncate font-medium text-text-primary">
+                    {b.name} -{b.percent}%
+                  </span>
+                </span>
+                <span className="mt-0.5 block text-text-muted">
+                  {b.itemCodes.length}개 · {b.fullPrice.toLocaleString()} →{" "}
+                  {b.price.toLocaleString()} · 판매 {b.stats.sold} · 쓴{" "}
+                  {MEDAL_LABEL} {b.stats.medals.toLocaleString()}
+                </span>
+              </span>
+              <RowActions>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={toggle.isPending}
+                  onClick={() => toggle.mutate(b)}
+                >
+                  {b.onSale ? "판매 내리기" : "판매 시작"}
+                </Button>
+              </RowActions>
             </div>
           ))}
         </div>

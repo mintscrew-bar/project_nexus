@@ -20,7 +20,13 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/auth-store";
-import { medalApi, shopApi, type ShopItemState } from "@/lib/api-client";
+import {
+  medalApi,
+  shopApi,
+  type ShopBundleView,
+  type ShopItemState,
+} from "@/lib/api-client";
+import { BundleList } from "./_BundleList";
 import { MEDAL_QUERY_KEY } from "@/components/cosmetics/MedalChip";
 import {
   applyLoadout,
@@ -46,7 +52,7 @@ const SLOTS: ShopSlot[] = [
   "PROFILE_BANNER",
 ];
 /** 진열 탭 — 자리별 상품 + 산 것만 모아 보는 보관함 */
-type ShopTab = ShopSlot | "OWNED";
+type ShopTab = ShopSlot | "OWNED" | "BUNDLES";
 
 const RARITY_STYLE: Record<CosmeticItem["rarity"], string> = {
   STARTER: "bg-bg-elevated text-text-secondary",
@@ -92,6 +98,13 @@ export default function ShopPage() {
     queryFn: shopApi.getShop,
     enabled: isAuthenticated,
   });
+  // 묶음(번들) — 이미 가진 상품을 뺀 내 기준 값
+  const bundlesQuery = useQuery({
+    queryKey: ["shop", "bundles"],
+    queryFn: shopApi.getBundles,
+    enabled: isAuthenticated,
+  });
+  const bundles = bundlesQuery.data ?? [];
   // 잔액은 헤더 메달 칩과 같은 쿼리를 본다 — 출석·운영자 지급 뒤 상점만 옛 값으로 남지 않게
   const medal = useQuery({
     queryKey: MEDAL_QUERY_KEY,
@@ -124,7 +137,29 @@ export default function ShopPage() {
     // 잔액(헤더 칩·상점)과 로비 카드·프로필이 들고 있는 장착 상태를 함께 새로 읽는다
     refreshMedalViews(queryClient);
     void queryClient.invalidateQueries({ queryKey: [LOADOUT_QUERY_KEY] });
+    // 낱개로 사도 묶음 값(가진 것 빼기)이 바뀐다
+    void queryClient.invalidateQueries({ queryKey: ["shop", "bundles"] });
   };
+
+  const buyBundle = useMutation({
+    mutationFn: (b: ShopBundleView) => shopApi.purchaseBundle(b.id, b.price),
+    onSuccess: (res, b) => {
+      addToast(
+        `「${b.name}」 묶음을 샀어요 — ${res.items.length}개가 보관함에 들어갔어요`,
+        "success",
+      );
+      setMedalBalance(queryClient, res.balance);
+      refresh();
+    },
+    onError: (err: any) => {
+      addToast(
+        err?.response?.data?.message ||
+          "묶음을 사지 못했어요. 다시 시도해 주세요.",
+        "error",
+      );
+      if (err?.response?.status === 409) refresh();
+    },
+  });
 
   const purchase = useMutation({
     // 확인 창에 띄운 가격을 같이 보낸다 — 그 사이 할인이 끝나거나 값이 바뀌면 서버가 거절
@@ -400,7 +435,12 @@ export default function ShopPage() {
         <div className="min-w-0 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-1.5">
-              {[...SLOTS, "OWNED" as const].map((t) => (
+              {[
+                ...SLOTS,
+                // 파는 묶음이 있을 때만 탭을 보인다
+                ...(bundles.length ? (["BUNDLES"] as const) : []),
+                "OWNED" as const,
+              ].map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -412,11 +452,21 @@ export default function ShopPage() {
                       : "bg-bg-tertiary/60 text-text-secondary hover:bg-bg-tertiary",
                   )}
                 >
-                  {t === "OWNED" ? `보관함 ${ownedCount}` : SLOT_LABEL[t]}
+                  {t === "OWNED"
+                    ? `보관함 ${ownedCount}`
+                    : t === "BUNDLES"
+                      ? `묶음 ${bundles.length}`
+                      : SLOT_LABEL[t]}
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2 text-xs">
+            {/* 묶음 탭에는 거르기·정렬이 필요 없다 */}
+            <div
+              className={cn(
+                "flex items-center gap-2 text-xs",
+                tab === "BUNDLES" && "hidden",
+              )}
+            >
               <label className="flex cursor-pointer items-center gap-1.5 text-text-secondary">
                 <input
                   type="checkbox"
@@ -438,7 +488,16 @@ export default function ShopPage() {
             </div>
           </div>
 
-          {isLoading ? (
+          {tab === "BUNDLES" ? (
+            <BundleList
+              bundles={bundles}
+              balance={balance}
+              username={me.username}
+              avatar={avatarSrc}
+              buying={buyBundle.isPending}
+              onBuy={(b) => buyBundle.mutate(b)}
+            />
+          ) : isLoading ? (
             <div className="py-20 text-center text-sm text-text-tertiary">
               불러오는 중…
             </div>

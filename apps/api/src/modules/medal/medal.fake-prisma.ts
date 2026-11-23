@@ -12,6 +12,7 @@ export function createFakePrisma() {
   const overrides: any[] = [];
   const discounts: any[] = [];
   let customs: any[] = [];
+  const bundles: any[] = [];
   const users = new Set(["u1", "u2", "admin"]);
 
   const api: any = {
@@ -221,6 +222,34 @@ export function createFakePrisma() {
         for (let i = overrides.length - 1; i >= 0; i--)
           if (overrides[i].code === where.code) overrides.splice(i, 1);
         return { count: before - overrides.length };
+      }),
+    },
+    // 묶음 상품
+    shopBundle: {
+      findMany: jest.fn(async ({ where }: any = {}) =>
+        bundles.filter(
+          (b) => where?.onSale === undefined || b.onSale === where.onSale,
+        ),
+      ),
+      findUnique: jest.fn(
+        async ({ where }: any) => bundles.find((b) => b.id === where.id) ?? null,
+      ),
+      create: jest.fn(async ({ data }: any) => {
+        const row = {
+          id: `b${bundles.length + 1}`,
+          description: "",
+          onSale: true,
+          sortOrder: 0,
+          createdAt: new Date(),
+          ...data,
+        };
+        bundles.push(row);
+        return row;
+      }),
+      update: jest.fn(async ({ where, data }: any) => {
+        const row = bundles.find((b) => b.id === where.id);
+        Object.assign(row, data);
+        return row;
       }),
     },
     // 상점 관리 2단계 — 관리자가 추가한 상품

@@ -1,5 +1,6 @@
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -184,4 +185,89 @@ export class CreateShopItemDto {
 export class UploadShopMediaQueryDto {
   @IsIn(["video", "mp4", "image"])
   kind!: "video" | "mp4" | "image";
+}
+
+/** POST shop/admin/bundles (ADMIN) — 묶음 만들기. 서비스가 상품 수·할인율을 다시 검사한다 */
+export class CreateShopBundleDto {
+  @KeepRaw()
+  @IsString()
+  @IsNotEmpty({ message: "묶음 이름을 적어 주세요." })
+  @MaxLength(40)
+  name!: string;
+
+  @KeepRaw()
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(200)
+  description?: string | null;
+
+  @KeepRaw()
+  @IsArray()
+  @ArrayMinSize(2)
+  @ArrayMaxSize(12)
+  @IsString({ each: true })
+  itemCodes!: string[];
+
+  @KeepRaw()
+  @IsInt()
+  @Min(1)
+  @Max(90)
+  percent!: number;
+
+  @KeepRaw()
+  @IsOptional()
+  @IsBoolean()
+  onSale?: boolean;
+
+  @KeepRaw()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  sortOrder?: number;
+}
+
+/** PATCH shop/admin/bundles/:id (ADMIN) — 넘긴 필드만 바꾼다 */
+export class UpdateShopBundleDto {
+  @KeepRaw()
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(40)
+  name?: string;
+
+  @KeepRaw()
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(200)
+  description?: string | null;
+
+  @KeepRaw()
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(2)
+  @ArrayMaxSize(12)
+  @IsString({ each: true })
+  itemCodes?: string[];
+
+  @KeepRaw()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(90)
+  percent?: number;
+
+  @KeepRaw()
+  @IsOptional()
+  @IsBoolean()
+  onSale?: boolean;
+
+  @KeepRaw()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  sortOrder?: number;
 }

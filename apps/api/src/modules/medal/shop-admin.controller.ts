@@ -23,10 +23,13 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { ShopAdminService } from "./shop-admin.service";
 import { UploadService } from "../upload/upload.service";
+import { ShopBundleService } from "./shop-bundle.service";
 import {
+  CreateShopBundleDto,
   CreateShopDiscountDto,
   CreateShopItemDto,
   GrantShopItemDto,
+  UpdateShopBundleDto,
   UpdateShopItemDto,
   UploadShopMediaQueryDto,
 } from "./dto/shop-admin.dto";
@@ -39,7 +42,33 @@ export class ShopAdminController {
   constructor(
     private readonly shopAdmin: ShopAdminService,
     private readonly upload: UploadService,
+    private readonly bundles: ShopBundleService,
   ) {}
+
+  /** 묶음 목록(판매 내린 것 포함) + 판매 수 */
+  @Get("bundles")
+  listBundles() {
+    return this.bundles.adminList();
+  }
+
+  /** 묶음 만들기 */
+  @Post("bundles")
+  createBundle(
+    @CurrentUser("sub") adminId: string,
+    @Body() dto: CreateShopBundleDto,
+  ) {
+    return this.bundles.create(adminId, dto);
+  }
+
+  /** 묶음 바꾸기(판매 켜기·끄기 포함) */
+  @Patch("bundles/:id")
+  updateBundle(
+    @CurrentUser("sub") adminId: string,
+    @Param("id") id: string,
+    @Body() dto: UpdateShopBundleDto,
+  ) {
+    return this.bundles.update(adminId, id, dto);
+  }
 
   /** 상품표 + 판매 현황 */
   @Get("items")

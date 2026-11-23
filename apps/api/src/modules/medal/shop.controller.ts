@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Param,
   HttpStatus,
   Post,
   Put,
@@ -13,9 +14,11 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { ShopService } from "./shop.service";
 import { ShopCatalogService } from "./shop-catalog.service";
+import { ShopBundleService } from "./shop-bundle.service";
 import {
   EquipCosmeticDto,
   NameTintDto,
+  PurchaseBundleDto,
   PurchaseCosmeticDto,
 } from "./dto/shop.dto";
 
@@ -24,7 +27,27 @@ export class ShopController {
   constructor(
     private readonly shopService: ShopService,
     private readonly catalog: ShopCatalogService,
+    private readonly bundles: ShopBundleService,
   ) {}
+
+  /** 판매 중인 묶음 — 이미 가진 상품을 뺀 내 기준 값 */
+  @Get("bundles")
+  @UseGuards(JwtAuthGuard)
+  listBundles(@CurrentUser("sub") userId: string) {
+    return this.bundles.listForUser(userId);
+  }
+
+  /** 묶음 사기 */
+  @Post("bundles/:id/purchase")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  purchaseBundle(
+    @CurrentUser("sub") userId: string,
+    @Param("id") id: string,
+    @Body() dto: PurchaseBundleDto,
+  ) {
+    return this.bundles.purchase(userId, id, dto.expectedPrice);
+  }
 
   /**
    * 상품 그림 정의 — 관리자가 추가한 상품까지(로그인 없이).

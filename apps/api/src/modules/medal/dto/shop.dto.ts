@@ -80,3 +80,12 @@ export class NameTintDto {
   @Type(() => NameTintValueDto)
   tint!: NameTintValueDto | null;
 }
+
+/** POST shop/bundles/:id/purchase — 화면에서 본 가격(다르면 409) */
+export class PurchaseBundleDto {
+  @KeepRaw()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  expectedPrice?: number;
+}

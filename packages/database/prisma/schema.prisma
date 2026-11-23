@@ -1952,6 +1952,7 @@ enum AdminAction {
   SHOP_DISCOUNT // 상점 기간 할인 만들기·끄기
   SHOP_ITEM_CREATE // 상점 새 상품 추가(관리자 2단계)
   SHOP_ITEM_DELETE // 상점 새 상품 지우기(가진 사람 없을 때만)
+  SHOP_BUNDLE // 상점 묶음 상품 만들기·바꾸기
 }
 
 enum VoteType {
@@ -2378,6 +2379,25 @@ model ShopCustomItem {
   updatedAt   DateTime @updatedAt
 
   @@map("shop_custom_items")
+}
+
+/// 상점 묶음 상품 (번들, 2026-11-24) — 여러 상품을 한 번에 싸게.
+/// 이미 가진 상품은 빼고 나머지 상품 값(할인 전 가격 합)에 percent 할인을 적용한다.
+/// 산 기록은 원장 한 줄(sourceId = bundle:<id>)에 상품별 몫(metadata.allocations)을 남겨 하나씩 환불할 수 있다.
+model ShopBundle {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  itemCodes   String[]
+  /// 묶음 할인율(%) 1~90
+  percent     Int
+  onSale      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("shop_bundles")
 }
 
 /// 상점 기간 할인 — itemCodes 가 비면 전체 상품. 기간 안이고 active 일 때만 적용,

@@ -2542,6 +2542,27 @@ export const adminShopApi = {
     posterUrl: string | null;
   }): Promise<AdminShopItem> =>
     (await apiClient.post("/shop/admin/items", input)).data,
+  /** 묶음 목록·만들기·바꾸기 */
+  listBundles: async (): Promise<AdminShopBundle[]> =>
+    (await apiClient.get("/shop/admin/bundles")).data,
+  createBundle: async (input: {
+    name: string;
+    description: string | null;
+    itemCodes: string[];
+    percent: number;
+    onSale: boolean;
+  }) => (await apiClient.post("/shop/admin/bundles", input)).data,
+  updateBundle: async (
+    id: string,
+    patch: Partial<{
+      name: string;
+      description: string | null;
+      itemCodes: string[];
+      percent: number;
+      onSale: boolean;
+      sortOrder: number;
+    }>,
+  ) => (await apiClient.patch(`/shop/admin/bundles/${id}`, patch)).data,
   /** 관리자 상품 지우기(가진 사람이 없을 때만) */
   deleteItem: async (code: string) =>
     (await apiClient.delete(`/shop/admin/items/${code}`)).data,
@@ -2566,8 +2587,51 @@ export type CosmeticLoadoutState = Partial<Record<CosmeticSlot, string>> & {
   nameTint?: NameTint;
 };
 
+/** 상점 묶음(번들) — 이미 가진 상품을 뺀 내 기준 값 */
+export interface ShopBundleView {
+  id: string;
+  name: string;
+  description: string;
+  percent: number;
+  itemCodes: string[];
+  /** 아직 안 가진(살) 상품 */
+  remaining: string[];
+  /** 이미 가진 상품 */
+  owned: string[];
+  /** 남은 상품의 할인 전 가격 합 */
+  fullPrice: number;
+  /** 낼 값 */
+  price: number;
+}
+
+/** 관리자 묶음 목록 한 줄 */
+export interface AdminShopBundle {
+  id: string;
+  name: string;
+  description: string;
+  itemCodes: string[];
+  percent: number;
+  onSale: boolean;
+  sortOrder: number;
+  createdAt: string;
+  /** 아무것도 안 가진 사람 기준 값 */
+  fullPrice: number;
+  price: number;
+  stats: { sold: number; medals: number };
+}
+
 /** 메달 상점 — 진열·구매·장착 */
 export const shopApi = {
+  /** 판매 중인 묶음 */
+  getBundles: async (): Promise<ShopBundleView[]> =>
+    (await apiClient.get("/shop/bundles")).data,
+  /** 묶음 사기 — 본 가격과 다르면 409 */
+  purchaseBundle: async (
+    id: string,
+    expectedPrice: number,
+  ): Promise<{ balance: number; items: string[]; price: number }> =>
+    (await apiClient.post(`/shop/bundles/${id}/purchase`, { expectedPrice }))
+      .data,
   /** 상품 그림 정의(관리자가 추가한 상품 포함) — 로그인 없이 */
   catalog: async (): Promise<ShopCatalogEntry[]> =>
     (await apiClient.get("/shop/catalog")).data,

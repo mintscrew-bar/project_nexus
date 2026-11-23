@@ -17,6 +17,21 @@ import { PrismaService } from "../prisma/prisma.service";
 import { MedalService } from "./medal.service";
 import { ShopCatalogService } from "./shop-catalog.service";
 
+/**
+ * 묶음 원장 줄에서 한 상품의 몫 — 묶음 구매가 아니거나 몫이 없으면 null.
+ * (ShopBundleService.purchase 가 metadata.allocations 에 상품별 몫을 남긴다)
+ */
+function bundleAllocation(
+  ledger: { sourceId: string | null; metadata: unknown },
+  itemCode: string,
+): number | null {
+  if (!ledger.sourceId?.startsWith("bundle:")) return null;
+  const alloc = (ledger.metadata as { allocations?: Record<string, number> })
+    ?.allocations;
+  const v = alloc?.[itemCode];
+  return typeof v === "number" ? v : null;
+}
+
 /** 저장된 세 값 → 고른 색. 아무것도 안 골랐으면 null (빈 값은 원래 값으로 채운다) */
 function toTint(row: {
   hue: number | null;
@@ -250,7 +265,9 @@ export class ShopService {
         "메달로 산 상품만 환불할 수 있어요 (운영자가 준 상품이에요).",
       );
     }
-    const price = -purchase.amount;
+    // 묶음으로 산 상품이면 그 상품 몫만 돌려준다(묶음 원장 한 줄에 상품별 몫이 있다)
+    const bundleShare = bundleAllocation(purchase, input.itemCode);
+    const price = bundleShare ?? -purchase.amount;
 
     const entry = await this.prisma
       .$transaction(async (tx) => {
@@ -258,7 +275,11 @@ export class ShopService {
           userId: input.userId,
           amount: price,
           reason: MedalReason.REFUND,
-          idempotencyKey: `refund:${purchase.id}`,
+          // 묶음은 한 원장 줄에 상품이 여럿이라 상품마다 따로 키를 쓴다
+          idempotencyKey:
+            bundleShare != null
+              ? `refund:${purchase.id}:${input.itemCode}`
+              : `refund:${purchase.id}`,
           sourceId: input.itemCode,
           metadata: {
             itemCode: input.itemCode,
@@ -321,7 +342,13 @@ export class ShopService {
     const purchases = ledgerIds.length
       ? await this.prisma.medalLedger.findMany({
           where: { id: { in: ledgerIds } },
-          select: { id: true, amount: true, createdAt: true },
+          select: {
+            id: true,
+            amount: true,
+            createdAt: true,
+            sourceId: true,
+            metadata: true,
+          },
         })
       : [];
     const byId = new Map(purchases.map((p) => [p.id, p]));
@@ -335,7 +362,8 @@ export class ShopService {
           slot: slotByCode.get(o.itemCode) ?? null,
           source: o.source,
           acquiredAt: o.acquiredAt,
-          paid: p ? -p.amount : null,
+          // 묶음으로 산 상품은 그 상품 몫
+          paid: p ? (bundleAllocation(p, o.itemCode) ?? -p.amount) : null,
           equipped: equipped.has(o.itemCode),
           refundable: o.source === "PURCHASE" && !!p,
         };
