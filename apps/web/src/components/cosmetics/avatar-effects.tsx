@@ -24,6 +24,7 @@ import {
   CrownFrame,
   EmberRing,
   HaloFrame,
+  LunarPhasesFrame,
   MoonFrame,
   TwinSwordsFrame,
 } from "./avatar-frames";
@@ -31,6 +32,7 @@ import {
 export type AvatarEffectCode =
   | "cat_ears"
   | "moon"
+  | "lunar_phases"
   | "crown"
   | "halo"
   | "fire_ring"
@@ -340,6 +342,7 @@ const withAura = (code: AvatarEffectCode, Fx: (p: FxProps) => ReactNode) =>
 const AVATAR_EFFECTS: Record<AvatarEffectCode, (p: FxProps) => ReactNode> = {
   cat_ears: withAura("cat_ears", CatEarsFx),
   moon: withAura("moon", MoonFx),
+  lunar_phases: ({ size }) => <LunarPhasesFrame size={size} />,
   crown: withAura("crown", CrownFx),
   halo: withAura("halo", HaloFx),
   fire_ring: withAura("fire_ring", FireRingFx),

@@ -172,6 +172,19 @@ export default function MedalShopPreview() {
     <div className="container mx-auto max-w-6xl space-y-8 px-6 py-6">
       <section>
         <h2 className="mb-3 text-sm font-bold text-text-secondary">
+          달 세트 함께 장착한 모습
+        </h2>
+        <div className="w-[180px]">
+          <PortraitParticipantCard
+            {...cardProps}
+            p={player(0, "달의 위상", "EMERALD")}
+            frameCode="FX_LUNAR_PHASES"
+            avatarFrameCode="AV_LUNAR_PHASES"
+          />
+        </div>
+      </section>
+      <section>
+        <h2 className="mb-3 text-sm font-bold text-text-secondary">
           로비에서 장착한 모습
         </h2>
         <div className="grid grid-cols-5 gap-3">

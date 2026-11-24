@@ -12,6 +12,7 @@
  */
 
 import { InkDragonVideo } from "./ink-dragon-video";
+import { LunarCard } from "./lunar-card";
 import { CARD_SCENES } from "./card-scenes";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ export type CosmeticEffectCode =
   | "bats"
   | "sword"
   | "lightning"
+  | "lunar_card"
   | "dragon";
 
 export type Palette = Record<string, string>;
@@ -616,6 +618,7 @@ const EFFECTS: Record<
   bats: BatsFx,
   sword: SwordFx,
   lightning: LightningFx,
+  lunar_card: LunarCard,
   dragon: DragonFx,
 };
 
