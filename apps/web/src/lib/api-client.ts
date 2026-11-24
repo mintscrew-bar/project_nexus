@@ -2792,6 +2792,13 @@ export interface MedalCampaignPreview {
   max: number;
   alreadyGranted: number;
   top: { username: string; matches: number; amount: number }[];
+  /** 받는 사람 전체(많이 받는 순) */
+  recipients: {
+    userId: string;
+    username: string;
+    matches: number;
+    amount: number;
+  }[];
 }
 
 export const adminMedalApi = {

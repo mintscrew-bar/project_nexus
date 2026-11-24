@@ -135,6 +135,13 @@ export class MedalCampaignService {
         matches,
         amount,
       })),
+      /** 받는 사람 전체 — 관리자 화면에서 검색·정렬해 한 사람씩 확인한다(가입자 수백 명 규모) */
+      recipients: shares.map(({ userId, username, matches, amount }) => ({
+        userId,
+        username,
+        matches,
+        amount,
+      })),
     };
   }
 

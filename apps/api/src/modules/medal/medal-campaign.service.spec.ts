@@ -78,6 +78,12 @@ describe("MedalCampaignService (일괄 보상 지급)", () => {
       cappedUsers: 1,
     });
     expect(p.top[0]).toEqual({ username: "고인물", matches: 50, amount: 900 });
+    // 받는 사람 전체가 많이 받는 순으로 온다(상위 10명 너머도 확인할 수 있게)
+    expect(p.recipients.map((r) => [r.userId, r.amount])).toEqual([
+      ["u1", 900],
+      ["u3", 400],
+      ["u2", 300],
+    ]);
     expect(db.ledger()).toHaveLength(0);
   });
 
