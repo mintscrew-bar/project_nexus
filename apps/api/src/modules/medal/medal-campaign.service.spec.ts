@@ -71,6 +71,11 @@ describe("MedalCampaignService (일괄 보상 지급)", () => {
       max: 900,
       min: 300,
       alreadyGranted: 0,
+      // 기본 300×3 + 판당 20×(30+5)
+      baseTotal: 900,
+      perMatchTotal: 700,
+      countedMatches: 55,
+      cappedUsers: 1,
     });
     expect(p.top[0]).toEqual({ username: "고인물", matches: 50, amount: 900 });
     expect(db.ledger()).toHaveLength(0);

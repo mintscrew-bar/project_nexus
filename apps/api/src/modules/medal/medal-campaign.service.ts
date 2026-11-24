@@ -113,10 +113,20 @@ export class MedalCampaignService {
     });
     const total = shares.reduce((s, x) => s + x.amount, 0);
     const active = shares.filter((s) => s.matches > 0).length;
+    // 미리보기에서 "어디서 얼마가 나가는지" 나눠 보여 준다
+    const baseTotal = input.base * shares.length;
     return {
       users: shares.length,
       activeUsers: active,
       total,
+      /** 모두에게 주는 기본 몫 합계 */
+      baseTotal,
+      /** 판당 몫 합계 (한 사람 최대치에 잘린 만큼은 빠진다) */
+      perMatchTotal: total - baseTotal,
+      /** 셈에 들어간 완주 판 수 합계 (상한 적용 전) */
+      countedMatches: shares.reduce((s, x) => s + x.matches, 0),
+      /** 판 수 상한에 걸린 사람 수 */
+      cappedUsers: shares.filter((s) => s.matches > input.matchCap).length,
       min: shares.length ? shares[shares.length - 1].amount : 0,
       max: shares.length ? shares[0].amount : 0,
       alreadyGranted: already,

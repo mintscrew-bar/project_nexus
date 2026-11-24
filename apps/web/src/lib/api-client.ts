@@ -2780,6 +2780,14 @@ export interface MedalCampaignPreview {
   users: number;
   activeUsers: number;
   total: number;
+  /** 모두에게 주는 기본 몫 합계 */
+  baseTotal: number;
+  /** 판당 몫 합계 */
+  perMatchTotal: number;
+  /** 셈에 들어간 완주 판 수 합계(상한 적용 전) */
+  countedMatches: number;
+  /** 판 수 상한에 걸린 사람 수 */
+  cappedUsers: number;
   min: number;
   max: number;
   alreadyGranted: number;

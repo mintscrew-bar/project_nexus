@@ -104,6 +104,11 @@ export function MedalCampaignPanel({
             <b>기본 + 완주한 내전 수 × 판당</b>만큼 줍니다. 판 수는 상한까지만
             쳐 줍니다. 일일 상한은 적용되지 않아요.
           </p>
+          <p className="mt-1 text-xs text-text-tertiary">
+            완주한 내전은 <b>메달 출시 전 경기까지</b> 경기 기록에서 셉니다 —
+            끝난 내전 중 15분 이상, 참가자 80% 이상이 사람인 판만 치고, 무효
+            처리한 판은 뺍니다.
+          </p>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -173,6 +178,28 @@ export function MedalCampaignPanel({
                 {preview.activeUsers}명
               </span>
             </p>
+            {/* 어디서 얼마가 나가는지 — 기본 몫과 판당 몫을 나눠 본다 */}
+            <p className="text-text-secondary">
+              기본{" "}
+              <b className="tabular-nums text-text-primary">
+                {preview.baseTotal.toLocaleString()}
+              </b>{" "}
+              + 판당{" "}
+              <b className="tabular-nums text-text-primary">
+                {preview.perMatchTotal.toLocaleString()}
+              </b>
+              <span className="ml-2 text-text-muted">
+                완주 {preview.countedMatches.toLocaleString()}판을 셈
+                {preview.cappedUsers > 0 &&
+                  ` · 상한 ${form.matchCap}판에 걸린 사람 ${preview.cappedUsers}명`}
+              </span>
+            </p>
+            {preview.activeUsers === 0 && Number(form.perMatch) > 0 && (
+              <p className="text-amber-300">
+                완주한 내전이 있는 사람이 없어 판당 몫이 0이에요 — 경기 기록을
+                확인해 주세요.
+              </p>
+            )}
             {preview.alreadyGranted > 0 && (
               <p className="text-amber-300">
                 이 이름표로 이미 {preview.alreadyGranted}명이 받았어요 — 그
@@ -182,7 +209,13 @@ export function MedalCampaignPanel({
             <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-text-secondary md:grid-cols-3">
               {preview.top.map((t) => (
                 <span key={t.username} className="truncate">
-                  {t.username} · {t.matches}판 ·{" "}
+                  {t.username} · {t.matches}판
+                  {t.matches > Number(form.matchCap) && (
+                    <span className="text-text-muted">
+                      ({form.matchCap}판까지)
+                    </span>
+                  )}{" "}
+                  ·{" "}
                   <b className="tabular-nums text-text-primary">
                     {t.amount.toLocaleString()}
                   </b>
