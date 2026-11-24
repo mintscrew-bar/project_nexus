@@ -5,6 +5,7 @@ import {
   checkEligibility,
   firstMatchKey,
   kstDayKey,
+  MatchMedalService,
   planMatchGrants,
   type MedalMatch,
 } from "./match-medal.service";
@@ -289,5 +290,50 @@ describe("경기 메달 — 첫 내전 보너스와 무효 처리", () => {
     expect(firstMatchKey("u1", ["m1", "m2"], new Set(["m1", "m2"]))).toBe(
       "first-match:u1:2",
     );
+  });
+});
+
+describe("경기 메달 — 일괄 보상용 완주 수 세기", () => {
+  /** 원장이 하나도 없는 옛 경기들만 있는 상태 — 메달 출시 전 경기 */
+  function serviceWith(
+    matches: MedalMatch[],
+    voided: string[] = [],
+    bots: string[] = [],
+  ) {
+    const prisma: any = {
+      match: { findMany: jest.fn(async () => matches) },
+      medalMatchVoid: {
+        findMany: jest.fn(async () => voided.map((matchId) => ({ matchId }))),
+      },
+      user: {
+        findMany: jest.fn(async () => bots.map((id) => ({ id }))),
+      },
+    };
+    return new MatchMedalService(prisma, {} as MedalService);
+  }
+
+  it("원장이 없어도 경기 기록으로 판 수를 센다 (메달 출시 전 경기)", async () => {
+    const counts = await serviceWith([
+      makeMatch({ id: "m1" }),
+      makeMatch({ id: "m2" }),
+    ]).countCompletedMatchesByUser();
+    expect(counts.get("a1")).toBe(2);
+    expect(counts.get("b5")).toBe(2);
+  });
+
+  it("무효 처리·15분 미만·미완료 경기는 빼고, 봇은 세지 않는다", async () => {
+    const short = new Date(START.getTime() + 10 * 60 * 1000);
+    const counts = await serviceWith(
+      [
+        makeMatch({ id: "ok" }),
+        makeMatch({ id: "void" }),
+        makeMatch({ id: "short", completedAt: short }),
+        makeMatch({ id: "live", status: MatchStatus.IN_PROGRESS }),
+      ],
+      ["void"],
+      ["b5"],
+    ).countCompletedMatchesByUser();
+    expect(counts.get("a1")).toBe(1);
+    expect(counts.has("b5")).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ describe("MedalCampaignService (일괄 보상 지급)", () => {
   let db: ReturnType<typeof createFakePrisma>;
   let campaigns: MedalCampaignService;
   let events: { emit: jest.Mock };
+  let matchMedals: { countCompletedMatchesByUser: jest.Mock };
   const notifications: any[] = [];
 
   const input = {
@@ -28,12 +29,16 @@ describe("MedalCampaignService (일괄 보상 지급)", () => {
       { id: "u2", username: "뉴비" },
       { id: "u3", username: "중수" },
     ]);
-    db.api.medalMatchVoid = { findMany: jest.fn(async () => []) };
-    // 완주 경기 수: u1 50판(상한 30에 걸림), u3 5판, u2 0판
-    db.api.medalLedger.groupBy = jest.fn(async () => [
-      { userId: "u1", _count: { _all: 50 } },
-      { userId: "u3", _count: { _all: 5 } },
-    ]);
+    // 완주 경기 수(경기 기록에서 센 값): u1 50판(상한 30에 걸림), u3 5판, u2 0판
+    matchMedals = {
+      countCompletedMatchesByUser: jest.fn(
+        async () =>
+          new Map([
+            ["u1", 50],
+            ["u3", 5],
+          ]),
+      ),
+    };
     db.api.medalLedger.count = jest.fn(
       async ({ where }: any) =>
         db
@@ -52,6 +57,7 @@ describe("MedalCampaignService (일괄 보상 지급)", () => {
     campaigns = new MedalCampaignService(
       db.api,
       new MedalService(db.api, events as any),
+      matchMedals as any,
     );
   });
 

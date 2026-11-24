@@ -3,6 +3,7 @@ import { MedalReason } from "@nexus/database";
 import { PrismaService } from "../prisma/prisma.service";
 import { TEST_BOT_USER_WHERE } from "../common/test-bot.util";
 import { MedalService } from "./medal.service";
+import { MatchMedalService } from "./match-medal.service";
 
 /**
  * 일괄 지급 한 번의 설정.
@@ -39,8 +40,9 @@ const PER_USER_MAX = 20000;
  * 관리자 일괄 지급 (2026-11-20) — 가입한 모든 유저에게 보상 메달을 활동량에 따라 차등으로 준다.
  *
  * - 대상: 정지되지 않은 가입자 전부(테스트 봇 제외).
- * - 활동량: 완주한 내전 수 = 경기 완주(MATCH_COMPLETE) 원장 줄 수. 무효 처리된 경기는 뺀다.
- *   (메달 출시 전 경기도 소급 지급으로 원장에 들어가 있어 이것 하나로 센다)
+ * - 활동량: 완주한 내전 수 = 경기 메달 자격이 되는 완료 내전 수(경기 기록에서 직접 센다,
+ *   MatchMedalService.countCompletedMatchesByUser). 무효·봇 판·15분 미만 판은 뺀다.
+ *   원장(MATCH_COMPLETE)으로 세면 메달 출시 전 경기가 빠진다 — 이 지급이 소급을 대신한다.
  * - 원장 키 `campaign:<이름표>:<사람>` — 같은 이름표로 다시 보내도 이미 받은 사람은 건너뛴다.
  *   중간에 끊겨도 같은 설정으로 다시 누르면 못 받은 사람만 마저 받는다.
  * - 일일 상한은 적용하지 않는다(운영자 지급).
@@ -52,6 +54,7 @@ export class MedalCampaignService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly medal: MedalService,
+    private readonly matchMedals: MatchMedalService,
   ) {}
 
   private validate(input: MedalCampaignInput) {
@@ -77,24 +80,13 @@ export class MedalCampaignService {
 
   /** 대상자별 몫 계산 — 미리보기와 실제 지급이 같은 계산을 쓴다 */
   private async computeShares(input: MedalCampaignInput): Promise<Share[]> {
-    const [users, voids] = await Promise.all([
+    const [users, matchesBy] = await Promise.all([
       this.prisma.user.findMany({
         where: { isBanned: false, NOT: TEST_BOT_USER_WHERE },
         select: { id: true, username: true },
       }),
-      this.prisma.medalMatchVoid.findMany({ select: { matchId: true } }),
+      this.matchMedals.countCompletedMatchesByUser(),
     ]);
-    const voided = voids.map((v) => v.matchId);
-    const rows = await this.prisma.medalLedger.groupBy({
-      by: ["userId"],
-      where: {
-        reason: MedalReason.MATCH_COMPLETE,
-        userId: { not: null },
-        ...(voided.length ? { sourceId: { notIn: voided } } : {}),
-      },
-      _count: { _all: true },
-    });
-    const matchesBy = new Map(rows.map((r) => [r.userId, r._count._all]));
     return users
       .map((u) => {
         const matches = matchesBy.get(u.id) ?? 0;

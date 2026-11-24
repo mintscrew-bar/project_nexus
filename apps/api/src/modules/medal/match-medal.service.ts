@@ -93,6 +93,30 @@ export interface MedalMatch {
   commendationSessions: { userId: string }[];
 }
 
+/** 정산에 쓰는 경기 컬럼 — 한 경기 정산과 일괄 보상의 완주 수 세기가 같이 쓴다 */
+const MEDAL_MATCH_SELECT = {
+  id: true,
+  isInternal: true,
+  status: true,
+  startedAt: true,
+  completedAt: true,
+  gameDuration: true,
+  riotMatchId: true,
+  dataCollected: true,
+  mvpUserId: true,
+  aceUserId: true,
+  roomHostId: true,
+  teamAId: true,
+  teamBId: true,
+  teamAIdSnapshot: true,
+  teamBIdSnapshot: true,
+  winnerId: true,
+  winnerIdSnapshot: true,
+  rosterSnapshots: { select: { userId: true, teamSlot: true } },
+  commendations: { select: { id: true, targetUserId: true } },
+  commendationSessions: { select: { userId: true } },
+} as const;
+
 export type Ineligible =
   "NOT_COMPLETED" | "NO_ROSTER" | "TOO_FEW_HUMANS" | "TOO_SHORT" | "VOIDED";
 
@@ -504,29 +528,48 @@ export class MatchMedalService {
   private loadMatch(matchId: string): Promise<MedalMatch | null> {
     return this.prisma.match.findUnique({
       where: { id: matchId },
-      select: {
-        id: true,
-        isInternal: true,
-        status: true,
-        startedAt: true,
-        completedAt: true,
-        gameDuration: true,
-        riotMatchId: true,
-        dataCollected: true,
-        mvpUserId: true,
-        aceUserId: true,
-        roomHostId: true,
-        teamAId: true,
-        teamBId: true,
-        teamAIdSnapshot: true,
-        teamBIdSnapshot: true,
-        winnerId: true,
-        winnerIdSnapshot: true,
-        rosterSnapshots: { select: { userId: true, teamSlot: true } },
-        commendations: { select: { id: true, targetUserId: true } },
-        commendationSessions: { select: { userId: true } },
-      },
+      select: MEDAL_MATCH_SELECT,
     }) as Promise<MedalMatch | null>;
+  }
+
+  /**
+   * 사람마다 "메달 자격이 되는 완주 내전" 수 — 관리자 일괄 보상(medal-campaign)이 쓴다.
+   *
+   * 원장(MATCH_COMPLETE 줄)이 아니라 **경기 기록에서 직접** 센다. 메달 출시(2026-11-17) 전에
+   * 끝난 경기는 소급 정산(retroGrantAll)을 돌려야만 원장에 생기는데, 일괄 보상은 그 소급을
+   * 대신하려고 만든 것이라 원장으로 세면 옛 경기가 전부 0판이 된다(2026-11-24 발견).
+   * 판정은 경기 메달과 같은 checkEligibility — 무효·봇 판·15분 미만 판은 빠진다.
+   */
+  async countCompletedMatchesByUser(): Promise<Map<string, number>> {
+    const [matches, voids] = await Promise.all([
+      this.prisma.match.findMany({
+        where: { isInternal: true, status: MatchStatus.COMPLETED },
+        select: MEDAL_MATCH_SELECT,
+      }) as Promise<MedalMatch[]>,
+      this.prisma.medalMatchVoid.findMany({ select: { matchId: true } }),
+    ]);
+    const voided = new Set(voids.map((v) => v.matchId));
+
+    // 봇 판정은 한 번에 — 경기마다 묻지 않는다
+    const memberIds = new Set<string>();
+    for (const m of matches)
+      for (const r of m.rosterSnapshots) if (r.userId) memberIds.add(r.userId);
+    const bots = memberIds.size
+      ? await this.prisma.user.findMany({
+          where: { AND: [{ id: { in: [...memberIds] } }, TEST_BOT_USER_WHERE] },
+          select: { id: true },
+        })
+      : [];
+    const botIds = new Set(bots.map((b) => b.id));
+
+    const counts = new Map<string, number>();
+    for (const m of matches) {
+      const check = checkEligibility(m, botIds, voided.has(m.id));
+      if (!check.ok) continue;
+      for (const h of check.humans)
+        counts.set(h.userId, (counts.get(h.userId) ?? 0) + 1);
+    }
+    return counts;
   }
 
   /** 봇 목록·무효 여부·방의 마지막 경기인지 */
