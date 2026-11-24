@@ -188,7 +188,7 @@ const COSMETIC_DEFS: CosmeticItem[] = [
   {
     code: "FX_LUNAR_PHASES",
     slot: "CARD_FRAME",
-    name: "달의 위상 · 카드",
+    name: "월륜 · 카드",
     description: "깊은 밤하늘에 별빛이 반짝이고 별똥별이 스쳐 지나간다",
     price: 1200,
     rarity: "RARE",
@@ -220,7 +220,7 @@ const COSMETIC_DEFS: CosmeticItem[] = [
   {
     code: "AV_LUNAR_PHASES",
     slot: "AVATAR_FRAME",
-    name: "달의 위상",
+    name: "월륜 · 아바타",
     description: "여덟 위상의 달이 아바타를 둘러싸고 달빛이 차례로 반짝인다",
     price: 1800,
     rarity: "RARE",

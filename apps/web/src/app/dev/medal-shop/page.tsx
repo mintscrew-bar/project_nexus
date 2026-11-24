@@ -177,7 +177,7 @@ export default function MedalShopPreview() {
         <div className="w-[180px]">
           <PortraitParticipantCard
             {...cardProps}
-            p={player(0, "달의 위상", "EMERALD")}
+            p={player(0, "월륜", "EMERALD")}
             frameCode="FX_LUNAR_PHASES"
             avatarFrameCode="AV_LUNAR_PHASES"
           />
