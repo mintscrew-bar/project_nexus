@@ -223,11 +223,262 @@ export function CatEarsFrame({ size }: { size: number }) {
 
 /* ───────── 공전하는 달 (입문) ───────── */
 
+/** 여덟 위상의 달이 고정된 자리에서 차례로 빛나는 아바타 장식. */
+export function LunarPhasesFrame({ size }: { size: number }) {
+  const id = useId().replace(/:/g, "");
+  // 위쪽의 삭에서 시계 방향으로 차고, 아래 보름달을 지나 다시 기운다.
+  const phases = [null, 0.72, 0, -0.72, -1, -0.72, 0, 0.72];
+  const radius = 10;
+  return (
+    <Layer size={size} front className="pointer-events-none cfx-deco">
+      <defs>
+        <radialGradient id={`${id}-lunar-gold`} cx="35%" cy="25%" r="80%">
+          <stop offset="0" stopColor="#fffdf0" />
+          <stop offset="0.58" stopColor="#f4deb2" />
+          <stop offset="1" stopColor="#bd946a" />
+        </radialGradient>
+        <radialGradient id={`${id}-lunar-full`} cx="50%" cy="45%" r="55%">
+          <stop offset="0" stopColor="#fffdf0" />
+          <stop offset="0.72" stopColor="#f6e5c4" />
+          <stop offset="1" stopColor="#d8c29f" />
+        </radialGradient>
+        <radialGradient id={`${id}-lunar-shadow`} cx="35%" cy="28%" r="80%">
+          <stop offset="0" stopColor="#56647b" />
+          <stop offset="0.6" stopColor="#303b52" />
+          <stop offset="1" stopColor="#151d30" />
+        </radialGradient>
+        <mask
+          id={`${id}-moon-clearance`}
+          maskUnits="userSpaceOnUse"
+          x="-100"
+          y="-100"
+          width="200"
+          height="200"
+        >
+          <rect x="-100" y="-100" width="200" height="200" fill="white" />
+          {phases.map((_, index) => {
+            const angle = (index * Math.PI) / 4 - Math.PI / 2;
+            return (
+              <circle
+                key={index}
+                cx={Math.cos(angle) * 70}
+                cy={Math.sin(angle) * 70}
+                r={radius + 1}
+                fill="black"
+              />
+            );
+          })}
+        </mask>
+      </defs>
+      {/* 아바타 지름은 그대로 두고 장식만 축소해 카드 안쪽 여백을 확보한다. */}
+      <g transform="scale(0.86)">
+        {/* 달 뒤에 천구와 별자리를 깔아 타로 카드 같은 인장을 만든다. */}
+        <g mask={`url(#${id}-moon-clearance)`}>
+          <circle
+            r="70"
+            fill="none"
+            stroke="#cda967"
+            strokeWidth="0.65"
+            opacity="0.48"
+          />
+          <circle
+            r="65"
+            fill="none"
+            stroke="#a78f72"
+            strokeWidth="0.4"
+            strokeDasharray="1 4"
+            opacity="0.55"
+          />
+          <circle
+            r="54"
+            fill="none"
+            stroke="#e4c481"
+            strokeWidth="1"
+            opacity="0.72"
+          />
+          {/* 끊어진 바깥 테두리와 작은 눈금으로 천체 관측기 같은 질감을 더한다. */}
+          <circle
+            r="79"
+            fill="none"
+            stroke="#d7b77b"
+            strokeWidth="0.55"
+            strokeDasharray="11 51.05"
+            strokeDashoffset="5.5"
+            opacity="0.6"
+          />
+          {Array.from({ length: 16 }, (_, index) => (
+            <path
+              key={`tick-${index}`}
+              d={index % 2 === 0 ? "M0 -58 L0 -61" : "M0 -59 L0 -60.5"}
+              transform={`rotate(${index * 22.5})`}
+              stroke="#e6c88f"
+              strokeWidth="0.65"
+              opacity="0.7"
+            />
+          ))}
+          {/* 달 사이마다 작은 마름모와 바깥쪽으로 뻗는 인장 장식. */}
+          {Array.from({ length: 8 }, (_, index) => {
+            const angle = ((index + 0.5) * Math.PI) / 4 - Math.PI / 2;
+            const x = Math.cos(angle) * 70;
+            const y = Math.sin(angle) * 70;
+            const major = index % 2 === 0;
+            return (
+              <g key={`star-${index}`} transform={`translate(${x} ${y})`}>
+                <g transform={`rotate(${(index + 0.5) * 45})`}>
+                  <path
+                    d="M0 -5 L0 -9 M0 5 L0 10"
+                    fill="none"
+                    stroke="#d7b77b"
+                    strokeWidth="0.75"
+                    opacity="0.75"
+                  />
+                  <path
+                    d="M0 -5 L2.4 0 L0 5 L-2.4 0 Z"
+                    fill="#242439"
+                    stroke="#d7b77b"
+                    strokeWidth="0.7"
+                  />
+                </g>
+                <path
+                  d={
+                    major
+                      ? "M0 -4.8 Q0.65 -0.65 3.5 0 Q0.65 0.65 0 4.8 Q-0.65 0.65 -3.5 0 Q-0.65 -0.65 0 -4.8Z"
+                      : "M0 -2.8 Q0.5 -0.5 2.2 0 Q0.5 0.5 0 2.8 Q-0.5 0.5 -2.2 0 Q-0.5 -0.5 0 -2.8Z"
+                  }
+                  fill="#fbe2a3"
+                  className="cfx-scene-twinkle"
+                  style={{ animationDelay: `${index * -0.4}s` }}
+                />
+              </g>
+            );
+          })}
+        </g>
+        {phases.map((phase, index) => {
+          const angle = (index * Math.PI) / 4 - Math.PI / 2;
+          const x = Math.cos(angle) * 70;
+          const y = Math.sin(angle) * 70;
+          const mirror = index > 4 ? -1 : 1;
+          const litPath =
+            phase === null
+              ? ""
+              : phase === -1
+                ? `M 0 ${-radius} A ${radius} ${radius} 0 1 1 0 ${radius} A ${radius} ${radius} 0 1 1 0 ${-radius} Z`
+                : phase === 0
+                  ? `M 0 ${-radius} A ${radius} ${radius} 0 0 1 0 ${radius} L 0 ${-radius} Z`
+                  : `M 0 ${-radius} A ${radius} ${radius} 0 0 1 0 ${radius} A ${Math.abs(phase) * radius} ${radius} 0 0 ${phase > 0 ? 0 : 1} 0 ${-radius} Z`;
+          return (
+            <g key={index} transform={`translate(${x} ${y})`}>
+              <circle
+                r={radius}
+                fill={`url(#${id}-lunar-shadow)`}
+                opacity={phase === null ? 0.7 : 0.3}
+              />
+              {phase === null && (
+                <g className="cfx-lunar-eclipse">
+                  <circle
+                    r={radius + 1.1}
+                    fill="none"
+                    stroke="#e68d5a"
+                    strokeWidth="2"
+                    opacity="0.65"
+                  />
+                  <circle
+                    r={radius + 0.2}
+                    fill="none"
+                    stroke="#ffe4a2"
+                    strokeWidth="0.85"
+                  />
+                  {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
+                    <path
+                      key={angle}
+                      d="M0 -11.8 L0 -14.5"
+                      transform={`rotate(${angle})`}
+                      stroke="#ffce82"
+                      strokeWidth="0.8"
+                      strokeLinecap="round"
+                    />
+                  ))}
+                </g>
+              )}
+              {phase !== null && (
+                <g transform={`scale(${mirror} 1)`}>
+                  <defs>
+                    <clipPath id={`${id}-phase-${index}`}>
+                      <path d={litPath} />
+                    </clipPath>
+                  </defs>
+                  <path
+                    d={litPath}
+                    fill="#fff2bb"
+                    className="cfx-lunar-phase-glow"
+                    style={{ animationDelay: `${index}s` }}
+                  />
+                  <path
+                    d={litPath}
+                    fill={`url(#${id}-${phase === -1 ? "lunar-full" : "lunar-gold"})`}
+                  />
+                  <g
+                    clipPath={`url(#${id}-phase-${index})`}
+                    fill="#9b846e"
+                    opacity={phase === -1 ? 0.17 : 0.26}
+                  >
+                    <path d="M-6-4 Q-5-7 -2-6 L0-5 Q2-4 1-2 L-1 0 Q-4 0 -5-1 Z" />
+                    <path d="M3-5 Q6-5 7-2 L6 1 Q4 2 2 0 L2-2 Z" />
+                    <path d="M-4 3 Q-2 1 0 2 L3 3 L2 5 Q0 7-3 6 Z" />
+                    <circle cx="5" cy="4.5" r="1.1" />
+                    <circle cx="-5.5" cy="1" r="0.7" />
+                  </g>
+                  <circle
+                    cx="-2.8"
+                    cy="3.8"
+                    r="1.1"
+                    fill="none"
+                    stroke="#fff7de"
+                    strokeOpacity="0.55"
+                    strokeWidth="0.45"
+                    clipPath={`url(#${id}-phase-${index})`}
+                  />
+                  {phase === -1 ? (
+                    <circle
+                      r={radius}
+                      fill="none"
+                      stroke="#fff9e7"
+                      strokeOpacity="0.7"
+                      strokeWidth="0.55"
+                    />
+                  ) : (
+                    <path
+                      d={`M 0 ${-radius} A ${radius} ${radius} 0 0 1 0 ${radius}`}
+                      fill="none"
+                      stroke="#fff9e7"
+                      strokeOpacity="0.7"
+                      strokeWidth="0.55"
+                    />
+                  )}
+                </g>
+              )}
+            </g>
+          );
+        })}
+      </g>
+    </Layer>
+  );
+}
+
 /** 은빛 고리 둘레 궤도를 초승달이 돌고, 별이 번갈아 반짝인다 */
 export function MoonFrame({ size }: { size: number }) {
   const id = useId().replace(/:/g, "");
+  // 궤도 회전 — 회전 중심을 그림 상자(fill-box)가 아니라 viewBox 가운데(0,0 = 아바타 중심)로.
+  // 예전엔 fill-box 라 달이 붙은 쪽으로 상자가 기울어 궤도가 찌그러져 돌았다(2026-11-24)
+  const orbit: CSSProperties = {
+    transformBox: "view-box",
+    // view-box 의 퍼센트는 viewBox 의 x·y 가 아니라 좌표 원점에서 잰다 — 가운데(0,0)를 그대로 준다
+    transformOrigin: "0px 0px",
+    animationDuration: "16s",
+  };
   return (
     <>
+      {/* 궤도 — 점선 원 */}
       <Layer size={size}>
         <circle
           r="70"
@@ -235,20 +486,27 @@ export function MoonFrame({ size }: { size: number }) {
           stroke="#9fb7e8"
           strokeWidth="1"
           strokeDasharray="1.5 5"
-          opacity="0.6"
+          opacity="0.55"
         />
       </Layer>
       <Layer size={size} front>
         <defs>
-          <linearGradient id={`${id}-moon`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#fffbe0" />
-            <stop offset="1" stopColor="#f0c95a" />
-          </linearGradient>
+          <radialGradient id={`${id}-moon`} cx="0.35" cy="0.3" r="0.8">
+            <stop offset="0" stopColor="#fffdf0" />
+            <stop offset="0.6" stopColor="#f6dc8a" />
+            <stop offset="1" stopColor="#d9a93a" />
+          </radialGradient>
           <linearGradient id={`${id}-ring`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#eef4ff" />
             <stop offset="1" stopColor="#7d93c4" />
           </linearGradient>
+          {/* 초승달 — 둥근 달에서 오른쪽 위로 비킨 원을 도려낸다(하늘의 🌙 모양) */}
+          <mask id={`${id}-cut`}>
+            <rect x="-30" y="-30" width="60" height="60" fill="#fff" />
+            <circle cx="6.5" cy="-4" r="13" fill="#000" />
+          </mask>
         </defs>
+        {/* 은빛 고리 */}
         <circle
           r="52.5"
           fill="none"
@@ -262,22 +520,34 @@ export function MoonFrame({ size }: { size: number }) {
           stroke={`url(#${id}-ring)`}
           strokeWidth="3"
         />
-        <Anim className="cfx-spin" duration="14s">
-          {/* 궤도 상자를 정사각형으로 — 회전축이 아바타 중심에 오게 */}
-          <circle r="70" fill="none" stroke="none" />
-          <g transform="translate(0 -70) rotate(20)">
-            <path
-              d="M0 -17 A17 17 0 1 0 0 17 A13 13 0 1 1 0 -17 Z"
-              fill={`url(#${id}-moon)`}
-              stroke="#b8902a"
-              strokeWidth="1"
-              style={{ filter: "drop-shadow(0 0 3px rgba(255,236,160,0.9))" }}
-            />
+        {/* 궤도를 도는 달 — 늘 똑바로 선 초승달 */}
+        <g className="cfx-spin" style={orbit}>
+          {/* 빛은 도려낸 초승달 모양을 따라만 번지게 — 바깥 g 에 그림자를 건다
+              (달 뒤에 원을 깔면 도려낸 안쪽에 회색 원판이 비쳤다) */}
+          <g
+            transform="translate(0 -70)"
+            style={{ filter: "drop-shadow(0 0 4px rgba(255,236,160,0.85))" }}
+          >
+            {/* 궤도를 도는 만큼 거꾸로 돌려 달은 늘 똑바로 선다 */}
+            <g
+              className="cfx-spin-rev"
+              style={{
+                transformBox: "fill-box",
+                transformOrigin: "50% 50%",
+                animationDuration: "16s",
+              }}
+            >
+              <circle
+                r="15"
+                fill={`url(#${id}-moon)`}
+                mask={`url(#${id}-cut)`}
+              />
+            </g>
           </g>
-          <Glint x={0} y={70} r={5} color="#dbe8ff" delay="0s" />
-          <Glint x={-70} y={0} r={4} color="#ffffff" delay="-0.7s" />
-          <Glint x={70} y={0} r={4} color="#ffffff" delay="-1.4s" />
-        </Anim>
+          {/* 달을 따라오는 작은 별 둘 */}
+          <Glint x={-24} y={-66} r={3} color="#ffffff" delay="-0.4s" />
+          <Glint x={22} y={-67} r={2.4} color="#dbe8ff" delay="-1.2s" />
+        </g>
         <Glint x={-46} y={-60} r={3.5} color="#ffffff" delay="-0.3s" />
         <Glint x={58} y={48} r={3} color="#cfe0ff" delay="-1.8s" />
       </Layer>

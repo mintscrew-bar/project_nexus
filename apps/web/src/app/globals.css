@@ -1419,6 +1419,44 @@ body.scroll-locked {
   50% { opacity: 1; }
 }
 .cfx-scene-twinkle { animation: cfx-scene-twinkle 3s ease-in-out infinite; }
+@keyframes cfx-lunar-meteor {
+  0%, 24%, 100% { opacity: 0; transform: translate(0, 0); }
+  4% { opacity: 0.9; }
+  18% { opacity: 0; transform: translate(-55px, 46px); }
+}
+.cfx-lunar-meteor {
+  opacity: 0;
+  filter: drop-shadow(0 0 1.5px #f8d99d);
+  animation: cfx-lunar-meteor 8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cfx-lunar-meteor { animation: none; }
+}
+/* 달의 위상: 달 위치는 그대로 두고 빛이 한 칸씩 이어진다. */
+@keyframes cfx-lunar-phase-glow {
+  0%, 18%, 100% { opacity: 0; }
+  5% { opacity: 0.65; }
+  10% { opacity: 0.4; }
+}
+.cfx-lunar-phase-glow {
+  opacity: 0;
+  filter: drop-shadow(0 0 2.5px #ffe7a0) drop-shadow(0 0 5px #e4bd6c);
+  animation: cfx-lunar-phase-glow 8s linear infinite;
+}
+/* 삭은 짧은 일식 코로나로 강조한다. */
+@keyframes cfx-lunar-eclipse {
+  0%, 18%, 100% { opacity: 0; }
+  5% { opacity: 1; }
+  11% { opacity: 0.75; }
+}
+.cfx-lunar-eclipse {
+  opacity: 0;
+  filter: drop-shadow(0 0 2px #ff974d) drop-shadow(0 0 4px #ed6444);
+  animation: cfx-lunar-eclipse 8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cfx-lunar-phase-glow, .cfx-lunar-eclipse { animation: none; }
+}
 @keyframes cfx-scene-drift {
   0%, 100% { transform: translateX(-10px); }
   50% { transform: translateX(14px); }

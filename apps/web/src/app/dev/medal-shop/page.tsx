@@ -59,7 +59,7 @@ const cardProps = {
 /** 로비에서 꾸미기를 장착한 모습 — 10명 방 한 화면 */
 const LOBBY_ROW: { name: string; tier: string; frame?: string }[] = [
   { name: "기본 카드", tier: "GOLD" },
-  { name: "슬라임왕", tier: "SILVER", frame: "FX_SLIME" },
+  { name: "슬라임킹", tier: "SILVER", frame: "FX_SLIME" },
   { name: "새벽유령", tier: "PLATINUM", frame: "FX_GHOST" },
   { name: "봄바람", tier: "EMERALD", frame: "FX_SAKURA" },
   { name: "불꽃미드", tier: "DIAMOND", frame: "FX_FIRE" },
@@ -170,6 +170,19 @@ const SHOP_SLOTS: CosmeticSlot[] = ["CARD_FRAME", "AVATAR_FRAME"];
 export default function MedalShopPreview() {
   return (
     <div className="container mx-auto max-w-6xl space-y-8 px-6 py-6">
+      <section>
+        <h2 className="mb-3 text-sm font-bold text-text-secondary">
+          달 세트 함께 장착한 모습
+        </h2>
+        <div className="w-[180px]">
+          <PortraitParticipantCard
+            {...cardProps}
+            p={player(0, "달의 위상", "EMERALD")}
+            frameCode="FX_LUNAR_PHASES"
+            avatarFrameCode="AV_LUNAR_PHASES"
+          />
+        </div>
+      </section>
       <section>
         <h2 className="mb-3 text-sm font-bold text-text-secondary">
           로비에서 장착한 모습
