@@ -33,9 +33,12 @@ describe("ShopBundleService (묶음 상품)", () => {
     db.setBalance("u1", 1000);
     const res = await bundles.purchase("u1", b.id, 640);
     expect(res.balance).toBe(360);
-    expect(db.cosmetics().map((c: any) => c.itemCode).sort()).toEqual(
-      ["AV_CAT_EARS", "FX_GHOST", "FX_SLIME"].sort(),
-    );
+    expect(
+      db
+        .cosmetics()
+        .map((c: any) => c.itemCode)
+        .sort(),
+    ).toEqual(["AV_CAT_EARS", "FX_GHOST", "FX_SLIME"].sort());
     // 원장은 한 줄, 상품별 몫의 합이 낸 값
     const row = db.ledger()[0];
     expect(row).toMatchObject({
@@ -79,10 +82,7 @@ describe("ShopBundleService (묶음 상품)", () => {
     const b = await bundles.create("admin", input);
     db.setBalance("u1", 1000);
     await bundles.purchase("u1", b.id);
-    const alloc = db.ledger()[0].metadata.allocations as Record<
-      string,
-      number
-    >;
+    const alloc = db.ledger()[0].metadata.allocations as Record<string, number>;
     const r1 = await shop.adminRefund({
       adminId: "admin",
       userId: "u1",

@@ -232,7 +232,8 @@ export function createFakePrisma() {
         ),
       ),
       findUnique: jest.fn(
-        async ({ where }: any) => bundles.find((b) => b.id === where.id) ?? null,
+        async ({ where }: any) =>
+          bundles.find((b) => b.id === where.id) ?? null,
       ),
       create: jest.fn(async ({ data }: any) => {
         const row = {

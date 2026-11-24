@@ -184,7 +184,12 @@ export class ShopBundleService {
         });
         for (const code of q.remaining) {
           await tx.userCosmetic.create({
-            data: { userId, itemCode: code, source: "PURCHASE", ledgerId: row.id },
+            data: {
+              userId,
+              itemCode: code,
+              source: "PURCHASE",
+              ledgerId: row.id,
+            },
           });
         }
         return row;
@@ -199,7 +204,9 @@ export class ShopBundleService {
     } catch (err: any) {
       // 같은 순간 두 번 눌렀거나 그 사이 하나를 따로 샀다 — 통째로 되돌려졌다
       if (err?.code === "P2002")
-        throw new ConflictException("이미 산 묶음이거나 그 사이 상품을 샀어요.");
+        throw new ConflictException(
+          "이미 산 묶음이거나 그 사이 상품을 샀어요.",
+        );
       throw err;
     }
   }
@@ -298,7 +305,9 @@ export class ShopBundleService {
         itemCodes: codes,
         percent: merged.percent,
         ...(patch.onSale !== undefined ? { onSale: patch.onSale } : {}),
-        ...(patch.sortOrder !== undefined ? { sortOrder: patch.sortOrder } : {}),
+        ...(patch.sortOrder !== undefined
+          ? { sortOrder: patch.sortOrder }
+          : {}),
       },
     });
     await this.audit(adminId, id, { op: "update", before, patch });
