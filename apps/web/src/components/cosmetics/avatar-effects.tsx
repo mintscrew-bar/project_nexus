@@ -261,14 +261,90 @@ function MediaAvatarFx({ size, media }: FxProps & { media: AvatarMediaDef }) {
   );
 }
 
+/* ───────── 빛무리 + 반짝이 (2026-11-24 「허접한 장식」 다듬기) ─────────
+ * 코드로 그린 장식은 그림만 덩그러니 있어 밋밋했다. 뒤에 장식 색의 빛무리가 숨 쉬듯 번지고,
+ * 둘레를 따라 작은 반짝이가 깜빡이게 한다. 흑룡(영상)은 그대로 둔다. */
+const AURA: Partial<
+  Record<AvatarEffectCode, { glow: string; spark: string; count: number }>
+> = {
+  cat_ears: { glow: "255,150,70", spark: "#ffd29a", count: 6 },
+  moon: { glow: "150,190,255", spark: "#eef4ff", count: 8 },
+  crown: { glow: "255,205,70", spark: "#fff3b0", count: 9 },
+  halo: { glow: "255,244,210", spark: "#ffffff", count: 10 },
+  fire_ring: { glow: "255,100,40", spark: "#ffc04d", count: 8 },
+  bat_wings: { glow: "150,90,255", spark: "#d8b8ff", count: 7 },
+  twin_swords: { glow: "120,175,255", spark: "#e3efff", count: 8 },
+};
+
+function Aura({ size, code }: FxProps & { code: AvatarEffectCode }) {
+  const a = AURA[code];
+  if (!a) return null;
+  const glowBox = size * 1.7;
+  const ring = size * 0.6;
+  return (
+    <>
+      {/* 뒤 — 장식 색 빛무리 */}
+      <div
+        className="cfx-aura-pulse pointer-events-none absolute rounded-full"
+        style={{
+          ...BACK,
+          left: (size - glowBox) / 2,
+          top: (size - glowBox) / 2,
+          width: glowBox,
+          height: glowBox,
+          background: `radial-gradient(circle, rgba(${a.glow},0.42) 0%, rgba(${a.glow},0.16) 42%, rgba(${a.glow},0) 70%)`,
+        }}
+      />
+      {/* 앞 — 둘레의 반짝이(천천히 돈다) */}
+      <div
+        className="cfx-aura-orbit pointer-events-none absolute"
+        style={{ ...FRONT, left: 0, top: 0, width: size, height: size }}
+      >
+        {Array.from({ length: a.count }, (_, i) => {
+          const ang = (i / a.count) * Math.PI * 2 + (i % 2 ? 0.3 : 0);
+          const r = ring * (i % 3 === 0 ? 1.12 : 1);
+          const dot = Math.max(2, size * (i % 3 === 0 ? 0.05 : 0.032));
+          return (
+            <span
+              key={i}
+              className="cfx-scene-twinkle absolute rounded-full"
+              style={{
+                left: size / 2 + Math.cos(ang) * r - dot / 2,
+                top: size / 2 + Math.sin(ang) * r - dot / 2,
+                width: dot,
+                height: dot,
+                background: a.spark,
+                boxShadow: `0 0 ${dot * 2}px ${a.spark}`,
+                animationDuration: `${2.2 + (i % 4) * 0.6}s`,
+                animationDelay: `${-i * 0.45}s`,
+              }}
+            />
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+/** 장식 그림 + 빛무리를 함께 그린다 */
+const withAura = (code: AvatarEffectCode, Fx: (p: FxProps) => ReactNode) =>
+  function AuraFx(p: FxProps) {
+    return (
+      <>
+        <Aura {...p} code={code} />
+        {Fx(p)}
+      </>
+    );
+  };
+
 const AVATAR_EFFECTS: Record<AvatarEffectCode, (p: FxProps) => ReactNode> = {
-  cat_ears: CatEarsFx,
-  moon: MoonFx,
-  crown: CrownFx,
-  halo: HaloFx,
-  fire_ring: FireRingFx,
-  bat_wings: BatWingsFx,
-  twin_swords: TwinSwordsFx,
+  cat_ears: withAura("cat_ears", CatEarsFx),
+  moon: withAura("moon", MoonFx),
+  crown: withAura("crown", CrownFx),
+  halo: withAura("halo", HaloFx),
+  fire_ring: withAura("fire_ring", FireRingFx),
+  bat_wings: withAura("bat_wings", BatWingsFx),
+  twin_swords: withAura("twin_swords", TwinSwordsFx),
   dragon_orbit: DragonOrbitFx,
 };
 

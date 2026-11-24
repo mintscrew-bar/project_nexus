@@ -12,6 +12,7 @@
  */
 
 import { InkDragonVideo } from "./ink-dragon-video";
+import { CARD_SCENES } from "./card-scenes";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { PixelFire } from "./pixel-fire";
@@ -637,11 +638,14 @@ export function CosmeticEffect({
     );
   }
   const Fx = EFFECTS[code];
+  // 카드 전체를 채우는 배경 장면(2026-11-24) — 그 위에서 기존 캐릭터가 논다
+  const Backdrop = CARD_SCENES[code];
   return (
     <div
       aria-hidden
       className="cfx-root cfx-deco pointer-events-none absolute inset-0 overflow-hidden"
     >
+      {Backdrop && <Backdrop />}
       <Fx px={px} />
     </div>
   );
