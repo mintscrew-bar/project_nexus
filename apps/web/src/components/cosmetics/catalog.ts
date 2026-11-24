@@ -119,8 +119,8 @@ const COSMETIC_DEFS: CosmeticItem[] = [
   {
     code: "FX_SAKURA",
     slot: "CARD_FRAME",
-    name: "벚꽃 흩날림",
-    description: "꽃잎 14장이 바람에 크게 흔들리며 쏟아진다",
+    name: "벚꽃의 여운",
+    description: "노을 진 언덕 위 만개한 벚나무에서 꽃잎이 흩날리고 바람이 스친다",
     price: 450,
     rarity: "COMMON",
     className: "bg-[#b56a86]",

@@ -14,6 +14,7 @@
 import { InkDragonVideo } from "./ink-dragon-video";
 import { LunarCard } from "./lunar-card";
 import { CARD_SCENES } from "./card-scenes";
+import { LiveBanner } from "./live-banner";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { PixelFire } from "./pixel-fire";
@@ -633,10 +634,20 @@ export function CosmeticEffect({
   code: CosmeticEffectCode;
   px: number;
 }) {
+  if (code === "sakura") {
+    // 벚꽃의 여운 — 노을 벚나무 반복 영상(live-banner 가 재생·멈춘 그림·숨기기를 처리)
+    return <LiveBanner code="sakura_card" className="pointer-events-none" />;
+  }
   if (code === "dragon") {
     return (
-      <div aria-hidden className="cfx-root cfx-deco pointer-events-none absolute inset-0 overflow-hidden bg-[#ece7dd]">
-        <InkDragonVideo variant="card" className="absolute inset-0 h-full w-full" />
+      <div
+        aria-hidden
+        className="cfx-root cfx-deco pointer-events-none absolute inset-0 overflow-hidden bg-[#ece7dd]"
+      >
+        <InkDragonVideo
+          variant="card"
+          className="absolute inset-0 h-full w-full"
+        />
       </div>
     );
   }

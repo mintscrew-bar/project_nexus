@@ -40,6 +40,14 @@ export const LIVE_BANNERS = {
     poster: "/cosmetics/banners/ember_knight/banner.webp",
     size: [1536, 640], focusY: 0.5,
   },
+  // 벚꽃의 여운 카드 — pA 프롬프트로 뽑은 3.5초 반복(scripts/comfy, 시드 2000 그림·시드 101 영상)
+  sakura_card: {
+    webm: "/cosmetics/cards/sakura/loop.webm",
+    mp4: "/cosmetics/cards/sakura/loop.mp4",
+    poster: "/cosmetics/cards/sakura/poster.webp",
+    size: [704, 672],
+    focusY: 0.5,
+  },
   ink_swordsman: {
     webm: "/cosmetics/banners/ink_swordsman/loop.webm",
     mp4: "/cosmetics/banners/ink_swordsman/loop.mp4",
