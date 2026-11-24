@@ -226,8 +226,17 @@ export function CatEarsFrame({ size }: { size: number }) {
 /** 은빛 고리 둘레 궤도를 초승달이 돌고, 별이 번갈아 반짝인다 */
 export function MoonFrame({ size }: { size: number }) {
   const id = useId().replace(/:/g, "");
+  // 궤도 회전 — 회전 중심을 그림 상자(fill-box)가 아니라 viewBox 가운데(0,0 = 아바타 중심)로.
+  // 예전엔 fill-box 라 달이 붙은 쪽으로 상자가 기울어 궤도가 찌그러져 돌았다(2026-11-24)
+  const orbit: CSSProperties = {
+    transformBox: "view-box",
+    // view-box 의 퍼센트는 viewBox 의 x·y 가 아니라 좌표 원점에서 잰다 — 가운데(0,0)를 그대로 준다
+    transformOrigin: "0px 0px",
+    animationDuration: "16s",
+  };
   return (
     <>
+      {/* 궤도 — 점선 원 */}
       <Layer size={size}>
         <circle
           r="70"
@@ -235,20 +244,27 @@ export function MoonFrame({ size }: { size: number }) {
           stroke="#9fb7e8"
           strokeWidth="1"
           strokeDasharray="1.5 5"
-          opacity="0.6"
+          opacity="0.55"
         />
       </Layer>
       <Layer size={size} front>
         <defs>
-          <linearGradient id={`${id}-moon`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#fffbe0" />
-            <stop offset="1" stopColor="#f0c95a" />
-          </linearGradient>
+          <radialGradient id={`${id}-moon`} cx="0.35" cy="0.3" r="0.8">
+            <stop offset="0" stopColor="#fffdf0" />
+            <stop offset="0.6" stopColor="#f6dc8a" />
+            <stop offset="1" stopColor="#d9a93a" />
+          </radialGradient>
           <linearGradient id={`${id}-ring`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#eef4ff" />
             <stop offset="1" stopColor="#7d93c4" />
           </linearGradient>
+          {/* 초승달 — 둥근 달에서 아바타 쪽(아래)으로 비킨 원을 도려낸다 */}
+          <mask id={`${id}-cut`}>
+            <rect x="-30" y="-30" width="60" height="60" fill="#fff" />
+            <circle cx="0" cy="7" r="13.5" fill="#000" />
+          </mask>
         </defs>
+        {/* 은빛 고리 */}
         <circle
           r="52.5"
           fill="none"
@@ -262,22 +278,21 @@ export function MoonFrame({ size }: { size: number }) {
           stroke={`url(#${id}-ring)`}
           strokeWidth="3"
         />
-        <Anim className="cfx-spin" duration="14s">
-          {/* 궤도 상자를 정사각형으로 — 회전축이 아바타 중심에 오게 */}
-          <circle r="70" fill="none" stroke="none" />
-          <g transform="translate(0 -70) rotate(20)">
-            <path
-              d="M0 -17 A17 17 0 1 0 0 17 A13 13 0 1 1 0 -17 Z"
+        {/* 궤도를 도는 달 — 밝은 쪽이 늘 바깥을 본다 */}
+        <g className="cfx-spin" style={orbit}>
+          <g transform="translate(0 -70)">
+            <circle r="20" fill="rgba(255,236,160,0.18)" />
+            <circle
+              r="15"
               fill={`url(#${id}-moon)`}
-              stroke="#b8902a"
-              strokeWidth="1"
-              style={{ filter: "drop-shadow(0 0 3px rgba(255,236,160,0.9))" }}
+              mask={`url(#${id}-cut)`}
+              style={{ filter: "drop-shadow(0 0 4px rgba(255,236,160,0.85))" }}
             />
           </g>
-          <Glint x={0} y={70} r={5} color="#dbe8ff" delay="0s" />
-          <Glint x={-70} y={0} r={4} color="#ffffff" delay="-0.7s" />
-          <Glint x={70} y={0} r={4} color="#ffffff" delay="-1.4s" />
-        </Anim>
+          {/* 달을 따라오는 작은 별 둘 */}
+          <Glint x={-24} y={-66} r={3} color="#ffffff" delay="-0.4s" />
+          <Glint x={22} y={-67} r={2.4} color="#dbe8ff" delay="-1.2s" />
+        </g>
         <Glint x={-46} y={-60} r={3.5} color="#ffffff" delay="-0.3s" />
         <Glint x={58} y={48} r={3} color="#cfe0ff" delay="-1.8s" />
       </Layer>

@@ -59,7 +59,7 @@ const cardProps = {
 /** 로비에서 꾸미기를 장착한 모습 — 10명 방 한 화면 */
 const LOBBY_ROW: { name: string; tier: string; frame?: string }[] = [
   { name: "기본 카드", tier: "GOLD" },
-  { name: "슬라임왕", tier: "SILVER", frame: "FX_SLIME" },
+  { name: "슬라임킹", tier: "SILVER", frame: "FX_SLIME" },
   { name: "새벽유령", tier: "PLATINUM", frame: "FX_GHOST" },
   { name: "봄바람", tier: "EMERALD", frame: "FX_SAKURA" },
   { name: "불꽃미드", tier: "DIAMOND", frame: "FX_FIRE" },
