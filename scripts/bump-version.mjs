@@ -15,8 +15,18 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const TARGETS = ["package.json", "apps/api/package.json", "apps/web/package.json"];
-const INFRA_SCOPES = new Set([
+const TARGETS = [
+  "package.json",
+  "apps/api/package.json",
+  "apps/web/package.json",
+];
+/**
+ * minor 를 올리지 않는 feat scope — 유저 화면 버전을 부풀리지 않으려고.
+ * - 인프라: ci·deploy·build·infra·deps·release·chore
+ * - 관리자 화면(admin): 운영진만 보는 기능이라 유저가 체감하지 않는다 (2026-11-24 사용자 지시 —
+ *   일괄 보상 미리보기 같은 운영 도구 손질이 1.101 → 1.102 로 올라간 뒤 "작은 세부 버전으로" 하자고 함)
+ */
+const NON_MINOR_SCOPES = new Set([
   "ci",
   "deploy",
   "build",
@@ -24,6 +34,7 @@ const INFRA_SCOPES = new Set([
   "deps",
   "release",
   "chore",
+  "admin",
 ]);
 
 const args = process.argv.slice(2);
@@ -76,7 +87,7 @@ function decideBump(subjects, bodies) {
   const userFeatures = subjects.filter((subject) => {
     const match = subject.match(featScopePattern);
     if (!match) return false;
-    return !INFRA_SCOPES.has((match[1] || "").trim());
+    return !NON_MINOR_SCOPES.has((match[1] || "").trim());
   });
 
   if (userFeatures.length > 0) {
