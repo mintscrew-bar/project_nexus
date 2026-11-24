@@ -258,10 +258,10 @@ export function MoonFrame({ size }: { size: number }) {
             <stop offset="0" stopColor="#eef4ff" />
             <stop offset="1" stopColor="#7d93c4" />
           </linearGradient>
-          {/* 초승달 — 둥근 달에서 아바타 쪽(아래)으로 비킨 원을 도려낸다 */}
+          {/* 초승달 — 둥근 달에서 오른쪽 위로 비킨 원을 도려낸다(하늘의 🌙 모양) */}
           <mask id={`${id}-cut`}>
             <rect x="-30" y="-30" width="60" height="60" fill="#fff" />
-            <circle cx="0" cy="7" r="13.5" fill="#000" />
+            <circle cx="6.5" cy="-4" r="13" fill="#000" />
           </mask>
         </defs>
         {/* 은빛 고리 */}
@@ -278,7 +278,7 @@ export function MoonFrame({ size }: { size: number }) {
           stroke={`url(#${id}-ring)`}
           strokeWidth="3"
         />
-        {/* 궤도를 도는 달 — 밝은 쪽이 늘 바깥을 본다 */}
+        {/* 궤도를 도는 달 — 늘 똑바로 선 초승달 */}
         <g className="cfx-spin" style={orbit}>
           {/* 빛은 도려낸 초승달 모양을 따라만 번지게 — 바깥 g 에 그림자를 건다
               (달 뒤에 원을 깔면 도려낸 안쪽에 회색 원판이 비쳤다) */}
@@ -286,7 +286,21 @@ export function MoonFrame({ size }: { size: number }) {
             transform="translate(0 -70)"
             style={{ filter: "drop-shadow(0 0 4px rgba(255,236,160,0.85))" }}
           >
-            <circle r="15" fill={`url(#${id}-moon)`} mask={`url(#${id}-cut)`} />
+            {/* 궤도를 도는 만큼 거꾸로 돌려 달은 늘 똑바로 선다 */}
+            <g
+              className="cfx-spin-rev"
+              style={{
+                transformBox: "fill-box",
+                transformOrigin: "50% 50%",
+                animationDuration: "16s",
+              }}
+            >
+              <circle
+                r="15"
+                fill={`url(#${id}-moon)`}
+                mask={`url(#${id}-cut)`}
+              />
+            </g>
           </g>
           {/* 달을 따라오는 작은 별 둘 */}
           <Glint x={-24} y={-66} r={3} color="#ffffff" delay="-0.4s" />
