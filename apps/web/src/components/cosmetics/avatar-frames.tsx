@@ -280,14 +280,13 @@ export function MoonFrame({ size }: { size: number }) {
         />
         {/* 궤도를 도는 달 — 밝은 쪽이 늘 바깥을 본다 */}
         <g className="cfx-spin" style={orbit}>
-          <g transform="translate(0 -70)">
-            <circle r="20" fill="rgba(255,236,160,0.18)" />
-            <circle
-              r="15"
-              fill={`url(#${id}-moon)`}
-              mask={`url(#${id}-cut)`}
-              style={{ filter: "drop-shadow(0 0 4px rgba(255,236,160,0.85))" }}
-            />
+          {/* 빛은 도려낸 초승달 모양을 따라만 번지게 — 바깥 g 에 그림자를 건다
+              (달 뒤에 원을 깔면 도려낸 안쪽에 회색 원판이 비쳤다) */}
+          <g
+            transform="translate(0 -70)"
+            style={{ filter: "drop-shadow(0 0 4px rgba(255,236,160,0.85))" }}
+          >
+            <circle r="15" fill={`url(#${id}-moon)`} mask={`url(#${id}-cut)`} />
           </g>
           {/* 달을 따라오는 작은 별 둘 */}
           <Glint x={-24} y={-66} r={3} color="#ffffff" delay="-0.4s" />
