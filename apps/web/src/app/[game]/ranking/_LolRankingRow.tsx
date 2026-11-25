@@ -33,7 +33,7 @@ export interface LolRankingEntry {
   wins: number;
   losses: number;
   winRate: number;
-  /** 보정 승률 점수(0~100) — 줄 세우는 기준 */
+  /** 랭킹 점수(50 시작, 0~100) — 줄 세우는 기준 (api ranking-rating.ts) */
   score: number;
   user: {
     id: string;

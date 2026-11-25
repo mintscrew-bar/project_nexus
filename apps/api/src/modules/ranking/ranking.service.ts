@@ -4,11 +4,17 @@ import {
   NotFoundException,
   OnApplicationBootstrap,
 } from "@nestjs/common";
+import { Cron } from "@nestjs/schedule";
 import { PrismaService } from "../prisma/prisma.service";
 import { BalanceScoreService } from "../common/balance-score.service";
 import { Role } from "@nexus/database";
 import { resolveWinnerSlot } from "../match/match-roster.util";
-import { rankingScore } from "./ranking-score";
+import {
+  computeRatings,
+  displayRating,
+  RATING_DISPLAY_START,
+  type RatingMatch,
+} from "./ranking-rating";
 import { applyAutoMvpAce } from "../match/auto-mvp.util";
 import {
   summarizeCommendations,
@@ -19,13 +25,16 @@ import {
   TEST_BOT_USER_WHERE,
 } from "../common/test-bot.util";
 
+/** 경기가 끝나 참가자 10명이 한꺼번에 갱신될 때 점수 재계산을 한 번으로 묶는 대기 시간 */
+const RATING_REFRESH_DEBOUNCE_MS = 3000;
+
 /** 부팅 직후 DB·다른 모듈 준비를 기다렸다가 재계산한다 */
 const BOOT_RECALC_DELAY_MS = 60 * 1000;
 
 /** 리더보드에 보일 사람 — 봇 행이 남아 있어도(재계산 전) 목록·순위에서 뺀다 */
 const NOT_BOT_USER = { NOT: TEST_BOT_USER_WHERE };
 
-/** 리더보드 정렬 — 보정 승률 점수 → 같으면 판수 많은 순 (ranking-score.ts) */
+/** 리더보드 정렬 — 랭킹 점수 → 같으면 판수 많은 순 (ranking-rating.ts) */
 const RANKING_ORDER = [
   { score: "desc" as const },
   { totalGames: "desc" as const },
@@ -54,11 +63,17 @@ export interface RankingRowStats {
 @Injectable()
 export class RankingService implements OnApplicationBootstrap {
   private readonly logger = new Logger(RankingService.name);
-  // 정렬은 보정 승률 점수 순(ranking-score.ts). 1판짜리 100% 가 위로 튀지 않고,
-  // 많이 지기만 한 사람이 판수로 올라가지도 않는다.
+  // 정렬은 랭킹 점수 순(ranking-rating.ts). 모든 내전을 다시 돌려 매기는 실력 평가라
+  // 판수에 중립이다 — 1판짜리가 위로 튀지 않고, 많이 뛴다고 불리하지도 않다.
   // 랭킹 등재 최소 판수. 2026-11-03 10판 → 1판: 내전 성사 자체가 드물어 10판 조건이면 목록이 비어 있었다.
   private static readonly MIN_GAMES_FOR_RANK = 1;
   private static readonly RECENT_GAMES_COUNT = 20;
+
+  /** 점수 재계산 예약 타이머 — 여러 번 불려도 한 번만 돈다 */
+  private ratingRefreshTimer: NodeJS.Timeout | null = null;
+  /** 재계산이 도는 중에 또 요청이 오면 끝난 뒤 한 번 더 돈다 */
+  private ratingRefreshRunning = false;
+  private ratingRefreshPending = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -129,7 +144,8 @@ export class RankingService implements OnApplicationBootstrap {
           wins,
           losses,
           winRate,
-          score: rankingScore(wins, totalGames),
+          // 점수는 모든 경기를 다시 돌려야 나온다 — 처음엔 시작값, 곧 재계산이 덮는다
+          score: RATING_DISPLAY_START,
           recentWins,
           recentLosses,
         },
@@ -138,11 +154,13 @@ export class RankingService implements OnApplicationBootstrap {
           wins,
           losses,
           winRate,
-          score: rankingScore(wins, totalGames),
           recentWins,
           recentLosses,
         },
       });
+
+      // 랭킹 점수는 다른 사람 점수에도 걸려 있어(상대 팀 전력) 전체를 다시 계산한다.
+      this.scheduleRatingRefresh();
 
       // 전체·라인 전적을 모두 저장한 뒤 계산해야 방금 끝난 경기까지 반영된다.
       await this.balanceScores.refreshUser(userId);
@@ -277,12 +295,12 @@ export class RankingService implements OnApplicationBootstrap {
         wins: entry.wins,
         losses,
         winRate,
-        score: rankingScore(entry.wins, entry.totalGames),
       };
 
+      // 점수는 refreshRatingScores 가 채운다 — 새 행만 시작값으로 둔다
       await this.prisma.nexusRoleRecord.upsert({
         where: { userId_role: { userId, role } },
-        create: { userId, role, ...payload },
+        create: { userId, role, ...payload, score: RATING_DISPLAY_START },
         update: payload,
       });
     }
@@ -410,16 +428,29 @@ export class RankingService implements OnApplicationBootstrap {
       role,
     );
 
-    // 순위 번호 — 검색 중이면 각자 전체 순위를 따로 센다(결과가 한 페이지라 비용이 작다)
-    const rankedData = await Promise.all(
-      rankings.map(async (r, i) => ({
-        ...r,
-        globalRank: search
-          ? (await this.countRankedAbove(r.score, r.totalGames, role)) + 1
-          : skip + i + 1,
-        stats: stats.get(r.userId) ?? null,
-      })),
-    );
+    // 순위 번호 — 점수와 판수가 모두 같으면 공동 순위(1, 2, 2, 4 …).
+    // 검색 중이면 각자 전체 순위를 따로 센다(결과가 한 페이지라 비용이 작다).
+    // 목록이면 앞 행과 같을 때 그 번호를 잇고, 페이지 첫 행만 전체에서 센다
+    // (앞 페이지 끝과 동점일 수 있다).
+    const ranks: number[] = [];
+    for (let i = 0; i < rankings.length; i++) {
+      const r = rankings[i];
+      const prev = rankings[i - 1];
+      if (search || i === 0) {
+        ranks.push(
+          (await this.countRankedAbove(r.score, r.totalGames, role)) + 1,
+        );
+      } else if (prev.score === r.score && prev.totalGames === r.totalGames) {
+        ranks.push(ranks[i - 1]);
+      } else {
+        ranks.push(skip + i + 1);
+      }
+    }
+    const rankedData = rankings.map((r, i) => ({
+      ...r,
+      globalRank: ranks[i],
+      stats: stats.get(r.userId) ?? null,
+    }));
 
     return {
       rankings: rankedData,
@@ -659,6 +690,166 @@ export class RankingService implements OnApplicationBootstrap {
   }
 
   /**
+   * 랭킹 점수 재계산을 잠깐 뒤로 예약한다.
+   *
+   * 경기 하나가 끝나면 참가자 10명의 updateRanking 이 한꺼번에 불린다. 점수는 매번
+   * 전체 경기를 다시 돌려야 해서, 대기 시간 안의 요청을 한 번으로 묶는다.
+   * 테스트에서는 타이머를 걸지 않는다(필요하면 refreshRatingScores 를 직접 부른다).
+   */
+  private scheduleRatingRefresh(): void {
+    if (process.env.NODE_ENV === "test") return;
+    if (this.ratingRefreshTimer) clearTimeout(this.ratingRefreshTimer);
+    this.ratingRefreshTimer = setTimeout(() => {
+      this.ratingRefreshTimer = null;
+      this.refreshRatingScores().catch((error) =>
+        this.logger.warn(`랭킹 점수 재계산 실패: ${error}`),
+      );
+    }, RATING_REFRESH_DEBOUNCE_MS);
+    this.ratingRefreshTimer.unref?.();
+  }
+
+  private cancelScheduledRatingRefresh(): void {
+    if (this.ratingRefreshTimer) clearTimeout(this.ratingRefreshTimer);
+    this.ratingRefreshTimer = null;
+  }
+
+  /**
+   * 칭찬은 경기가 끝난 뒤에 들어와서 경기 종료 시점의 재계산에 못 들어간다.
+   * 한 시간에 한 번 다시 돌려 반영한다. 내전 수십 판이라 비용은 작다.
+   */
+  @Cron("17 * * * *")
+  async refreshRatingScoresHourly(): Promise<void> {
+    try {
+      await this.refreshRatingScores();
+    } catch (error) {
+      this.logger.warn(`랭킹 점수 정기 재계산 실패: ${error}`);
+    }
+  }
+
+  /**
+   * 점수 계산에 쓸 내전을 모은다 — 전적 집계(computeInternalRecord)와 같은 범위:
+   * 완료된 내전, 봇을 채워 시험한 판 제외, 승패가 확정된 판만.
+   */
+  private async loadRatingMatches(): Promise<RatingMatch[]> {
+    const rows = await this.prisma.match.findMany({
+      where: {
+        isInternal: true,
+        status: "COMPLETED",
+        ...NO_TEST_BOT_MATCH_WHERE,
+      },
+      select: {
+        id: true,
+        completedAt: true,
+        createdAt: true,
+        winnerId: true,
+        winnerIdSnapshot: true,
+        teamAId: true,
+        teamBId: true,
+        teamAIdSnapshot: true,
+        teamBIdSnapshot: true,
+        mvpUserId: true,
+        aceUserId: true,
+        rosterSnapshots: {
+          select: { userId: true, teamSlot: true, assignedRole: true },
+        },
+        participants: {
+          select: {
+            userId: true,
+            riotTeamId: true,
+            kills: true,
+            deaths: true,
+            assists: true,
+          },
+        },
+        commendations: { select: { giverId: true, targetUserId: true } },
+      },
+    });
+
+    const matches: RatingMatch[] = [];
+    for (const row of rows) {
+      const winnerSlot = resolveWinnerSlot(row);
+      if (!winnerSlot) continue;
+      matches.push({
+        id: row.id,
+        completedAt: row.completedAt ?? row.createdAt,
+        winnerSlot,
+        members: row.rosterSnapshots.map((r) => ({
+          userId: r.userId,
+          slot: r.teamSlot === "B" ? "B" : "A",
+          role: r.assignedRole,
+        })),
+        stats: row.participants.map((p) => ({
+          userId: p.userId,
+          riotTeamId: p.riotTeamId ?? 0,
+          kills: p.kills ?? 0,
+          deaths: p.deaths ?? 0,
+          assists: p.assists ?? 0,
+        })),
+        mvpUserId: row.mvpUserId,
+        aceUserId: row.aceUserId,
+        commendations: row.commendations,
+      });
+    }
+    return matches;
+  }
+
+  /**
+   * 랭킹 점수를 처음부터 다시 매겨 저장한다 (종합·라인별), 순위 번호까지.
+   *
+   * 한 사람 점수가 상대 팀 전력에 걸려 있어 부분 갱신이 안 된다. 모든 내전을 끝난
+   * 순서대로 다시 돌린다(ranking-rating.ts). 동시에 두 번 돌지 않게 막고, 도는 중에
+   * 들어온 요청은 끝난 뒤 한 번 더 돌려 마지막 경기까지 반영한다.
+   */
+  async refreshRatingScores(): Promise<void> {
+    if (this.ratingRefreshRunning) {
+      this.ratingRefreshPending = true;
+      return;
+    }
+    this.ratingRefreshRunning = true;
+    try {
+      do {
+        this.ratingRefreshPending = false;
+        const { overall, byRole } = computeRatings(
+          await this.loadRatingMatches(),
+        );
+
+        const [rankings, roleRecords] = await Promise.all([
+          this.prisma.nexusRanking.findMany({
+            select: { id: true, userId: true, score: true },
+          }),
+          this.prisma.nexusRoleRecord.findMany({
+            select: { id: true, userId: true, role: true, score: true },
+          }),
+        ]);
+
+        // 값이 바뀐 행만 쓴다 — 한 시간마다 도는 재계산이 매번 전 행을 고치지 않게
+        for (const row of rankings) {
+          const score = displayRating(overall.get(row.userId));
+          if (score !== row.score) {
+            await this.prisma.nexusRanking.update({
+              where: { id: row.id },
+              data: { score },
+            });
+          }
+        }
+        for (const row of roleRecords) {
+          const score = displayRating(byRole.get(`${row.userId}:${row.role}`));
+          if (score !== row.score) {
+            await this.prisma.nexusRoleRecord.update({
+              where: { id: row.id },
+              data: { score },
+            });
+          }
+        }
+
+        await this.updateGlobalRankNumbers();
+      } while (this.ratingRefreshPending);
+    } finally {
+      this.ratingRefreshRunning = false;
+    }
+  }
+
+  /**
    * Recalculate all rankings (admin/cron)
    */
   async recalculateAllRankings(): Promise<{
@@ -714,8 +905,10 @@ export class RankingService implements OnApplicationBootstrap {
       processed++;
     }
 
-    // Update global rank numbers
-    await this.updateGlobalRankNumbers();
+    // 전적을 다 맞춘 뒤 점수를 처음부터 다시 매긴다(순위 번호도 그 안에서 매긴다).
+    // 위 updateRanking 들이 걸어 둔 예약은 이걸로 대신하므로 지운다.
+    this.cancelScheduledRatingRefresh();
+    await this.refreshRatingScores();
 
     this.logger.log(
       `Recalculation complete: ${processed} users processed, ${purgedBotRows} bot rows purged`,
@@ -757,14 +950,22 @@ export class RankingService implements OnApplicationBootstrap {
         user: NOT_BOT_USER,
       },
       orderBy: RANKING_ORDER,
-      select: { id: true },
+      select: { id: true, score: true, totalGames: true, globalRank: true },
     });
 
-    // Batch update rank numbers
+    // 점수·판수가 같으면 공동 순위. 바뀐 행만 쓴다.
+    let rank = 0;
     for (let i = 0; i < rankings.length; i++) {
+      const prev = rankings[i - 1];
+      const tied =
+        prev &&
+        prev.score === rankings[i].score &&
+        prev.totalGames === rankings[i].totalGames;
+      if (!tied) rank = i + 1;
+      if (rankings[i].globalRank === rank) continue;
       await this.prisma.nexusRanking.update({
         where: { id: rankings[i].id },
-        data: { globalRank: i + 1 },
+        data: { globalRank: rank },
       });
     }
 

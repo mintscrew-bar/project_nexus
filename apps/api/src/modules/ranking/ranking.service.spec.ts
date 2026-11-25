@@ -311,7 +311,11 @@ describe("RankingService", () => {
         ])
         .mockResolvedValueOnce([]);
       prisma.nexusRanking.findMany
+        // 재계산 대상 모으기
         .mockResolvedValueOnce([{ userId: "stale-user" }])
+        // 점수 재계산(refreshRatingScores) 이 점수를 쓸 행 읽기
+        .mockResolvedValueOnce([])
+        // 순위 번호 매기기
         .mockResolvedValueOnce([]);
       prisma.nexusRanking.upsert.mockResolvedValue({});
       prisma.nexusRanking.updateMany.mockResolvedValue({ count: 0 });
@@ -484,6 +488,77 @@ describe("RankingService", () => {
         },
         topChampions: ["Zed", "Ahri"],
       });
+    });
+  });
+
+  describe("랭킹 점수 재계산 (refreshRatingScores)", () => {
+    it("모든 내전을 다시 돌려 이긴 쪽은 50 위, 진 쪽은 50 아래로 저장하고 순위를 매긴다", async () => {
+      const roster = (userId: string, teamSlot: string) => ({
+        userId,
+        teamSlot,
+        assignedRole: null,
+      });
+      prisma.match.findMany.mockResolvedValue([
+        {
+          id: "m1",
+          completedAt: new Date("2026-11-01T00:00:00Z"),
+          createdAt: new Date("2026-11-01T00:00:00Z"),
+          winnerId: "tA",
+          winnerIdSnapshot: null,
+          teamAId: "tA",
+          teamBId: "tB",
+          teamAIdSnapshot: null,
+          teamBIdSnapshot: null,
+          mvpUserId: null,
+          aceUserId: null,
+          rosterSnapshots: [roster("win", "A"), roster("lose", "B")],
+          participants: [],
+          commendations: [],
+        },
+      ]);
+      prisma.nexusRanking.findMany
+        .mockResolvedValueOnce([
+          { id: "r-win", userId: "win", score: 50 },
+          { id: "r-lose", userId: "lose", score: 50 },
+        ])
+        .mockResolvedValueOnce([
+          { id: "r-win", score: 55, totalGames: 1, globalRank: null },
+          { id: "r-lose", score: 45, totalGames: 1, globalRank: null },
+        ]);
+
+      await service.refreshRatingScores();
+
+      const written = Object.fromEntries(
+        prisma.nexusRanking.update.mock.calls
+          .filter((c: any) => c[0].data.score !== undefined)
+          .map((c: any) => [c[0].where.id, c[0].data.score]),
+      );
+      expect(written["r-win"]).toBeGreaterThan(50);
+      expect(written["r-lose"]).toBeLessThan(50);
+      expect(prisma.nexusRanking.update).toHaveBeenCalledWith({
+        where: { id: "r-win" },
+        data: { globalRank: 1 },
+      });
+    });
+
+    it("점수·판수가 같으면 공동 순위를 준다", async () => {
+      prisma.nexusRanking.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { id: "x", score: 60, totalGames: 3, globalRank: null },
+          { id: "y", score: 60, totalGames: 3, globalRank: null },
+          { id: "z", score: 55, totalGames: 3, globalRank: null },
+        ]);
+
+      await service.refreshRatingScores();
+
+      const ranks = Object.fromEntries(
+        prisma.nexusRanking.update.mock.calls.map((c: any) => [
+          c[0].where.id,
+          c[0].data.globalRank,
+        ]),
+      );
+      expect(ranks).toEqual({ x: 1, y: 1, z: 3 });
     });
   });
 });

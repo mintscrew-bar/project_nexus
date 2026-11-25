@@ -253,7 +253,7 @@ function LolRankingPage() {
               <EmptyState
                 icon={Trophy}
                 title="아직 랭킹에 오른 플레이어가 없습니다"
-                description="내전을 한 판만 해도 랭킹에 등록됩니다. 판수를 반영한 보정 승률 점수 순으로 줄을 세웁니다. 첫 기록을 만들어보세요."
+                description="내전을 한 판만 해도 랭킹에 등록됩니다. 50점에서 시작해 경기마다 오르내리는 실력 점수 순으로 줄을 세웁니다. 첫 기록을 만들어보세요."
                 action={{
                   label: "내전 방 둘러보기",
                   onClick: () => router.push(`${gamePrefix}/tournaments`),
@@ -470,14 +470,24 @@ function ScoreHelp() {
         점수는 어떻게 매기나요?
         <ChevronDown className="h-4 w-4 text-text-tertiary transition-transform group-open:rotate-180" />
       </summary>
+      {/* 계산식은 api ranking/ranking-rating.ts — 바꾸면 여기 설명도 맞춘다 */}
       <p className="mt-2 text-xs leading-relaxed text-text-secondary">
-        판수를 반영한 보정 승률입니다. 모두에게 5판 분량의 50%를 깔고 계산해서,
-        몇 판 안 한 전승보다 많이 뛰고 많이 이긴 사람이 위로 옵니다.
+        모두 50점에서 시작해 경기마다 오르내리는 실력 점수입니다. 강한 팀을
+        이기면 많이 오르고, 약한 팀에게 지면 많이 내려갑니다.
+      </p>
+      <p className="mt-1.5 text-xs leading-relaxed text-text-secondary">
+        한 판의 결과는 승패 70%와 개인 기여 30%로 봅니다. 개인 기여는 같은 판
+        사람들과 비교한 KDA·킬관여, MVP·ACE, 받은 칭찬(상대 팀 칭찬이 더
+        무겁습니다)입니다.
+      </p>
+      <p className="mt-1.5 text-xs leading-relaxed text-text-secondary">
+        판이 적으면 아직 확실하지 않은 몫을 빼고 보여 주고, 판이 쌓일수록 빠지는
+        몫이 줄어듭니다. 실력만큼 하면 판을 많이 뛰어도 손해가 없습니다. 점수와
+        판수가 같으면 공동 순위입니다.
       </p>
       <p className="mt-1.5 text-xs leading-relaxed text-text-tertiary">
-        KDA·주력 챔피언은 Riot 기록이 수집된 내전 기준이고, MVP는 Riot 기록으로
-        자동으로 정합니다. 라인 탭은 그 라인으로 배정돼 끝까지 치른 내전만
-        셉니다.
+        Riot 기록이 없는 내전(코드 없는 사설방)은 승패와 칭찬만 반영합니다. 라인
+        탭은 그 라인으로 배정돼 끝까지 치른 내전만 셉니다.
       </p>
     </details>
   );
