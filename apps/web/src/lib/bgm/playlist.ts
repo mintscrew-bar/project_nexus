@@ -34,6 +34,12 @@ export const BGM_TRACKS: BgmTrack[] = [
     title: "Detuned Focus",
     src: "/audio/bgm/detuned-focus.mp3",
   },
+  // 2026-11-25 추가
+  {
+    id: "still-outside",
+    title: "Still Outside",
+    src: "/audio/bgm/still-outside.mp3",
+  },
   // 게임 시작 순간용 곡은 `hype: true` 를 붙인다. 예:
   // { id: "hype-01", title: "게임 시작", src: "/audio/bgm/hype-01.mp3", hype: true },
 ];
