@@ -49,6 +49,11 @@ interface NameStyleDef {
    * 글자색은 CSS 변수 --nfx-fill 로 넘기고, 원래 색이면 변수를 비워 css 의 기본 색을 쓴다.
    */
   colorize?: boolean;
+  /**
+   * 굵기를 고를 수 있는 글꼴 (2026-11-25) — 굵기 단계가 실제로 있는 글꼴(가변 글꼴)만.
+   * 굵기 단계가 없는 글꼴을 억지로 두껍게 하면 글자가 뭉개져서 뺐다.
+   */
+  weight?: { min: number; max: number; step: number; default: number };
 }
 
 const gf = (family: string) =>
@@ -103,50 +108,58 @@ export const NAME_STYLES: Record<NameStyleCode, NameStyleDef> = {
     className: "nfx-rainbow",
   },
   flame: {
-    family: "'Black Han Sans'",
-    href: gf("Black+Han+Sans"),
+    // 먹선과 같은 글꼴(Black Han Sans)이라 비슷해 보였다 — 더 각지고 굵은 Gasoek One 으로 (2026-11-25)
+    family: "'Gasoek One'",
+    href: gf("Gasoek+One"),
     className: "nfx-flame",
     tintable: true,
   },
-  // ── 2026-11-25 추가 6종 (모두 SIL OFL 한글 글꼴) ──
+  // ── 2026-11-25 추가 6종 (모두 SIL OFL 한글 글꼴, 서로 다른 글꼴 갈래로 골랐다) ──
   frost: {
-    family: "Sunflower",
-    href: gf("Sunflower:wght@700"),
+    // 단정한 세리프 가변 글꼴 — 서리 낀 유리 글씨
+    family: "Hahmlet",
+    href: gf("Hahmlet:wght@100..900"),
     className: "nfx-frost",
     tintable: true,
+    weight: { min: 100, max: 900, step: 50, default: 700 },
   },
   thunder: {
-    family: "Dokdo",
-    href: gf("Dokdo"),
-    scale: 1.3,
+    // 전자·기계 느낌의 각진 둥근 글꼴
+    family: "Orbit",
+    href: gf("Orbit"),
+    scale: 1.05,
     className: "nfx-thunder",
     tintable: true,
   },
   moon: {
-    family: "'Song Myung'",
-    href: gf("Song+Myung"),
-    scale: 1.05,
+    // 가늘고 둥근 글꼴 — 달무리처럼 번지는 빛
+    family: "Dongle",
+    href: gf("Dongle:wght@700"),
+    scale: 1.5,
     className: "nfx-moon",
     tintable: true,
   },
   slime: {
-    family: "'Single Day'",
-    href: gf("Single+Day"),
-    scale: 1.1,
+    // 통통하게 부푼 글꼴 — 말랑한 덩어리
+    family: "'Bagel Fat One'",
+    href: gf("Bagel+Fat+One"),
+    scale: 0.95,
     className: "nfx-slime",
     tintable: true,
   },
   sunset: {
-    family: "Gaegu",
-    href: gf("Gaegu:wght@700"),
-    scale: 1.25,
+    // 깔끔한 현대 고딕 가변 글꼴 — 노을 띠가 흐른다
+    family: "'Noto Sans KR'",
+    href: gf("Noto+Sans+KR:wght@100..900"),
     className: "nfx-sunset",
     tintable: true,
+    weight: { min: 100, max: 900, step: 50, default: 800 },
   },
   ghost: {
-    family: "'Yeon Sung'",
-    href: gf("Yeon+Sung"),
-    scale: 1.05,
+    // 삐뚤빼뚤 떨리는 손글씨 — 흐릿한 잔상이 뒤따른다
+    family: "'Kirang Haerang'",
+    href: gf("Kirang+Haerang"),
+    scale: 1.15,
     className: "nfx-ghost",
     tintable: true,
   },
@@ -216,7 +229,8 @@ export function StyledName({
   const style: CSSProperties = {
     fontFamily: `${def.family}, var(--font-sans, sans-serif)`,
     fontSize: def.scale ? `${def.scale}em` : undefined,
-    fontWeight: 400,
+    // 굵기 — 굵기를 고를 수 있는 글꼴은 고른 값(없으면 글꼴 기본), 나머지는 400
+    fontWeight: def.weight ? (tint?.weight ?? def.weight.default) : 400,
   };
   // 글자 속을 칠하는 글꼴 — 원래 색이면 변수를 비워 css 기본 색을 쓴다
   const fill = def.colorize ? nameFillColor(tint) : null;

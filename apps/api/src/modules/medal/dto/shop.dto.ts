@@ -67,6 +67,14 @@ export class NameTintValueDto {
   @Min(50)
   @Max(150)
   brightness!: number;
+
+  /** 글자 굵기 100~900 — 굵기 단계가 있는 글꼴만, 없으면 글꼴 기본 */
+  @KeepRaw()
+  @IsOptional()
+  @IsInt()
+  @Min(100)
+  @Max(900)
+  weight?: number | null;
 }
 
 /** PUT shop/name-tint — 닉네임 글꼴 색·채도·밝기. tint 가 null 이면 원래 색 */

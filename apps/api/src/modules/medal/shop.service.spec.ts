@@ -179,6 +179,25 @@ describe("ShopService", () => {
       });
     });
 
+    it("굵기는 선택이고, 저장하면 장착 정보에 실리며 범위 밖이면 거절한다", async () => {
+      db.setBalance("u1", 1000);
+      await shop.purchase("u1", "NM_GOLD", true);
+      const bold = { hue: 0, saturation: 100, brightness: 100, weight: 700 };
+      // 색은 원래대로라도 굵기만 골랐으면 기본값이 아니다
+      await shop.setNameTint("u1", "NM_GOLD", bold);
+      expect(await shop.getLoadouts(["u1"])).toEqual({
+        u1: { NAME_STYLE: "NM_GOLD", nameTint: bold },
+      });
+      await expect(
+        shop.setNameTint("u1", "NM_GOLD", { ...bold, weight: 50 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      // 굵기를 지우고 색도 원래면 원래 색(저장 없음)
+      await shop.setNameTint("u1", "NM_GOLD", { ...bold, weight: null });
+      expect(await shop.getLoadouts(["u1"])).toEqual({
+        u1: { NAME_STYLE: "NM_GOLD" },
+      });
+    });
+
     it("가지지 않은 상품·닉네임 글꼴이 아닌 상품·범위 밖 값은 거절한다", async () => {
       db.setBalance("u1", 1000);
       await shop.purchase("u1", "FX_SLIME");

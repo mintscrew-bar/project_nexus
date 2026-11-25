@@ -295,17 +295,28 @@ export interface NameTint {
   saturation: number;
   /** 밝기 % 50~150 (100 = 원래) */
   brightness: number;
+  /**
+   * 글자 굵기 100~900 (2026-11-25) — 굵기 단계가 실제로 있는 글꼴만 쓴다. 없으면 글꼴 기본 굵기.
+   */
+  weight?: number | null;
 }
 
 export const NAME_TINT_LIMITS = {
   hue: [0, 359],
   saturation: [0, 200],
   brightness: [50, 150],
+  weight: [100, 900],
 } as const;
 
 /** 원래 색 그대로인가 */
 export function isDefaultNameTint(t: NameTint | null | undefined): boolean {
-  return !t || (t.hue === 0 && t.saturation === 100 && t.brightness === 100);
+  return (
+    !t ||
+    (t.hue === 0 &&
+      t.saturation === 100 &&
+      t.brightness === 100 &&
+      t.weight == null)
+  );
 }
 
 /**

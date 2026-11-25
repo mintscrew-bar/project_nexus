@@ -1738,93 +1738,137 @@ body.scroll-locked {
   filter: drop-shadow(0 0 3px rgba(255, 90, 20, 0.7)) drop-shadow(0 1px 0 #3a0a00);
   animation: nfx-burn 1.4s ease-in-out infinite;
 }
-@media (prefers-reduced-motion: reduce) {
-/* ───── 2026-11-25 추가 6종 ───── */
-/* 프로스트 — 얼음빛 글자 위로 서리 반짝임이 스친다 */
+/* ───── 2026-11-25 추가 6종 (글꼴·효과를 서로 다르게) ───── */
+/* 프로스트 — 서리 낀 유리 글씨. 얼음빛 위로 흰 반짝임이 스치고, 모서리에 얼음 알갱이가 깜빡인다 */
 @keyframes nfx-frost-glint {
-  0%, 60% { background-position: 170% 0; }
-  100% { background-position: -70% 0; }
+  0%, 55% { background-position: 170% 0, 0 0; }
+  100% { background-position: -70% 0, 0 0; }
+}
+@keyframes nfx-frost-star {
+  0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(45deg); }
 }
 .nfx-frost {
   background-image:
-    linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 1) 50%, transparent 58%),
-    linear-gradient(180deg, #f2fcff 0%, #9fe3ff 50%, #4aa8e8 100%);
+  position: relative;
+    linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 1) 50%, transparent 60%),
+    linear-gradient(180deg, #f6fdff 0%, #a8e6ff 48%, #3f9de0 100%);
   background-size: 260% 100%, 100% 100%;
   background-repeat: no-repeat;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 2px rgba(120, 210, 255, 0.8)) drop-shadow(0 1px 0 rgba(10, 40, 90, 0.9));
+  filter: drop-shadow(0 0 3px rgba(120, 215, 255, 0.9)) drop-shadow(0 1px 0 rgba(8, 36, 88, 0.95));
   animation: nfx-frost-glint 4s ease-in-out infinite;
 }
-/* 썬더 — 노란 번개 글씨가 순간 번쩍인다 */
+.nfx-frost::after {
+  content: "✦";
+  position: absolute;
+  right: -0.45em;
+  top: -0.35em;
+  font-size: 0.55em;
+  font-family: sans-serif;
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  text-shadow: 0 0 5px #9fe6ff;
+  animation: nfx-frost-star 2.8s ease-in-out infinite;
+}
+/* 썬더 — 각진 전자 글씨. 노란 번개빛이 번쩍이고 지직거린다 */
 @keyframes nfx-thunder-zap {
-  0%, 86%, 100% { filter: drop-shadow(0 0 2px rgba(255, 220, 60, 0.8)) drop-shadow(0 1px 0 #2a1a00); }
-  88%, 92% { filter: drop-shadow(0 0 8px rgba(255, 255, 200, 1)) drop-shadow(0 0 3px #fff) drop-shadow(0 1px 0 #2a1a00); }
-  90% { filter: drop-shadow(0 0 2px rgba(255, 220, 60, 0.4)) drop-shadow(0 1px 0 #2a1a00); }
+  0%, 84%, 100% { filter: drop-shadow(0 0 3px rgba(255, 215, 40, 0.9)) drop-shadow(0 1px 0 #2a1a00); transform: translateX(0); }
+  86% { filter: drop-shadow(0 0 12px #fff) drop-shadow(0 0 5px #ffe14a) drop-shadow(0 1px 0 #2a1a00); transform: translateX(-1px); }
+  88% { filter: drop-shadow(0 0 2px rgba(255, 215, 40, 0.3)) drop-shadow(0 1px 0 #2a1a00); transform: translateX(1px); }
+  90% { filter: drop-shadow(0 0 12px #fff) drop-shadow(0 0 5px #ffe14a) drop-shadow(0 1px 0 #2a1a00); transform: translateX(0); }
 }
 .nfx-thunder {
-  background-image: linear-gradient(180deg, #fffbd0 0%, #ffe24a 50%, #ffb300 100%);
+  display: inline-block;
+  background-image: linear-gradient(180deg, #ffffff 0%, #fff27a 40%, #ffc400 75%, #ff8c00 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 2px rgba(255, 220, 60, 0.8)) drop-shadow(0 1px 0 #2a1a00);
-  animation: nfx-thunder-zap 3.4s linear infinite;
+  -webkit-text-stroke: 0.6px #3b2600;
+  filter: drop-shadow(0 0 3px rgba(255, 215, 40, 0.9)) drop-shadow(0 1px 0 #2a1a00);
+  animation: nfx-thunder-zap 3.2s linear infinite;
 }
-/* 문라이트 — 은빛 보랏빛 글자가 달빛처럼 숨 쉰다 */
-@keyframes nfx-moon-breathe {
-  0%, 100% { filter: drop-shadow(0 0 2px rgba(190, 180, 255, 0.5)) drop-shadow(0 1px 0 #1a1640); }
-  50% { filter: drop-shadow(0 0 7px rgba(210, 200, 255, 0.95)) drop-shadow(0 1px 0 #1a1640); }
+/* 문라이트 — 가늘고 둥근 글씨 둘레로 달무리가 번졌다 걷힌다 */
+@keyframes nfx-moon-halo {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(200, 190, 255, 0.55)) drop-shadow(0 0 6px rgba(150, 140, 235, 0.35)) drop-shadow(0 1px 0 #17133a); }
+  50% { filter: drop-shadow(0 0 4px rgba(235, 228, 255, 1)) drop-shadow(0 0 14px rgba(170, 160, 255, 0.85)) drop-shadow(0 1px 0 #17133a); }
 }
 .nfx-moon {
-  background-image: linear-gradient(180deg, #fbf8ff 0%, #d4ccff 55%, #a79be8 100%);
+  background-image: linear-gradient(180deg, #ffffff 0%, #dcd5ff 55%, #a99bf0 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 2px rgba(190, 180, 255, 0.5)) drop-shadow(0 1px 0 #1a1640);
-  animation: nfx-moon-breathe 4.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 2px rgba(200, 190, 255, 0.55)) drop-shadow(0 0 6px rgba(150, 140, 235, 0.35)) drop-shadow(0 1px 0 #17133a);
+  animation: nfx-moon-halo 4.6s ease-in-out infinite;
 }
-/* 슬라임 — 연두빛 말랑한 글자가 살짝 눌렸다 퍼진다 */
+/* 슬라임 — 통통한 글씨가 말랑하게 눌렸다 퍼지고, 윗면에 반짝이는 광택이 있다 */
 @keyframes nfx-slime-wobble {
   0%, 100% { transform: scale(1, 1); }
-  50% { transform: scale(1.03, 0.96); }
+  30% { transform: scale(1.05, 0.93); }
+  60% { transform: scale(0.97, 1.05); }
 }
 .nfx-slime {
   display: inline-block;
   transform-origin: 50% 100%;
-  background-image: linear-gradient(180deg, #eaffb0 0%, #8be04a 55%, #3da82a 100%);
+  background-image:
+    radial-gradient(ellipse 60% 35% at 30% 22%, rgba(255, 255, 255, 0.85), transparent 70%),
+    linear-gradient(180deg, #d9ff8a 0%, #86e03f 50%, #34a825 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 1px 0 #17501a) drop-shadow(0 0 3px rgba(130, 230, 70, 0.55));
-  animation: nfx-slime-wobble 2.2s ease-in-out infinite;
+  filter: drop-shadow(0 1px 0 #17501a) drop-shadow(0 0 4px rgba(120, 230, 60, 0.6));
+  animation: nfx-slime-wobble 2.4s ease-in-out infinite;
 }
-/* 선셋 — 노을 주황에서 보라로 번지는 색이 천천히 흐른다 */
+/* 선셋 — 깔끔한 고딕에 노을 띠. 낮은 해가 지나가듯 주황~분홍~보라가 천천히 흐른다 */
 @keyframes nfx-sunset-flow {
   0%, 100% { background-position: 0% 0; }
   50% { background-position: 100% 0; }
 }
 .nfx-sunset {
-  background-image: linear-gradient(90deg, #ffd27a, #ff8a6b, #d96fb0, #9a7be0, #d96fb0, #ff8a6b, #ffd27a);
-  background-size: 240% 100%;
+  background-image: linear-gradient(90deg, #ffe08a, #ff9a5c, #ff6f91, #c86bd6, #7d6bf0, #c86bd6, #ff6f91, #ff9a5c, #ffe08a);
+  background-size: 260% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 1px 0 rgba(60, 10, 50, 0.85));
-  animation: nfx-sunset-flow 6s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px rgba(255, 130, 110, 0.55)) drop-shadow(0 1px 0 rgba(45, 8, 60, 0.9));
+  animation: nfx-sunset-flow 7s ease-in-out infinite;
 }
-/* 고스트 — 창백한 청록 글자가 흐려졌다 선명해진다 */
+/* 고스트 — 떨리는 손글씨 뒤로 흐릿한 잔상이 위아래로 떠다닌다 */
+@keyframes nfx-ghost-float {
+  0%, 100% { transform: translateY(0); opacity: 0.55; }
+  50% { transform: translateY(-3px); opacity: 0.2; }
+}
 @keyframes nfx-ghost-fade {
   0%, 100% { opacity: 1; }
-  45% { opacity: 0.55; }
-  55% { opacity: 0.8; }
+  45% { opacity: 0.62; }
+  55% { opacity: 0.85; }
 }
 .nfx-ghost {
   color: #b4ffe2;
+  position: relative;
   text-shadow: 0 0 3px #7fffd0, 0 0 10px rgba(80, 230, 180, 0.7), 0 2px 0 #0b3a30;
   animation: nfx-ghost-fade 3.6s ease-in-out infinite;
 }
   .nfx-root { animation: none !important; }
+.nfx-ghost::after {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  color: #7fffd0;
+  text-shadow: none;
+  filter: blur(3px);
+  pointer-events: none;
+  animation: nfx-ghost-float 3.6s ease-in-out infinite;
+}
+html.cfx-off .nfx-root::before,
+html.cfx-off .nfx-root::after {
+  display: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
 }
 /* 효과 끄기 「멈춘 그림」 — 글꼴·색은 두고 움직임만 멈춘다 */
 .cfx-still .nfx-root,

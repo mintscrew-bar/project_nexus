@@ -14,17 +14,24 @@ import { useToast } from "@/components/ui/Toast";
 import { findCosmetic } from "./catalog";
 import {
   NAME_HUE_PRESETS,
+  NAME_STYLES,
   StyledName,
   isNameStyleTintable,
 } from "./name-styles";
 import { LOADOUT_QUERY_KEY } from "./useCosmeticLoadouts";
 
-const ORIGINAL: NameTint = { hue: 0, saturation: 100, brightness: 100 };
+const ORIGINAL: NameTint = {
+  hue: 0,
+  saturation: 100,
+  brightness: 100,
+  weight: null,
+};
 
 const sameTint = (a: NameTint, b: NameTint) =>
   a.hue === b.hue &&
   a.saturation === b.saturation &&
-  a.brightness === b.brightness;
+  a.brightness === b.brightness &&
+  (a.weight ?? null) === (b.weight ?? null);
 
 /** 슬라이더 한 줄 — 이름·현재 값·띠 */
 function Slider({
@@ -32,6 +39,7 @@ function Slider({
   value,
   min,
   max,
+  step = 1,
   unit,
   track,
   onChange,
@@ -40,6 +48,7 @@ function Slider({
   value: number;
   min: number;
   max: number;
+  step?: number;
   unit: string;
   /** 띠 배경 — 값이 무엇을 바꾸는지 감 잡게 */
   track: string;
@@ -58,6 +67,7 @@ function Slider({
         type="range"
         min={min}
         max={max}
+        step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="mt-1 h-1.5 w-full cursor-pointer appearance-none rounded-full accent-accent-primary"
@@ -187,6 +197,21 @@ export function NameTintPicker({
         track="linear-gradient(90deg, #1f1f1f, #f5f5f5)"
         onChange={(brightness) => set({ brightness })}
       />
+      {/* 굵기 — 굵기 단계가 있는 글꼴만. 기본 굵기로 돌리면 null(저장 안 함) */}
+      {NAME_STYLES[style].weight && (
+        <Slider
+          label="굵기"
+          value={draft.weight ?? NAME_STYLES[style].weight.default}
+          min={NAME_STYLES[style].weight.min}
+          max={NAME_STYLES[style].weight.max}
+          step={NAME_STYLES[style].weight.step}
+          unit=""
+          track="linear-gradient(90deg, #6b6b6b, #f5f5f5)"
+          onChange={(w) =>
+            set({ weight: w === NAME_STYLES[style].weight!.default ? null : w })
+          }
+        />
+      )}
 
       <div className="flex items-center justify-between gap-2">
         <button

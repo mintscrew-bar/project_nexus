@@ -37,14 +37,22 @@ function toTint(row: {
   hue: number | null;
   saturation: number | null;
   brightness: number | null;
+  weight?: number | null;
 }): NameTint | null {
-  if (row.hue == null && row.saturation == null && row.brightness == null)
+  if (
+    row.hue == null &&
+    row.saturation == null &&
+    row.brightness == null &&
+    row.weight == null
+  )
     return null;
-  return {
+  const tint: NameTint = {
     hue: row.hue ?? 0,
     saturation: row.saturation ?? 100,
     brightness: row.brightness ?? 100,
   };
+  if (row.weight != null) tint.weight = row.weight;
+  return tint;
 }
 
 /** 한 번에 장착 상태를 물어볼 수 있는 최대 인원 (로비 100인 방 기준) */
@@ -81,6 +89,7 @@ export class ShopService {
           hue: true,
           saturation: true,
           brightness: true,
+          weight: true,
         },
       }),
       this.getLoadout(userId),
@@ -384,6 +393,17 @@ export class ShopService {
           throw new BadRequestException("고른 색 값이 범위를 벗어났어요.");
         }
       }
+      // 굵기는 선택 — 있으면 100~900 정수
+      if (tint.weight != null) {
+        const [min, max] = NAME_TINT_LIMITS.weight;
+        if (
+          !Number.isInteger(tint.weight) ||
+          tint.weight < min ||
+          tint.weight > max
+        ) {
+          throw new BadRequestException("고른 굵기 값이 범위를 벗어났어요.");
+        }
+      }
     }
     const item = await this.catalog.find(code);
     if (!item) throw new NotFoundException("없는 상품이에요.");
@@ -399,11 +419,12 @@ export class ShopService {
     await this.prisma.userCosmetic.update({
       where: { id: owned.id },
       data: plain
-        ? { hue: null, saturation: null, brightness: null }
+        ? { hue: null, saturation: null, brightness: null, weight: null }
         : {
             hue: tint!.hue,
             saturation: tint!.saturation,
             brightness: tint!.brightness,
+            weight: tint!.weight ?? null,
           },
     });
     return { code, tint: plain ? null : tint };
@@ -442,7 +463,13 @@ export class ShopService {
         where: {
           OR: named.map((r) => ({ userId: r.userId, itemCode: r.itemCode })),
         },
-        select: { userId: true, hue: true, saturation: true, brightness: true },
+        select: {
+          userId: true,
+          hue: true,
+          saturation: true,
+          brightness: true,
+          weight: true,
+        },
       });
       for (const o of owned) {
         const tint = toTint(o);

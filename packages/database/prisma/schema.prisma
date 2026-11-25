@@ -2319,6 +2319,8 @@ model UserCosmetic {
   hue        Int?
   saturation Int?
   brightness Int?
+  /// 글자 굵기 100~900 — 굵기 단계가 있는 글꼴만 (2026-11-25). null 이면 글꼴 기본
+  weight     Int?
   acquiredAt DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
