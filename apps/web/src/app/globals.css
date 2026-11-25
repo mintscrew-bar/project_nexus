@@ -1642,7 +1642,7 @@ body.scroll-locked {
   }
 }
 .nfx-ink {
-  color: #f4f4f2;
+  color: var(--nfx-fill, #f4f4f2);
   text-shadow:
     -1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111,
     0 2px 0 #000;
@@ -1696,7 +1696,7 @@ body.scroll-locked {
   50% { filter: drop-shadow(0 0 4px rgba(239, 229, 207, 0.55)); }
 }
 .nfx-brush {
-  color: #efe5cf;
+  color: var(--nfx-fill, #efe5cf);
   text-shadow: 0 0 1px #000, 1px 1px 0 #3a2a1a;
   animation: nfx-brush-glow 4s ease-in-out infinite;
 }
@@ -1739,6 +1739,91 @@ body.scroll-locked {
   animation: nfx-burn 1.4s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
+/* ───── 2026-11-25 추가 6종 ───── */
+/* 프로스트 — 얼음빛 글자 위로 서리 반짝임이 스친다 */
+@keyframes nfx-frost-glint {
+  0%, 60% { background-position: 170% 0; }
+  100% { background-position: -70% 0; }
+}
+.nfx-frost {
+  background-image:
+    linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 1) 50%, transparent 58%),
+    linear-gradient(180deg, #f2fcff 0%, #9fe3ff 50%, #4aa8e8 100%);
+  background-size: 260% 100%, 100% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 2px rgba(120, 210, 255, 0.8)) drop-shadow(0 1px 0 rgba(10, 40, 90, 0.9));
+  animation: nfx-frost-glint 4s ease-in-out infinite;
+}
+/* 썬더 — 노란 번개 글씨가 순간 번쩍인다 */
+@keyframes nfx-thunder-zap {
+  0%, 86%, 100% { filter: drop-shadow(0 0 2px rgba(255, 220, 60, 0.8)) drop-shadow(0 1px 0 #2a1a00); }
+  88%, 92% { filter: drop-shadow(0 0 8px rgba(255, 255, 200, 1)) drop-shadow(0 0 3px #fff) drop-shadow(0 1px 0 #2a1a00); }
+  90% { filter: drop-shadow(0 0 2px rgba(255, 220, 60, 0.4)) drop-shadow(0 1px 0 #2a1a00); }
+}
+.nfx-thunder {
+  background-image: linear-gradient(180deg, #fffbd0 0%, #ffe24a 50%, #ffb300 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 2px rgba(255, 220, 60, 0.8)) drop-shadow(0 1px 0 #2a1a00);
+  animation: nfx-thunder-zap 3.4s linear infinite;
+}
+/* 문라이트 — 은빛 보랏빛 글자가 달빛처럼 숨 쉰다 */
+@keyframes nfx-moon-breathe {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(190, 180, 255, 0.5)) drop-shadow(0 1px 0 #1a1640); }
+  50% { filter: drop-shadow(0 0 7px rgba(210, 200, 255, 0.95)) drop-shadow(0 1px 0 #1a1640); }
+}
+.nfx-moon {
+  background-image: linear-gradient(180deg, #fbf8ff 0%, #d4ccff 55%, #a79be8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 2px rgba(190, 180, 255, 0.5)) drop-shadow(0 1px 0 #1a1640);
+  animation: nfx-moon-breathe 4.5s ease-in-out infinite;
+}
+/* 슬라임 — 연두빛 말랑한 글자가 살짝 눌렸다 퍼진다 */
+@keyframes nfx-slime-wobble {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.03, 0.96); }
+}
+.nfx-slime {
+  display: inline-block;
+  transform-origin: 50% 100%;
+  background-image: linear-gradient(180deg, #eaffb0 0%, #8be04a 55%, #3da82a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 #17501a) drop-shadow(0 0 3px rgba(130, 230, 70, 0.55));
+  animation: nfx-slime-wobble 2.2s ease-in-out infinite;
+}
+/* 선셋 — 노을 주황에서 보라로 번지는 색이 천천히 흐른다 */
+@keyframes nfx-sunset-flow {
+  0%, 100% { background-position: 0% 0; }
+  50% { background-position: 100% 0; }
+}
+.nfx-sunset {
+  background-image: linear-gradient(90deg, #ffd27a, #ff8a6b, #d96fb0, #9a7be0, #d96fb0, #ff8a6b, #ffd27a);
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(60, 10, 50, 0.85));
+  animation: nfx-sunset-flow 6s ease-in-out infinite;
+}
+/* 고스트 — 창백한 청록 글자가 흐려졌다 선명해진다 */
+@keyframes nfx-ghost-fade {
+  0%, 100% { opacity: 1; }
+  45% { opacity: 0.55; }
+  55% { opacity: 0.8; }
+}
+.nfx-ghost {
+  color: #b4ffe2;
+  text-shadow: 0 0 3px #7fffd0, 0 0 10px rgba(80, 230, 180, 0.7), 0 2px 0 #0b3a30;
+  animation: nfx-ghost-fade 3.6s ease-in-out infinite;
+}
   .nfx-root { animation: none !important; }
 }
 /* 효과 끄기 「멈춘 그림」 — 글꼴·색은 두고 움직임만 멈춘다 */

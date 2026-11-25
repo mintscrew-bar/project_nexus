@@ -225,6 +225,48 @@ export const COSMETIC_SHOP_ITEMS: CosmeticShopItem[] = [
     rarity: "RARE",
     onSale: true,
   },
+  {
+    code: "NM_SLIME",
+    slot: "NAME_STYLE",
+    price: 180,
+    rarity: "STARTER",
+    onSale: true,
+  },
+  {
+    code: "NM_SUNSET",
+    slot: "NAME_STYLE",
+    price: 360,
+    rarity: "COMMON",
+    onSale: true,
+  },
+  {
+    code: "NM_MOON",
+    slot: "NAME_STYLE",
+    price: 360,
+    rarity: "COMMON",
+    onSale: true,
+  },
+  {
+    code: "NM_GHOST",
+    slot: "NAME_STYLE",
+    price: 540,
+    rarity: "PREMIUM",
+    onSale: true,
+  },
+  {
+    code: "NM_FROST",
+    slot: "NAME_STYLE",
+    price: 600,
+    rarity: "PREMIUM",
+    onSale: true,
+  },
+  {
+    code: "NM_THUNDER",
+    slot: "NAME_STYLE",
+    price: 1100,
+    rarity: "RARE",
+    onSale: true,
+  },
   // 프로필 배경 — 프로필 전체를 차지하고 제작비가 가장 커서 최상위 가격 (2026-11-18)
   {
     code: "BN_INK_SWORDSMAN",
