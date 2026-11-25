@@ -3238,6 +3238,14 @@ export interface AdminRoomFunnel {
   medianWaitMinutes: number | null;
   avgHumansInStarted: number | null;
   excludedBotRooms: number;
+  /** 최고 인원이 기록된 방 수 (2026-11-26 부터) — 아래 세 값의 분모 */
+  peakRecorded: number;
+  /** 사람만으로 정원이 한 번이라도 찼던 방 */
+  peakFull: number;
+  /** 정원 80% 이상 찼다가 시작 못 한 방 */
+  nearFullNotStarted: number;
+  /** 시작 못 한 방의 평균 최고 인원 */
+  avgPeakInNotStarted: number | null;
 }
 
 /** 관리자 내전 기록 상세 — 목록 필드에 팀/참가자 지표가 더해진다 */

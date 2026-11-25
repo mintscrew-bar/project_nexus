@@ -1,4 +1,4 @@
-import { recordRoomOutcome } from "./room-outcome.util";
+import { bumpRoomPeakHumans, recordRoomOutcome } from "./room-outcome.util";
 
 const human = (name: string) => ({
   user: { username: name, email: null, riotAccounts: [] },
@@ -17,6 +17,7 @@ function makeRoom(over: Record<string, any> = {}) {
     maxParticipants: 10,
     isPrivate: false,
     scheduledAt: null,
+    peakHumanCount: 0,
     host: { username: "alice", email: null, riotAccounts: [] },
     participants: [human("a"), human("b"), bot("testbot_01")],
     matches: [],
@@ -99,5 +100,48 @@ describe("recordRoomOutcome", () => {
 
     const broken = { room: {}, roomOutcome: {} } as any;
     await expect(recordRoomOutcome(broken, "r1")).resolves.toBeUndefined();
+  });
+});
+
+describe("최고 인원", () => {
+  it("방이 지워질 때 최고 인원을 옮겨 담는다", async () => {
+    const prisma = makePrisma(makeRoom({ peakHumanCount: 9 }));
+    await recordRoomOutcome(prisma, "r1");
+    const data = prisma.roomOutcome.upsert.mock.calls[0][0].create;
+    expect(data.peakHumanCount).toBe(9);
+    expect(data.humanCount).toBe(2);
+  });
+
+  it("갱신을 놓쳐 최고 인원이 지금 인원보다 작으면 지금 인원을 쓴다", async () => {
+    const prisma = makePrisma(makeRoom({ peakHumanCount: 0 }));
+    await recordRoomOutcome(prisma, "r1");
+    expect(
+      prisma.roomOutcome.upsert.mock.calls[0][0].create.peakHumanCount,
+    ).toBe(2);
+  });
+
+  it("지금 사람 수가 저장값보다 클 때만 올린다 (봇 제외 조건으로 센다)", async () => {
+    const prisma = {
+      roomParticipant: { count: jest.fn().mockResolvedValue(7) },
+      room: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    } as any;
+    await bumpRoomPeakHumans(prisma, "r1");
+
+    const countArgs = prisma.roomParticipant.count.mock.calls[0][0];
+    expect(countArgs.where.roomId).toBe("r1");
+    expect(countArgs.where.user.NOT).toBeDefined();
+    expect(prisma.room.updateMany).toHaveBeenCalledWith({
+      where: { id: "r1", peakHumanCount: { lt: 7 } },
+      data: { peakHumanCount: 7 },
+    });
+  });
+
+  it("갱신이 실패해도 던지지 않는다 (입장을 막지 않는다)", async () => {
+    const prisma = {
+      roomParticipant: { count: jest.fn().mockRejectedValue(new Error("db")) },
+      room: { updateMany: jest.fn() },
+    } as any;
+    await expect(bumpRoomPeakHumans(prisma, "r1")).resolves.toBeUndefined();
+    expect(prisma.room.updateMany).not.toHaveBeenCalled();
   });
 });

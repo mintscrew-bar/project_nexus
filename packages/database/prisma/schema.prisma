@@ -520,6 +520,10 @@ model Room {
   /// 정원을 못 채운 채 식어버려 모집 공지를 닫은 시각.
   /// 방 자체는 남긴다 — 호스트가 직접 닫거나 다시 쓸 수 있어야 한다.
   recruitClosedAt          DateTime?
+  /// 이 방에 한꺼번에 있었던 사람(봇 제외, 관전 포함) 수의 최댓값 (2026-11-26).
+  /// 참가할 때마다 더 크면 올린다. 9명까지 찼다가 흩어진 방을 지워질 때 인원만으로는
+  /// 못 가려서 남긴다. 방이 지워질 때 RoomOutcome.peakHumanCount 로 옮겨진다.
+  peakHumanCount           Int                   @default(0)
   startedAt                DateTime?
   completedAt              DateTime?
   // 방송 오버레이: 호스트가 중계 중인 경기(방송 토큰은 User로 이동 — per-streamer 단일 토큰)
@@ -2194,6 +2198,9 @@ model RoomOutcome {
   participantCount  Int
   /// 그중 봇이 아닌 사람 수
   humanCount        Int
+  /// 방이 살아 있는 동안 한꺼번에 있었던 사람 수의 최댓값 (Room.peakHumanCount).
+  /// 이 칸이 생기기 전(2026-11-26)에 지워진 방은 null — 그때는 몰랐다.
+  peakHumanCount    Int?
   hostIsBot         Boolean    @default(false)
   isPrivate         Boolean    @default(false)
   scheduled         Boolean    @default(false)

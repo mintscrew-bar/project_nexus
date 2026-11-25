@@ -1,6 +1,6 @@
 import { Logger } from "@nestjs/common";
 import { PrismaClient } from "@nexus/database";
-import { isTestBotUser } from "./test-bot.util";
+import { isTestBotUser, TEST_BOT_USER_WHERE } from "./test-bot.util";
 
 const logger = new Logger("RoomOutcome");
 
@@ -30,6 +30,7 @@ export async function recordRoomOutcome(
         maxParticipants: true,
         isPrivate: true,
         scheduledAt: true,
+        peakHumanCount: true,
         host: {
           select: {
             username: true,
@@ -84,6 +85,9 @@ export async function recordRoomOutcome(
         maxParticipants: room.maxParticipants,
         participantCount,
         humanCount,
+        // 지워질 때 인원이 최고치보다 클 수는 없지만, 갱신을 놓친 경로가 있어도
+        // 기록이 지금 인원보다 작게 남지 않게 둘 중 큰 값을 쓴다.
+        peakHumanCount: Math.max(room.peakHumanCount ?? 0, humanCount),
         hostIsBot: isTestBotUser(room.host),
         isPrivate: room.isPrivate,
         scheduled: room.scheduledAt !== null,
@@ -93,5 +97,34 @@ export async function recordRoomOutcome(
     });
   } catch (error) {
     logger.warn(`방 결과 기록 실패 (${roomId}): ${(error as Error).message}`);
+  }
+}
+
+/**
+ * 방 최고 인원(`Room.peakHumanCount`)을 지금 사람 수로 올린다 (2026-11-26).
+ *
+ * 참가자가 들어온 뒤에 부른다. 지금 있는 사람(봇 제외, 관전 포함)을 세어
+ * 저장된 값보다 클 때만 바꾼다 — 조건부 갱신이라 동시에 여러 명이 들어와도
+ * 값이 거꾸로 내려가지 않는다.
+ *
+ * **실패해도 입장을 막지 않는다.** 분석용 부가 기록이라 트랜잭션 밖에서 부르고
+ * 오류는 로그만 남긴다.
+ */
+export async function bumpRoomPeakHumans(
+  prisma: Pick<PrismaClient, "room" | "roomParticipant">,
+  roomId: string,
+): Promise<void> {
+  try {
+    const humans = await prisma.roomParticipant.count({
+      where: { roomId, user: { NOT: TEST_BOT_USER_WHERE } },
+    });
+    await prisma.room.updateMany({
+      where: { id: roomId, peakHumanCount: { lt: humans } },
+      data: { peakHumanCount: humans },
+    });
+  } catch (error) {
+    logger.warn(
+      `방 최고 인원 갱신 실패 (${roomId}): ${(error as Error).message}`,
+    );
   }
 }

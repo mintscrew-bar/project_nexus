@@ -136,6 +136,40 @@ export function RoomFunnelCard({
                 value={`${data.fullAtEnd.toLocaleString()} (${pct(data.fullAtEnd, data.created)})`}
               />
             </dl>
+            {/*
+              최고 인원 — 지워질 때 인원만 보면 9명까지 찼다가 흩어진 방도 빈 방으로
+              보인다. 이 칸은 2026-11-26 부터 쌓이므로 분모를 따로(peakRecorded) 쓴다.
+            */}
+            {data.peakRecorded > 0 ? (
+              <div>
+                <p className="mb-1.5 text-[11px] text-text-muted">
+                  최고 인원 기준 · 기록된 방{" "}
+                  {data.peakRecorded.toLocaleString()}개
+                </p>
+                <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+                  <Item
+                    label="한 번이라도 정원 찬 방"
+                    value={`${data.peakFull.toLocaleString()} (${pct(data.peakFull, data.peakRecorded)})`}
+                  />
+                  <Item
+                    label="거의 찼다가 못 시작(80%+)"
+                    value={`${data.nearFullNotStarted.toLocaleString()} (${pct(data.nearFullNotStarted, data.peakRecorded)})`}
+                  />
+                  <Item
+                    label="못 시작한 방 평균 최고 인원"
+                    value={
+                      data.avgPeakInNotStarted === null
+                        ? "-"
+                        : `${data.avgPeakInNotStarted}명`
+                    }
+                  />
+                </dl>
+              </div>
+            ) : (
+              <p className="text-[11px] text-text-muted">
+                최고 인원은 2026-11-26 이후 지워진 방부터 기록됩니다.
+              </p>
+            )}
           </>
         )}
         {data && (

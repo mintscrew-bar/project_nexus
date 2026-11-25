@@ -8,6 +8,7 @@ const row = (over: Partial<RoomOutcomeRow> = {}): RoomOutcomeRow => ({
   maxParticipants: 10,
   participantCount: 1,
   humanCount: 1,
+  peakHumanCount: null,
   hadResult: false,
   hostIsBot: false,
   ...over,
@@ -24,6 +25,10 @@ describe("computeRoomFunnel", () => {
       medianWaitMinutes: null,
       avgHumansInStarted: null,
       excludedBotRooms: 0,
+      peakRecorded: 0,
+      peakFull: 0,
+      nearFullNotStarted: 0,
+      avgPeakInNotStarted: null,
     });
   });
 
@@ -89,5 +94,35 @@ describe("computeRoomFunnel", () => {
       row({ humanCount: 1 }),
     ]);
     expect(f.avgHumansInStarted).toBe(9);
+  });
+
+  it("최고 인원: 9명까지 찼다가 흩어진 방은 '거의 찼다 무너진 방'으로 센다", () => {
+    const f = computeRoomFunnel([
+      // 9/10 까지 찼다가 1명 남아 지워짐 → 지워질 때 인원으로는 빈 방처럼 보인다
+      row({ peakHumanCount: 9, humanCount: 1 }),
+      // 정원이 차서 시작
+      row({ peakHumanCount: 10, humanCount: 10, startedAt: at(15) }),
+      // 아무도 안 옴
+      row({ peakHumanCount: 1 }),
+      // 이 칸이 생기기 전 기록 — 최고 인원 지표에서만 빠진다
+      row({ peakHumanCount: null }),
+    ]);
+    expect(f.created).toBe(4);
+    expect(f.emptied).toBe(3);
+    expect(f.peakRecorded).toBe(3);
+    expect(f.peakFull).toBe(1);
+    expect(f.nearFullNotStarted).toBe(1);
+    // 시작 못 한 방(9, 1)의 평균
+    expect(f.avgPeakInNotStarted).toBe(5);
+  });
+
+  it("'거의 찬 방' 기준은 정원의 80% 올림이다 (배그 100명 방은 80명)", () => {
+    const f = computeRoomFunnel([
+      row({ maxParticipants: 100, peakHumanCount: 79 }),
+      row({ maxParticipants: 100, peakHumanCount: 80 }),
+      row({ maxParticipants: 10, peakHumanCount: 7 }),
+      row({ maxParticipants: 10, peakHumanCount: 8 }),
+    ]);
+    expect(f.nearFullNotStarted).toBe(2);
   });
 });

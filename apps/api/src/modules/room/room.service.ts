@@ -47,7 +47,10 @@ import { BalanceScoreService } from "../common/balance-score.service";
 import { StatsService } from "../stats/stats.service";
 import { NotificationService } from "../notification/notification.service";
 import { BALANCE_ROLES } from "../common/balance-score.util";
-import { recordRoomOutcome } from "../common/room-outcome.util";
+import {
+  bumpRoomPeakHumans,
+  recordRoomOutcome,
+} from "../common/room-outcome.util";
 import type { UpdateRoomDto } from "./dto/update-room.dto";
 
 /**
@@ -1249,6 +1252,9 @@ export class RoomService {
       },
     );
 
+    // 방장 한 명으로 최고 인원을 시작한다(방장이 봇이면 0 그대로).
+    await bumpRoomPeakHumans(this.prisma, room.id);
+
     // Discord 봇 연동: 팀별 음성채널 생성
     // 예고 방은 여기서 만들지 않는다. 몇 시간 뒤 내전 때문에 지금부터
     // 빈 채널이 서버에 방치되면 예약이 쌓일수록 채널 목록이 무너진다.
@@ -2015,6 +2021,9 @@ export class RoomService {
     for (const disbandedRoom of switchResult.disbandedRooms) {
       this.notifyRoomDisbanded(disbandedRoom, userId);
     }
+
+    // 방 최고 인원을 올린다 — 나중에 흩어져도 "몇 명까지 찼던 방"인지 남는다.
+    await bumpRoomPeakHumans(this.prisma, switchResult.joinedRoomId);
 
     // 들어왔으니 이 방 초대는 다 썼다. 대기 탭에서 사라지게 지운다.
     // 지우지 못해도 입장은 끝났다. 목록 조회 때 "이미 들어간 방"으로 걸러진다.
