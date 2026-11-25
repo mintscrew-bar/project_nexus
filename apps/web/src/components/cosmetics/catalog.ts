@@ -405,7 +405,7 @@ const COSMETIC_DEFS: CosmeticItem[] = [
     code: "NM_GHOST",
     slot: "NAME_STYLE",
     name: "고스트",
-    description: "떨리는 손글씨 뒤로 흐릿한 잔상이 떠다닌다",
+    description: "삐뚤빼뚤 두꺼운 손글씨 뒤로 흐릿한 잔상이 떠다닌다",
     price: 540,
     rarity: "PREMIUM",
     className: "",

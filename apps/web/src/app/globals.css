@@ -1819,6 +1819,9 @@ body.scroll-locked {
   background-clip: text;
   color: transparent;
   filter: drop-shadow(0 1px 0 #17501a) drop-shadow(0 0 4px rgba(120, 230, 60, 0.6));
+  /* 감다살체는 굵기가 하나뿐이고 가늘다 — 글자 둘레를 같은 연두로 한 겹 두르고(stroke) 덩어리처럼 통통하게 */
+  -webkit-text-stroke: 1.4px #6fd338;
+  paint-order: stroke fill;
   animation: nfx-slime-wobble 2.4s ease-in-out infinite;
 }
 /* 선셋 — 깔끔한 고딕에 노을 띠. 낮은 해가 지나가듯 주황~분홍~보라가 천천히 흐른다 */
@@ -1846,12 +1849,11 @@ body.scroll-locked {
   55% { opacity: 0.85; }
 }
 .nfx-ghost {
-  color: #b4ffe2;
   position: relative;
   text-shadow: 0 0 3px #7fffd0, 0 0 10px rgba(80, 230, 180, 0.7), 0 2px 0 #0b3a30;
+  color: #b4ffe2;
   animation: nfx-ghost-fade 3.6s ease-in-out infinite;
 }
-  .nfx-root { animation: none !important; }
 .nfx-ghost::after {
   content: attr(data-text);
   position: absolute;
@@ -1870,6 +1872,7 @@ html.cfx-off .nfx-root::after {
 }
 @media (prefers-reduced-motion: reduce) {
 }
+  .nfx-root { animation: none !important; }
 /* 효과 끄기 「멈춘 그림」 — 글꼴·색은 두고 움직임만 멈춘다 */
 .cfx-still .nfx-root,
 .nfx-root.cfx-still {

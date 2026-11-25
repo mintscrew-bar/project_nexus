@@ -32,8 +32,13 @@ export type NameStyleCode =
 interface NameStyleDef {
   /** 글꼴 이름 (font-family) */
   family: string;
-  /** 불러올 스타일시트 */
-  href: string;
+  /** 불러올 스타일시트 (Google Fonts·공식 CSS). 눈누 글꼴처럼 파일만 있으면 faces 를 쓴다 */
+  href?: string;
+  /**
+   * 글꼴 파일을 직접 가리킨다 — 눈누(noonnu.cc) 글꼴은 jsdelivr 에 파일만 있어서 @font-face 를 만들어 넣는다.
+   * 굵기별 파일이 있으면 weight 마다 하나씩.
+   */
+  faces?: { weight: number; url: string }[];
   /** 글꼴마다 눈에 보이는 크기가 달라 맞춘다 (em) */
   scale?: number;
   /** 색·효과 — globals.css 의 .nfx-* */
@@ -140,40 +145,68 @@ export const NAME_STYLES: Record<NameStyleCode, NameStyleDef> = {
     tintable: true,
   },
   slime: {
-    // 통통하게 부푼 글꼴 — 말랑한 덩어리
-    family: "'Bagel Fat One'",
-    href: gf("Bagel+Fat+One"),
-    scale: 0.95,
+    // 감다살체(눈누·AI올컷, 나눔고딕 기반 SIL OFL) — 통통하게 굴린 고딕, 말랑한 덩어리
+    family: "Gamdasal",
+    faces: [
+      {
+        weight: 400,
+        url: "https://cdn.jsdelivr.net/gh/Project-Noonnu/2611101345@font-412/font-412/감다살체.woff2",
+      },
+    ],
+    scale: 1.05,
     className: "nfx-slime",
     tintable: true,
   },
   sunset: {
-    // 깔끔한 현대 고딕 가변 글꼴 — 노을 띠가 흐른다
-    family: "'Noto Sans KR'",
-    href: gf("Noto+Sans+KR:wght@100..900"),
+    // 페이퍼로지(눈누, SIL OFL) — 9굵기 정적 글꼴. 단정한 고딕에 노을 띠가 흐른다
+    family: "Paperozi",
+    faces: [100, 200, 300, 400, 500, 600, 700, 800, 900].map((w, i) => ({
+      weight: w,
+      url: `https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-${i + 1}${["Thin", "ExtraLight", "Light", "Regular", "Medium", "SemiBold", "Bold", "ExtraBold", "Black"][i]}.woff2`,
+    })),
     className: "nfx-sunset",
     tintable: true,
-    weight: { min: 100, max: 900, step: 50, default: 800 },
+    weight: { min: 100, max: 900, step: 100, default: 800 },
   },
   ghost: {
-    // 삐뚤빼뚤 떨리는 손글씨 — 흐릿한 잔상이 뒤따른다
-    family: "'Kirang Haerang'",
-    href: gf("Kirang+Haerang"),
-    scale: 1.15,
+    // 히피체(눈누·AI올컷, SIL OFL) — 삐뚤빼뚤 두꺼운 손글씨 고딕, 흐릿한 잔상이 뒤따른다
+    family: "Hippie",
+    faces: [
+      {
+        weight: 400,
+        url: "https://cdn.jsdelivr.net/gh/Project-Noonnu/2610081905@hippie/hippie/hippie_히피체.woff2",
+      },
+    ],
+    scale: 1.1,
     className: "nfx-ghost",
     tintable: true,
   },
 };
 
-/** 같은 스타일시트를 두 번 넣지 않는다 */
+/** 같은 스타일시트·@font-face 를 두 번 넣지 않는다 */
 const loaded = new Set<string>();
-function ensureStylesheet(href: string) {
-  if (typeof document === "undefined" || loaded.has(href)) return;
-  loaded.add(href);
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = href;
-  document.head.appendChild(link);
+function ensureFont(def: NameStyleDef) {
+  if (typeof document === "undefined") return;
+  if (def.href && !loaded.has(def.href)) {
+    loaded.add(def.href);
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = def.href;
+    document.head.appendChild(link);
+  }
+  if (def.faces && !loaded.has(def.family)) {
+    loaded.add(def.family);
+    // 한글 파일명(감다살체 등)은 주소를 인코딩한다. 글자가 처음 쓰일 때 받도록 swap
+    const css = def.faces
+      .map(
+        (f) =>
+          `@font-face{font-family:${def.family};font-weight:${f.weight};font-display:swap;src:url("${encodeURI(f.url)}") format("woff2");}`,
+      )
+      .join("");
+    const style = document.createElement("style");
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
 }
 
 /**
@@ -223,7 +256,7 @@ export function StyledName({
 }) {
   const def = code ? NAME_STYLES[code] : null;
   useEffect(() => {
-    if (def) ensureStylesheet(def.href);
+    if (def) ensureFont(def);
   }, [def]);
   if (!def) return <span className={className}>{children}</span>;
   const style: CSSProperties = {
