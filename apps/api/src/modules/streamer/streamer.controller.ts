@@ -21,7 +21,13 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { StreamerService } from "./streamer.service";
 import { StreamerVerificationService } from "./streamer-verification.service";
-import { VerifyChannelDto } from "./dto";
+import {
+  CreateStreamerNoticeDto,
+  UpdateStreamerNoticeDto,
+  UpdateStreamerPageDto,
+  VerifyChannelDto,
+} from "./dto";
+import { StreamerPageService } from "./streamer-page.service";
 import { ChzzkOAuthService } from "./chzzk-oauth.service";
 import { GameScopeQueryDto } from "@/common/dto/game-scope.dto";
 import { StartStreamerOAuthDto } from "../user/dto/upsert-streamer-profile.dto";
@@ -32,6 +38,7 @@ export class StreamerController {
     private readonly streamerService: StreamerService,
     private readonly verificationService: StreamerVerificationService,
     private readonly chzzkOAuth: ChzzkOAuthService,
+    private readonly pageService: StreamerPageService,
   ) {}
 
   // ── 공개 ──────────────────────────────────────────────────────────────
@@ -45,6 +52,61 @@ export class StreamerController {
     @Query() query: GameScopeQueryDto = {},
   ) {
     return this.streamerService.listStreamers(viewerId, query.gameTitle);
+  }
+
+  /** 스트리머 페이지 — 머리·공지·방송 내전 기록·시청자 리그·일정 */
+  @Get(":streamerId/page")
+  @UseGuards(OptionalJwtGuard)
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  page(
+    @Param("streamerId") streamerId: string,
+    @CurrentUser("id") viewerId?: string,
+  ) {
+    return this.pageService.getPage(streamerId, viewerId);
+  }
+
+  // ── 스트리머 페이지 편집 (본인) ────────────────────────────────────────
+
+  /** 한마디·방송 일정·비공개 방 기록 공개 */
+  @Patch("me/page")
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  updatePage(
+    @CurrentUser("sub") userId: string,
+    @Body() dto: UpdateStreamerPageDto,
+  ) {
+    return this.pageService.updateSettings(userId, dto);
+  }
+
+  @Post("me/notices")
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  createNotice(
+    @CurrentUser("sub") userId: string,
+    @Body() dto: CreateStreamerNoticeDto,
+  ) {
+    return this.pageService.createNotice(userId, dto);
+  }
+
+  @Patch("me/notices/:noticeId")
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  updateNotice(
+    @CurrentUser("sub") userId: string,
+    @Param("noticeId") noticeId: string,
+    @Body() dto: UpdateStreamerNoticeDto,
+  ) {
+    return this.pageService.updateNotice(userId, noticeId, dto);
+  }
+
+  @Delete("me/notices/:noticeId")
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  deleteNotice(
+    @CurrentUser("sub") userId: string,
+    @Param("noticeId") noticeId: string,
+  ) {
+    return this.pageService.deleteNotice(userId, noticeId);
   }
 
   // ── 팔로우 ────────────────────────────────────────────────────────────

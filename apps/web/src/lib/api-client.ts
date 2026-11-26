@@ -3788,6 +3788,92 @@ export interface AdminStreamerItem {
   createdAt: string;
 }
 
+/** 스트리머 페이지(/streamers/:id) — api streamer-page.service getPage */
+export interface StreamerPageMatch {
+  id: string;
+  completedAt: string;
+  roomName: string | null;
+  teamMode: string | null;
+  durationSec: number | null;
+  teamA: { name: string; champions: string[]; won: boolean };
+  teamB: { name: string; champions: string[]; won: boolean };
+  /** 스트리머가 뛴 팀. 관전만 했으면 null */
+  streamerSlot: "A" | "B" | null;
+  streamerLine: {
+    championName: string | null;
+    kills: number;
+    deaths: number;
+    assists: number;
+  } | null;
+  mvp: { userId: string; username: string } | null;
+  highlight: string | null;
+}
+
+export interface StreamerPageSession {
+  /** 방송 날짜 (KST, 새벽 6시 기준) YYYY-MM-DD */
+  date: string;
+  matchCount: number;
+  viewerCount: number;
+  matches: StreamerPageMatch[];
+}
+
+export interface StreamerNoticeItem {
+  id: string;
+  content: string;
+  pinned: boolean;
+  createdAt: string;
+}
+
+export interface StreamerPageSettings {
+  tagline: string | null;
+  /** 0=일 … 6=토 */
+  scheduleDays: number[];
+  scheduleTime: string | null;
+  showPrivateRooms: boolean;
+}
+
+export interface StreamerPageData {
+  streamer: StreamerListItem;
+  isOwner: boolean;
+  settings: StreamerPageSettings;
+  notices: StreamerNoticeItem[];
+  ranking: {
+    score: number | null;
+    globalRank: number | null;
+    totalGames: number;
+    wins: number;
+    losses: number;
+  };
+  summary: {
+    hostedMatches: number;
+    sessions: number;
+    viewers: number;
+    streamerWins: number;
+    streamerLosses: number;
+    avgPlayers: number;
+    commendations: number;
+  };
+  sessions: StreamerPageSession[];
+  commendationTags: { tag: string; count: number }[];
+  league: {
+    userId: string;
+    username: string;
+    games: number;
+    wins: number;
+    mvp: number;
+    score: number;
+  }[];
+  upcoming: {
+    id: string;
+    name: string;
+    gameTitle: GameTitle;
+    teamMode: string;
+    scheduledAt: string | null;
+    maxParticipants: number;
+    players: number;
+  }[];
+}
+
 export const streamerApi = {
   /** 스트리머 탭 목록 — 방송 중인 스트리머가 위로 정렬되어 온다 */
   list: async (gameTitle?: GameTitle): Promise<StreamerListItem[]> => {
@@ -3803,6 +3889,43 @@ export const streamerApi = {
 
   unfollow: async (streamerId: string): Promise<void> => {
     await apiClient.delete(`/streamers/${streamerId}/follow`);
+  },
+
+  /** 스트리머 페이지 — 머리·공지·방송 내전 기록·시청자 리그·일정 */
+  getPage: async (streamerId: string): Promise<StreamerPageData> => {
+    const response = await apiClient.get(`/streamers/${streamerId}/page`);
+    return response.data;
+  },
+
+  /** 내 스트리머 페이지 설정 — 보낸 항목만 바뀐다 */
+  updatePage: async (
+    data: Partial<StreamerPageSettings>,
+  ): Promise<StreamerPageSettings> => {
+    const response = await apiClient.patch("/streamers/me/page", data);
+    return response.data;
+  },
+
+  createNotice: async (data: {
+    content: string;
+    pinned?: boolean;
+  }): Promise<StreamerNoticeItem> => {
+    const response = await apiClient.post("/streamers/me/notices", data);
+    return response.data;
+  },
+
+  updateNotice: async (
+    noticeId: string,
+    data: { content?: string; pinned?: boolean },
+  ): Promise<StreamerNoticeItem> => {
+    const response = await apiClient.patch(
+      `/streamers/me/notices/${noticeId}`,
+      data,
+    );
+    return response.data;
+  },
+
+  deleteNotice: async (noticeId: string): Promise<void> => {
+    await apiClient.delete(`/streamers/me/notices/${noticeId}`);
   },
 
   startChzzkOAuth: async (games?: GameTitle[]): Promise<{ url: string }> => {

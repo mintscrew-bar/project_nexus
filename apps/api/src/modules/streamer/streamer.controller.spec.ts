@@ -14,6 +14,7 @@ describe("StreamerController", () => {
     {} as never,
     verificationService as never,
     chzzkOAuth as never,
+    {} as never,
   );
 
   beforeEach(() => {

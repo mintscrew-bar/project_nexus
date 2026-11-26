@@ -164,7 +164,13 @@ export function LiveStreamerCard({
           </Link>
         )}
         {!streamer.activeRoom && (
-          <span className="flex-1 text-xs text-text-muted">방송 시작 알림</span>
+          // 방송 내전 기록·공지·일정이 있는 스트리머 페이지로
+          <Link
+            href={`/streamers/${streamer.userId}`}
+            className="flex-1 text-xs font-medium text-text-secondary transition-colors hover:text-accent-primary"
+          >
+            스트리머 페이지 →
+          </Link>
         )}
         {onToggleFollow && (
           <FollowButton
@@ -188,10 +194,10 @@ export function OfflineStreamerCard({
 
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-xl border border-bg-tertiary bg-bg-secondary p-3 transition-colors hover:border-bg-elevated hover:bg-bg-tertiary/60">
-      <a
-        href={streamer.channelUrl}
-        target="_blank"
-        rel="noopener noreferrer"
+      {/* 방송 중이 아니면 채널보다 스트리머 페이지(방송 내전 기록·일정)가 볼 게 많다.
+          채널은 오른쪽 플랫폼 배지로 바로 간다 */}
+      <Link
+        href={`/streamers/${streamer.userId}`}
         className="flex min-w-0 flex-1 items-center gap-3"
       >
         <StreamerAvatar streamer={streamer} size={44} />
@@ -204,7 +210,7 @@ export function OfflineStreamerCard({
             {formatLastLive(streamer.lastLiveAt)}
           </p>
         </div>
-      </a>
+      </Link>
       <div className="flex min-w-0 flex-wrap justify-end gap-1">
         {channels.map((channel) => (
           <a

@@ -9,12 +9,16 @@ import { DiscordModule } from "../discord/discord.module";
 import { NotificationModule } from "../notification/notification.module";
 import { ChzzkOAuthService } from "./chzzk-oauth.service";
 import { ChzzkOAuthController } from "./chzzk-oauth.controller";
+import { StreamerPageService } from "./streamer-page.service";
+import { RankingModule } from "../ranking/ranking.module";
 
 @Module({
-  imports: [DiscordModule, NotificationModule],
+  // RankingModule — 스트리머 페이지의 본인 내전 점수
+  imports: [DiscordModule, NotificationModule, RankingModule],
   controllers: [StreamerController, ChzzkOAuthController],
   providers: [
     StreamerService,
+    StreamerPageService,
     StreamerVerificationService,
     ChzzkOAuthService,
     ChzzkLiveProvider,

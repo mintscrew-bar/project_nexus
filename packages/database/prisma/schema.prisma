@@ -112,6 +112,9 @@ model User {
   settings                       UserSettings?
   streamerProfiles               StreamerProfile[]
   streamerLinks                  StreamerLink[]
+  /// 스트리머 페이지 설정·공지 (/streamers/:id)
+  streamerPage                   StreamerPage?
+  streamerNotices                StreamerNotice[]
   streamerFollowing              StreamerFollow[]      @relation("StreamerFollower")
   streamerFollowers              StreamerFollow[]      @relation("StreamerFollowed")
   statsRecomputeQueue            StatsRecomputeQueue?
@@ -243,6 +246,41 @@ model StreamerProfile {
   @@index([isActive])
   @@index([verifiedAt])
   @@map("streamer_profiles")
+}
+
+/// 스트리머 페이지(/streamers/:id) 설정 — 스트리머가 직접 정한다 (2026-11-26).
+/// 행이 없으면 기본값(한마디 없음·일정 없음·비공개 방 기록 숨김)으로 본다.
+model StreamerPage {
+  userId           String   @id
+  /// 머리 카드의 한마디 (최대 120자)
+  tagline          String?
+  /// 정기 방송 요일 — 0=일요일 … 6=토요일
+  scheduleDays     Int[]    @default([])
+  /// 정기 방송 시작 시각 "HH:mm" (KST)
+  scheduleTime     String?
+  /// 비공개 방으로 연 내전도 기록에 보여 줄지. 기본은 숨김 — 비밀번호로 연 방의
+  /// 참가자 이름이 스트리머 페이지에 드러나지 않게 한다.
+  showPrivateRooms Boolean  @default(false)
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("streamer_pages")
+}
+
+/// 스트리머 공지사항 — 스트리머 페이지에 최신순(고정 먼저)으로 보인다
+model StreamerNotice {
+  id        String   @id @default(cuid())
+  userId    String
+  /// 본문 (최대 500자)
+  content   String
+  /// 고정 공지는 맨 위
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("streamer_notices")
 }
 
 model StreamerLink {
