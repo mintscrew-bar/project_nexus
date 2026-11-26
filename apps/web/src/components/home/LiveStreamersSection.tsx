@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Eye, Radio, Swords } from "lucide-react";
+import { ArrowRight, ExternalLink, Eye, Radio, Swords } from "lucide-react";
 import { streamerApi, type StreamerListItem } from "@/lib/api-client";
 import { roomPath } from "@/lib/room-links";
 
@@ -91,8 +91,9 @@ function LiveStreamerTile({ streamer }: { streamer: StreamerListItem }) {
   const thumbnailFailed = !!thumbnail && failedThumbnail === thumbnail;
 
   return (
-    <div className="group overflow-hidden rounded-panel border border-white/[0.08] bg-bg-secondary transition-colors hover:border-accent-primary/40">
-      <a href={streamer.channelUrl} target="_blank" rel="noopener noreferrer">
+    // 본문은 스트리머 페이지로, 방송 시청은 썸네일 위 버튼으로 (스트리머 목록 카드와 같은 규칙)
+    <div className="group relative overflow-hidden rounded-panel border border-white/[0.08] bg-bg-secondary transition-colors hover:border-accent-primary/40">
+      <Link href={`/streamers/${streamer.userId}`} className="block">
         <div className="relative aspect-video w-full overflow-hidden bg-bg-tertiary">
           {thumbnail && !thumbnailFailed ? (
             <Image
@@ -131,6 +132,19 @@ function LiveStreamerTile({ streamer }: { streamer: StreamerListItem }) {
             {streamer.username} · {livePlatforms}
           </p>
         </div>
+      </Link>
+
+      {/* 방송 보러 가기 — 대표 채널로 새 창 (앵커 중첩을 피하려 Link 밖에 겹쳐 둔다) */}
+      <a
+        href={streamer.channelUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={`${PLATFORM_LABELS[streamer.platform] ?? streamer.platform}에서 방송 보기`}
+        className="absolute right-2.5 top-2.5 flex items-center gap-1 rounded-chip bg-black/75 px-2 py-0.5 text-[10px] font-semibold text-white shadow-lg transition-colors hover:bg-accent-primary"
+      >
+        {PLATFORM_LABELS[streamer.platform] ?? streamer.platform}
+        에서 보기
+        <ExternalLink className="h-2.5 w-2.5" />
       </a>
 
       {streamer.activeRoom && (

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { Bell, BellOff, Eye, Radio, Swords } from "lucide-react";
+import { Bell, BellOff, ExternalLink, Eye, Radio, Swords } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StreamerChannelItem, StreamerListItem } from "@/lib/api-client";
 import { StreamerPlatformBadge } from "@/components/domain/StreamerPlatformBadge";
@@ -42,8 +42,9 @@ function formatLastLive(lastLiveAt: string | null): string {
 
 /**
  * 방송 중인 스트리머 카드 — 썸네일 미리보기를 크게 보여준다.
- * 카드를 누르면 NEXUS에 붙잡아두지 않고 스트리머의 방송으로 보낸다.
- * (임베드로 여기서 시청하게 하면 플랫폼 시청자 수에 안 잡혀 홍보에 손해)
+ * 카드 본문을 누르면 스트리머 페이지(방송 내전 기록·공지·일정)로 간다.
+ * 방송은 썸네일 오른쪽 위 「○○에서 보기」 버튼으로 플랫폼에 바로 보낸다.
+ * (임베드로 여기서 시청하게 하면 플랫폼 시청자 수에 안 잡혀 홍보에 손해라 시청은 늘 바깥으로)
  */
 interface StreamerCardProps {
   streamer: StreamerListItem;
@@ -74,13 +75,9 @@ export function LiveStreamerCard({
   const thumbnailFailed = !!thumbnail && failedThumbnail === thumbnail;
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-bg-tertiary bg-bg-secondary transition-colors hover:border-accent-primary/40">
-      <a
-        href={selectedChannel.channelUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block"
-      >
+    // relative: 채널 버튼을 Link 밖에 두고(앵커 중첩 금지) 썸네일 위에 겹쳐 올리기 위함
+    <div className="group relative overflow-hidden rounded-2xl border border-bg-tertiary bg-bg-secondary transition-colors hover:border-accent-primary/40">
+      <Link href={`/streamers/${streamer.userId}`} className="block">
         {/* 썸네일 미리보기 */}
         <div className="relative aspect-video w-full overflow-hidden bg-bg-tertiary">
           {thumbnail && !thumbnailFailed ? (
@@ -129,6 +126,19 @@ export function LiveStreamerCard({
             </p>
           </div>
         </div>
+      </Link>
+
+      {/* 방송 보러 가기 — 썸네일 오른쪽 위. 고른 플랫폼 채널로 새 창 */}
+      <a
+        href={selectedChannel.channelUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={`${PLATFORM_LABELS[selectedChannel.platform] ?? selectedChannel.platform}에서 방송 보기`}
+        className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-black/75 px-2.5 py-1 text-xs font-semibold text-white shadow-lg transition-colors hover:bg-accent-primary"
+      >
+        {PLATFORM_LABELS[selectedChannel.platform] ?? selectedChannel.platform}
+        에서 보기
+        <ExternalLink className="h-3 w-3" />
       </a>
 
       {liveChannels.length > 1 && (
