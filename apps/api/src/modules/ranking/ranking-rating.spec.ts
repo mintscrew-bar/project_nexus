@@ -106,6 +106,19 @@ describe("computeRatings", () => {
     expect(Math.abs(a.mu - 25)).toBeLessThan(1);
   });
 
+  it("판수 중립(화면 점수): 반반 이기는 사람은 10판이든 100판이든 점수가 거의 같다", () => {
+    const after = (n: number) => {
+      const games: RatingMatch[] = [];
+      for (let i = 0; i < n; i++) {
+        games.push(match(TEAM_A, TEAM_B, i % 2 === 0 ? "A" : "B"));
+      }
+      return displayRating(computeRatings(games).overall.get("a1"));
+    };
+    // σ 하한이 없을 때는 10판 52.6 → 100판 75.7 로 판수만으로 올랐다
+    expect(Math.abs(after(100) - after(10))).toBeLessThan(2);
+    expect(after(100)).toBeLessThan(55);
+  });
+
   it("3승 0패보다 5승 1패가 위다 (예전 보정 승률은 거꾸로였다)", () => {
     const p = ["p1", "p2", "p3", "p4", "p5"];
     const q = ["q1", "q2", "q3", "q4", "q5"];

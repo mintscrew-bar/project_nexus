@@ -22,6 +22,8 @@ import type { Role } from "@nexus/database";
  *
  * 표시 점수는 50 에서 시작한다: 50 + (μ − 2σ − 시작값) × 3.
  * μ − 2σ 는 "아직 잘 모름" 몫을 뺀 보수적 추정이라, 1~2판짜리가 위로 튀지 않는다.
+ * 빼는 σ 는 10판 쯤의 값에서 멈춘다(RATING_DISPLAY_SIGMA_FLOOR) — 그 뒤로는 판수가
+ * 점수를 움직이지 않는다.
  */
 
 /** 처음 실력 추정과 불확실성 — OpenSkill 기본값 */
@@ -50,6 +52,14 @@ const MIN_STAT_LINES = 8;
 /** 표시 점수 — 시작 50, 한 단위 변화의 배율, 표시 범위 */
 export const RATING_DISPLAY_START = 50;
 const DISPLAY_SIGMA_K = 2;
+/**
+ * 표시 점수에서 빼는 σ 의 하한 (≈ 10판 쯤의 σ).
+ * σ 는 판마다 계속 줄어서, 하한이 없으면 "−2σ" 몫이 작아지는 것만으로 점수가 오른다
+ * — 반반 이기는 사람도 100판이면 76점이 됐다(판수 쏠림). 그래서 빼는 몫은
+ * 이 값 아래로 내리지 않는다. 10판 뒤로는 μ(실력 추정)만 점수를 움직인다.
+ * μ 갱신에는 실제 σ 를 그대로 써서, 오래 뛴 사람 점수가 한 판에 크게 출렁이지 않게 둔다.
+ */
+export const RATING_DISPLAY_SIGMA_FLOOR = RATING_SIGMA0 * 0.92;
 const DISPLAY_SCALE = 3;
 const DISPLAY_MIN = 0;
 const DISPLAY_MAX = 100;
@@ -292,7 +302,9 @@ export function computeRatings(matches: RatingMatch[]): RatingResult {
 export function displayRating(state: RatingState | undefined): number {
   if (!state) return RATING_DISPLAY_START;
   const start = RATING_MU0 - DISPLAY_SIGMA_K * RATING_SIGMA0;
-  const conservative = state.mu - DISPLAY_SIGMA_K * Math.sqrt(state.sigma2);
+  // 빼는 불확실성 몫은 하한 아래로 내리지 않는다 — 판수만으로 점수가 오르지 않게
+  const sigma = Math.max(Math.sqrt(state.sigma2), RATING_DISPLAY_SIGMA_FLOOR);
+  const conservative = state.mu - DISPLAY_SIGMA_K * sigma;
   const raw = RATING_DISPLAY_START + (conservative - start) * DISPLAY_SCALE;
   const clamped = Math.min(DISPLAY_MAX, Math.max(DISPLAY_MIN, raw));
   return Math.round(clamped * 10) / 10;

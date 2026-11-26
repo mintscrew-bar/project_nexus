@@ -481,9 +481,9 @@ function ScoreHelp() {
         무겁습니다)입니다.
       </p>
       <p className="mt-1.5 text-xs leading-relaxed text-text-secondary">
-        판이 적으면 아직 확실하지 않은 몫을 빼고 보여 주고, 판이 쌓일수록 빠지는
-        몫이 줄어듭니다. 실력만큼 하면 판을 많이 뛰어도 손해가 없습니다. 점수와
-        판수가 같으면 공동 순위입니다.
+        판이 적으면 아직 확실하지 않은 몫을 빼고 보여 주고, 빠지는 몫은
+        10판쯤까지 줄어든 뒤 멈춥니다. 그 뒤로는 판을 많이 뛴다고 오르지도
+        내리지도 않고 실력만 반영됩니다. 점수와 판수가 같으면 공동 순위입니다.
       </p>
       <p className="mt-1.5 text-xs leading-relaxed text-text-tertiary">
         Riot 기록이 없는 내전(코드 없는 사설방)은 승패와 칭찬만 반영합니다. 라인
