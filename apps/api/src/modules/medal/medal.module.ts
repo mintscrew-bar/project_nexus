@@ -30,6 +30,7 @@ import { UploadModule } from "../upload/upload.module";
     MedalCampaignService,
     ShopBundleService,
   ],
-  exports: [MedalService, ShopService, MatchMedalService],
+  // AttendanceService — 디스코드 `/nexus attendance` 로도 출석한다
+  exports: [MedalService, ShopService, MatchMedalService, AttendanceService],
 })
 export class MedalModule {}

@@ -1,4 +1,9 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Optional,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import {
@@ -60,9 +65,25 @@ import {
   PUBG_PLATFORM_LABELS,
   getPubgGameMode,
   pubgGameModes,
+  teamSizeForRoom,
+  type GameTitle,
   type PubgGameMode,
   type PubgPlatform,
 } from "@nexus/types";
+import { RankingService } from "../ranking/ranking.service";
+import { PubgRankingService } from "../pubg/pubg-ranking.service";
+import { AttendanceService } from "../medal/attendance.service";
+import { MedalService } from "../medal/medal.service";
+import {
+  formatAttendanceHeadline,
+  formatCommendations,
+  formatLolLeaderboardLine,
+  formatNextBonus,
+  formatPubgLeaderboardLine,
+  formatScore,
+  formatWinRate,
+  joinButtonLabel,
+} from "./bot-command-format";
 
 // 티어 이모지 맵핑
 const TIER_EMOJI: Record<string, string> = {
@@ -86,21 +107,6 @@ const ROLE_EMOJI: Record<string, string> = {
   MID: "⚡",
   ADC: "🎯",
   SUPPORT: "💚",
-};
-
-// 티어 순서 맵핑 (정렬용)
-const TIER_ORDER: Record<string, number> = {
-  CHALLENGER: 10,
-  GRANDMASTER: 9,
-  MASTER: 8,
-  DIAMOND: 7,
-  EMERALD: 6,
-  PLATINUM: 5,
-  GOLD: 4,
-  SILVER: 3,
-  BRONZE: 2,
-  IRON: 1,
-  UNRANKED: 0,
 };
 
 // 방 상태 한글 맵핑 (프로젝트 흐름: WAITING → TEAM_SELECTION → DRAFT → DRAFT_COMPLETED → ROLE_SELECTION → IN_PROGRESS → COMPLETED)
@@ -191,6 +197,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     private readonly eventEmitter: EventEmitter2,
     private readonly redis: RedisService,
     private readonly emojiService: DiscordEmojiService,
+    // 아래는 봇 명령(leaderboard·stats·attendance·medal)용. 테스트에서는 생략할 수 있어
+    // @Optional — 없으면 해당 명령이 "지금은 쓸 수 없다" 로 답한다.
+    @Optional() private readonly rankingService?: RankingService,
+    @Optional() private readonly pubgRankingService?: PubgRankingService,
+    @Optional() private readonly attendanceService?: AttendanceService,
+    @Optional() private readonly medalService?: MedalService,
   ) {
     this.client = new Client({
       intents: [
@@ -1049,12 +1061,48 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             .setDescription("참가 중인 방의 대진표(브래킷) 보기"),
         )
         .addSubcommand((sub) =>
-          sub.setName("stats").setDescription("내 통계 정보 보기"),
+          sub
+            .setName("stats")
+            .setDescription("내 내전 기록 보기 — 랭킹 점수·순위·KDA·칭찬")
+            .addStringOption((opt) =>
+              opt
+                .setName("game")
+                .setDescription("어떤 게임 기록인지 (기본: 롤)")
+                .setRequired(false)
+                .addChoices(
+                  { name: "리그 오브 레전드", value: "LOL" },
+                  { name: "배틀그라운드", value: "PUBG" },
+                ),
+            )
+            .addUserOption((opt) =>
+              opt
+                .setName("user")
+                .setDescription("기록을 볼 유저 (비우면 나)")
+                .setRequired(false),
+            ),
         )
         .addSubcommand((sub) =>
           sub
             .setName("leaderboard")
-            .setDescription("티어+LP 기준 상위 10명 리더보드 보기"),
+            .setDescription("내전 랭킹 상위 10명 보기")
+            .addStringOption((opt) =>
+              opt
+                .setName("game")
+                .setDescription("어떤 게임 랭킹인지 (기본: 롤)")
+                .setRequired(false)
+                .addChoices(
+                  { name: "리그 오브 레전드", value: "LOL" },
+                  { name: "배틀그라운드", value: "PUBG" },
+                ),
+            ),
+        )
+        .addSubcommand((sub) =>
+          sub
+            .setName("attendance")
+            .setDescription("오늘 출석하고 메달 받기 (연속 출석 보너스)"),
+        )
+        .addSubcommand((sub) =>
+          sub.setName("medal").setDescription("내 메달 잔액과 출석 현황 보기"),
         )
         .addSubcommand((sub) =>
           sub.setName("clan").setDescription("내가 속한 클랜 정보 보기"),
@@ -1310,6 +1358,12 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             break;
           case "leaderboard":
             await this.handleLeaderboardCommand(interaction);
+            break;
+          case "attendance":
+            await this.handleAttendanceCommand(interaction);
+            break;
+          case "medal":
+            await this.handleMedalCommand(interaction);
             break;
           case "clan":
             await this.handleClanCommand(interaction);
@@ -1773,7 +1827,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     const embed = new EmbedBuilder()
       .setColor(Colors.Blue)
       .setTitle("🎮 Nexus 명령어 도움말")
-      .setDescription("LoL 내전 토너먼트 플랫폼 Nexus의 Discord 봇입니다.")
+      .setDescription("롤·배그 내전을 열고 기록하는 Nexus의 Discord 봇입니다.")
       .addFields(
         {
           name: "📋 기본 명령어",
@@ -1781,21 +1835,28 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             "`/nexus help` - 이 도움말 보기",
             "`/nexus link` - Discord 계정 연동",
             "`/nexus profile [@유저]` - 프로필 보기",
-            "`/nexus stats` - 내 통계 보기",
+            "`/nexus stats [game] [@유저]` - 내전 기록 (점수·순위·KDA·칭찬)",
           ].join("\n"),
         },
         {
           name: "🏅 랭킹 & 클랜",
           value: [
-            "`/nexus leaderboard` - 티어+LP 상위 10명",
+            "`/nexus leaderboard [game]` - 내전 랭킹 상위 10명",
             "`/nexus clan` - 내 클랜 정보",
             "`/nexus serverstats` - 최근 30일 이 서버 내전 기록",
           ].join("\n"),
         },
         {
+          name: "🎖️ 메달",
+          value: [
+            "`/nexus attendance` - 오늘 출석하고 메달 받기",
+            "`/nexus medal` - 메달 잔액·출석 현황",
+          ].join("\n"),
+        },
+        {
           name: "🏠 방 관련",
           value: [
-            "`/nexus rooms` - 활성 방 목록 (대기~역할선택~진행중)",
+            "`/nexus rooms` - 활성 방 목록 (모집 중인 방은 바로 참가)",
             "`/nexus schedule <시간> <모드>` - 내전 예약 개설",
             "  └ 배그는 `game:배틀그라운드` + `pubgmode` + `platform` 을 함께",
             "`/nexus team` - 현재 팀 정보",
@@ -1902,11 +1963,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
                 : "유저",
           inline: true,
         },
-        {
-          name: "⭐ 평판",
-          value: `${user.reputation}점`,
-          inline: true,
-        },
+        // 예전엔 User.reputation(기본 100) 을 보여 줬는데, 별점이 칭찬으로 바뀐 뒤
+        // 아무도 움직이지 않는 숫자가 됐다. 웹 프로필처럼 내전 점수와 칭찬을 보인다.
+        ...(await this.lolSummaryFields(user.id)),
       );
 
     if (primaryAccount) {
@@ -2056,7 +2115,29 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    await interaction.reply({ embeds: [embed] });
+    // 모집 중이고 자리가 남은 방에는 바로 참가하는 버튼을 단다.
+    // 모집 공지의 "참가하기" 와 같은 customId 라 같은 처리(연동 확인·비밀번호 모달)를 탄다.
+    // 디스코드는 한 줄에 버튼 5개, 메시지에 5줄까지라 목록(최대 10개)이 늘 들어간다.
+    const joinable = rooms.filter(
+      (room) =>
+        room.status === "WAITING" &&
+        room._count.participants < room.maxParticipants,
+    );
+    const components: ActionRowBuilder<ButtonBuilder>[] = [];
+    for (let i = 0; i < joinable.length; i += 5) {
+      components.push(
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          ...joinable.slice(i, i + 5).map((room) =>
+            new ButtonBuilder()
+              .setCustomId(`${JOIN_ROOM_BUTTON_PREFIX}${room.id}`)
+              .setLabel(joinButtonLabel(roomDisplayName(room)))
+              .setStyle(ButtonStyle.Success),
+          ),
+        ),
+      );
+    }
+
+    await interaction.reply({ embeds: [embed], components });
   }
 
   private async handleTeamCommand(interaction: ChatInputCommandInteraction) {
@@ -2141,7 +2222,8 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     });
 
     embed.addFields({
-      name: `👥 팀원 (${team.members.length}/5)`,
+      // 팀 인원은 게임마다 다르다(롤 5, 배그 4) — 숫자를 박지 않는다
+      name: `👥 팀원 (${team.members.length}/${teamSizeForRoom(team.room)})`,
       value: memberLines.join("\n") || "팀원 없음",
       inline: false,
     });
@@ -2217,7 +2299,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         name: `${team.name} (${team.captain.username})`,
         value: [
           `💵 예산: ${team.remainingBudget.toLocaleString()} / ${team.initialBudget.toLocaleString()} (${budgetPercent}%)`,
-          `👥 인원: ${team.members.length}/5`,
+          `👥 인원: ${team.members.length}/${teamSizeForRoom(room)}`,
         ].join("\n"),
         inline: true,
       });
@@ -2470,9 +2552,272 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     await interaction.reply({ embeds: [embed] });
   }
 
-  private async handleStatsCommand(interaction: ChatInputCommandInteraction) {
-    const user = await this.findUserByDiscordId(interaction.user.id);
+  /** 명령 옵션 `game` — 없으면 롤 */
+  private gameOption(interaction: ChatInputCommandInteraction): GameTitle {
+    return interaction.options.getString("game") === "PUBG" ? "PUBG" : "LOL";
+  }
 
+  /** 서비스가 주입되지 않은 환경(테스트 등)에서 명령이 조용히 죽지 않게 답한다 */
+  private async replyUnavailable(interaction: ChatInputCommandInteraction) {
+    await interaction.reply({
+      content:
+        "❌ 지금은 이 명령을 쓸 수 없습니다. 잠시 뒤 다시 시도해 주세요.",
+      ephemeral: true,
+    });
+  }
+
+  /**
+   * 프로필에 붙는 롤 내전 요약 칸 — 랭킹 점수·순위, 받은 칭찬.
+   * 랭킹 서비스가 없거나 조회가 실패하면 칸을 빼고 프로필은 그대로 보인다.
+   */
+  private async lolSummaryFields(
+    userId: string,
+  ): Promise<{ name: string; value: string; inline: boolean }[]> {
+    if (!this.rankingService) return [];
+    try {
+      const [ranking, stats] = await Promise.all([
+        this.rankingService.getUserRanking(userId),
+        this.rankingService.getUserRankingStats(userId),
+      ]);
+      const fields = [
+        {
+          name: "🏆 내전 랭킹",
+          value:
+            ranking.totalGames > 0 && "score" in ranking
+              ? `${formatScore(ranking.score)}점${ranking.globalRank ? ` · ${ranking.globalRank}위` : ""}`
+              : "아직 내전 기록 없음",
+          inline: true,
+        },
+      ];
+      if (stats) {
+        fields.push({
+          name: "👏 받은 칭찬",
+          value: formatCommendations(stats.commendations),
+          inline: true,
+        });
+      }
+      return fields;
+    } catch (error) {
+      console.warn("[DiscordBot] 프로필 랭킹 조회 실패:", error);
+      return [];
+    }
+  }
+
+  /**
+   * `/nexus stats [game] [@유저]` — 웹 랭킹과 같은 값으로 내전 기록을 보인다.
+   *
+   * 예전 명령은 아무도 남기지 않는 별점(UserRating) 평균과, 내전이 아닌 경기까지 센
+   * 승률을 보여 줬다. 지금은 랭킹 점수·순위·승패·KDA·MVP·칭찬을 쓴다.
+   */
+  private async handleStatsCommand(interaction: ChatInputCommandInteraction) {
+    const target = interaction.options.getUser("user") ?? interaction.user;
+    const isSelf = target.id === interaction.user.id;
+    const user = await this.findUserByDiscordId(target.id);
+
+    if (!user) {
+      await interaction.reply({
+        content: isSelf
+          ? "❌ 계정이 연동되지 않았습니다. `/nexus link`로 연동하세요!"
+          : "❌ 해당 유저가 Nexus에 연동되지 않았습니다.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const game = this.gameOption(interaction);
+    const appUrl =
+      this.configService.get("APP_URL") || "https://labs-nexus.com";
+
+    if (game === "PUBG") {
+      if (!this.pubgRankingService) return this.replyUnavailable(interaction);
+      // 배그 랭킹은 요청마다 세는 가벼운 계산이라 전체를 받아 이 사람 행을 찾는다
+      const { rankings } = await this.pubgRankingService.getRanking(1, 10_000);
+      const row = rankings.find((r) => r.userId === user.id);
+      const embed = new EmbedBuilder()
+        .setColor(Colors.Orange)
+        .setTitle(`🍗 ${user.username}의 배그 내전 기록`)
+        .setURL(gameUrl(appUrl, "ranking", "PUBG"))
+        .setTimestamp();
+      if (!row) {
+        embed.setDescription("아직 결과가 들어간 배그 내전이 없습니다.");
+      } else {
+        embed.addFields(
+          { name: "🏆 순위", value: `${row.rank}위`, inline: true },
+          { name: "🎮 참가", value: `${row.scrims}판`, inline: true },
+          { name: "🥇 1위", value: `${row.wins}회`, inline: true },
+          {
+            name: "📊 평균 순위",
+            value: `${row.averagePlacement.toFixed(1)}위`,
+            inline: true,
+          },
+          {
+            name: "🔫 판당 킬",
+            value: row.averageKills.toFixed(1),
+            inline: true,
+          },
+          { name: "⭐ 총점", value: `${row.totalPoints}점`, inline: true },
+        );
+      }
+      await interaction.reply({ embeds: [embed] });
+      return;
+    }
+
+    if (!this.rankingService) return this.replyUnavailable(interaction);
+    const [ranking, stats] = await Promise.all([
+      this.rankingService.getUserRanking(user.id),
+      this.rankingService.getUserRankingStats(user.id),
+    ]);
+
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Purple)
+      .setTitle(`📊 ${user.username}의 롤 내전 기록`)
+      .setURL(gameUrl(appUrl, "ranking", "LOL"))
+      .setTimestamp();
+
+    if (ranking.totalGames === 0 || !("score" in ranking)) {
+      embed.setDescription(
+        "아직 끝까지 치른 내전이 없습니다. 내전을 한 판 하면 50점에서 시작해요.",
+      );
+      await interaction.reply({ embeds: [embed] });
+      return;
+    }
+
+    embed.addFields(
+      {
+        name: "🏆 랭킹 점수",
+        value: `${formatScore(ranking.score)}점${ranking.globalRank ? ` · ${ranking.globalRank}위` : ""}`,
+        inline: true,
+      },
+      {
+        name: "⚔️ 전적",
+        value: `${ranking.totalGames}판 ${ranking.wins}승 ${ranking.losses}패`,
+        inline: true,
+      },
+      {
+        name: "📈 승률",
+        value: formatWinRate(ranking.wins, ranking.totalGames),
+        inline: true,
+      },
+    );
+
+    if (stats) {
+      embed.addFields(
+        {
+          name: "🗡️ KDA",
+          // KDA 는 Riot 기록이 있는 판에서만 나온다 — 없으면 비운다
+          value:
+            stats.kda !== null && stats.statGames > 0
+              ? `${stats.kda.toFixed(2)} (${stats.avgKills.toFixed(1)} / ${stats.avgDeaths.toFixed(1)} / ${stats.avgAssists.toFixed(1)})`
+              : "기록 없음",
+          inline: true,
+        },
+        { name: "⭐ MVP", value: `${stats.mvpCount}회`, inline: true },
+        {
+          name: "👏 받은 칭찬",
+          value: formatCommendations(stats.commendations),
+          inline: true,
+        },
+      );
+    }
+
+    // 라인별 점수 — 웹 랭킹의 라인 탭과 같은 값
+    if (ranking.byRole.length > 0) {
+      embed.addFields({
+        name: "🧭 라인별",
+        value: ranking.byRole
+          .map(
+            (r) =>
+              `${ROLE_EMOJI[r.role] ?? ""} ${r.role} ${formatScore(r.score)}점 · ${r.totalGames}판 ${r.wins}승 ${r.losses}패`,
+          )
+          .join("\n"),
+        inline: false,
+      });
+    }
+
+    embed.setFooter({
+      text: "점수는 50에서 시작해 승패와 개인 기여로 오르내립니다",
+    });
+    await interaction.reply({ embeds: [embed] });
+  }
+
+  /**
+   * `/nexus leaderboard [game]` — 웹 랭킹 화면의 상위 10명.
+   *
+   * 예전엔 대표 Riot 계정의 솔로랭크 티어·LP 순서였다. 내전 실력과 관계없는 순위라
+   * 웹 랭킹(롤: 랭킹 점수, 배그: 평균 순위)과 같은 기준으로 바꿨다.
+   */
+  private async handleLeaderboardCommand(
+    interaction: ChatInputCommandInteraction,
+  ) {
+    const game = this.gameOption(interaction);
+    const appUrl =
+      this.configService.get("APP_URL") || "https://labs-nexus.com";
+
+    let lines: string[];
+    if (game === "PUBG") {
+      if (!this.pubgRankingService) return this.replyUnavailable(interaction);
+      const { rankings } = await this.pubgRankingService.getRanking(1, 10);
+      lines = rankings.map((r) =>
+        formatPubgLeaderboardLine({
+          rank: r.rank,
+          username: r.user?.username ?? "(탈퇴한 유저)",
+          scrims: r.scrims,
+          averagePlacement: r.averagePlacement,
+          wins: r.wins,
+          averageKills: r.averageKills,
+        }),
+      );
+    } else {
+      if (!this.rankingService) return this.replyUnavailable(interaction);
+      const { rankings } = await this.rankingService.getGlobalRanking(1, 10);
+      lines = rankings.map((r) =>
+        formatLolLeaderboardLine({
+          globalRank: r.globalRank,
+          score: r.score,
+          totalGames: r.totalGames,
+          wins: r.wins,
+          losses: r.losses,
+          username: r.user.username,
+        }),
+      );
+    }
+
+    if (lines.length === 0) {
+      await interaction.reply({
+        content: "❌ 아직 랭킹에 오른 사람이 없습니다. 내전을 한 판 해 보세요!",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Gold)
+      .setTitle(
+        game === "PUBG"
+          ? "🏆 배그 내전 랭킹 — 상위 10명"
+          : "🏆 롤 내전 랭킹 — 상위 10명",
+      )
+      .setURL(gameUrl(appUrl, "ranking", game))
+      .setDescription(lines.join("\n"))
+      .setFooter({
+        text:
+          game === "PUBG"
+            ? "평균 순위가 낮을수록 위 · 전체 랭킹은 웹사이트에서"
+            : "점수는 50에서 시작해 승패와 개인 기여로 오르내립니다 · 전체 랭킹은 웹사이트에서",
+      })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed] });
+  }
+
+  /** `/nexus attendance` — 웹 헤더 메달 버튼과 같은 출석. 하루 한 번만 받는다 */
+  private async handleAttendanceCommand(
+    interaction: ChatInputCommandInteraction,
+  ) {
+    if (!this.attendanceService || !this.medalService) {
+      return this.replyUnavailable(interaction);
+    }
+    const user = await this.findUserByDiscordId(interaction.user.id);
     if (!user) {
       await interaction.reply({
         content: "❌ 계정이 연동되지 않았습니다. `/nexus link`로 연동하세요!",
@@ -2481,154 +2826,71 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    // 통계 집계
-    const [roomCount, matchCount, winCount, ratingStats] = await Promise.all([
-      // 참가한 방 수
-      this.prisma.roomParticipant.count({
-        where: { userId: user.id },
-      }),
-      // 총 매치 수
-      this.prisma.teamMember.count({
-        where: {
-          userId: user.id,
-          team: {
-            OR: [
-              { matchesAsTeamA: { some: { status: "COMPLETED" } } },
-              { matchesAsTeamB: { some: { status: "COMPLETED" } } },
-            ],
-          },
-        },
-      }),
-      // 승리 수 (팀 승리)
-      this.prisma.teamMember.count({
-        where: {
-          userId: user.id,
-          team: { wonMatches: { some: {} } },
-        },
-      }),
-      // 평균 평점
-      this.prisma.userRating.aggregate({
-        where: { targetUserId: user.id },
-        _avg: {
-          skillRating: true,
-          attitudeRating: true,
-          communicationRating: true,
-        },
-        _count: true,
-      }),
-    ]);
+    // 메달 기록이 조금 걸릴 수 있어 먼저 응답을 잡아 둔다(디스코드 3초 제한)
+    await interaction.deferReply({ ephemeral: true });
+    const result = await this.attendanceService.checkIn(user.id);
+    const balance = await this.medalService.getBalance(user.id);
 
     const embed = new EmbedBuilder()
-      .setColor(Colors.Purple)
-      .setTitle(`📊 ${user.username}의 통계`)
+      .setColor(result.granted > 0 ? Colors.Green : Colors.Grey)
+      .setTitle("📅 출석 체크")
+      .setDescription(formatAttendanceHeadline(result))
       .addFields(
+        { name: "🔥 연속 출석", value: `${result.streak}일`, inline: true },
         {
-          name: "🏠 참가한 방",
-          value: `${roomCount}개`,
+          name: "🗓️ 이번 달",
+          value: `${result.monthDays.length}일`,
           inline: true,
         },
-        {
-          name: "⚔️ 총 매치",
-          value: `${matchCount}회`,
-          inline: true,
-        },
-        {
-          name: "🏆 승률",
-          value:
-            matchCount > 0
-              ? `${Math.round((winCount / matchCount) * 100)}%`
-              : "N/A",
-          inline: true,
-        },
-        {
-          name: "⭐ 평판 점수",
-          value: `${user.reputation}점`,
-          inline: true,
-        },
-      );
+        { name: "🎖️ 내 메달", value: `${balance}개`, inline: true },
+      )
+      .setFooter({ text: formatNextBonus(result) });
 
-    if (ratingStats._count > 0) {
-      const avgSkill = ratingStats._avg.skillRating?.toFixed(1) || "N/A";
-      const avgAttitude = ratingStats._avg.attitudeRating?.toFixed(1) || "N/A";
-      const avgComm = ratingStats._avg.communicationRating?.toFixed(1) || "N/A";
-
-      embed.addFields(
-        {
-          name: "🎯 실력 평점",
-          value: `${avgSkill}/5`,
-          inline: true,
-        },
-        {
-          name: "😊 태도 평점",
-          value: `${avgAttitude}/5`,
-          inline: true,
-        },
-        {
-          name: "💬 소통 평점",
-          value: `${avgComm}/5`,
-          inline: true,
-        },
-      );
-    }
-
-    embed.setFooter({ text: `총 ${ratingStats._count}개의 평가 받음` });
-
-    await interaction.reply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
   }
 
-  private async handleLeaderboardCommand(
-    interaction: ChatInputCommandInteraction,
-  ) {
-    const accounts = await this.prisma.riotAccount.findMany({
-      where: { isPrimary: true },
-      select: {
-        gameName: true,
-        tagLine: true,
-        tier: true,
-        rank: true,
-        lp: true,
-        user: { select: { username: true } },
-      },
-    });
-
-    // 티어 + LP 기준 내림차순 정렬
-    const rankValue: Record<string, number> = { I: 4, II: 3, III: 2, IV: 1 };
-    accounts.sort(
-      (a: (typeof accounts)[number], b: (typeof accounts)[number]) => {
-        const tierDiff = (TIER_ORDER[b.tier] ?? 0) - (TIER_ORDER[a.tier] ?? 0);
-        if (tierDiff !== 0) return tierDiff;
-        const rankDiff =
-          (rankValue[b.rank ?? ""] ?? 0) - (rankValue[a.rank ?? ""] ?? 0);
-        if (rankDiff !== 0) return rankDiff;
-        return b.lp - a.lp;
-      },
-    );
-
-    const top10 = accounts.slice(0, 10);
-
-    if (top10.length === 0) {
+  /** `/nexus medal` — 메달 잔액과 출석 현황(출석은 하지 않는다) */
+  private async handleMedalCommand(interaction: ChatInputCommandInteraction) {
+    if (!this.attendanceService || !this.medalService) {
+      return this.replyUnavailable(interaction);
+    }
+    const user = await this.findUserByDiscordId(interaction.user.id);
+    if (!user) {
       await interaction.reply({
-        content: "❌ 등록된 Riot 계정이 없습니다.",
+        content: "❌ 계정이 연동되지 않았습니다. `/nexus link`로 연동하세요!",
         ephemeral: true,
       });
       return;
     }
 
-    const lines = top10.map((acc: (typeof top10)[number], i: number) => {
-      const medal =
-        i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
-      const tierEmoji = TIER_EMOJI[acc.tier] || "❓";
-      const rankStr = acc.rank && acc.tier !== "UNRANKED" ? ` ${acc.rank}` : "";
-      return `${medal} ${tierEmoji} **${acc.user.username}** — ${acc.gameName}#${acc.tagLine} · ${acc.tier}${rankStr} ${acc.lp} LP`;
-    });
+    await interaction.deferReply({ ephemeral: true });
+    const [balance, status] = await Promise.all([
+      this.medalService.getBalance(user.id),
+      this.attendanceService.getStatus(user.id),
+    ]);
+    const appUrl =
+      this.configService.get("APP_URL") || "https://labs-nexus.com";
 
     const embed = new EmbedBuilder()
       .setColor(Colors.Gold)
-      .setTitle("🏆 리더보드 — 상위 10명")
-      .setDescription(lines.join("\n"))
-      .setTimestamp();
+      .setTitle(`🎖️ ${user.username}의 메달`)
+      .addFields(
+        { name: "🎖️ 잔액", value: `${balance}개`, inline: true },
+        {
+          name: "📅 오늘 출석",
+          value: status.checkedToday ? "완료" : "아직 — `/nexus attendance`",
+          inline: true,
+        },
+        { name: "🔥 연속 출석", value: `${status.streak}일`, inline: true },
+      )
+      .setDescription(
+        `메달은 출석과 내전으로 모이고, [상점](${appUrl.replace(/\/+$/, "")}/shop)에서 꾸미기로 바꿀 수 있어요.`,
+      )
+      .setFooter({
+        text: formatNextBonus({ ...status, granted: 0, bonus: 0 }),
+      });
 
-    await interaction.reply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
   }
 
   private async handleClanCommand(interaction: ChatInputCommandInteraction) {

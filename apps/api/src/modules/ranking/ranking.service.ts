@@ -690,6 +690,15 @@ export class RankingService implements OnApplicationBootstrap {
   }
 
   /**
+   * 한 사람의 KDA·MVP·칭찬 — 디스코드 `/nexus stats` 처럼 한 명만 볼 때 쓴다.
+   * 리더보드 행과 같은 값이라 웹과 봇 숫자가 어긋나지 않는다.
+   */
+  async getUserRankingStats(userId: string): Promise<RankingRowStats | null> {
+    const stats = await this.getRankingRowStats([userId]);
+    return stats.get(userId) ?? null;
+  }
+
+  /**
    * 랭킹 점수 재계산을 잠깐 뒤로 예약한다.
    *
    * 경기 하나가 끝나면 참가자 10명의 updateRanking 이 한꺼번에 불린다. 점수는 매번
