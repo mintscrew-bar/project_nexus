@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  BarChart3,
   Bell,
   BellOff,
   CalendarDays,
@@ -56,13 +57,14 @@ import {
 import { useCosmeticLoadouts } from "@/components/cosmetics/useCosmeticLoadouts";
 import { getChampionKoreanName } from "@nexus/types";
 import { StreamerPageEditor } from "./_StreamerPageEditor";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import { ParticipantsTable } from "./_ParticipantsTable";
 
 /*
  * 스트리머 페이지 (/streamers/:id) — 유저 프로필과 같은 틀.
  *   머리 카드(배너·아바타·이름·한마디·채널·버튼)
- *   → 위 두 칸(방송 내전 통계 · 칭찬 모음)
- *   → 왼쪽 방송 내전 기록(회차별/달력) · 오른쪽 공지사항·방송 일정·시청자 리그
+ *   → 탭: 내전 기록(회차별/달력) · 통계(요약·칭찬 모음·참가자 통계표)
+ *         · 시청자 리그 · 공지사항 · 방송 일정
  * 배너는 방송 중이면 방송 미리보기, 아니면 프로필 배경. 칸 크기가 같아 바뀌어도
  * 아래 내용이 밀리지 않는다. 방송 중 표시는 아바타 테두리(빨강) + LIVE 글자.
  */
@@ -95,6 +97,24 @@ const TEAM_MODE_KO: Record<string, string> = {
   AUTO_BALANCE: "자동 밸런스",
   MANUAL_TEAM: "자유 팀",
 };
+
+/** 머리 카드 아래 탭 — 순서대로 보인다 */
+const STREAMER_TABS = [
+  { value: "records", label: "내전 기록", Icon: Trophy },
+  { value: "stats", label: "통계", Icon: BarChart3 },
+  { value: "league", label: "시청자 리그", Icon: Crown },
+  { value: "notices", label: "공지사항", Icon: Megaphone },
+  { value: "schedule", label: "방송 일정", Icon: CalendarDays },
+] as const;
+
+/** 탭 안이 비었을 때 — 빈 화면 대신 한 줄 안내 */
+function TabEmpty({ text }: { text: string }) {
+  return (
+    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary px-6 py-12 text-center text-sm text-text-tertiary">
+      {text}
+    </div>
+  );
+}
 
 export function StreamerPageClient({ streamerId }: { streamerId: string }) {
   const router = useRouter();
@@ -339,37 +359,73 @@ export function StreamerPageClient({ streamerId }: { streamerId: string }) {
           </CardContent>
         </Card>
 
-        {/* ── 위 두 칸 ── */}
-        <div className="mb-4 grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-          <StatsCard data={data} />
-          <CommendationCard tags={data.commendationTags} />
-        </div>
+        {/* ── 머리 카드 아래는 전부 탭 — 한 화면에 다 쌓으면 길어서 찾기 어렵다 ── */}
+        <Tabs defaultValue="records">
+          <TabsList className="mb-4 w-full">
+            {STREAMER_TABS.map(({ value, label, Icon }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="flex items-center gap-1.5"
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-        {/* ── 아래: 기록 · 오른쪽 칸 ── */}
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <RecordsCard
-            sessions={data.sessions}
-            upcomingDates={data.upcoming
-              .map((r) => r.scheduledAt)
-              .filter((d): d is string => !!d)}
-          />
-          <aside className="space-y-4 self-start lg:sticky lg:top-20">
+          {/* 내전 기록 — 회차별/달력 */}
+          <TabsContent value="records">
+            <RecordsCard
+              sessions={data.sessions}
+              upcomingDates={data.upcoming
+                .map((r) => r.scheduledAt)
+                .filter((d): d is string => !!d)}
+            />
+          </TabsContent>
+
+          {/* 통계 — 요약 숫자·칭찬 모음 두 칸 + 참가자 통계표(엑셀형) */}
+          <TabsContent value="stats">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+              <StatsCard data={data} />
+              <CommendationCard tags={data.commendationTags} />
+            </div>
+            <ParticipantsTable
+              rows={data.participants}
+              isOwner={data.isOwner}
+              streamerName={streamer.username}
+            />
+          </TabsContent>
+
+          {/* 시청자 리그 — 비면 카드가 null 이라 빈 안내를 대신 보인다 */}
+          <TabsContent value="league">
+            {data.league.length > 0 ? (
+              <LeagueCard league={data.league} />
+            ) : (
+              <TabEmpty text="아직 시청자 리그 순위가 없어요. 방송 내전이 쌓이면 여기에 순위가 생겨요." />
+            )}
+          </TabsContent>
+
+          {/* 공지사항 — 스트리머 본인은 여기서 쓰고 고정·삭제한다 */}
+          <TabsContent value="notices">
             <NoticesCard
               streamerId={streamerId}
               notices={data.notices}
               isOwner={data.isOwner}
             />
-            <ScheduleCard data={data} />
-            <LeagueCard league={data.league} />
-          </aside>
-        </div>
+          </TabsContent>
 
-        {/* ── 내전 참가자 통계 (엑셀형, 전체 폭) ── */}
-        <ParticipantsTable
-          rows={data.participants}
-          isOwner={data.isOwner}
-          streamerName={streamer.username}
-        />
+          {/* 방송 일정 — 정기 요일·시각과 예약 내전. 시청자에게 보일 게 없으면 빈 안내 */}
+          <TabsContent value="schedule">
+            {data.isOwner ||
+            data.settings.scheduleDays.length > 0 ||
+            data.upcoming.length > 0 ? (
+              <ScheduleCard data={data} />
+            ) : (
+              <TabEmpty text="등록된 방송 일정이 없어요." />
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {data.isOwner && (
