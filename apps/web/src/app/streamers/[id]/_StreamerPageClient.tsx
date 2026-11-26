@@ -110,7 +110,7 @@ const STREAMER_TABS = [
 /** 탭 안이 비었을 때 — 빈 화면 대신 한 줄 안내 */
 function TabEmpty({ text }: { text: string }) {
   return (
-    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary px-6 py-12 text-center text-sm text-text-tertiary">
+    <div className="px-6 py-12 text-center text-sm text-text-tertiary">
       {text}
     </div>
   );
@@ -377,8 +377,8 @@ export function StreamerPageClient({ streamerId }: { streamerId: string }) {
               ))}
             </TabsList>
 
-            {/* 탭 내용 칸 — 안쪽 카드들이 이 칸 위에 얹힌다 */}
-            <div className="p-3 md:p-4">
+            {/* 탭 내용 칸 — 안쪽 칸들은 테두리·배경 없이 이 상자에 바로 얹혀 탭 줄과 한 장으로 보인다 */}
+            <div>
               {/* 내전 기록 — 회차별/달력 */}
               <TabsContent value="records">
                 <RecordsCard
@@ -391,7 +391,7 @@ export function StreamerPageClient({ streamerId }: { streamerId: string }) {
 
               {/* 통계 — 요약 숫자·칭찬 모음 두 칸 + 참가자 통계표(엑셀형) */}
               <TabsContent value="stats">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+                <div className="grid divide-y divide-bg-tertiary border-b border-bg-tertiary lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
                   <StatsCard data={data} />
                   <CommendationCard tags={data.commendationTags} />
                 </div>
@@ -593,7 +593,7 @@ function StatsCard({ data }: { data: StreamerPageData }) {
     { label: "평균 참가", value: `${s.avgPlayers}`, unit: "명" },
   ];
   return (
-    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary p-6">
+    <div className="p-6">
       <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-text-primary">
         <Radio className="h-5 w-5 text-accent-primary" />
         방송 내전 통계
@@ -624,7 +624,7 @@ function CommendationCard({
 }) {
   const max = tags[0]?.count ?? 0;
   return (
-    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary p-6">
+    <div className="p-6">
       <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-text-primary">
         <ThumbsUp className="h-5 w-5 text-accent-primary" />
         칭찬 모음
@@ -668,7 +668,7 @@ function RecordsCard({
 }) {
   const [view, setView] = useState<"list" | "calendar">("list");
   return (
-    <div className="min-w-0 self-start rounded-xl border border-bg-tertiary bg-bg-secondary p-6">
+    <div className="min-w-0 self-start p-6">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h2 className="flex items-center gap-2 text-xl font-bold text-text-primary">
           <Trophy className="h-5 w-5 text-accent-primary" />
@@ -1056,7 +1056,7 @@ function NoticesCard({
   if (!isOwner && notices.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary p-5">
+    <div className="p-5">
       <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-text-primary">
         <Megaphone className="h-4 w-4 text-accent-primary" />
         공지사항
@@ -1155,7 +1155,7 @@ function ScheduleCard({ data }: { data: StreamerPageData }) {
     return null;
   }
   return (
-    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary p-5">
+    <div className="p-5">
       <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-text-primary">
         <CalendarDays className="h-4 w-4 text-accent-primary" />
         방송 일정
@@ -1223,7 +1223,7 @@ function ScheduleCard({ data }: { data: StreamerPageData }) {
 function LeagueCard({ league }: { league: StreamerPageData["league"] }) {
   if (league.length === 0) return null;
   return (
-    <div className="rounded-xl border border-bg-tertiary bg-bg-secondary p-5">
+    <div className="p-5">
       <h2 className="mb-1 flex items-center gap-2 text-base font-bold text-text-primary">
         <Crown className="h-4 w-4 text-accent-gold" />
         시청자 리그

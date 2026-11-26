@@ -234,7 +234,7 @@ export function ParticipantsTable({
   if (rows.length === 0) return null;
 
   return (
-    <div className="mt-4 rounded-xl border border-bg-tertiary bg-bg-secondary p-6">
+    <div className="p-6">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h2 className="flex items-center gap-2 text-xl font-bold text-text-primary">
           <Table2 className="h-5 w-5 text-accent-primary" />
