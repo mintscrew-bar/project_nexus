@@ -782,7 +782,7 @@ export default function PostDetailClient() {
                   {post.comments.map((comment) => (
                     <div key={comment.id}>
                       {/* 최상위 댓글 */}
-                      <div className="group/comment flex gap-3 p-4 rounded-lg bg-bg-tertiary/50">
+                      <div className="flex gap-3 p-4 rounded-lg bg-bg-tertiary/50">
                         <div className="relative w-8 h-8 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
                           {comment.author.avatar ? (
                             <Image
@@ -876,7 +876,7 @@ export default function PostDetailClient() {
                                 </>
                               ) : (
                                 isAuthenticated && (
-                                  /* 본인 댓글 아닐 때만 신고 버튼 (hover 시 표시) */
+                                  /* 본인 댓글이 아니면 신고 버튼 — 늘 보이게(마우스를 올려야 나오면 신고할 수 있는지 모른다) */
                                   <button
                                     onClick={() =>
                                       openReport({
@@ -886,7 +886,7 @@ export default function PostDetailClient() {
                                       })
                                     }
                                     title="댓글 신고"
-                                    className="opacity-0 group-hover/comment:opacity-100 transition-opacity text-text-tertiary hover:text-red-400 ml-1"
+                                    className="ml-1 text-text-tertiary/70 transition-colors hover:text-red-400"
                                   >
                                     <Flag className="h-4 w-4" />
                                   </button>
@@ -1000,7 +1000,7 @@ export default function PostDetailClient() {
                                   {comment.replies.map((reply) => (
                                     <div
                                       key={reply.id}
-                                      className="group/reply flex gap-2.5 rounded-lg bg-bg-secondary/60 px-3 py-2.5"
+                                      className="flex gap-2.5 rounded-lg bg-bg-secondary/60 px-3 py-2.5"
                                     >
                                       <div className="relative w-7 h-7 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
                                         {reply.author.avatar ? (
@@ -1094,7 +1094,7 @@ export default function PostDetailClient() {
                                                     })
                                                   }
                                                   title="댓글 신고"
-                                                  className="opacity-0 group-hover/reply:opacity-100 transition-opacity text-text-tertiary hover:text-red-400 ml-1"
+                                                  className="ml-1 text-text-tertiary/70 transition-colors hover:text-red-400"
                                                 >
                                                   <Flag className="h-4 w-4" />
                                                 </button>
