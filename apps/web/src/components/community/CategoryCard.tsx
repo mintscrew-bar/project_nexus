@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { type Post, formatDate } from "./community-types";
 import { type Board } from "@/lib/api-client";
 import { BoardIcon } from "@/components/community/BoardIcon";
-import { useCommunityStore } from "@/stores/community-store";
 import { useNavigationGame } from "@/hooks/useCurrentGame";
 import { GAMES } from "@nexus/types";
 
@@ -26,7 +25,6 @@ export function CategoryCard({
 }: CategoryCardProps) {
   const router = useRouter();
   const game = useNavigationGame();
-  const setSelectedCategory = useCommunityStore((s) => s.setSelectedCategory);
   const title = board.fullName ?? board.name;
 
   // 최대 5개 표시
@@ -47,7 +45,12 @@ export function CategoryCard({
           )}
         </div>
         <button
-          onClick={() => setSelectedCategory(board.slug)}
+          // 주소로 게시판을 연다 — 뒤로 가기로 전체 게시판에 돌아올 수 있다
+          onClick={() =>
+            router.push(
+              `/community?game=${GAMES[game].slug}&board=${encodeURIComponent(board.slug)}`,
+            )
+          }
           className="text-xs text-text-tertiary hover:text-accent-primary transition-colors"
         >
           더보기 →

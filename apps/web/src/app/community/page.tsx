@@ -146,33 +146,53 @@ function CommunityPageContent() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // URL ?board=<slug> / 레거시 ?category=<ENUM> / ?tag= 파라미터로 스토어 초기화 (마운트 1회)
-  useEffect(() => {
-    const boardParam =
-      searchParams.get("board") ?? searchParams.get("category");
-    if (boardParam) {
-      // enum/slug 모두 소문자 슬러그로 정규화 (예: NOTICE → notice)
-      setSelectedCategory(boardParam.toLowerCase());
-    }
-    const tagParam = searchParams.get("tag");
-    if (tagParam) {
-      useCommunityStore.getState().setSelectedTag(tagParam);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 이전 게임의 게시판·검색·페이지가 다음 게임에 남지 않게 한다.
+  /*
+   * 게시판·페이지는 주소(?board=&page=)가 기준이다. 스토어에만 두면 글에 들어갔다가
+   * 뒤로 오거나 「목록으로」를 눌렀을 때 전체 게시판 1쪽으로 돌아가 버렸다.
+   * 주소가 바뀔 때마다(뒤로 가기 포함) 스토어를 주소에 맞춘다.
+   * 레거시 ?category=<ENUM> 도 받는다. ?tag= 는 주소에 있을 때만 반영한다.
+   */
   useEffect(() => {
     const state = useCommunityStore.getState();
-    state.setSearchQuery("");
     state.setSelectedCategory(
       (
         searchParams.get("board") ?? searchParams.get("category")
       )?.toLowerCase() ?? "ALL",
     );
-    state.setCurrentPage(1);
-    state.setSelectedTag(searchParams.get("tag") ?? "");
-  }, [gameTitle, searchParams]);
+    const tagParam = searchParams.get("tag");
+    if (tagParam) state.setSelectedTag(tagParam);
+    // 게시판·태그 setter 가 1쪽으로 되돌리므로 맨 마지막에 주소의 쪽수를 넣는다
+    const page = Number(searchParams.get("page"));
+    state.setCurrentPage(Number.isInteger(page) && page > 0 ? page : 1);
+  }, [searchParams]);
+
+  // 이전 게임의 검색·태그가 다음 게임에 남지 않게 한다(게시판·쪽수는 위에서 주소로 맞춘다).
+  // setter 를 쓰면 쪽수가 1로 되돌아가 주소의 ?page= 를 덮으므로 값만 직접 바꾼다.
+  useEffect(() => {
+    useCommunityStore.setState({
+      searchQuery: "",
+      selectedTag: searchParams.get("tag") ?? "",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameTitle]);
+
+  /** 게시판·쪽수를 주소에 적는다. 히스토리를 쌓지 않게 replace — 뒤로 가기는 글 → 목록 한 번 */
+  const replaceListUrl = (board: string, page: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("category");
+    if (board === "ALL") params.delete("board");
+    else params.set("board", board);
+    if (page > 1) params.set("page", String(page));
+    else params.delete("page");
+    const qs = params.toString();
+    router.replace(qs ? `/community?${qs}` : "/community", { scroll: false });
+  };
+
+  /** 게시판 칩을 누르면 — 스토어를 바로 바꾸고 주소도 맞춘다 */
+  const selectBoard = (board: string) => {
+    setSelectedCategory(board);
+    replaceListUrl(board, 1);
+  };
 
   // 검색어 debounce (queryKey에 사용)
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -316,10 +336,21 @@ function CommunityPageContent() {
     );
   }
 
+  /** 목록 → 글로 갈 때 주소에 실어 보내는 지금 위치. 전체 게시판·1쪽이면 비운다 */
+  const listQuery = [
+    selectedCategory !== "ALL"
+      ? `board=${encodeURIComponent(selectedCategory)}`
+      : "",
+    currentPage > 1 ? `page=${currentPage}` : "",
+  ]
+    .filter(Boolean)
+    .join("&");
+
   const handlePageChange = (page: number) => {
     startTransition(() => {
       setCurrentPage(page);
     });
+    replaceListUrl(selectedCategory, page);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -342,7 +373,7 @@ function CommunityPageContent() {
           boards={boards}
           selectedCategory={selectedCategory}
           isAllMode={isAllMode}
-          onSelect={setSelectedCategory}
+          onSelect={selectBoard}
         />
 
         {/* ── 카테고리 헤더 ── */}
@@ -494,6 +525,7 @@ function CommunityPageContent() {
                     totalPages={totalPages}
                     currentPage={currentPage}
                     onPageChange={handlePageChange}
+                    listQuery={listQuery}
                     showCategory
                   />
                 )}
@@ -557,6 +589,7 @@ function CommunityPageContent() {
                   totalPages={totalPages}
                   currentPage={currentPage}
                   onPageChange={handlePageChange}
+                  listQuery={listQuery}
                 />
               )}
             </>
@@ -576,6 +609,7 @@ function PostListSection({
   currentPage,
   onPageChange,
   showCategory,
+  listQuery,
 }: {
   pinnedPosts: Post[];
   regularPosts: Post[];
@@ -584,6 +618,8 @@ function PostListSection({
   currentPage: number;
   onPageChange: (page: number) => void;
   showCategory?: boolean;
+  /** 글 주소에 붙일 목록 위치 — PostRow 참고 */
+  listQuery?: string;
 }) {
   return (
     <>
@@ -602,6 +638,7 @@ function PostListSection({
               key={post.id}
               post={post}
               showCategoryIcon={showCategory}
+              listQuery={listQuery}
             />
           ))}
           {regularPosts.map((post) => (
@@ -609,6 +646,7 @@ function PostListSection({
               key={post.id}
               post={post}
               showCategoryIcon={showCategory}
+              listQuery={listQuery}
             />
           ))}
         </CardContent>

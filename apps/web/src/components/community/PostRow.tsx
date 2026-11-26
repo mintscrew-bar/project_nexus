@@ -12,10 +12,22 @@ interface PostRowProps {
   post: Post;
   /** ALL 모드에서 게시판 아이콘 표시 여부 */
   showCategoryIcon?: boolean;
+  /**
+   * 글 주소에 덧붙일 목록 위치 (예: "board=free&page=2").
+   * 글에서 「목록으로」·뒤로 가기를 했을 때 보던 게시판·쪽수로 돌아가는 데 쓴다.
+   */
+  listQuery?: string;
+  /** 지금 보고 있는 글 — 글 아래 목록에서 강조한다 */
+  active?: boolean;
 }
 
 /** 단일 게시판 모드 테이블 행 컴포넌트 */
-export function PostRow({ post, showCategoryIcon = false }: PostRowProps) {
+export function PostRow({
+  post,
+  showCategoryIcon = false,
+  listQuery,
+  active = false,
+}: PostRowProps) {
   const router = useRouter();
   const game = useNavigationGame();
   const catColor = post.board?.color ?? "text-text-secondary";
@@ -24,13 +36,18 @@ export function PostRow({ post, showCategoryIcon = false }: PostRowProps) {
   return (
     <div
       onClick={() =>
-        router.push(`/community/${post.id}?game=${GAMES[game].slug}`)
+        router.push(
+          `/community/${post.id}?game=${GAMES[game].slug}${listQuery ? `&${listQuery}` : ""}`,
+        )
       }
       className={cn(
         "grid grid-cols-12 gap-2 px-4 py-3 hover:bg-bg-tertiary cursor-pointer transition-colors border-b border-bg-elevated last:border-0",
         // 고정 글은 옅은 바탕으로만 구분한다(왼쪽 색 막대 금지 — CLAUDE.md)
         post.isPinned && "bg-accent-primary/5",
+        // 지금 보는 글 — 옅은 강조 바탕(왼쪽 막대 금지)
+        active && "bg-accent-primary/10 hover:bg-accent-primary/15",
       )}
+      aria-current={active ? "page" : undefined}
     >
       {/* 제목 열 */}
       <div className="col-span-12 md:col-span-7 flex items-center gap-1.5 min-w-0">
@@ -49,6 +66,7 @@ export function PostRow({ post, showCategoryIcon = false }: PostRowProps) {
             post.isPinned
               ? "font-semibold text-text-primary"
               : "font-medium text-text-primary",
+            active && "text-accent-primary",
           )}
         >
           {post.title}

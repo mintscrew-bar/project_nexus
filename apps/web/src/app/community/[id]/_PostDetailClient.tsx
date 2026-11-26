@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/stores/auth-store";
 import { communityApi } from "@/lib/api-client";
@@ -20,6 +20,7 @@ import { ConfirmModal } from "@/components/ui/Modal";
 import { MarkdownViewer } from "@/components/community/MarkdownViewer";
 import { RichTextViewer } from "@/components/community/RichTextViewer";
 import { AdSlotCard } from "@/components/ads/AdSlot";
+import { PostDetailBoardList } from "@/components/community/PostDetailBoardList";
 import { useNavigationGame } from "@/hooks/useCurrentGame";
 import { scopedSectionPath } from "@/lib/scoped-section-routes";
 import { GAMES, type GameTitle } from "@nexus/types";
@@ -227,7 +228,19 @@ export default function PostDetailClient() {
   const hasBookmarked = bookmarkedQuery.data ?? false;
   const setHasBookmarked = useQueryDataSetter<boolean>(bookmarkedKey, false);
   const game = post?.board?.gameTitle ?? navigationGame;
-  const communityPath = scopedSectionPath("community", game);
+  /*
+   * 목록에서 들어왔으면 주소에 그 게시판·쪽수(?board=&page=)가 실려 온다.
+   * 「목록으로」는 그 자리로 돌려보낸다. 없으면(전체 게시판·바깥 링크) 전체 게시판.
+   */
+  const searchParams = useSearchParams();
+  const fromBoard = searchParams.get("board");
+  const fromPageRaw = Number(searchParams.get("page"));
+  const fromPage =
+    Number.isInteger(fromPageRaw) && fromPageRaw > 0 ? fromPageRaw : 1;
+  const communityPath =
+    scopedSectionPath("community", game) +
+    (fromBoard ? `&board=${encodeURIComponent(fromBoard)}` : "") +
+    (fromBoard && fromPage > 1 ? `&page=${fromPage}` : "");
   /** 좋아요 요청 진행 중. 연타로 요청이 겹치는 것을 막는다. */
   const [isLiking, setIsLiking] = useState(false);
   const [commentText, setCommentText] = useState("");
@@ -1157,6 +1170,19 @@ export default function PostDetailClient() {
               )}
             </CardContent>
           </Card>
+
+          {/* 같은 게시판 다른 글 — 목록으로 나가지 않고 바로 넘어간다 */}
+          {post.board && (
+            <PostDetailBoardList
+              key={post.board.slug}
+              gameTitle={game}
+              board={post.board}
+              // 들어온 게시판이 이 글의 게시판이면 그 쪽수, 아니면 1쪽
+              initialPage={fromBoard === post.board.slug ? fromPage : 1}
+              currentPostId={post.id}
+              fromBoard={fromBoard}
+            />
+          )}
         </div>
       </div>
 
