@@ -19,11 +19,10 @@ import { AuthService } from "../auth/auth.service";
 import { DiscordService } from "./discord.service";
 import { DiscordBotService } from "./discord-bot.service";
 import { DiscordAdminAlertService } from "./discord-admin-alert.service";
+// 초대 권한 비트는 서버 설정 카드의 「권한 다시 주기」 링크와 같이 쓴다
+import { BOT_PERMISSIONS } from "./bot-permissions";
 
 // 봇이 외부 길드에서 필요한 권한 비트필드:
-// VIEW_CHANNEL(1024) + SEND_MESSAGES(2048) + CONNECT(1048576) +
-// MOVE_MEMBERS(16777216) + MANAGE_CHANNELS(16) = 17828880
-const BOT_PERMISSIONS = "17828880";
 
 // 길드 연동 OAuth state 토큰의 purpose 식별자 (계정 연동 토큰과 분리)
 const GUILD_LINK_PURPOSE = "discord_guild";

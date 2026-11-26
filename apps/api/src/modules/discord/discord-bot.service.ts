@@ -74,6 +74,7 @@ import { RankingService } from "../ranking/ranking.service";
 import { PubgRankingService } from "../pubg/pubg-ranking.service";
 import { AttendanceService } from "../medal/attendance.service";
 import { MedalService } from "../medal/medal.service";
+import { GuildSetupFlow } from "./guild-setup";
 import {
   formatAttendanceHeadline,
   formatCommendations,
@@ -178,6 +179,8 @@ interface RoomNotifEntry {
 @Injectable()
 export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   private client: Client;
+  /** 서버 초기 설정 카드(`/nexus setup`) — guild-setup.ts */
+  private readonly setupFlow: GuildSetupFlow;
   private rest: REST;
   private voiceService: DiscordVoiceService | null = null;
   // 방 생성 알림 메시지 참조 (roomId → 메시지 정보), 재시작 시 초기화됨
@@ -215,6 +218,18 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     this.rest = new REST({ version: "10" }).setToken(
       this.configService.get("DISCORD_BOT_TOKEN") || "",
     );
+
+    this.setupFlow = new GuildSetupFlow({
+      prisma: this.prisma,
+      client: this.client,
+      appUrl: () =>
+        this.configService.get("APP_URL") || "https://labs-nexus.com",
+      clientId: () =>
+        this.client.application?.id ||
+        this.client.user?.id ||
+        this.configService.get("DISCORD_CLIENT_ID") ||
+        "",
+    });
   }
 
   async onModuleInit() {
@@ -498,23 +513,64 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
     return null;
   }
 
-  /** 봇이 서버에 들어온 직후 공지 채널 설정을 안내한다. */
+  /**
+   * 봇이 서버에 들어온 직후 서버 설정 카드(시작 버튼)를 올린다.
+   *
+   * 예전엔 "공지 채널을 지정해주세요" 글과 버튼 하나뿐이라, 나머지 설정(알림 역할·
+   * 다른 서버 공지·권한)은 관리자가 명령을 찾아 헤맸다. 이제 단계형 카드로 안내한다.
+   * 봇이 글을 쓸 채널이 하나도 없으면 연동한 사람에게 DM 으로 보낸다(예비 경로).
+   */
   private async sendAnnounceSetupOnboarding(guildId: string): Promise<boolean> {
     try {
       const guild = await this.client.guilds.fetch(guildId);
       const channel = await this.findPostableChannel(guild);
-      if (!channel) {
-        console.warn(
-          `[DiscordBot] 길드 ${guildId}: 안내를 보낼 텍스트 채널을 찾지 못함`,
+      if (channel) {
+        await channel.send(
+          (await this.setupFlow.buildOnboarding(guild, channel)) as never,
         );
-        return false;
+        return true;
       }
-      await channel.send(this.buildAnnounceSetupNotice());
-      return true;
+      return await this.sendSetupOnboardingDm(guildId, guild.name);
     } catch (err: any) {
       console.warn(
-        `[DiscordBot] 길드 ${guildId} 공지 채널 안내 실패: ${err?.message}`,
+        `[DiscordBot] 길드 ${guildId} 서버 설정 안내 실패: ${err?.message}`,
       );
+      return false;
+    }
+  }
+
+  /** 채널에 못 올릴 때 — 연동한 사람에게 DM 으로 `/nexus setup` 을 알린다 */
+  private async sendSetupOnboardingDm(
+    guildId: string,
+    guildName: string,
+  ): Promise<boolean> {
+    const link = await this.prisma.discordGuildLink.findUnique({
+      where: { guildId },
+      select: { ownerId: true },
+    });
+    const provider = link
+      ? await this.prisma.authProvider.findFirst({
+          where: { userId: link.ownerId, provider: "DISCORD" },
+          select: { providerId: true },
+        })
+      : null;
+    if (!provider) {
+      console.warn(
+        `[DiscordBot] 길드 ${guildId}: 안내를 보낼 채널도, 연동한 사람의 디스코드도 찾지 못함`,
+      );
+      return false;
+    }
+    try {
+      const user = await this.client.users.fetch(provider.providerId);
+      await user.send(
+        [
+          `**${guildName}** 에 NEXUS가 들어왔어요!`,
+          "봇이 글을 쓸 수 있는 채널이 없어 DM 으로 알려 드려요.",
+          "서버의 아무 채널에서 `/nexus setup` 을 입력하면 버튼 몇 번으로 설정이 끝나요.",
+        ].join("\n"),
+      );
+      return true;
+    } catch {
       return false;
     }
   }
@@ -1098,6 +1154,13 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
         )
         .addSubcommand((sub) =>
           sub
+            .setName("setup")
+            .setDescription(
+              "서버 설정 — 처음 설정하거나, 문제 있는 부분을 찾아 고치기 (관리자)",
+            ),
+        )
+        .addSubcommand((sub) =>
+          sub
             .setName("attendance")
             .setDescription("오늘 출석하고 메달 받기 (연속 출석 보너스)"),
         )
@@ -1296,6 +1359,37 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async handleInteraction(interaction: Interaction) {
+    // 서버 설정 카드·멤버 알림 버튼 — 버튼·선택 목록·모달 모두 guild-setup.ts 가 맡는다
+    if (
+      (interaction.isButton() ||
+        interaction.isChannelSelectMenu() ||
+        interaction.isRoleSelectMenu() ||
+        interaction.isModalSubmit()) &&
+      GuildSetupFlow.isSetupCustomId(interaction.customId)
+    ) {
+      try {
+        if (interaction.isModalSubmit()) {
+          await this.setupFlow.handleModal(interaction);
+        } else {
+          await this.setupFlow.handleComponent(interaction);
+        }
+      } catch (error) {
+        console.error("[DiscordBot] 서버 설정 처리 실패:", error);
+        const content =
+          "❌ 설정 중 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.";
+        if (interaction.deferred || interaction.replied) {
+          await interaction
+            .followUp({ content, ephemeral: true })
+            .catch(() => undefined);
+        } else {
+          await interaction
+            .reply({ content, ephemeral: true })
+            .catch(() => undefined);
+        }
+      }
+      return;
+    }
+
     if (interaction.isModalSubmit()) {
       if (interaction.customId === RULES_MODAL_ID) {
         await this.handleRulesModalSubmit(interaction);
@@ -1361,6 +1455,9 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             break;
           case "attendance":
             await this.handleAttendanceCommand(interaction);
+            break;
+          case "setup":
+            await this.setupFlow.handleCommand(interaction);
             break;
           case "medal":
             await this.handleMedalCommand(interaction);
@@ -1860,6 +1957,7 @@ export class DiscordBotService implements OnModuleInit, OnModuleDestroy {
             "`/nexus schedule <시간> <모드>` - 내전 예약 개설",
             "  └ 배그는 `game:배틀그라운드` + `pubgmode` + `platform` 을 함께",
             "`/nexus team` - 현재 팀 정보",
+            "`/nexus setup` - 서버 설정·문제 고치기 (관리자)",
             "`/nexus rules` - 서버 규칙 게시 (관리자)",
             "`/nexus verify` - 서버 기본 역할 받기",
             "`/nexus setuproles` - 티어/라인 역할 자동 생성 (관리자)",
