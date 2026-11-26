@@ -257,18 +257,45 @@ export function buildCommendationTags(
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 }
 
-/**
- * 시청자 리그 — 이 스트리머의 방송 내전만으로 랭킹 점수식을 다시 돌린다.
- * 스트리머 본인은 뺀다(시청자끼리의 순위). 점수 → 판수 순.
- */
-export function buildViewerLeague(
-  rows: HostedMatchRow[],
-  streamerId: string,
-): StreamerLeagueEntry[] {
-  const ratingMatches: RatingMatch[] = [];
+/** 내전 참가자 통계표 한 줄 — 이 스트리머의 방송 내전에 뛴 시청자 한 명 */
+export interface StreamerParticipantRow {
+  userId: string;
+  username: string;
+  /** 결과가 난 판 */
+  games: number;
+  wins: number;
+  losses: number;
+  /** 이 방송 내전만으로 다시 계산한 점수(랭킹 점수와 같은 식, 시작 50) */
+  score: number;
+  /** Riot 기록이 있는 판 — K/D/A 는 이 판들의 평균 */
+  statGames: number;
+  avgKills: number | null;
+  avgDeaths: number | null;
+  avgAssists: number | null;
+  /** (K+A)/D — 데스가 0 이면 K+A */
+  kda: number | null;
+  mvp: number;
+  ace: number;
+  /** 이 방송 내전에서 받은 칭찬 */
+  commendations: number;
+  firstAt: string;
+  lastAt: string;
+  /** 참가한 방송 회차 수 */
+  sessions: number;
+  /** 배정 라인 — 많이 맡은 순 */
+  roles: { role: string; games: number }[];
+  /** Riot 기록의 챔피언 — 많이 한 순 최대 3개 */
+  champions: { name: string; games: number }[];
+}
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/** 방송 내전을 랭킹 점수 계산 입력으로 바꾼다 */
+function toRatingMatches(rows: HostedMatchRow[]): RatingMatch[] {
+  const out: RatingMatch[] = [];
   for (const row of rows) {
     if (!row.winnerSlot) continue;
-    ratingMatches.push({
+    out.push({
       id: row.id,
       completedAt: row.completedAt,
       winnerSlot: row.winnerSlot,
@@ -292,34 +319,142 @@ export function buildViewerLeague(
       })),
     });
   }
-  const { overall } = computeRatings(ratingMatches);
+  return out;
+}
 
-  const record = new Map<
-    string,
-    { username: string; games: number; wins: number; mvp: number }
-  >();
+/**
+ * 내전 참가자 통계표 — 이 스트리머의 방송 내전에 뛴 시청자 전원(스트리머 본인 제외).
+ * 기본 순서는 판수 → 점수. 화면에서 칸마다 다시 정렬한다.
+ */
+export function buildParticipantTable(
+  rows: HostedMatchRow[],
+  streamerId: string,
+): StreamerParticipantRow[] {
+  const { overall } = computeRatings(toRatingMatches(rows));
+
+  interface Acc {
+    username: string;
+    games: number;
+    wins: number;
+    statGames: number;
+    kills: number;
+    deaths: number;
+    assists: number;
+    mvp: number;
+    ace: number;
+    commendations: number;
+    first: number;
+    last: number;
+    sessions: Set<string>;
+    roles: Map<string, number>;
+    champions: Map<string, number>;
+  }
+  const accs = new Map<string, Acc>();
+  const bump = (m: Map<string, number>, k: string) =>
+    m.set(k, (m.get(k) ?? 0) + 1);
+
   for (const row of rows) {
-    if (!row.winnerSlot) continue;
+    const at = row.completedAt.getTime();
+    const seen = new Set<string>();
     for (const r of row.roster) {
-      if (!r.userId || r.userId === streamerId) continue;
-      const rec = record.get(r.userId) ?? {
+      if (!r.userId || r.userId === streamerId || seen.has(r.userId)) continue;
+      seen.add(r.userId);
+      const acc: Acc = accs.get(r.userId) ?? {
         username: r.username,
         games: 0,
         wins: 0,
+        statGames: 0,
+        kills: 0,
+        deaths: 0,
+        assists: 0,
         mvp: 0,
+        ace: 0,
+        commendations: 0,
+        first: at,
+        last: at,
+        sessions: new Set(),
+        roles: new Map(),
+        champions: new Map(),
       };
-      rec.games++;
-      if (r.teamSlot === row.winnerSlot) rec.wins++;
-      if (row.mvpUserId === r.userId) rec.mvp++;
-      record.set(r.userId, rec);
+      // 가장 최근 판의 닉네임을 쓴다(닉네임을 바꾼 사람)
+      if (at >= acc.last) acc.username = r.username;
+      acc.first = Math.min(acc.first, at);
+      acc.last = Math.max(acc.last, at);
+      acc.sessions.add(sessionDateKey(row.completedAt));
+      if (row.winnerSlot) {
+        acc.games++;
+        if (r.teamSlot === row.winnerSlot) acc.wins++;
+      }
+      if (r.assignedRole) bump(acc.roles, r.assignedRole);
+      if (row.mvpUserId === r.userId) acc.mvp++;
+      if (row.aceUserId === r.userId) acc.ace++;
+      const stat = row.participants.find((p) => p.userId === r.userId);
+      if (stat) {
+        acc.statGames++;
+        acc.kills += stat.kills ?? 0;
+        acc.deaths += stat.deaths ?? 0;
+        acc.assists += stat.assists ?? 0;
+        if (stat.championName) bump(acc.champions, stat.championName);
+      }
+      acc.commendations += row.commendations.filter(
+        (c) => c.targetUserId === r.userId,
+      ).length;
+      accs.set(r.userId, acc);
     }
   }
 
-  return [...record.entries()]
-    .map(([userId, rec]) => ({
+  const topOf = (m: Map<string, number>, limit: number) =>
+    [...m.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, limit);
+
+  return [...accs.entries()]
+    .map(([userId, a]) => ({
       userId,
-      ...rec,
+      username: a.username,
+      games: a.games,
+      wins: a.wins,
+      losses: a.games - a.wins,
       score: displayRating(overall.get(userId)),
+      statGames: a.statGames,
+      avgKills: a.statGames ? round1(a.kills / a.statGames) : null,
+      avgDeaths: a.statGames ? round1(a.deaths / a.statGames) : null,
+      avgAssists: a.statGames ? round1(a.assists / a.statGames) : null,
+      kda: a.statGames
+        ? Math.round(((a.kills + a.assists) / Math.max(a.deaths, 1)) * 100) /
+          100
+        : null,
+      mvp: a.mvp,
+      ace: a.ace,
+      commendations: a.commendations,
+      firstAt: new Date(a.first).toISOString(),
+      lastAt: new Date(a.last).toISOString(),
+      sessions: a.sessions.size,
+      roles: topOf(a.roles, 5).map(([role, games]) => ({ role, games })),
+      champions: topOf(a.champions, 3).map(([name, games]) => ({
+        name,
+        games,
+      })),
+    }))
+    .sort((a, b) => b.games - a.games || b.score - a.score);
+}
+
+/**
+ * 시청자 리그 — 참가자 통계표에서 점수 높은 순 상위 몇 명.
+ * 판이 없는(결과가 안 난 판만 뛴) 사람은 뺀다.
+ */
+export function buildViewerLeague(
+  table: StreamerParticipantRow[],
+): StreamerLeagueEntry[] {
+  return table
+    .filter((r) => r.games > 0)
+    .map((r) => ({
+      userId: r.userId,
+      username: r.username,
+      games: r.games,
+      wins: r.wins,
+      mvp: r.mvp,
+      score: r.score,
     }))
     .sort((a, b) => b.score - a.score || b.games - a.games)
     .slice(0, LEAGUE_SIZE);

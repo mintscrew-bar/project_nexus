@@ -2,6 +2,7 @@ import {
   buildCommendationTags,
   buildSessions,
   buildSummary,
+  buildParticipantTable,
   buildViewerLeague,
   isScheduleTime,
   sessionDateKey,
@@ -176,18 +177,92 @@ describe("streamer-page.util", () => {
 
   it("시청자 리그 — 스트리머는 빼고, 많이 이긴 사람이 위", () => {
     const league = buildViewerLeague(
-      [
-        row("2026-11-25T12:00:00Z", A, B, "A"),
-        row("2026-11-25T13:00:00Z", A, B, "A", { mvpUserId: "a2" }),
-        row("2026-11-25T14:00:00Z", A, B, "A"),
-      ],
-      ST,
+      buildParticipantTable(
+        [
+          row("2026-11-25T12:00:00Z", A, B, "A"),
+          row("2026-11-25T13:00:00Z", A, B, "A", { mvpUserId: "a2" }),
+          row("2026-11-25T14:00:00Z", A, B, "A"),
+        ],
+        ST,
+      ),
     );
     expect(league).toHaveLength(5);
     expect(league.some((e) => e.userId === ST)).toBe(false);
     expect(league[0].wins).toBe(3);
     expect(league[0].score).toBeGreaterThan(50);
     expect(league.find((e) => e.userId === "a2")?.mvp).toBe(1);
+  });
+
+  it("참가자 통계표 — 판·승패·평균 K/D/A·MVP·ACE·칭찬·참가 이력·라인·챔피언", () => {
+    const stat = (
+      userId: string,
+      championName: string,
+      k: number,
+      d: number,
+      a: number,
+    ) => ({
+      userId,
+      championName,
+      riotTeamId: 100,
+      kills: k,
+      deaths: d,
+      assists: a,
+      pentaKills: 0,
+    });
+    const table = buildParticipantTable(
+      [
+        row("2026-11-18T12:00:00Z", A, B, "A", {
+          participants: [stat("a2", "Ahri", 4, 2, 6)],
+          aceUserId: "a2",
+        }),
+        row("2026-11-25T12:00:00Z", A, B, "B", {
+          participants: [stat("a2", "Ahri", 2, 4, 2)],
+          mvpUserId: "a2",
+          commendations: [
+            { giverId: "b1", targetUserId: "a2", tags: [] },
+            { giverId: "b2", targetUserId: "a3", tags: [] },
+          ],
+          roster: [
+            ...A.map((userId) => ({
+              userId,
+              username: userId === "a2" ? "새닉" : userId,
+              teamSlot: "A" as const,
+              assignedRole: userId === "a2" ? "MID" : null,
+            })),
+            ...B.map((userId) => ({
+              userId,
+              username: userId,
+              teamSlot: "B" as const,
+              assignedRole: null,
+            })),
+          ],
+        }),
+      ],
+      ST,
+    );
+    expect(table.some((r) => r.userId === ST)).toBe(false);
+    const a2 = table.find((r) => r.userId === "a2")!;
+    expect(a2).toMatchObject({
+      username: "새닉",
+      games: 2,
+      wins: 1,
+      losses: 1,
+      statGames: 2,
+      avgKills: 3,
+      avgDeaths: 3,
+      avgAssists: 4,
+      kda: 2.33,
+      mvp: 1,
+      ace: 1,
+      commendations: 1,
+      firstAt: "2026-11-18T12:00:00.000Z",
+      lastAt: "2026-11-25T12:00:00.000Z",
+      sessions: 2,
+      roles: [{ role: "MID", games: 1 }],
+      champions: [{ name: "Ahri", games: 2 }],
+    });
+    // Riot 기록이 없는 사람은 K/D/A 가 비어 있다
+    expect(table.find((r) => r.userId === "b1")!.kda).toBeNull();
   });
 
   it("방송 시각은 HH:mm", () => {

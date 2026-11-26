@@ -3799,6 +3799,29 @@ export interface AdminStreamerItem {
   createdAt: string;
 }
 
+/** 스트리머 내전 참가자 통계표 한 줄 — api streamer-page.util buildParticipantTable */
+export interface StreamerParticipantRow {
+  userId: string;
+  username: string;
+  games: number;
+  wins: number;
+  losses: number;
+  score: number;
+  statGames: number;
+  avgKills: number | null;
+  avgDeaths: number | null;
+  avgAssists: number | null;
+  kda: number | null;
+  mvp: number;
+  ace: number;
+  commendations: number;
+  firstAt: string;
+  lastAt: string;
+  sessions: number;
+  roles: { role: string; games: number }[];
+  champions: { name: string; games: number }[];
+}
+
 /** 스트리머 페이지(/streamers/:id) — api streamer-page.service getPage */
 export interface StreamerPageMatch {
   id: string;
@@ -3874,6 +3897,8 @@ export interface StreamerPageData {
     mvp: number;
     score: number;
   }[];
+  /** 내전 참가자 통계표 — 방송 내전에 뛴 시청자 전원 */
+  participants: StreamerParticipantRow[];
   upcoming: {
     id: string;
     name: string;

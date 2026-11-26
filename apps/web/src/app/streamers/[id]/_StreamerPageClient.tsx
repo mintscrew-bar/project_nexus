@@ -56,6 +56,7 @@ import {
 import { useCosmeticLoadouts } from "@/components/cosmetics/useCosmeticLoadouts";
 import { getChampionKoreanName } from "@nexus/types";
 import { StreamerPageEditor } from "./_StreamerPageEditor";
+import { ParticipantsTable } from "./_ParticipantsTable";
 
 /*
  * 스트리머 페이지 (/streamers/:id) — 유저 프로필과 같은 틀.
@@ -362,6 +363,13 @@ export function StreamerPageClient({ streamerId }: { streamerId: string }) {
             <LeagueCard league={data.league} />
           </aside>
         </div>
+
+        {/* ── 내전 참가자 통계 (엑셀형, 전체 폭) ── */}
+        <ParticipantsTable
+          rows={data.participants}
+          isOwner={data.isOwner}
+          streamerName={streamer.username}
+        />
       </div>
 
       {data.isOwner && (

@@ -10,6 +10,7 @@ import { resolveWinnerSlot } from "../match/match-roster.util";
 import { StreamerService, type StreamerListItem } from "./streamer.service";
 import {
   buildCommendationTags,
+  buildParticipantTable,
   buildSessions,
   buildSummary,
   buildViewerLeague,
@@ -69,6 +70,9 @@ export class StreamerPageService {
       this.loadUpcomingRooms(streamerId),
     ]);
 
+    // 내전 참가자 통계표 — 시청자 리그도 이 표에서 뽑는다
+    const participants = buildParticipantTable(rows, streamerId);
+
     return {
       streamer,
       isOwner: viewerId === streamerId,
@@ -89,7 +93,8 @@ export class StreamerPageService {
       summary: buildSummary(rows, streamerId),
       sessions: buildSessions(rows, streamerId),
       commendationTags: buildCommendationTags(rows),
-      league: buildViewerLeague(rows, streamerId),
+      league: buildViewerLeague(participants),
+      participants,
       upcoming,
     };
   }
