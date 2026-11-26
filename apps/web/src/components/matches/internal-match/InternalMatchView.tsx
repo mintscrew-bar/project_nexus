@@ -854,19 +854,20 @@ function TeamSection({
   const agg = getTeamAggregates(participants);
 
   return (
-    <div className="bg-bg-secondary border border-bg-tertiary rounded-xl overflow-hidden">
+    // 팀 묶음은 테두리 없이 — 팀색을 옅게 깐 머리 띠와 팀 사이 간격으로 나눈다(2026-11-26).
+    // 팀 이름 앞의 색 점도 뺐다: 띠 바탕과 팀색 글자가 진영을 대신 보여 준다
+    <div className="rounded-xl overflow-hidden bg-bg-secondary">
       {/* Team Header (always visible, clickable in large match) */}
       <button
         onClick={() => setExpanded(!expanded)}
         className={`w-full flex items-center gap-2 px-4 py-3 ${
-          isLargeMatch ? "cursor-pointer hover:bg-bg-elevated/30" : ""
+          isLargeMatch ? "cursor-pointer hover:brightness-110" : ""
         } transition-colors`}
+        style={{ backgroundColor: `${teamColor}1f` }}
       >
-        <div
-          className="w-3 h-3 rounded-full flex-shrink-0"
-          style={{ backgroundColor: teamColor }}
-        />
-        <h3 className="text-base font-bold text-text-primary">{teamName}</h3>
+        <h3 className="text-base font-black" style={{ color: teamColor }}>
+          {teamName}
+        </h3>
         {/* 승패는 둥근 배지 대신 굵은 글자로 */}
         <span
           className={`text-sm font-black flex-shrink-0 ${
@@ -889,7 +890,7 @@ function TeamSection({
 
       {/* Player List (collapsible) */}
       {expanded && (
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 pt-2">
           {!isLargeMatch && (
             <div className="flex items-center gap-2 px-3 py-1.5 text-[10px] text-text-tertiary font-medium uppercase tracking-wider">
               <div className="w-12 flex-shrink-0" />
@@ -1234,7 +1235,8 @@ export function MatchSkeleton() {
         {[1, 2].map((t) => (
           <div
             key={t}
-            className="bg-bg-secondary border border-bg-tertiary rounded-xl p-4 space-y-2"
+            // 팀 묶음 자리 — 실제 팀 묶음처럼 테두리 없이
+            className="bg-bg-secondary rounded-xl p-4 space-y-2"
           >
             <Skeleton className="h-6 w-32 mb-2" />
             {[1, 2, 3, 4, 5].map((j) => (
@@ -1281,18 +1283,15 @@ function DraftTeamColumn({
   bans: number[];
 }) {
   return (
-    <div className="bg-bg-secondary border border-bg-tertiary rounded-xl overflow-hidden">
+    // 팀 묶음은 테두리 없이 — 종합 탭의 팀 묶음과 같은 방식(팀색 머리 띠 + 팀색 글자)
+    <div className="bg-bg-secondary rounded-xl overflow-hidden">
       <div
-        className="flex items-center justify-between px-4 py-3 border-b border-bg-tertiary"
-        style={{ backgroundColor: `${color}14` }}
+        className="flex items-center justify-between px-4 py-3"
+        style={{ backgroundColor: `${color}1f` }}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <span
-            className="h-2.5 w-2.5 rounded-full shrink-0"
-            style={{ backgroundColor: color }}
-          />
-          <span className="font-bold text-text-primary truncate">{title}</span>
-        </div>
+        <span className="font-black truncate" style={{ color }}>
+          {title}
+        </span>
         {isWinner && (
           <span className="text-sm font-black text-accent-success">승리</span>
         )}
@@ -1767,12 +1766,11 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
                     key={team.side}
                     className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3"
                   >
-                    <div className="flex w-36 items-center gap-2 text-sm font-semibold text-text-secondary">
-                      <div
-                        className="h-3 w-3 flex-shrink-0 rounded-full"
-                        style={{ backgroundColor: team.color }}
-                      />
-                      <span className="truncate">{team.name}</span>
+                    <div
+                      className="w-36 truncate text-sm font-bold"
+                      style={{ color: team.color }}
+                    >
+                      {team.name}
                     </div>
                     <div className="flex items-center gap-5">
                       <ObjectiveIcon
@@ -1832,14 +1830,11 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
                 </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: TEAM_A_COLOR }}
-                      />
-                      <span className="text-xs text-text-tertiary">
-                        {match.teamA.name}
-                      </span>
+                    <div
+                      className="mb-2 text-xs font-bold"
+                      style={{ color: TEAM_A_COLOR }}
+                    >
+                      {match.teamA.name}
                     </div>
                     <div className="flex gap-1.5">
                       {teamABans.map((champId, idx) => (
@@ -1863,14 +1858,11 @@ export function InternalMatchView({ match }: { match: MatchDetails }) {
                     </div>
                   </div>
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: TEAM_B_COLOR }}
-                      />
-                      <span className="text-xs text-text-tertiary">
-                        {match.teamB.name}
-                      </span>
+                    <div
+                      className="mb-2 text-xs font-bold"
+                      style={{ color: TEAM_B_COLOR }}
+                    >
+                      {match.teamB.name}
                     </div>
                     <div className="flex gap-1.5">
                       {teamBBans.map((champId, idx) => (
