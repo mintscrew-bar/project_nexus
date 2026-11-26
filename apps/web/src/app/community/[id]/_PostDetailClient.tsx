@@ -80,6 +80,15 @@ interface Comment {
   replies?: Comment[];
 }
 
+/** 댓글·대댓글 작성자가 이 글을 쓴 사람이면 이름 옆에 붙는 작은 표시 */
+function AuthorBadge() {
+  return (
+    <span className="rounded bg-accent-primary/15 px-1.5 py-px text-[10px] font-semibold text-accent-primary">
+      글쓴이
+    </span>
+  );
+}
+
 interface Post {
   id: string;
   title: string;
@@ -784,6 +793,9 @@ export default function PostDetailClient() {
                               <p className="font-medium text-text-primary text-sm">
                                 {comment.author.username}
                               </p>
+                              {comment.author.id === post.author.id && (
+                                <AuthorBadge />
+                              )}
                               <p className="text-xs text-text-tertiary">
                                 {formatDate(comment.createdAt)}
                               </p>
@@ -897,7 +909,7 @@ export default function PostDetailClient() {
                               </button>
                             </div>
                           ) : (
-                            <p className="text-text-secondary text-sm">
+                            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text-secondary">
                               {comment.content}
                             </p>
                           )}
@@ -943,16 +955,17 @@ export default function PostDetailClient() {
 
                       {/* 대댓글 목록 */}
                       {comment.replies && comment.replies.length > 0 && (
-                        <div className="ml-8 mt-2 space-y-2">
+                        /*
+                         * 대댓글 — 부모 댓글 글자 시작선(아바타 오른쪽)에 맞춰 들여 쓰고, 부모보다 옅은
+                         * 바탕 칸으로 구분한다. 왼쪽 색 막대·화살표는 쓰지 않는다(CLAUDE.md 왼쪽 강조 보더 금지).
+                         */
+                        <div className="ml-11 mt-1.5 space-y-1.5">
                           {comment.replies.map((reply) => (
                             <div
                               key={reply.id}
-                              className="group flex gap-3 p-3 rounded-lg bg-bg-secondary/50 border-l-2 border-accent-primary/30"
+                              className="group flex gap-2.5 rounded-lg bg-bg-tertiary/25 px-3 py-2.5"
                             >
-                              <div className="text-text-tertiary flex-shrink-0 mt-1">
-                                <CornerDownRight className="h-3 w-3" />
-                              </div>
-                              <div className="relative w-6 h-6 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
+                              <div className="relative w-7 h-7 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
                                 {reply.author.avatar ? (
                                   <Image
                                     src={reply.author.avatar}
@@ -963,16 +976,19 @@ export default function PostDetailClient() {
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
-                                    <User className="h-3 w-3 text-text-tertiary" />
+                                    <User className="h-3.5 w-3.5 text-text-tertiary" />
                                   </div>
                                 )}
                               </div>
-                              <div className="flex-grow">
-                                <div className="flex items-center justify-between mb-1">
+                              <div className="min-w-0 flex-grow">
+                                <div className="flex items-center justify-between mb-0.5">
                                   <div className="flex items-center gap-2">
                                     <p className="font-medium text-text-primary text-sm">
                                       {reply.author.username}
                                     </p>
+                                    {reply.author.id === post.author.id && (
+                                      <AuthorBadge />
+                                    )}
                                     <p className="text-xs text-text-tertiary">
                                       {formatDate(reply.createdAt)}
                                     </p>
@@ -1072,7 +1088,7 @@ export default function PostDetailClient() {
                                     </button>
                                   </div>
                                 ) : (
-                                  <p className="text-text-secondary text-sm">
+                                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text-secondary">
                                     {reply.content}
                                   </p>
                                 )}
