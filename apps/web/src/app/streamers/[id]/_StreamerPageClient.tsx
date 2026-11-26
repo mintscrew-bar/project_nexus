@@ -207,172 +207,174 @@ export function StreamerPageClient({ streamerId }: { streamerId: string }) {
   return (
     <div className="flex-grow p-4 md:p-8">
       <div className="container mx-auto max-w-[1480px]">
-        {/* ── 머리 카드 (유저 프로필과 같은 틀) ── */}
-        <Card className="mb-4 overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
-          <HeaderBanner
-            live={liveChannel}
-            channelUrl={primary.channelUrl}
-            bannerFx={bannerFx}
-            profileBanner={profile?.profileBanner ?? null}
-            username={streamer.username}
-          />
-          <CardContent className="p-4 md:p-5">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
-                <LiveAvatar
-                  userId={streamer.userId}
-                  src={streamer.avatar ?? primary.channelImageUrl}
-                  live={!!liveChannel}
-                />
-                <div className="min-w-0 flex-1 pt-1">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <h1 className="text-xl font-black leading-tight text-text-primary md:text-2xl">
-                      <UserName userId={streamer.userId}>
-                        {streamer.username}
-                      </UserName>
-                    </h1>
-                    <span
-                      className="rounded-md px-2 py-1 text-xs font-black"
-                      style={{
-                        color: ACCENT,
-                        backgroundColor: `${ACCENT}22`,
-                      }}
-                    >
-                      스트리머
-                    </span>
-                    {data.ranking.globalRank ? (
-                      <Link
-                        href={`/lol/ranking?q=${encodeURIComponent(streamer.username)}`}
-                        className="inline-flex items-center gap-1 rounded-md bg-accent-gold/15 px-2 py-1 text-xs font-black text-accent-gold transition-colors hover:bg-accent-gold/25"
+        {/* ── 머리 카드 + 아래 내용은 전부 탭. 탭 줄을 머리 카드 바닥에 붙여 한 덩어리로 보이게 한다 ── */}
+        <Tabs defaultValue="records">
+          {/* ── 머리 카드 (유저 프로필과 같은 틀) ── */}
+          <Card className="mb-4 overflow-hidden rounded-lg border-bg-tertiary bg-bg-secondary p-0 shadow-sm">
+            <HeaderBanner
+              live={liveChannel}
+              channelUrl={primary.channelUrl}
+              bannerFx={bannerFx}
+              profileBanner={profile?.profileBanner ?? null}
+              username={streamer.username}
+            />
+            <CardContent className="p-4 md:p-5">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
+                  <LiveAvatar
+                    userId={streamer.userId}
+                    src={streamer.avatar ?? primary.channelImageUrl}
+                    live={!!liveChannel}
+                  />
+                  <div className="min-w-0 flex-1 pt-1">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <h1 className="text-xl font-black leading-tight text-text-primary md:text-2xl">
+                        <UserName userId={streamer.userId}>
+                          {streamer.username}
+                        </UserName>
+                      </h1>
+                      <span
+                        className="rounded-md px-2 py-1 text-xs font-black"
+                        style={{
+                          color: ACCENT,
+                          backgroundColor: `${ACCENT}22`,
+                        }}
                       >
-                        <Trophy className="h-3.5 w-3.5" />
-                        랭킹 #{data.ranking.globalRank}
-                      </Link>
-                    ) : null}
-                  </div>
-
-                  <p className="mb-3 max-w-2xl text-sm text-text-secondary">
-                    {data.settings.tagline ?? (
-                      <span className="italic text-text-tertiary">
-                        {data.isOwner
-                          ? "「페이지 꾸미기」에서 한마디를 남겨 보세요."
-                          : "아직 한마디가 없어요."}
+                        스트리머
                       </span>
-                    )}
-                  </p>
+                      {data.ranking.globalRank ? (
+                        <Link
+                          href={`/lol/ranking?q=${encodeURIComponent(streamer.username)}`}
+                          className="inline-flex items-center gap-1 rounded-md bg-accent-gold/15 px-2 py-1 text-xs font-black text-accent-gold transition-colors hover:bg-accent-gold/25"
+                        >
+                          <Trophy className="h-3.5 w-3.5" />
+                          랭킹 #{data.ranking.globalRank}
+                        </Link>
+                      ) : null}
+                    </div>
 
-                  {/* 채널 칩 — 프로필의 링크 칩과 같은 모양 */}
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    {channels.map((channel) => (
-                      <a
-                        key={channel.platform}
-                        href={channel.channelUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex min-w-0 max-w-[260px] items-center gap-2 rounded-lg border border-bg-elevated bg-bg-tertiary px-2.5 py-2 transition-colors hover:border-accent-primary"
-                      >
-                        <StreamerPlatformBadge platform={channel.platform} />
-                        <span className="truncate text-xs font-bold text-text-primary">
-                          {channel.channelName ?? streamer.username}
+                    <p className="mb-3 max-w-2xl text-sm text-text-secondary">
+                      {data.settings.tagline ?? (
+                        <span className="italic text-text-tertiary">
+                          {data.isOwner
+                            ? "「페이지 꾸미기」에서 한마디를 남겨 보세요."
+                            : "아직 한마디가 없어요."}
                         </span>
-                        {typeof channel.followerCount === "number" && (
-                          <span className="flex-shrink-0 text-[11px] text-text-tertiary">
-                            팔로워 {channel.followerCount.toLocaleString()}
-                          </span>
-                        )}
-                      </a>
-                    ))}
-                  </div>
+                      )}
+                    </p>
 
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-tertiary">
-                    <span>
-                      방송 내전{" "}
-                      <b className="font-bold text-accent-primary">
-                        {data.summary.hostedMatches}판
-                      </b>
-                    </span>
-                    <span>
-                      함께한 시청자{" "}
-                      <b className="font-bold text-accent-primary">
-                        {data.summary.viewers}명
-                      </b>
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <ThumbsUp className="h-3 w-3 text-accent-primary" />
-                      칭찬{" "}
-                      <b className="font-bold text-accent-primary">
-                        {data.summary.commendations}
-                      </b>
-                    </span>
-                    {data.ranking.score !== null && (
-                      <span className="text-accent-gold">
-                        내전 점수 {data.ranking.score.toFixed(1)}
+                    {/* 채널 칩 — 프로필의 링크 칩과 같은 모양 */}
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {channels.map((channel) => (
+                        <a
+                          key={channel.platform}
+                          href={channel.channelUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-w-0 max-w-[260px] items-center gap-2 rounded-lg border border-bg-elevated bg-bg-tertiary px-2.5 py-2 transition-colors hover:border-accent-primary"
+                        >
+                          <StreamerPlatformBadge platform={channel.platform} />
+                          <span className="truncate text-xs font-bold text-text-primary">
+                            {channel.channelName ?? streamer.username}
+                          </span>
+                          {typeof channel.followerCount === "number" && (
+                            <span className="flex-shrink-0 text-[11px] text-text-tertiary">
+                              팔로워 {channel.followerCount.toLocaleString()}
+                            </span>
+                          )}
+                        </a>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-tertiary">
+                      <span>
+                        방송 내전{" "}
+                        <b className="font-bold text-accent-primary">
+                          {data.summary.hostedMatches}판
+                        </b>
                       </span>
-                    )}
+                      <span>
+                        함께한 시청자{" "}
+                        <b className="font-bold text-accent-primary">
+                          {data.summary.viewers}명
+                        </b>
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <ThumbsUp className="h-3 w-3 text-accent-primary" />
+                        칭찬{" "}
+                        <b className="font-bold text-accent-primary">
+                          {data.summary.commendations}
+                        </b>
+                      </span>
+                      {data.ranking.score !== null && (
+                        <span className="text-accent-gold">
+                          내전 점수 {data.ranking.score.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex w-full flex-shrink-0 flex-wrap gap-2 sm:w-auto lg:justify-end">
-                {data.isOwner ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setEditOpen(true)}
+                <div className="flex w-full flex-shrink-0 flex-wrap gap-2 sm:w-auto lg:justify-end">
+                  {data.isOwner ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setEditOpen(true)}
+                    >
+                      <Pencil className="mr-1 h-4 w-4" />
+                      페이지 꾸미기
+                    </Button>
+                  ) : (
+                    <Button
+                      variant={streamer.isFollowing ? "secondary" : "outline"}
+                      size="sm"
+                      disabled={followMutation.isPending}
+                      onClick={toggleFollow}
+                    >
+                      {streamer.isFollowing ? (
+                        <BellOff className="mr-1 h-4 w-4" />
+                      ) : (
+                        <Bell className="mr-1 h-4 w-4" />
+                      )}
+                      {streamer.isFollowing ? "알림 끄기" : "방송 알림"}
+                    </Button>
+                  )}
+                  <Link href={userProfilePath(streamer.userId)}>
+                    <Button variant="outline" size="sm">
+                      <User className="mr-1 h-4 w-4" />
+                      프로필
+                    </Button>
+                  </Link>
+                  <a
+                    href={primary.channelUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
-                    <Pencil className="mr-1 h-4 w-4" />
-                    페이지 꾸미기
-                  </Button>
-                ) : (
-                  <Button
-                    variant={streamer.isFollowing ? "secondary" : "outline"}
-                    size="sm"
-                    disabled={followMutation.isPending}
-                    onClick={toggleFollow}
-                  >
-                    {streamer.isFollowing ? (
-                      <BellOff className="mr-1 h-4 w-4" />
-                    ) : (
-                      <Bell className="mr-1 h-4 w-4" />
-                    )}
-                    {streamer.isFollowing ? "알림 끄기" : "방송 알림"}
-                  </Button>
-                )}
-                <Link href={userProfilePath(streamer.userId)}>
-                  <Button variant="outline" size="sm">
-                    <User className="mr-1 h-4 w-4" />
-                    프로필
-                  </Button>
-                </Link>
-                <a
-                  href={primary.channelUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                    <Button variant="primary" size="sm">
+                      <ExternalLink className="mr-1 h-4 w-4" />
+                      {liveChannel ? "방송 보러 가기" : "채널 가기"}
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            </CardContent>
+
+            {/* 탭 줄 — 카드 안 맨 아래, 위 구분선 하나로 머리와 이어진다.
+              공용 탭의 알약 모양 대신 밑줄 강조(고른 탭만 강조색 밑줄) */}
+            <TabsList className="gap-0 rounded-none border-0 border-t border-bg-tertiary bg-transparent p-0 px-2 md:px-3">
+              {STREAMER_TABS.map(({ value, label, Icon }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="flex items-center gap-1.5 rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-3 shadow-none hover:translate-y-0 hover:border-transparent hover:bg-transparent aria-selected:border-accent-primary aria-selected:bg-transparent aria-selected:text-accent-primary"
                 >
-                  <Button variant="primary" size="sm">
-                    <ExternalLink className="mr-1 h-4 w-4" />
-                    {liveChannel ? "방송 보러 가기" : "채널 가기"}
-                  </Button>
-                </a>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── 머리 카드 아래는 전부 탭 — 한 화면에 다 쌓으면 길어서 찾기 어렵다 ── */}
-        <Tabs defaultValue="records">
-          <TabsList className="mb-4 w-full">
-            {STREAMER_TABS.map(({ value, label, Icon }) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="flex items-center gap-1.5"
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Card>
 
           {/* 내전 기록 — 회차별/달력 */}
           <TabsContent value="records">
