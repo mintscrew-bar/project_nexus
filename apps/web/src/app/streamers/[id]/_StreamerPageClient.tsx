@@ -786,7 +786,7 @@ function MatchRow({ match }: { match: StreamerPageMatch }) {
       </button>
       {mounted && (
         <div className={expanded ? "block" : "hidden"}>
-          <InternalMatchExpand matchId={match.id} />
+          <InternalMatchExpand matchId={match.id} publicFirst />
         </div>
       )}
     </div>

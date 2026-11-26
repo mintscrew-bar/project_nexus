@@ -105,10 +105,18 @@ export class StreamerPageService {
         isInternal: true,
         status: "COMPLETED",
         ...NO_TEST_BOT_MATCH_WHERE,
-        // 비공개 방 기록은 스트리머가 켰을 때만 — 예전 기록은 공개 여부가 비어 있을 수 있다
+        // 비공개 방 기록은 스트리머가 켰을 때만.
+        // "공개" 판정은 공개 경기 상세(match.service getPublicMatchDetails)와 같게 둔다 —
+        // 공개 여부가 비어 있는 예전 기록은 방이 남아 있고 공개일 때만 공개로 본다.
+        // 다르면 목록에는 보이는데 펼치면 비로그인 방문자에게 안 열린다.
         ...(showPrivate
           ? {}
-          : { OR: [{ roomIsPrivate: false }, { roomIsPrivate: null }] }),
+          : {
+              OR: [
+                { roomIsPrivate: false },
+                { roomIsPrivate: null, room: { is: { isPrivate: false } } },
+              ],
+            }),
       },
       orderBy: { completedAt: "desc" },
       take: MAX_HOSTED_MATCHES,

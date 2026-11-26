@@ -14,11 +14,29 @@ import { InternalMatchView, type MatchDetails } from "./InternalMatchView";
  * 내전 상세 페이지와 같은 InternalMatchView 를 그대로 펼쳐서, 어디서 열든
  * 팀 이름·골드 그래프·스탯 표가 같은 모양으로 보이게 한다.
  */
-export function InternalMatchExpand({ matchId }: { matchId: string }) {
+export function InternalMatchExpand({
+  matchId,
+  publicFirst = false,
+}: {
+  matchId: string;
+  /**
+   * 비로그인 방문자도 보는 화면(스트리머 페이지)이면 true — 로그인이 필요 없는
+   * 공개 상세를 먼저 읽고, 공개가 아닌 경기(비공개 방)면 로그인 상세로 다시 읽는다.
+   * 프로필처럼 로그인한 사람만 보는 화면은 그대로 로그인 상세를 쓴다.
+   */
+  publicFirst?: boolean;
+}) {
   const gamePrefix = useGamePrefix();
   const { data, isLoading, isError } = useQuery<MatchDetails>({
     queryKey: ["internalMatch", matchId],
-    queryFn: () => matchApi.getMatch(matchId),
+    queryFn: async () => {
+      if (!publicFirst) return matchApi.getMatch(matchId);
+      try {
+        return await matchApi.getPublicMatch(matchId);
+      } catch {
+        return matchApi.getMatch(matchId);
+      }
+    },
     staleTime: 5 * 60 * 1000,
   });
 

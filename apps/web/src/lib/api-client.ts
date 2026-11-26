@@ -1139,6 +1139,17 @@ export const matchApi = {
     return response.data;
   },
 
+  /**
+   * 공개 완료 내전 상세 — 로그인 없이 열린다(공개 방 경기만).
+   * 응답 모양은 getMatch 와 같다(공개 경기 상세 페이지가 같은 화면을 그린다).
+   */
+  getPublicMatch: async (matchId: string) => {
+    const response = await apiClient.get(
+      `/public/matches/${encodeURIComponent(matchId)}`,
+    );
+    return response.data;
+  },
+
   getMatch: async (matchId: string) => {
     const response = await apiClient.get(`/matches/${matchId}/details`);
     return response.data;
