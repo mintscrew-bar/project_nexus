@@ -1749,8 +1749,8 @@ body.scroll-locked {
   50% { opacity: 1; transform: scale(1) rotate(45deg); }
 }
 .nfx-frost {
-  background-image:
   position: relative;
+  background-image:
     linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 1) 50%, transparent 60%),
     linear-gradient(180deg, #f6fdff 0%, #a8e6ff 48%, #3f9de0 100%);
   background-size: 260% 100%, 100% 100%;
