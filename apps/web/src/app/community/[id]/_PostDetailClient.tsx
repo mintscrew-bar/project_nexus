@@ -38,6 +38,8 @@ import {
   HelpCircle,
   Lightbulb,
   CornerDownRight,
+  ChevronDown,
+  ChevronUp,
   X,
   Check,
   ThumbsUp,
@@ -237,6 +239,13 @@ export default function PostDetailClient() {
     username: string;
   } | null>(null);
   const [replyText, setReplyText] = useState("");
+  /**
+   * 댓글마다 답글 펼침 여부. 사용자가 누르기 전에는 답글 2개까지는 펼치고 3개부터는 접는다 —
+   * 짧은 대화는 바로 읽히고, 긴 스레드는 댓글 목록을 덜 차지하게.
+   */
+  const [repliesOpen, setRepliesOpen] = useState<Record<string, boolean>>({});
+  const isRepliesOpen = (c: Comment) =>
+    repliesOpen[c.id] ?? (c.replies?.length ?? 0) <= 2;
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentText, setEditCommentText] = useState("");
@@ -418,6 +427,8 @@ export default function PostDetailClient() {
         parentId: replyTo.id,
       });
       setReplyText("");
+      // 방금 단 답글이 접힌 스레드 안으로 숨지 않게 펼친다
+      setRepliesOpen((prev) => ({ ...prev, [replyTo.id]: true }));
       setReplyTo(null);
       addToast("답글이 작성되었습니다.", "success");
       fetchPost();
@@ -771,7 +782,7 @@ export default function PostDetailClient() {
                   {post.comments.map((comment) => (
                     <div key={comment.id}>
                       {/* 최상위 댓글 */}
-                      <div className="group flex gap-3 p-4 rounded-lg bg-bg-tertiary/50">
+                      <div className="group/comment flex gap-3 p-4 rounded-lg bg-bg-tertiary/50">
                         <div className="relative w-8 h-8 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
                           {comment.author.avatar ? (
                             <Image
@@ -829,10 +840,14 @@ export default function PostDetailClient() {
                                   onClick={() =>
                                     replyTo?.id === comment.id
                                       ? setReplyTo(null)
-                                      : setReplyTo({
+                                      : (setReplyTo({
                                           id: comment.id,
                                           username: comment.author.username,
-                                        })
+                                        }),
+                                        setRepliesOpen((prev) => ({
+                                          ...prev,
+                                          [comment.id]: true,
+                                        })))
                                   }
                                   className="text-xs text-text-tertiary hover:text-accent-primary flex items-center gap-1 ml-1"
                                 >
@@ -871,7 +886,7 @@ export default function PostDetailClient() {
                                       })
                                     }
                                     title="댓글 신고"
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-text-tertiary hover:text-red-400 ml-1"
+                                    className="opacity-0 group-hover/comment:opacity-100 transition-opacity text-text-tertiary hover:text-red-400 ml-1"
                                   >
                                     <Flag className="h-4 w-4" />
                                   </button>
@@ -913,190 +928,229 @@ export default function PostDetailClient() {
                               {comment.content}
                             </p>
                           )}
+
+                          {/* 답글 입력폼 */}
+                          {replyTo?.id === comment.id && (
+                            <div className="mt-2">
+                              <form
+                                onSubmit={handleSubmitReply}
+                                className="flex gap-2"
+                              >
+                                <input
+                                  value={replyText}
+                                  onChange={(e) => setReplyText(e.target.value)}
+                                  placeholder={`${replyTo.username}에게 답글...`}
+                                  className="flex-grow text-sm px-3 py-2 bg-bg-tertiary border border-bg-elevated rounded-lg text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                                />
+                                <button
+                                  type="submit"
+                                  disabled={
+                                    isSubmittingReply || !replyText.trim()
+                                  }
+                                  className="px-3 py-2 bg-accent-primary text-accent-on rounded-lg text-sm disabled:opacity-50"
+                                >
+                                  <Send className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setReplyTo(null);
+                                    setReplyText("");
+                                  }}
+                                  className="px-2 py-2 text-text-tertiary hover:text-text-primary"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </form>
+                            </div>
+                          )}
+
+                          {/* 대댓글 목록 */}
+                          {comment.replies && comment.replies.length > 0 && (
+                            /*
+                             * 대댓글 — 부모 댓글 칸 안, 본문과 같은 글자선에 놓고 「답글 N개」로 접고 편다.
+                             * 부모 칸보다 짙은 바탕으로 구분한다. 왼쪽 색 막대·화살표는 쓰지 않는다
+                             * (CLAUDE.md 왼쪽 강조 보더 금지).
+                             */
+                            <div className="mt-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setRepliesOpen((prev) => ({
+                                    ...prev,
+                                    [comment.id]: !isRepliesOpen(comment),
+                                  }))
+                                }
+                                className="flex items-center gap-1 rounded px-1 py-0.5 text-xs font-medium text-accent-primary hover:bg-accent-primary/10"
+                              >
+                                {isRepliesOpen(comment) ? (
+                                  <>
+                                    <ChevronUp className="h-3.5 w-3.5" />
+                                    답글 접기
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                    답글 {comment.replies.length}개 보기
+                                  </>
+                                )}
+                              </button>
+                              {isRepliesOpen(comment) && (
+                                <div className="mt-1.5 space-y-1.5">
+                                  {comment.replies.map((reply) => (
+                                    <div
+                                      key={reply.id}
+                                      className="group/reply flex gap-2.5 rounded-lg bg-bg-secondary/60 px-3 py-2.5"
+                                    >
+                                      <div className="relative w-7 h-7 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
+                                        {reply.author.avatar ? (
+                                          <Image
+                                            src={reply.author.avatar}
+                                            alt={reply.author.username}
+                                            fill
+                                            className="object-cover"
+                                            unoptimized
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-center">
+                                            <User className="h-3.5 w-3.5 text-text-tertiary" />
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="min-w-0 flex-grow">
+                                        <div className="flex items-center justify-between mb-0.5">
+                                          <div className="flex items-center gap-2">
+                                            <p className="font-medium text-text-primary text-sm">
+                                              {reply.author.username}
+                                            </p>
+                                            {reply.author.id ===
+                                              post.author.id && <AuthorBadge />}
+                                            <p className="text-xs text-text-tertiary">
+                                              {formatDate(reply.createdAt)}
+                                            </p>
+                                            {reply.isEdited && (
+                                              <span className="text-xs text-text-tertiary">
+                                                (수정됨)
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            {/* 대댓글 좋아요 */}
+                                            <button
+                                              onClick={() =>
+                                                handleToggleCommentLike(
+                                                  reply.id,
+                                                )
+                                              }
+                                              className={`flex items-center gap-1 text-xs px-1 py-0.5 rounded transition-colors ${
+                                                commentLikes[reply.id]?.liked
+                                                  ? "text-accent-primary"
+                                                  : "text-text-tertiary hover:text-accent-primary"
+                                              }`}
+                                            >
+                                              <ThumbsUp
+                                                className={`h-3 w-3 ${commentLikes[reply.id]?.liked ? "fill-current" : ""}`}
+                                              />
+                                              {(commentLikes[reply.id]?.count ||
+                                                0) > 0 && (
+                                                <span>
+                                                  {
+                                                    commentLikes[reply.id]
+                                                      ?.count
+                                                  }
+                                                </span>
+                                              )}
+                                            </button>
+                                            {user?.id === reply.author.id ? (
+                                              <>
+                                                <button
+                                                  onClick={() =>
+                                                    handleStartEditComment(
+                                                      reply,
+                                                    )
+                                                  }
+                                                  className="text-text-tertiary hover:text-accent-primary ml-1"
+                                                >
+                                                  <Edit className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                  onClick={() =>
+                                                    setDeleteCommentId(reply.id)
+                                                  }
+                                                  className="text-text-tertiary hover:text-accent-danger ml-1"
+                                                >
+                                                  <Trash2 className="h-4 w-4" />
+                                                </button>
+                                              </>
+                                            ) : (
+                                              isAuthenticated && (
+                                                <button
+                                                  onClick={() =>
+                                                    openReport({
+                                                      type: "comment",
+                                                      id: reply.id,
+                                                      authorName:
+                                                        reply.author.username,
+                                                    })
+                                                  }
+                                                  title="댓글 신고"
+                                                  className="opacity-0 group-hover/reply:opacity-100 transition-opacity text-text-tertiary hover:text-red-400 ml-1"
+                                                >
+                                                  <Flag className="h-4 w-4" />
+                                                </button>
+                                              )
+                                            )}
+                                          </div>
+                                        </div>
+                                        {/* 블라인드 처리된 대댓글은 경고 메시지 표시 */}
+                                        {reply.isBlinded ? (
+                                          <p className="text-xs text-yellow-500/80 italic">
+                                            [블라인드 처리된 댓글입니다]
+                                          </p>
+                                        ) : editingCommentId === reply.id ? (
+                                          <div className="flex gap-2 mt-1">
+                                            <input
+                                              value={editCommentText}
+                                              onChange={(e) =>
+                                                setEditCommentText(
+                                                  e.target.value,
+                                                )
+                                              }
+                                              className="flex-grow text-sm px-2 py-1 bg-bg-secondary border border-bg-elevated rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                                            />
+                                            <button
+                                              onClick={() =>
+                                                handleSubmitEditComment(
+                                                  reply.id,
+                                                )
+                                              }
+                                              className="text-accent-primary hover:text-accent-primary/80"
+                                            >
+                                              <Check className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                              onClick={() =>
+                                                setEditingCommentId(null)
+                                              }
+                                              className="text-text-tertiary hover:text-text-primary"
+                                            >
+                                              <X className="h-4 w-4" />
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text-secondary">
+                                            {reply.content}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
-
-                      {/* 답글 입력폼 */}
-                      {replyTo?.id === comment.id && (
-                        <div className="ml-8 mt-2">
-                          <form
-                            onSubmit={handleSubmitReply}
-                            className="flex gap-2"
-                          >
-                            <div className="flex items-center text-text-tertiary mr-1">
-                              <CornerDownRight className="h-4 w-4" />
-                            </div>
-                            <input
-                              value={replyText}
-                              onChange={(e) => setReplyText(e.target.value)}
-                              placeholder={`${replyTo.username}에게 답글...`}
-                              className="flex-grow text-sm px-3 py-2 bg-bg-tertiary border border-bg-elevated rounded-lg text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary"
-                            />
-                            <button
-                              type="submit"
-                              disabled={isSubmittingReply || !replyText.trim()}
-                              className="px-3 py-2 bg-accent-primary text-accent-on rounded-lg text-sm disabled:opacity-50"
-                            >
-                              <Send className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReplyTo(null);
-                                setReplyText("");
-                              }}
-                              className="px-2 py-2 text-text-tertiary hover:text-text-primary"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </form>
-                        </div>
-                      )}
-
-                      {/* 대댓글 목록 */}
-                      {comment.replies && comment.replies.length > 0 && (
-                        /*
-                         * 대댓글 — 부모 댓글 글자 시작선(아바타 오른쪽)에 맞춰 들여 쓰고, 부모보다 옅은
-                         * 바탕 칸으로 구분한다. 왼쪽 색 막대·화살표는 쓰지 않는다(CLAUDE.md 왼쪽 강조 보더 금지).
-                         */
-                        <div className="ml-11 mt-1.5 space-y-1.5">
-                          {comment.replies.map((reply) => (
-                            <div
-                              key={reply.id}
-                              className="group flex gap-2.5 rounded-lg bg-bg-tertiary/25 px-3 py-2.5"
-                            >
-                              <div className="relative w-7 h-7 rounded-full bg-bg-tertiary overflow-hidden flex-shrink-0">
-                                {reply.author.avatar ? (
-                                  <Image
-                                    src={reply.author.avatar}
-                                    alt={reply.author.username}
-                                    fill
-                                    className="object-cover"
-                                    unoptimized
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    <User className="h-3.5 w-3.5 text-text-tertiary" />
-                                  </div>
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-grow">
-                                <div className="flex items-center justify-between mb-0.5">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-medium text-text-primary text-sm">
-                                      {reply.author.username}
-                                    </p>
-                                    {reply.author.id === post.author.id && (
-                                      <AuthorBadge />
-                                    )}
-                                    <p className="text-xs text-text-tertiary">
-                                      {formatDate(reply.createdAt)}
-                                    </p>
-                                    {reply.isEdited && (
-                                      <span className="text-xs text-text-tertiary">
-                                        (수정됨)
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    {/* 대댓글 좋아요 */}
-                                    <button
-                                      onClick={() =>
-                                        handleToggleCommentLike(reply.id)
-                                      }
-                                      className={`flex items-center gap-1 text-xs px-1 py-0.5 rounded transition-colors ${
-                                        commentLikes[reply.id]?.liked
-                                          ? "text-accent-primary"
-                                          : "text-text-tertiary hover:text-accent-primary"
-                                      }`}
-                                    >
-                                      <ThumbsUp
-                                        className={`h-3 w-3 ${commentLikes[reply.id]?.liked ? "fill-current" : ""}`}
-                                      />
-                                      {(commentLikes[reply.id]?.count || 0) >
-                                        0 && (
-                                        <span>
-                                          {commentLikes[reply.id]?.count}
-                                        </span>
-                                      )}
-                                    </button>
-                                    {user?.id === reply.author.id ? (
-                                      <>
-                                        <button
-                                          onClick={() =>
-                                            handleStartEditComment(reply)
-                                          }
-                                          className="text-text-tertiary hover:text-accent-primary ml-1"
-                                        >
-                                          <Edit className="h-4 w-4" />
-                                        </button>
-                                        <button
-                                          onClick={() =>
-                                            setDeleteCommentId(reply.id)
-                                          }
-                                          className="text-text-tertiary hover:text-accent-danger ml-1"
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </button>
-                                      </>
-                                    ) : (
-                                      isAuthenticated && (
-                                        <button
-                                          onClick={() =>
-                                            openReport({
-                                              type: "comment",
-                                              id: reply.id,
-                                              authorName: reply.author.username,
-                                            })
-                                          }
-                                          title="댓글 신고"
-                                          className="opacity-0 group-hover:opacity-100 transition-opacity text-text-tertiary hover:text-red-400 ml-1"
-                                        >
-                                          <Flag className="h-4 w-4" />
-                                        </button>
-                                      )
-                                    )}
-                                  </div>
-                                </div>
-                                {/* 블라인드 처리된 대댓글은 경고 메시지 표시 */}
-                                {reply.isBlinded ? (
-                                  <p className="text-xs text-yellow-500/80 italic">
-                                    [블라인드 처리된 댓글입니다]
-                                  </p>
-                                ) : editingCommentId === reply.id ? (
-                                  <div className="flex gap-2 mt-1">
-                                    <input
-                                      value={editCommentText}
-                                      onChange={(e) =>
-                                        setEditCommentText(e.target.value)
-                                      }
-                                      className="flex-grow text-sm px-2 py-1 bg-bg-secondary border border-bg-elevated rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
-                                    />
-                                    <button
-                                      onClick={() =>
-                                        handleSubmitEditComment(reply.id)
-                                      }
-                                      className="text-accent-primary hover:text-accent-primary/80"
-                                    >
-                                      <Check className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => setEditingCommentId(null)}
-                                      className="text-text-tertiary hover:text-text-primary"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text-secondary">
-                                    {reply.content}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
