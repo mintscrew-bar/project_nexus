@@ -67,6 +67,47 @@ function LolDiscordGuidePage() {
       title="Discord 연동"
       description="모집 알림부터 음성 채널 이동까지 내전 운영 흐름을 Discord와 연결하는 방법입니다."
     >
+      {/* 맨 위 강조 — 봇을 넣은 관리자가 설정 명령을 못 찾아 헤매지 않게 /nexus setup 하나를 먼저 보인다 */}
+      <section className="rounded-[28px] bg-gradient-to-br from-accent-primary/[0.16] via-bg-secondary to-bg-secondary p-6 shadow-[0_16px_50px_rgb(0_0_0/0.12)] md:p-8">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-accent-primary">
+              서버 관리자라면 이것 하나만
+            </p>
+            <code className="mt-2 block text-3xl font-black tracking-[-0.03em] text-text-primary md:text-4xl">
+              /nexus setup
+            </code>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-text-secondary md:text-base">
+              명령어를 외울 필요 없이 버튼만 눌러 서버 설정을 끝냅니다. 봇을
+              서버에 넣으면 이 설정 카드가 자동으로 올라오고, 설정이 끝난 뒤
+              다시 열면 문제 있는 항목만 골라 고칠 수 있습니다.
+            </p>
+          </div>
+          <Settings2 className="hidden h-16 w-16 flex-none text-accent-primary/40 md:block" />
+        </div>
+        {/* 카드가 묻는 순서 — guild-setup-panel SETUP_STEPS 와 같다 */}
+        <ol className="mt-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ["봇 권한 확인", "모자란 권한이 있으면 다시 초대 링크로 채워요"],
+            ["공지 채널", "모집 공지를 올릴 채널을 고르거나 새로 만들어요"],
+            ["알림 역할", "공지에 멘션할 역할을 고르거나 새로 만들어요"],
+            ["마무리", "다른 서버에서 열린 내전 공지도 받을지 정해요"],
+          ].map(([title, description], i) => (
+            <li key={title} className="rounded-2xl bg-bg-primary/45 p-4">
+              <p className="flex items-center gap-2 font-bold text-text-primary">
+                <span className="flex h-6 w-6 flex-none items-center justify-center rounded-md bg-accent-primary text-xs font-black text-accent-on">
+                  {i + 1}
+                </span>
+                {title}
+              </p>
+              <p className="mt-1.5 text-sm leading-6 text-text-secondary">
+                {description}
+              </p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
       <GuideSection title="서버 연결하기">
         <ol className="grid gap-3 lg:grid-cols-3">
           <GuideStep number={1} title="봇 추가">
