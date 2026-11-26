@@ -3,9 +3,10 @@ import {
   ArrowRightLeft,
   Bot,
   Headphones,
-  Link2,
   Megaphone,
   MessageSquareText,
+  Settings2,
+  Shield,
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
@@ -39,18 +40,24 @@ export async function generateMetadata({
   };
 }
 
+/** 모든 멤버가 쓰는 명령어 — 봇 등록(discord-bot.service registerCommands)과 맞춘다 */
 const commands = [
   ["/nexus help", "사용 가능한 명령어 보기"],
   ["/nexus link", "Nexus 계정 연결"],
+  ["/nexus verify", "서버 기본 역할 받기 (채널 접근 열기)"],
   ["/nexus profile [@유저]", "연결된 프로필 확인"],
-  ["/nexus rooms", "참가 가능한 방 확인"],
+  ["/nexus rooms", "참가 가능한 방 목록 · 바로 참가 버튼"],
   ["/nexus team", "현재 팀 정보 확인"],
   ["/nexus auction", "경매 진행 상태 확인"],
   ["/nexus match", "현재 경기 확인"],
   ["/nexus bracket", "대진표 확인"],
-  ["/nexus stats", "내전 기록 확인"],
-  ["/nexus leaderboard", "랭킹 확인"],
-  ["/nexus clan", "클랜 정보 확인"],
+  ["/nexus stats [game] [@유저]", "내전 기록 — 랭킹 점수·순위·KDA·칭찬"],
+  ["/nexus leaderboard [game]", "내전 랭킹 상위 10명"],
+  ["/nexus attendance", "오늘 출석하고 메달 받기 (연속 출석 보너스)"],
+  ["/nexus medal", "내 메달 잔액과 출석 현황"],
+  ["/nexus schedule", "내전 예약 개설 + 모집 공지 올리기"],
+  ["/nexus serverstats", "최근 30일 이 서버의 내전 기록 요약"],
+  ["/nexus clan", "내가 속한 클랜 정보"],
 ];
 
 function LolDiscordGuidePage() {
@@ -91,8 +98,8 @@ function LolDiscordGuidePage() {
           </GuideStep>
           <GuideStep number={3} title="팀 채널 자동 이동">
             전원이 준비하고 대기실에 들어오면 방장이 시작합니다. 팀 편성이 끝난
-            뒤 봇이 참가자를 각 팀 음성 채널로 자동 이동시킵니다. 팀 채널은
-            팀 인원보다 2자리 넉넉해서 관전자나 운영자가 들어가 인터뷰할 수
+            뒤 봇이 참가자를 각 팀 음성 채널로 자동 이동시킵니다. 팀 채널은 팀
+            인원보다 2자리 넉넉해서 관전자나 운영자가 들어가 인터뷰할 수
             있습니다.
           </GuideStep>
         </ol>
@@ -150,34 +157,42 @@ function LolDiscordGuidePage() {
         </div>
       </GuideSection>
 
-      <GuideSection title="관리자 명령어">
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <GuideSection
+        title="관리자 명령어"
+        description="서버 관리 또는 관리자 권한이 있는 계정만 쓸 수 있습니다."
+      >
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           <InfoCard
-            icon={ShieldCheck}
-            title="/nexus rules"
-            description="서버의 내전 운영 규칙을 관리합니다."
-          />
-          <InfoCard
-            icon={Link2}
-            title="/nexus verify"
-            description="인증된 멤버에게 서버 기본 역할을 지급합니다."
-          />
-          <InfoCard
-            icon={MessageSquareText}
-            title="/nexus setuproles"
-            description="역할과 인증 패널 설정을 준비합니다. 인증 패널은 /nexus setupverifypanel로 설정합니다."
+            icon={Settings2}
+            title="/nexus setup"
+            description="서버 설정 카드를 엽니다. 처음엔 버튼만 눌러 권한·공지 채널·알림 역할을 차례로 설정하고, 설정이 끝난 뒤 다시 열면 문제 있는 항목만 골라 고칠 수 있습니다."
           />
           <InfoCard
             icon={Megaphone}
             title="/nexus setannounce"
             description="내전 모집 공지를 받을 텍스트 채널을 지정합니다. 채널을 생략하면 현재 채널로 설정됩니다."
           />
+          <InfoCard
+            icon={MessageSquareText}
+            title="/nexus setuproles"
+            description="인증·티어·주라인·부라인 역할을 자동으로 만듭니다. 인증 패널은 /nexus setupverifypanel로 게시합니다."
+          />
+          <InfoCard
+            icon={ShieldCheck}
+            title="/nexus rules"
+            description="서버 규칙 작성 창을 열고 봇 메시지로 게시합니다."
+          />
+          <InfoCard
+            icon={Shield}
+            title="/nexus linkclan"
+            description="이 Discord 서버를 내 Nexus 클랜과 연결합니다."
+          />
         </div>
       </GuideSection>
 
       <GuideSection
         title="서버 관리자 최초 설정"
-        description="서버 관리 또는 관리자 권한이 있는 계정으로 아래 순서대로 실행합니다."
+        description="서버 관리 또는 관리자 권한이 있는 계정으로 실행합니다. 가장 쉬운 방법은 /nexus setup 하나로 버튼만 눌러 끝내는 것이고, 명령어로 하나씩 설정하려면 아래 순서를 따릅니다."
       >
         <ol className="grid gap-3 lg:grid-cols-3">
           <GuideStep number={1} title="역할 준비">
