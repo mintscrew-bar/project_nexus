@@ -359,10 +359,12 @@ export function StreamerPageClient({ streamerId }: { streamerId: string }) {
                 </div>
               </div>
             </CardContent>
+          </Card>
 
-            {/* 탭 줄 — 카드 안 맨 아래, 위 구분선 하나로 머리와 이어진다.
+          {/* 탭 줄 + 탭 내용을 한 테두리로 묶는다 — 탭 줄이 내용 상자의 머리처럼 이어져 보이게.
               공용 탭의 알약 모양 대신 밑줄 강조(고른 탭만 강조색 밑줄) */}
-            <TabsList className="gap-0 rounded-none border-0 border-t border-bg-tertiary bg-transparent p-0 px-2 md:px-3">
+          <div className="overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
+            <TabsList className="gap-0 rounded-none border-0 border-b border-bg-tertiary bg-transparent p-0 px-2 md:px-3">
               {STREAMER_TABS.map(({ value, label, Icon }) => (
                 <TabsTrigger
                   key={value}
@@ -374,59 +376,62 @@ export function StreamerPageClient({ streamerId }: { streamerId: string }) {
                 </TabsTrigger>
               ))}
             </TabsList>
-          </Card>
 
-          {/* 내전 기록 — 회차별/달력 */}
-          <TabsContent value="records">
-            <RecordsCard
-              sessions={data.sessions}
-              upcomingDates={data.upcoming
-                .map((r) => r.scheduledAt)
-                .filter((d): d is string => !!d)}
-            />
-          </TabsContent>
+            {/* 탭 내용 칸 — 안쪽 카드들이 이 칸 위에 얹힌다 */}
+            <div className="p-3 md:p-4">
+              {/* 내전 기록 — 회차별/달력 */}
+              <TabsContent value="records">
+                <RecordsCard
+                  sessions={data.sessions}
+                  upcomingDates={data.upcoming
+                    .map((r) => r.scheduledAt)
+                    .filter((d): d is string => !!d)}
+                />
+              </TabsContent>
 
-          {/* 통계 — 요약 숫자·칭찬 모음 두 칸 + 참가자 통계표(엑셀형) */}
-          <TabsContent value="stats">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-              <StatsCard data={data} />
-              <CommendationCard tags={data.commendationTags} />
+              {/* 통계 — 요약 숫자·칭찬 모음 두 칸 + 참가자 통계표(엑셀형) */}
+              <TabsContent value="stats">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+                  <StatsCard data={data} />
+                  <CommendationCard tags={data.commendationTags} />
+                </div>
+                <ParticipantsTable
+                  rows={data.participants}
+                  isOwner={data.isOwner}
+                  streamerName={streamer.username}
+                />
+              </TabsContent>
+
+              {/* 시청자 리그 — 비면 카드가 null 이라 빈 안내를 대신 보인다 */}
+              <TabsContent value="league">
+                {data.league.length > 0 ? (
+                  <LeagueCard league={data.league} />
+                ) : (
+                  <TabEmpty text="아직 시청자 리그 순위가 없어요. 방송 내전이 쌓이면 여기에 순위가 생겨요." />
+                )}
+              </TabsContent>
+
+              {/* 공지사항 — 스트리머 본인은 여기서 쓰고 고정·삭제한다 */}
+              <TabsContent value="notices">
+                <NoticesCard
+                  streamerId={streamerId}
+                  notices={data.notices}
+                  isOwner={data.isOwner}
+                />
+              </TabsContent>
+
+              {/* 방송 일정 — 정기 요일·시각과 예약 내전. 시청자에게 보일 게 없으면 빈 안내 */}
+              <TabsContent value="schedule">
+                {data.isOwner ||
+                data.settings.scheduleDays.length > 0 ||
+                data.upcoming.length > 0 ? (
+                  <ScheduleCard data={data} />
+                ) : (
+                  <TabEmpty text="등록된 방송 일정이 없어요." />
+                )}
+              </TabsContent>
             </div>
-            <ParticipantsTable
-              rows={data.participants}
-              isOwner={data.isOwner}
-              streamerName={streamer.username}
-            />
-          </TabsContent>
-
-          {/* 시청자 리그 — 비면 카드가 null 이라 빈 안내를 대신 보인다 */}
-          <TabsContent value="league">
-            {data.league.length > 0 ? (
-              <LeagueCard league={data.league} />
-            ) : (
-              <TabEmpty text="아직 시청자 리그 순위가 없어요. 방송 내전이 쌓이면 여기에 순위가 생겨요." />
-            )}
-          </TabsContent>
-
-          {/* 공지사항 — 스트리머 본인은 여기서 쓰고 고정·삭제한다 */}
-          <TabsContent value="notices">
-            <NoticesCard
-              streamerId={streamerId}
-              notices={data.notices}
-              isOwner={data.isOwner}
-            />
-          </TabsContent>
-
-          {/* 방송 일정 — 정기 요일·시각과 예약 내전. 시청자에게 보일 게 없으면 빈 안내 */}
-          <TabsContent value="schedule">
-            {data.isOwner ||
-            data.settings.scheduleDays.length > 0 ||
-            data.upcoming.length > 0 ? (
-              <ScheduleCard data={data} />
-            ) : (
-              <TabEmpty text="등록된 방송 일정이 없어요." />
-            )}
-          </TabsContent>
+          </div>
         </Tabs>
       </div>
 
