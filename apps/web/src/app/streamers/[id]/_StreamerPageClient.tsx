@@ -361,15 +361,15 @@ export function StreamerPageClient({ streamerId }: { streamerId: string }) {
             </CardContent>
           </Card>
 
-          {/* 탭 줄 + 탭 내용을 한 테두리로 묶는다 — 탭 줄이 내용 상자의 머리처럼 이어져 보이게.
-              공용 탭의 알약 모양 대신 밑줄 강조(고른 탭만 강조색 밑줄) */}
-          <div className="overflow-hidden rounded-xl border border-bg-tertiary bg-bg-secondary">
-            <TabsList className="gap-0 rounded-none border-0 border-b border-bg-tertiary bg-transparent p-0 px-2 md:px-3">
+          {/* 폴더 탭 — 고른 탭은 내용 상자와 같은 색·테두리로 이어지고(아래 선이 끊김),
+              나머지 탭은 한 톤 어둡게 뒤로 물러나 있다. 탭 줄을 1px 내려 상자 윗선에 겹친다 */}
+          <div>
+            <TabsList className="relative z-10 -mb-px items-end gap-1 rounded-none border-0 bg-transparent p-0">
               {STREAMER_TABS.map(({ value, label, Icon }) => (
                 <TabsTrigger
                   key={value}
                   value={value}
-                  className="flex items-center gap-1.5 rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-3 shadow-none hover:translate-y-0 hover:border-transparent hover:bg-transparent aria-selected:border-accent-primary aria-selected:bg-transparent aria-selected:text-accent-primary"
+                  className="flex items-center gap-1.5 rounded-b-none rounded-t-xl border border-bg-tertiary bg-bg-primary px-4 py-2.5 text-text-tertiary shadow-none hover:translate-y-0 hover:border-bg-tertiary hover:bg-bg-tertiary/60 hover:text-text-primary aria-selected:border-bg-tertiary aria-selected:border-b-bg-secondary aria-selected:bg-bg-secondary aria-selected:text-accent-primary"
                 >
                   <Icon className="h-4 w-4" />
                   {label}
@@ -377,8 +377,9 @@ export function StreamerPageClient({ streamerId }: { streamerId: string }) {
               ))}
             </TabsList>
 
-            {/* 탭 내용 칸 — 안쪽 칸들은 테두리·배경 없이 이 상자에 바로 얹혀 탭 줄과 한 장으로 보인다 */}
-            <div>
+            {/* 탭 내용 상자 — 안쪽 칸들은 테두리·배경 없이 바로 얹힌다.
+                왼쪽 위 모서리는 첫 탭이 붙는 자리라 각지게 둔다 */}
+            <div className="overflow-hidden rounded-b-xl rounded-tr-xl border border-bg-tertiary bg-bg-secondary">
               {/* 내전 기록 — 회차별/달력 */}
               <TabsContent value="records">
                 <RecordsCard
