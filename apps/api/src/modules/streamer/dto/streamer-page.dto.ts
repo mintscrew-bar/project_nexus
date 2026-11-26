@@ -11,6 +11,7 @@ import {
   MinLength,
   ValidateIf,
 } from "class-validator";
+import { KeepRaw } from "../../../common/keep-raw.decorator";
 
 /** 스트리머 페이지 설정 — 보낸 항목만 바꾼다 */
 export class UpdateStreamerPageDto {
@@ -36,6 +37,8 @@ export class UpdateStreamerPageDto {
   })
   scheduleTime?: string | null;
 
+  // 전역 암묵 변환이 "false" 를 true 로 바꾸지 않게 원본 값으로 검증
+  @KeepRaw()
   @IsOptional()
   @IsBoolean()
   showPrivateRooms?: boolean;
@@ -47,6 +50,8 @@ export class CreateStreamerNoticeDto {
   @MaxLength(500, { message: "공지는 500자까지 쓸 수 있어요." })
   content!: string;
 
+  // 전역 암묵 변환이 "false" 를 true 로 바꾸지 않게 원본 값으로 검증
+  @KeepRaw()
   @IsOptional()
   @IsBoolean()
   pinned?: boolean;
@@ -59,6 +64,8 @@ export class UpdateStreamerNoticeDto {
   @MaxLength(500, { message: "공지는 500자까지 쓸 수 있어요." })
   content?: string;
 
+  // 전역 암묵 변환이 "false" 를 true 로 바꾸지 않게 원본 값으로 검증
+  @KeepRaw()
   @IsOptional()
   @IsBoolean()
   pinned?: boolean;
