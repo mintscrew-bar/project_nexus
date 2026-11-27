@@ -211,11 +211,12 @@ export function Burst({
  */
 const CARD_SHEETS = {
   fire: { frames: 60, columns: 8, src: "fire-blaze", bg: "fire" },
-  slime: { frames: 72, columns: 8, src: "slime", bg: "slime" },
-  ghost: { frames: 96, columns: 9, src: "ghost", bg: "ghost" },
-  bats: { frames: 96, columns: 9, src: "bats", bg: "bats" },
-  sword: { frames: 80, columns: 9, src: "sword", bg: "sword" },
-  // pixelfx weather/storm(구름 천장·비·번개) 위에 바다·등대 — 10초 반복이라 15fps
+  // 아래는 한 장면(scene-*): pixelfx 날씨 효과가 소품 사이사이에 겹친다(구름·안개·빛줄기·반딧불·폭풍).
+  // 배경째 움직이는 불투명 시트라 255색 팔레트 PNG 로 줄였다(scripts/pixelfx/png8.py)
+  slime: { frames: 144, columns: 11, src: "scene-slime", bg: "slime", fps: 12 },
+  ghost: { frames: 144, columns: 11, src: "scene-ghost", bg: "ghost", fps: 12 },
+  bats: { frames: 144, columns: 11, src: "scene-bats", bg: "bats", fps: 12 },
+  sword: { frames: 120, columns: 11, src: "scene-sword", bg: "sword", fps: 12 },
   storm: { frames: 150, columns: 12, src: "storm", bg: "storm", fps: 15 },
 } as const;
 

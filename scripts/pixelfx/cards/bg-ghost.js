@@ -93,13 +93,17 @@ function stone(p, x, base, w, h, kind, lean = 0) {
   });
 }
 
-export function draw(p) {
+// The scene in parts, so a live scene (scene-ghost) can slip weather/fog in between them. draw() below is the still
+// backdrop with its own thin fog bands.
+export function ghostSky(p) {
   sky(p, ["#090e20", "#0f1731", "#152142", "#1d2c55", "#283a68"], 0, 78, 1.1, 0.55);
   stars(p, 34, 5, 46, ["#4a5a8c", "#9fb0e0", "#ffffff"]);
   // the moon top right, in the clear sky over the ghost there
   halo(p, 92, 14, 28, "#c8d8ff", 0.45);
   moon(p, 92, 14, 8, { lit: "#eef2ff", mid: "#c9d3f0", dark: "#9aa6cc", crescent: -1, skyC: "#0f1731" });
 
+}
+export function ghostFar(p) {
   // ── depth, back to front: far hill with chapel and tiny far stones, fence on the middle rise with mid stones,
   // mist between, then the near slope with big moonlit stones; dark grass frames the bottom corners
   ridge(p, 58, 5, 30, 2, SIL[0]);
@@ -109,15 +113,20 @@ export function draw(p) {
     const base = 58 - Math.round(2 * Math.sin(x / 11));
     if (cross) { p.rect(x, base - h, 1, h, far); p.rect(x - 1, base - h + 1, 3, 1, far); } else p.rect(x - 1, base - h, 3, h, far);
   }
+}
+export function ghostTree(p) {
   // the gnarled tree on the left, the lantern on its low limb
   tree(p);
+}
+export function ghostMid(p) {
   // the middle rise: a rolling crest with a moonlit rim, the fence along it, two smaller, dimmer stones
   const mid = (x) => 63 + Math.round(1.5 * Math.sin(x / 13 + 1));
   p.shade(0, 58, W - 1, 91, (x, y) => (y < mid(x) ? undefined : y === mid(x) ? hex("#26365c") : SIL[1]));
   fence(p, 30, 84, 63);
   stone(p, 47, 66, 5, 7, "round");
   stone(p, 63, 65, 5, 8, "cross");
-  fogBand(p, 66, 4, "#8aa0d8", 0.35, 9);
+}
+export function ghostNear(p) {
   // the near slope: lower, closer, a little lighter, with the big stones on it
   const near = (x) => 68 + Math.round(2 * Math.sin(x / 17 + 2.2));
   const SOIL = ["#0d1426", "#141d34", "#1c2844"].map(hex);
@@ -141,6 +150,8 @@ export function draw(p) {
   for (const [x, y] of [[19, 73], [32, 72], [46, 72], [66, 73], [78, 72], [92, 74]]) {
     p.px(x, y, GRASS[2]); p.px(x, y - 1, hex("#b8d0ff")); p.px(x - 1, y - 1, hex("#7e9ad8")); p.px(x + 1, y - 1, hex("#7e9ad8"));
   }
+}
+export function ghostCorners(p) {
   // dark tall grass framing both bottom corners (nearest of all)
   const fg = hex("#060a16");
   for (let x = 0; x < W; x++) {
@@ -151,5 +162,11 @@ export function draw(p) {
     p.rect(x, 92 - 12 - h, 1, h + 12, fg);
     if (r > 0.7 && h > 6) p.px(x, 92 - 12 - h, hex("#1a2744"));
   }
+}
+
+export function draw(p) {
+  ghostSky(p); ghostFar(p); ghostTree(p); ghostMid(p);
+  fogBand(p, 66, 4, "#8aa0d8", 0.35, 9);
+  ghostNear(p); ghostCorners(p);
   fogBand(p, 76, 5, "#8aa0d8", 0.25, 4);
 }

@@ -20,7 +20,9 @@ function pillar(p, x, w) {
   p.rect(x - 2, 72, w + 4, 5, STONE[3]); p.rect(x - 2, 72, w + 4, 1, STONE[4]); p.rect(x - 2, 76, w + 4, 1, INK);
 }
 
-export function draw(p) {
+// The scene in parts, so a live scene (scene-sword) can put weather/god-rays between the wall and the pillars.
+// draw() below is the still backdrop with its own simple shafts.
+export function swordWall(p) {
   sky(p, ["#0c1220", "#111a2c", "#17223a", "#1e2c48", "#263656"], 0, 80, 1);
   // stone blocks on the back wall: a darker mortar grid, rows offset
   const mortar = hex("#0f1726");
@@ -43,6 +45,9 @@ export function draw(p) {
   p.rect(WX - 2, WY + WH - 1, WW + 4, 2, STONE[3]); // sill
   halo(p, WX + r, WY + 8, 22, "#8fb4e8", 0.35);
 
+}
+export function swordBeams(p) {
+  const WX = 10, WY = 5, WW = 13, WH = 22;
   // shafts of light slanting from the window down to the right
   const beam = hex("#8fb4e8");
   p.shade(0, WY, W - 1, 80, (x, y, o) => {
@@ -53,6 +58,8 @@ export function draw(p) {
     }
   });
 
+}
+export function swordPillars(p) {
   // a banner by the window: dark blue cloth, gold trim and a gold sword, a swallowtail hem
   const BX = 26, BW = 7;
   p.rect(BX - 1, 2, BW + 2, 1, GOLD[0]);
@@ -73,6 +80,8 @@ export function draw(p) {
   pillar(p, 1, 6);
   pillar(p, W - 7, 6);
 
+}
+export function swordFloor(p) {
   // the floor and the altar: two worn steps on the right under the sword
   p.rect(0, 77, W, 15, STONE[1]);
   p.rect(0, 77, W, 1, STONE[3]);
@@ -81,4 +90,8 @@ export function draw(p) {
   const crack = hex("#0c1322");
   for (let x = 4; x < W; x += 13) p.rect(x + Math.round(rand(x, 3) * 4), 78, 1, 14, crack);
   halo(p, 88, 70, 26, "#7fb0ff", 0.3);
+}
+
+export function draw(p) {
+  swordWall(p); swordBeams(p); swordPillars(p); swordFloor(p);
 }

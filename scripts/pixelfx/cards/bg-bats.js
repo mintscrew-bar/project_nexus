@@ -61,9 +61,13 @@ function deadTree(p, x, base, h, c, flip = 1) {
   line(x + flip, base - h, x + 3 * flip, base - h - 3, 1);
 }
 
-export function draw(p) {
+// The scene in parts, so a live scene (scene-bats) can slip effects in between them: clouds behind the castle,
+// fog through its foot, bats in front. draw() below is the still backdrop, all parts in order.
+export function batsSky(p) {
   sky(p, ["#0e0820", "#160d2c", "#211438", "#2e1b48", "#3e2558", "#4e2f66"], 0, 74, 1, 0.55);
   stars(p, 30, 9, 50, ["#5b4682", "#a48ac8", "#ffffff"]);
+}
+export function batsMoonAndClouds(p) {
   // the full moon, big, top left
   halo(p, 20, 20, 40, "#ffe0a0", 0.42);
   moon(p, 20, 20, 13);
@@ -73,9 +77,13 @@ export function draw(p) {
   libCloud(p, 26, 44, 30, 8, NIGHT, 3);   // across the moon's foot
   libCloud(p, 64, 16, 14, 4, NIGHT, 7);
   libCloud(p, 100, 30, 10, 3, NIGHT, 17);
+}
+export function batsPeaks(p) {
   // violet peaks, then the crag the castle stands on
   ridge(p, 54, 10, 16, 4, "#2a1a42");
   ridge(p, 60, 6, 10, 8, "#1f1434");
+}
+export function batsCastle(p) {
   // the castle on the crag, stepping up the rock: a low turret and wall on the left, the great keep with a steep
   // gabled roof and a rose window, a tall slender spire tower with a flag, a stout turret on the right edge
   const B = 57; // the castle's footing — the top of the crag drawn after it
@@ -116,6 +124,8 @@ export function draw(p) {
     const ledge = (y - B) % 6 === 0 && rand(Math.floor(x / 4), y, 19) > 0.4;
     return ledge ? R[3] : face ? R[2] : rand(Math.floor(x / 3), y, 23) > 0.85 ? R[2] : R[1];
   });
+}
+export function batsMoor(p) {
   // the moor in front: two rolling layers with moonlit rims, dead trees, rocks
   const mid = (x) => 66 + Math.round(2 * Math.sin(x / 14 + 0.5));
   p.shade(0, 60, W - 1, 91, (x, y) => (y < mid(x) ? undefined : y === mid(x) ? hex("#4a3266") : hex("#1c1230")));
@@ -137,6 +147,8 @@ export function draw(p) {
     const x = Math.round(rand(i, 71) * W), y = near(x), h = 1 + Math.round(rand(i, 72) * 3);
     p.rect(x, y - h, 1, h, hex("#3a2852")); p.px(x, y - h, hex("#6a4a86"));
   }
+}
+export function batsBranch(p) {
   // a gnarled branch reaching in from the bottom left, nearest of all
   const br = hex("#08040f");
   const seg = (x0, y0, x1, y1, w0, w1) => {
@@ -144,4 +156,8 @@ export function draw(p) {
     for (let i = 0; i <= n; i++) { const u = i / n; p.disc(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, Math.max(0.5, (w0 + (w1 - w0) * u) / 2), br); }
   };
   seg(-2, 92, 6, 70, 6, 4); seg(6, 70, 4, 56, 4, 2.5); seg(4, 56, 9, 46, 2.5, 1.2); seg(5, 64, 13, 60, 2, 1); seg(4, 56, 0, 50, 1.5, 1);
+}
+
+export function draw(p) {
+  batsSky(p); batsMoonAndClouds(p); batsPeaks(p); batsCastle(p); batsMoor(p); batsBranch(p);
 }

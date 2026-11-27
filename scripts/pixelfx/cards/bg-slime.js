@@ -46,7 +46,8 @@ function fern(p, x, base, flip, size) {
   }
 }
 
-export function draw(p) {
+// The scene in parts, so a live scene (scene-slime) can put weather/fireflies in between. draw() is the still backdrop.
+export function slimeSky(p) {
   // the sunset sky: violet at the top through rose and coral to gold at the horizon
   sky(p, ["#24183e", "#3e2150", "#6a2c5c", "#a2465e", "#d86a56", "#f0a05a", "#f8c870"], 0, 62, 0.9, 0.55);
   // the low sun on the left, just above the mountains
@@ -63,6 +64,8 @@ export function draw(p) {
   // two birds far off
   for (const [x, y] of [[84, 34], [90, 38]]) { p.px(x - 1, y - 1, INK); p.px(x, y, INK); p.px(x + 1, y - 1, INK); }
 
+}
+export function slimeHills(p) {
   // violet mountains, far then near
   ridge(p, 50, 9, 18, 4, "#5a3a6e");
   ridge(p, 55, 7, 12, 7, "#3e2a58");
@@ -74,6 +77,8 @@ export function draw(p) {
   }
   ridge(p, 64, 1, 8, 9, pineC);
 
+}
+export function slimeMeadow(p) {
   // the clearing: a sunlit grass rim, grass darkening toward the viewer
   const top = (x) => 68 + Math.round(1.2 * Math.sin(x / 15 + 0.6));
   const G = ["#14281c", "#1c3a22", "#2a5228", "#3e6e2e", "#8ab04a"].map(hex);
@@ -106,7 +111,13 @@ export function draw(p) {
     const y = top(x) + 2;
     p.px(x, y, G[3]); p.px(x, y - 1, hex(c));
   }
+}
+export function slimeFerns(p) {
   // ferns framing the bottom corners
   fern(p, 3, 92, 1, 16);
   fern(p, 107, 92, -1, 16);
+}
+
+export function draw(p) {
+  slimeSky(p); slimeHills(p); slimeMeadow(p); slimeFerns(p);
 }

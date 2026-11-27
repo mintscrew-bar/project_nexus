@@ -6,19 +6,23 @@
 ## 카드 장식 (`effects.tsx` 의 `CARD_SHEETS`)
 
 모든 카드는 **110×92 칸**이다 — 칸 크기가 같아야 로비에 여러 카드가 나란히 있을 때 픽셀 크기가 맞는다.
-카드 하나는 멈춘 배경 한 장(`bg-*.png`) 위에 움직이는 시트(`*.png`)를 겹친 것이다.
 
-| 카드                    | 배경 효과           | 움직이는 효과                                                                               | 구운 파일 (`apps/web/public/cosmetics/cards/`) |
-| ----------------------- | ------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| 픽셀 화염 `FX_FIRE`     | `cards/bg-fire.js`  | `card-blaze.js` (`fire/` 에 넣는다)                                                         | `bg-fire.png`, `fire-blaze.png`                |
-| 통통 슬라임 `FX_SLIME`  | `cards/bg-slime.js` | `cards/card-slime.js` (critters/slime 두 마리, 구름은 `_libcloud.js` = weather/clouds 방식) | `bg-slime.png`, `slime.png`                    |
-| 꼬마 유령 `FX_GHOST`    | `cards/bg-ghost.js` | `cards/card-ghost.js` (critters/ghost 두 마리 + 도깨비불)                                   | `bg-ghost.png`, `ghost.png`                    |
-| 박쥐 떼 `FX_BATS`       | `cards/bg-bats.js`  | `cards/card-bats.js` (critters/bat 세 마리)                                                 | `bg-bats.png`, `bats.png`                      |
-| 전설의 검 `FX_SWORD`    | `cards/bg-sword.js` | `cards/card-sword.js` (바위에 꽂힌 검, 직접 그림)                                           | `bg-sword.png`, `sword.png`                    |
-| 천둥번개 `FX_LIGHTNING` | `cards/bg-storm.js` | `cards/card-storm.js` (weather/storm 그대로 + 바다·등대, 15fps)                             | `bg-storm.png`, `storm.png`                    |
+화염을 뺀 다섯 장은 **한 장면(scene-\*)** 이다: 배경 소품을 여러 조각(`bg-*.js` 의 `export function`)으로 나누고,
+그 사이사이에 pixelfx 날씨 효과를 끼워 그린다 — 소품 위에 효과를 얹으면 효과가 소품 밑에 깔리기 때문.
+배경째 움직이는 불투명 시트라 `png8.py --quantize` 로 255색 팔레트 PNG 로 줄인다(대개 1/3).
+`bg-*.png`(한 장)는 시트가 뜨기 전에 보이는 바탕이다.
 
-`cards/_card.js` 는 카드 크기와 라이브러리 효과를 카드 위 자리에 찍는 `stamp`,
-`cards/_bg.js` 는 배경 그리기 도구(띠 하늘·실루엣·달·별·안개)다.
+| 카드                    | 장면 파일              | 끼운 pixelfx 효과                                  | 시트 (`apps/web/public/cosmetics/cards/`) |
+| ----------------------- | ---------------------- | -------------------------------------------------- | ----------------------------------------- |
+| 픽셀 화염 `FX_FIRE`     | `card-blaze.js`        | (불벽 단독, 투명 시트를 `bg-fire.png` 위에)        | `fire-blaze.png` 60장 20fps               |
+| 통통 슬라임 `FX_SLIME`  | `cards/scene-slime.js` | weather/fireflies, critters/slime                  | `scene-slime.png` 144장 12fps             |
+| 꼬마 유령 `FX_GHOST`    | `cards/scene-ghost.js` | weather/fog, critters/ghost                        | `scene-ghost.png` 144장 12fps             |
+| 박쥐 떼 `FX_BATS`       | `cards/scene-bats.js`  | weather/clouds, weather/fog, critters/bat          | `scene-bats.png` 144장 12fps              |
+| 전설의 검 `FX_SWORD`    | `cards/scene-sword.js` | weather/god-rays (검·제단은 `card-sword.js`)       | `scene-sword.png` 120장 12fps             |
+| 천둥번개 `FX_LIGHTNING` | `cards/card-storm.js`  | weather/storm (그 위에 `bg-storm.js` 의 바다·등대) | `storm.png` 150장 15fps                   |
+
+`cards/_card.js` 는 카드 크기와 라이브러리 효과를 카드 위 자리에 찍는 `stamp`, `cards/_bg.js` 는 배경 그리기 도구,
+`cards/_libcloud.js` 는 weather/clouds 의 구름 그리기를 옮긴 것이다.
 
 ## 다시 굽기
 
@@ -32,7 +36,7 @@
    ```bash
    cd pixelfx && node tools/render.mjs cards/card-slime
    ```
-3. 시트로 굽는다. 빛 번짐은 시트에 반투명 색으로 구워진다 — 움직이는 효과는 `light` 0.5,
+3. 시트로 굽는다. 장면 시트는 굽고 나서 `python3 scripts/pixelfx/png8.py <시트>.png <시트>.png --quantize`. 빛 번짐은 시트에 반투명 색으로 구워진다 — 움직이는 효과는 `light` 0.5,
    불은 0.35(세게 구우면 카드 아래 이름 가림막과 겹쳐 밑동이 회색으로 탁해진다). 배경은 기본값.
    ```bash
    node tools/render.mjs cards/card-slime --sheet --opts '{"light":0.5}'
