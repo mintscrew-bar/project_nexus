@@ -208,4 +208,85 @@ export function softCloud(p, cx, base, w, h, seed, ramp, flat = 0) {
   }
 }
 
+/**
+ * A heaped cumulus without an outline: round billows stacked in rows (a broad bottom row, a narrower middle row,
+ * one or two crowns), so the silhouette is clean rounded steps. Each billow is bright on top and shades toward its
+ * underside, and the billow in front starts bright again — that is what makes the heap read in layers. Higher rows
+ * are a step brighter; the flat base is the darkest.
+ * ramp: shadow .. light. w wide, h tall.
+ */
+export function heapCloud(p, cx, base, w, h, seed, ramp, out = null) {
+  const K = ramp.map(hex), n = K.length, L = [];
+  // billows overlap by about half their width; each row up is narrower, a bit bigger and sits behind the one below
+  const rows = h < w * 0.22 ? 1 : h < w * 0.45 ? 2 : 3, r0 = Math.min(h * 0.55, w * 0.16) + 1;
+  for (let row = 0; row < rows; row++) {
+    const r = r0 * (1 + 0.3 * row), span = Math.max(0, w - 2 * r) * (1 - row * 0.3);
+    const count = Math.max(1, Math.round(span / (r * 1.1)) + 1);
+    for (let i = 0; i < count; i++) {
+      const u = count === 1 ? 0 : i / (count - 1) - 0.5;
+      const rr = r * (0.85 + 0.3 * rand(i + row * 10, seed)) * (1 - Math.abs(u) * 0.3);
+      L.push({ x: cx - w * 0.04 * row + u * span + (rand(i, seed + row) - 0.5) * 1.5, y: base - r0 * 0.55 - row * r0 * 0.95 - (1 - Math.abs(u) * 2) * row * 1.5, r: rr, row });
+    }
+  }
+  const x0 = Math.floor(cx - w), x1 = Math.ceil(cx + w), y0 = Math.floor(base - h * 1.6);
+  const OUT = out ? hex(out) : 0;
+  // the billow a pixel belongs to: the front-most (lower row first, then lower centre)
+  const owner = (x, y) => {
+    if (y > base) return null;
+    let o = null;
+    for (const b of L) if (Math.hypot(x + 0.5 - b.x, y + 0.5 - b.y) <= b.r && (!o || b.row < o.row || (b.row === o.row && b.y > o.y))) o = b;
+    return o;
+  };
+  for (let y = y0; y <= base + 1; y++) for (let x = x0; x <= x1; x++) {
+    const o = owner(x, y);
+    if (!o) {
+      // the outline: any empty pixel touching the cloud
+      if (OUT && (owner(x - 1, y) || owner(x + 1, y) || owner(x, y - 1) || owner(x, y + 1))) p.px(x, y, OUT);
+      continue;
+    }
+    // a thin seam where this billow's top rim sits over a billow behind it, so the layers read like the outlined style
+    const above = owner(x, y - 1);
+    if (OUT && above && above.row > o.row) { p.px(x, y, K[Math.min(1, n - 1)]); continue; }
+    const ny = (y + 0.5 - o.y) / o.r, nx = (x + 0.5 - o.x) / o.r;
+    let t = 0.55 - ny * 0.45 - nx * 0.12 + o.row * 0.12;
+    if (y >= base - 1) t -= 0.35;
+    p.px(x, y, K[Math.max(0, Math.min(n - 1, Math.floor(t * n)))]);
+  }
+}
+
+/**
+ * A ceiling of cloud filling the top of the card down to about y = belly: the sky above is covered, and only the
+ * billowy underside shows — heaped clouds side by side whose tops run off the card, outlined where they meet the sky.
+ */
+export function cloudCeiling(p, belly, seed, ramp, out) {
+  const K = ramp.map(hex), n = K.length, OUT = hex(out), L = [];
+  // billows in rows from the belly up past the top of the card; one body, so the only outline is along the belly
+  for (let row = 0; row < 4; row++) {
+    const r = 9 + row * 2, step = r * 1.5;
+    for (let i = 0, x = -r + (row % 2) * step * 0.5; x < W + r; i++, x += step) {
+      const rr = r * (0.8 + 0.4 * rand(i + row * 30, seed));
+      L.push({ x: x + (rand(i, seed + row) - 0.5) * 4, y: belly - rr * 0.55 - row * 11 + (rand(i, seed + row + 9) - 0.5) * 4, r: rr, row });
+    }
+  }
+  const owner = (x, y) => {
+    let o = null;
+    for (const b of L) if (Math.hypot(x + 0.5 - b.x, y + 0.5 - b.y) <= b.r && (!o || b.row < o.row || (b.row === o.row && b.y > o.y))) o = b;
+    if (!o && y < belly - 30) return { x, y: -99, r: 99, row: 9 }; // solid cloud above the rows
+    return o;
+  };
+  for (let y = 0; y < belly + 2; y++) for (let x = 0; x < W; x++) {
+    const o = owner(x, y);
+    if (!o) { if (owner(x, y - 1)) p.px(x, y, OUT); continue; } // outline under the belly
+    const above = owner(x, y - 1);
+    if (above && above.row > o.row && o.row < 9) { p.px(x, y, K[1]); continue; } // seam over the billow behind
+    if (o.row === 9) { p.px(x, y, K[0]); continue; }
+    // the same shading as heapCloud: each billow bright on top, darker toward its underside, the one in front
+    // starting bright again; rows further back are a step darker so the ceiling recedes
+    const ny = (y + 0.5 - o.y) / o.r, nx = (x + 0.5 - o.x) / o.r;
+    let t = 0.6 - ny * 0.45 - nx * 0.1 - o.row * 0.1;
+    if (y >= belly - 1 && o.row === 0 && ny > 0.6) t -= 0.25;
+    p.px(x, y, K[Math.max(0, Math.min(n - 1, Math.floor(t * n)))]);
+  }
+}
+
 export { mix, hex };

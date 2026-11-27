@@ -1,7 +1,7 @@
-// Nexus card "천둥번개" backdrop: a storm at sea. One huge storm cloud heaped up over the sea, a dark heaving sea to the
+// Nexus card "천둥번개" backdrop: a storm at sea. A ceiling of storm cloud over the sea, a dark heaving sea to the
 // horizon with whitecaps, a black cliff on the right with a lighthouse (its lamp and sweeping beam are animated in
 // card-storm), rocks and spray on the left.
-import { sky, softCloud, W } from "./_bg.js";
+import { sky, cloudCeiling, W } from "./_bg.js";
 import { CARD } from "./_card.js";
 import { hex, rand, noise } from "../../core/index.js";
 export const meta = { name: "Card bg: storm", desc: "Storm at sea: piled clouds, heaving sea, cliff with a lighthouse.", tags: ["card", "bg"], ...CARD, duration: 0.05, loop: true, fps: 20, bg: "dark", options: { seed: 1 } };
@@ -10,13 +10,9 @@ export const LIGHTHOUSE = { x: 97, top: 30 };
 
 export function draw(p) {
   sky(p, ["#080c1c", "#0c1228", "#111a36", "#172344", "#1e2c54"], 0, 58, 1, 0.55);
-  // one huge storm cloud heaping up over the sea, a lower bank behind it at the horizon (no outline: tone steps
-  // from a near-black underside to cold-lit crowns)
+  // a ceiling of storm cloud filling the top of the card; only its billowy underside shows
   const STORM = ["#070a16", "#0e1428", "#18203c", "#243256", "#34467a", "#4a5e94"];
-  const FAR = ["#0a0e1e", "#10172e", "#18213e", "#22304e"];
-  softCloud(p, 92, 48, 46, 12, 11, FAR, 0.6);
-  softCloud(p, 8, 49, 30, 8, 13, FAR, 0.8);
-  softCloud(p, 46, 46, 92, 46, 5, STORM);
+  cloudCeiling(p, 40, 5, STORM, "#020409");
 
   // the sea from the horizon down: rows darker toward the viewer, swells and whitecaps
   const HZ = 52;
