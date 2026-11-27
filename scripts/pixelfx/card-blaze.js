@@ -34,15 +34,15 @@ export function draw(p, t, o) {
   // than the middle so the fire frames the portrait instead of hiding it.
   const T = [];
   for (let back = 1; back >= 0; back--) {
-    const step = back ? 13 : 9;
+    const step = back ? 11 : 8;
     for (let x = -HALF - 2 + (back ? 7 : 0); x <= HALF + 2; x += step) {
       const side = Math.abs(x) / HALF; // 0 middle .. 1 edge
-      const env = (0.62 + 0.3 * side * side) * (back ? 1.15 : 0.8);
+      const env = (0.55 + 0.18 * side * side) * (back ? 1.1 : 0.78);
       T.push({
         dx: x + R.range(-1.2, 1.2),
         y: 1,
-        h: 4 + HC * env * R.range(0.85, 1.12),
-        w: (back ? 6 : 5) * R.range(0.85, 1.15),
+        h: 4 + HC * env * R.range(0.7, 1.3),
+        w: (back ? 8.5 : 7) * R.range(0.9, 1.1),
         back,
         env,
         n: (S * 7 + T.length) * 13,
@@ -51,17 +51,17 @@ export function draw(p, t, o) {
   }
   const lean = (tt) => NL(tt, 0.67, S + 90) * 0.1;
   const height = (i, tt) => {
-    const { h, n } = T[i], leap = Math.max(0, NL(tt, 2.6, n + 70) - 0.55) * 0.7;
+    const { h, n } = T[i], leap = Math.max(0, NL(tt, 2.6, n + 70) - 0.6) * 0.35;
     return (h + 0.22 * h * NL(tt, 3.3, n) + h * leap) * (0.9 + 0.1 * fl);
   };
-  const sweep = (i, tt, h) => NL(tt, 2.2, T[i].n + 40) * (1 + h * 0.06) + lean(tt) * h * 0.8;
+  const sweep = (i, tt, h) => (NL(tt, 1.6, T[i].n + 40) * (0.6 + h * 0.02) + lean(tt) * h * 0.4) * 0.5;
   const tip = (i, tt) => {
     const h = height(i, tt);
     return [T[i].dx + sweep(i, tt, h) * 0.85, T[i].y - h * 0.88 + 3, h];
   };
   const tongueAt = (i) => {
     const { dx, y, w, n, back } = T[i], h = height(i, t);
-    flameTongue(p, dx, y, h, w, sweep(i, t, h), N, n, H, back ? BACK_LAYERS : w > 4 ? BIG_LAYERS : LAYERS, 0.5, 1.1 + h * 0.04);
+    flameTongue(p, dx, y, h, w, sweep(i, t, h), N, n, H, back ? BACK_LAYERS : w > 6 ? BIG_LAYERS : LAYERS, 0.35, 0.4);
   };
 
   // a bed of fire along the floor so the tongues grow out of something, not out of the card edge
