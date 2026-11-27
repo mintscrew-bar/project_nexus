@@ -1,0 +1,47 @@
+// Nexus card "천둥번개": the card's painted backdrop already rains, so this is only the lightning: twice a loop a forked bolt cracks down one side of
+// the portrait, flickering, lighting the sky and throwing sparks where it lands. Bolt shape and inking from
+// lightning/_lib (adapted from Sprite Fusion's open-source lightning, https://www.spritefusion.com/pixel-art-vfx/lightning,
+// MIT License, Copyright (c) 2026 Hugo Duprez).
+import { fit, rng, WHITE, hex } from "../../core/index.js";
+import { VOLT, PLASMA, zigzag, stroke, flight, spark } from "../lightning/_lib.js";
+import { CARD } from "./_card.js";
+
+export const meta = {
+  name: "Card: storm", desc: "Twice a loop a forked bolt cracks down one side of the portrait.",
+  tags: ["card", "lightning", "storm", "rain", "loop"], ...CARD, duration: 6, loop: true, fps: 20, bg: "dark",
+  options: { palette: VOLT, sparks: PLASMA, seed: 8 },
+};
+
+const [W, H] = CARD.size, FLOOR = 78, D = meta.duration;
+// [time, from x, to x]: when each bolt strikes, where it leaves the top and where it lands
+const BOLTS = [[1.1, 10, 18], [4.2, 102, 93]];
+// how bright a bolt is on each 20 fps step after it strikes: a hero frame, a dip, a re-strike, then out
+const BK = [1, 0.55, 0.15, 0.9, 0.45, 0.6, 0.2];
+
+export function draw(p, t, o) {
+  const C = fit(o.palette, 8), S = o.sparks.map(hex);
+  const steps = BOLTS.map(([bt]) => Math.floor((((t - bt) % D) + D) % D * 20 + 1e-6));
+  const flash = BOLTS.reduce((m, _, i) => Math.max(m, BK[steps[i]] ?? 0), 0);
+
+  // the sky lights up behind everything when a bolt strikes
+  if (flash > 0.1) p.glow(W / 2, 8, 90, C[3], 0.28 * flash);
+
+  BOLTS.forEach(([bt, x0, x1], i) => {
+    const s = steps[i], k = BK[s];
+    if (k !== undefined) {
+      stroke(p, zigzag(rng(o.seed, 9, i), x0, -2, x1, FLOOR, 0.24, 0.7), k, C, s === 0 ? 1.15 : 1, { hero: s === 0 });
+      p.circle(x1, FLOOR, 2.5 * k + 1, C[5]);
+      p.circle(x1, FLOOR, 1.6 * k, WHITE);
+      p.glow(x1, FLOOR - 16, 50, C[3], 0.45 * k);
+    }
+    // sparks thrown where it lands
+    const sa = (((t - bt) % D) + D) % D;
+    for (let j = 0; j < 12; j++) {
+      const q = rng(o.seed, 31 + i, j), life = q.range(0.25, 0.55);
+      if (sa >= life) continue;
+      const a = -Math.PI / 2 + q.range(-1.3, 1.3), sp = q.range(50, 160);
+      const [x, y, vx, vy] = flight(x1, FLOOR, Math.cos(a) * sp, Math.sin(a) * sp, sa, { floor: FLOOR });
+      spark(p, x, y, vx, vy, 1 - sa / life, S);
+    }
+  });
+}

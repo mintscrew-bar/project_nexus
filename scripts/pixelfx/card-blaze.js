@@ -11,15 +11,15 @@ export const meta = {
   name: "Card blaze",
   desc: "A wall of pixel fire along the bottom of a card: a white-hot base, hard color steps up to dark red jagged peaks, chunks of flame breaking off and rising, embers drifting up.",
   tags: ["fire", "wall", "card", "ambient", "loop"],
-  size: [88, 74],
-  origin: [44, 74],
+  size: [110, 92],
+  origin: [55, 92],
   duration: 3,
   loop: true,
   fps: 20,
   bg: "dark",
   options: {
     palette: ["#4a1712", "#8a1f17", "#c9281f", "#f2561d", "#ff8a2a", "#ffc23d", "#ffe26b", "#fff3a6", "#ffffff"],
-    height: 40,
+    height: 50,
     seed: 5,
   },
 };
@@ -58,9 +58,9 @@ export function draw(p, t, o) {
     const up = -y; // 0 at the floor
     const h = top(x);
     // tall streaks: stretched in y, scrolling up. A second, finer field roughens the edges.
-    const ny = up * 0.075 - phase * PY * SPEED;
-    const n1 = tileFbm(x * 0.3 + 30, ny, 0, PY, S, 3);
-    const n2 = tileFbm(x * 0.6 + 70, up * 0.16 - phase * PY * 4, 0, PY * 2, S + 50, 2);
+    const ny = up * 0.06 - phase * PY * SPEED;
+    const n1 = tileFbm(x * 0.24 + 30, ny, 0, PY, S, 3);
+    const n2 = tileFbm(x * 0.48 + 70, up * 0.128 - phase * PY * 4, 0, PY * 2, S + 50, 2);
     // noise grows with height: a solid base, ragged peaks, chunks breaking off above
     const u = up / h;
     const heat = 1.12 - u + (n1 * 0.7 + n2 * 0.2) * (0.15 + 0.85 * Math.min(1.5, u));
@@ -75,7 +75,7 @@ export function draw(p, t, o) {
   });
 
   // embers carried up by the heat, wandering and cooling, past the portrait into the dark
-  looped(t, D, 18, S + 500, (r) => ({ x: r.range(-HALF + 4, HALF - 4), y: -r.range(16, 30), vx: r.range(-7, 7), vy: -r.range(14, 28), life: r.range(1.2, 2.4), s: r.chance(0.15) ? 2 : 1, a: r.range(0, 6.3), b: r.range(0, 6.3) }), (q, age) => {
+  looped(t, D, 18, S + 500, (r) => ({ x: r.range(-HALF + 4, HALF - 4), y: -r.range(20, 38), vx: r.range(-7, 7), vy: -r.range(14, 28), life: r.range(1.2, 2.4), s: r.chance(0.15) ? 2 : 1, a: r.range(0, 6.3), b: r.range(0, 6.3) }), (q, age) => {
     const x = q.x + q.vx * age + 4 * (Math.sin(age * 2.1 + q.a) - Math.sin(q.a));
     const y = q.y + q.vy * age + 2 * (Math.sin(age * 3 + q.b) - Math.sin(q.b));
     if (y < -HT + 1) return;

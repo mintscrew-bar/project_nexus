@@ -18,16 +18,7 @@ import { LiveBanner } from "./live-banner";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { PixelSheet } from "./pixel-sheet";
-import {
-  BAT,
-  BAT_PAL,
-  INK_DRAGON_CARD,
-  INK_DRAGON_PAL,
-  SLIME,
-  SLIME_PAL,
-  SWORD,
-  SWORD_PAL,
-} from "./sprites";
+import { INK_DRAGON_CARD, INK_DRAGON_PAL } from "./sprites";
 
 export type CosmeticEffectCode =
   | "slime"
@@ -211,100 +202,62 @@ export function Burst({
   );
 }
 
-/* ───────── 슬라임 ───────── */
+/* ───────── pixelfx 카드 장면 ───────── */
 
 /**
- * 큰 슬라임이 높이 뛰어 철퍽 착지하면 물방울이 튄다. 새끼 슬라임이 뒤를 쫓는다.
- * 착지(58%)와 물방울 박자는 1.1초로 맞춘다.
+ * pixelfx(픽셀 효과 라이브러리)로 그려 구운 카드 장면 — 110×92 칸.
+ * 멈춘 배경 한 장(bg-*.png) 위에 움직이는 스프라이트 시트를 겹친다. 칸 크기가 모든
+ * 카드에서 같아 픽셀 크기가 맞는다. 원본 효과 파일과 다시 굽는 법은 scripts/pixelfx (README).
  */
-function SlimeFx({ px }: { px: number }) {
-  const big = px * 0.95;
+const CARD_SHEETS = {
+  fire: { frames: 60, columns: 8, src: "fire-blaze", bg: "fire" },
+  slime: { frames: 72, columns: 8, src: "slime", bg: "slime" },
+  ghost: { frames: 96, columns: 9, src: "ghost", bg: "ghost" },
+  bats: { frames: 96, columns: 9, src: "bats", bg: "bats" },
+  sword: { frames: 48, columns: 7, src: "sword", bg: "sword" },
+  storm: { frames: 120, columns: 11, src: "storm", bg: "storm" },
+} as const;
+
+function CardSheet({ name }: { name: keyof typeof CARD_SHEETS }) {
+  const s = CARD_SHEETS[name];
   return (
     <>
-      <div className="cfx-slime-walk absolute bottom-0">
-        <div className="cfx-slime-face">
-          <div className="relative">
-            <div
-              className="cfx-slime-hop"
-              style={{ filter: outline("rgba(120,230,140,0.7)") }}
-            >
-              <PixelArt art={SLIME} palette={SLIME_PAL} px={big} />
-            </div>
-            <Burst
-              count={6}
-              color="#7be08a"
-              size={big}
-              dist={big * 7}
-              duration={1.1}
-              className="cfx-splash"
-              style={{ left: 8 * big, bottom: big }}
-            />
-          </div>
-        </div>
-      </div>
-      {/* 새끼 — 조금 늦게 같은 길을 따라온다 */}
+      {/* 배경 — 시트와 같이 아래에 붙여 폭에 맞춘다(칸 크기가 시트와 같게) */}
       <div
-        className="cfx-slime-walk absolute bottom-0"
-        style={{ animationDelay: "-0.9s" }}
-      >
-        <div className="cfx-slime-face" style={{ animationDelay: "-0.9s" }}>
-          <div
-            className="cfx-slime-hop"
-            style={{
-              animationDuration: "0.8s",
-              filter: outline("rgba(120,230,140,0.6)"),
-            }}
-          >
-            <PixelArt art={SLIME} palette={SLIME_PAL} px={px * 0.45} />
-          </div>
-        </div>
-      </div>
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `url(/cosmetics/cards/bg-${s.bg}.png)`,
+          backgroundSize: "100% auto",
+          backgroundPosition: "bottom",
+          backgroundColor: "#0a0d18",
+          imageRendering: "pixelated",
+        }}
+      />
+      <PixelSheet
+        src={`/cosmetics/cards/${s.src}.png`}
+        frameW={110}
+        frameH={92}
+        frames={s.frames}
+        columns={s.columns}
+        fps={20}
+        className="absolute inset-x-0 bottom-0"
+      />
     </>
   );
 }
 
-/* ───────── 꼬마 유령 (벡터) ───────── */
+/* ───────── 슬라임 ───────── */
 
-/** 초상화를 휘젓고 다니다가, 몇 초마다 화면 앞으로 확 다가와 놀래킨다 */
-function GhostFx({ px }: { px: number }) {
-  const w = 15 * px;
-  return (
-    <div className="cfx-travel cfx-ghost-wander absolute">
-      <div className="cfx-ghost-boo">
-        <div className="cfx-ghost-bob">
-          <svg
-            width={w}
-            height={w * 1.15}
-            viewBox="0 0 24 28"
-            style={{
-              filter:
-                "drop-shadow(0 0 1px rgba(20,24,40,0.9)) drop-shadow(0 0 8px rgba(196,206,255,0.95))",
-            }}
-          >
-            <path
-              d="M12 1C5.5 1 2 6 2 12v14l3.4-3 3.3 3 3.3-3 3.3 3 3.3-3 3.4 3V12C22 6 18.5 1 12 1Z"
-              fill="rgba(244,246,255,0.96)"
-            />
-            <g className="cfx-ghost-blink">
-              <ellipse cx="8.6" cy="12" rx="1.8" ry="2.5" fill="#1b1f2e" />
-              <ellipse cx="15.4" cy="12" rx="1.8" ry="2.5" fill="#1b1f2e" />
-            </g>
-            {/* 놀래킬 때 벌어지는 입 */}
-            <ellipse
-              className="cfx-ghost-mouth"
-              cx="12"
-              cy="18"
-              rx="2.2"
-              ry="2.6"
-              fill="#1b1f2e"
-            />
-            <ellipse cx="6.2" cy="15.8" rx="1.6" ry="1" fill="#f5a3bd" />
-            <ellipse cx="17.8" cy="15.8" rx="1.6" ry="1" fill="#f5a3bd" />
-          </svg>
-        </div>
-      </div>
-    </div>
-  );
+/** 큰 슬라임이 초상화 오른쪽에서 통통 뛰고, 왼쪽의 작은 슬라임이 반 박자 늦게 따라 뛴다 */
+function SlimeFx() {
+  return <CardSheet name="slime" />;
+}
+
+/* ───────── 꼬마 유령 ───────── */
+
+/** 꼬마 유령이 초상화 옆에서 둥실거리고, 반대편에 흐릿한 유령이 하나 더 떠 있다 */
+function GhostFx() {
+  return <CardSheet name="ghost" />;
 }
 
 /* ───────── 벚꽃 (벡터) ───────── */
@@ -369,7 +322,7 @@ function SakuraFx({ px }: { px: number }) {
  * 떨어져 나가 솟아오르다 꺼진다. 양옆이 조금 더 높아 초상화를 감싼다.
  *
  * 그림은 pixelfx(픽셀 효과 라이브러리)로 그려 — 위로 흐르는 노이즈에서 높이를 빼 색 단계를 고른다 —
- * 구운 스프라이트 시트(88×74 칸 60장, 3초 반복) — 원본 효과 파일은
+ * 구운 스프라이트 시트(110×92 칸 60장, 3초 반복) — 원본 효과 파일은
  * scripts/pixelfx/card-blaze.js. 예전 실시간 열 전파 불(pixel-fire.tsx)은
  * 칸이 세로로 늘어나고 자글자글한 잡티가 많았다. 아바타 불꽃은 그대로 그걸 쓴다.
  */
@@ -377,206 +330,33 @@ function FireFx() {
   return (
     <>
       <div className="cfx-heat absolute inset-x-0 bottom-0 h-3/4" />
-      <PixelSheet
-        src="/cosmetics/cards/fire-blaze.png"
-        frameW={88}
-        frameH={74}
-        frames={60}
-        columns={8}
-        fps={20}
-        className="absolute inset-x-0 bottom-0"
-      />
+      <CardSheet name="fire" />
     </>
   );
 }
 
 /* ───────── 박쥐 떼 ───────── */
 
-const BATS = [
-  { top: 16, dur: 3.6, delay: 0, flap: 0.22, scale: 1.2, rev: false },
-  { top: 44, dur: 4.4, delay: -1.4, flap: 0.26, scale: 0.9, rev: true },
-  { top: 6, dur: 5.2, delay: -3.1, flap: 0.2, scale: 1.01, rev: false },
-  { top: 30, dur: 4, delay: -2.2, flap: 0.24, scale: 0.75, rev: true },
-  { top: 52, dur: 3.2, delay: -0.6, flap: 0.18, scale: 1.05, rev: false },
-  { top: 24, dur: 5.8, delay: -4.4, flap: 0.28, scale: 0.68, rev: true },
-];
-
-/** 박쥐 6마리가 양쪽에서 출렁이며 쏟아지듯 날아다닌다 */
-function BatsFx({ px }: { px: number }) {
-  return (
-    <>
-      {BATS.map((b, i) => (
-        <div
-          key={i}
-          className={cn(
-            "cfx-travel absolute",
-            b.rev ? "cfx-bat-path-rev" : "cfx-bat-path",
-          )}
-          style={{
-            top: `${b.top}%`,
-            animationDuration: `${b.dur}s`,
-            animationDelay: `${b.delay}s`,
-          }}
-        >
-          <div
-            className="cfx-bat-swoop"
-            style={{
-              animationDuration: `${b.dur / 3}s`,
-              animationDelay: `${b.delay}s`,
-              filter: outline("rgba(200,140,255,0.9)"),
-            }}
-          >
-            <Frames
-              frames={BAT}
-              palette={BAT_PAL}
-              px={px * b.scale}
-              duration={b.flap}
-            />
-          </div>
-        </div>
-      ))}
-    </>
-  );
+/** 박쥐 세 마리가 카드 위쪽에서 저마다 박자로 8자를 그리며 날갯짓한다 */
+function BatsFx() {
+  return <CardSheet name="bats" />;
 }
 
 /* ───────── 전설의 검 ───────── */
 
-export const SPARK = [".w.", "wWw", ".w."];
-
-/** 검 한 번 휘두르는 박자(초) — 검·궤적·충격·파편이 모두 이 박자를 따른다 */
-const SWORD_BEAT = 3.2;
-
-/**
- * 오른쪽 위에 떠 있던 큰 검이 초상화를 가로질러 크게 베면, 궤적이 남고
- * 화면이 번쩍이며 불꽃이 튄다. 한 바퀴 돌아 제자리로 와서 칼끝이 반짝인다.
- */
-function SwordFx({ px }: { px: number }) {
-  const sp = px * 0.62;
-  // 손잡이 가운데를 축으로 휘두른다. 베기 궤적 반지름은 축~칼끝 거리에 맞춘다
-  const pivotX = 7.5 * sp;
-  const pivotY = 30.5 * sp;
-  const slash = 30.5 * sp * (70 / 26);
-  const beat = { animationDuration: `${SWORD_BEAT}s` };
-  return (
-    <>
-      {/* 벨 때 초상화 전체가 하얗게 번쩍 */}
-      <div className="cfx-impact absolute inset-0 bg-sky-100" style={beat} />
-      <div className="absolute right-[12%] top-[2%]">
-        <svg
-          className="cfx-slash pointer-events-none absolute"
-          width={slash}
-          height={slash}
-          viewBox="0 0 70 70"
-          style={{ left: pivotX - slash / 2, top: pivotY - slash / 2 }}
-        >
-          <path
-            d="M46 11.4A26 26 0 1 0 43.9 59.4"
-            pathLength={100}
-            fill="none"
-            stroke="rgba(130,190,255,0.6)"
-            strokeWidth={10}
-            strokeLinecap="round"
-            style={beat}
-          />
-          <path
-            d="M46 11.4A26 26 0 1 0 43.9 59.4"
-            pathLength={100}
-            fill="none"
-            stroke="#ffffff"
-            strokeWidth={3.5}
-            strokeLinecap="round"
-            style={beat}
-          />
-        </svg>
-        <Burst
-          count={8}
-          color="#dff0ff"
-          size={px}
-          dist={px * 12}
-          duration={SWORD_BEAT}
-          className="cfx-sword-burst"
-          style={{ left: pivotX - slash * 0.3, top: pivotY + slash * 0.05 }}
-        />
-        <div
-          className="cfx-sword"
-          style={{
-            ...beat,
-            transformOrigin: `${pivotX}px ${pivotY}px`,
-            filter: outline("rgba(120,190,255,0.9)"),
-          }}
-        >
-          <PixelArt art={SWORD} palette={SWORD_PAL} px={sp} />
-          <PixelArt
-            art={SPARK}
-            palette={{ w: "#cfe6ff", W: "#ffffff" }}
-            px={sp}
-            className="cfx-glint absolute"
-            style={{ ...beat, left: 6 * sp, top: -1 * sp }}
-          />
-        </div>
-      </div>
-    </>
-  );
+/** 초상화 옆에 꽂힌 검에서 푸른 빛기둥이 솟고 반짝이가 피어오른다 */
+function SwordFx() {
+  return <CardSheet name="sword" />;
 }
 
-/* ───────── 천둥번개 (벡터) ───────── */
+/* ───────── 천둥번개 ───────── */
 
-const BOLTS = [
-  { left: 8, delay: 0, flip: false, h: 100 },
-  { left: 44, delay: 0.85, flip: true, h: 86 },
-  { left: 74, delay: 1.7, flip: false, h: 94 },
-];
-
-/** 굵은 번개 세 줄기가 연달아 내리꽂히고, 칠 때마다 초상화가 하얗게 번쩍인다 */
-function LightningFx({ px }: { px: number }) {
-  return (
-    <>
-      <div className="cfx-storm absolute inset-0" />
-      {BOLTS.map((b, i) => (
-        <div key={i} className="contents">
-          <div
-            className="cfx-travel cfx-flash absolute inset-0 bg-sky-100"
-            style={{ animationDelay: `${b.delay}s` }}
-          />
-          <svg
-            className="cfx-travel cfx-bolt absolute top-0"
-            width={18 * px}
-            viewBox="0 0 24 60"
-            preserveAspectRatio="none"
-            style={{
-              left: `${b.left}%`,
-              height: `${b.h}%`,
-              animationDelay: `${b.delay}s`,
-              transform: b.flip ? "scaleX(-1)" : undefined,
-              filter:
-                "drop-shadow(0 0 4px rgba(147,197,253,1)) drop-shadow(0 0 12px rgba(96,165,250,0.9))",
-            }}
-          >
-            {/* 줄기 + 곁가지 */}
-            <polygon
-              points="14,0 4,26 11,26 3,60 20,20 12,20 19,0"
-              fill="#fffdf0"
-              stroke="#1e3a8a"
-              strokeWidth={0.9}
-              strokeLinejoin="round"
-            />
-            <polyline
-              points="9,14 1,20 3,28"
-              fill="none"
-              stroke="#fffdf0"
-              strokeWidth={1.4}
-            />
-            <polyline
-              points="15,26 22,34 19,42"
-              fill="none"
-              stroke="#fffdf0"
-              strokeWidth={1.4}
-            />
-          </svg>
-        </div>
-      ))}
-    </>
-  );
+/**
+ * 6초에 두 번, 초상화 양옆으로 갈래 번개가 내리꽂혀 깜빡이고 불똥이 튄다.
+ * 비·먹구름·하늘 번쩍임은 카드 배경(card-scenes)이 그린다.
+ */
+function LightningFx() {
+  return <CardSheet name="storm" />;
 }
 
 /* ───────── 용의 숨결 ───────── */
