@@ -19,7 +19,8 @@ const INK = hex("#070a14");
 const STEEL = ["#2a3346", "#4b5875", "#8a9ab8", "#c9d6ee", "#f2f7ff"].map(hex);
 const GOLD = ["#3d260a", "#7a5216", "#b8862a", "#e8bd52", "#fff0b0"].map(hex);
 const LEATHER = ["#1e0f0b", "#3e2216", "#5f3622", "#84513a"].map(hex);
-const ROCK = ["#141a28", "#222a3c", "#323d55", "#46536f"].map(hex);
+// the pedestal is cut from the same stone as the sanctum (bg-sword STONE), so it belongs to the room
+const PED = ["#121a2a", "#1a2438", "#243049", "#33415e", "#4a5a7c"].map(hex);
 const WAX = ["#3a4258", "#6a7594", "#a3adc8"].map(hex);
 
 /** a small candle: a wax stick h tall with a drip, a blue flame that flickers on its own clock, a little light */
@@ -144,15 +145,28 @@ export function draw(p, t, o) {
   hilt(p, C, breath);
   shard(true);
 
-  // the stone it is buried in: a lumpy rock, lit from the left, a few cracks glowing blue
-  p.shade(X - 14, STONE - 4, X + 14, STONE + 10, (x, y, out) => {
-    const dx = (x + 0.5 - X) / 14, top = STONE - 3 + Math.round(3 * dx * dx + rand(Math.floor(x / 3), 11));
-    if (y < top) return;
-    if (y === top) return dx < 0 ? ROCK[3] : ROCK[2];
-    const crack = rand(x, y, 5) < 0.012 || (Math.abs(x - X) === 2 && y < STONE + 4) || (Math.abs(x - X - (y - STONE) * 0.8) < 0.6 && y > STONE);
-    if (crack) { out.l = C[5]; out.k = 0.4 * breath; return C[4]; }
-    return dx < -0.4 ? ROCK[2] : dx < 0.3 ? ROCK[1] : ROCK[0];
-  });
+  // the pedestal it is driven into: a cut block on the altar's top step, a moulded cap, a slot where the blade
+  // goes in leaking blue light, two runes carved on its face that breathe with the pillar, a hairline crack
+  const P0 = STONE - 6, P1 = STONE; // cap top .. bottom (the step's top is at STONE + 1)
+  p.rect(X - 10, P0 - 1, 21, 1, INK);
+  p.rect(X - 10, P0, 21, 2, PED[3]);
+  p.rect(X - 10, P0, 21, 1, PED[4]);
+  p.rect(X - 10, P0 + 2, 21, 1, INK);
+  p.rect(X - 8, P0 + 3, 17, P1 - P0 - 2, PED[2]);
+  p.rect(X - 8, P0 + 3, 1, P1 - P0 - 2, PED[3]);
+  p.rect(X + 8, P0 + 3, 1, P1 - P0 - 2, PED[1]);
+  p.rect(X - 9, P0 + 3, 1, P1 - P0 - 2, INK);
+  p.rect(X + 9, P0 + 3, 1, P1 - P0 - 2, INK);
+  p.rect(X - 9, P1 + 1, 19, 1, INK);
+  // the slot: dark either side of the blade, blue light welling out of it
+  p.px(X - 3, P0, INK); p.px(X + 3, P0, INK); p.px(X - 3, P0 + 1, C[4]); p.px(X + 3, P0 + 1, C[4]);
+  p.glow(X, P0, 7, C[5], 0.45 * breath);
+  // runes on the face, lit by the same breath
+  const rune = breath > 0.8 ? C[6] : C[5];
+  for (const [dx, dy] of [[-5, 0], [-6, 1], [-4, 1], [-5, 2], [5, 0], [5, 1], [4, 2], [6, 2]]) p.px(X + dx, P0 + 4 + dy, rune);
+  for (const dx of [-5, 5]) p.glow(X + dx, P0 + 5, 4, C[5], 0.25 * breath);
+  // a hairline crack running down from the slot
+  for (const [dx, dy] of [[1, 3], [1, 4], [2, 5], [2, 6]]) p.px(X + dx, P0 + dy, PED[0]);
 
   // a glint sliding down the blade once a loop
   const g = (ph - 0.15) / 0.3;
