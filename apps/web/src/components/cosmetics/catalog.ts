@@ -152,7 +152,8 @@ const COSMETIC_DEFS: CosmeticItem[] = [
     code: "FX_SWORD",
     slot: "CARD_FRAME",
     name: "전설의 검",
-    description: "빛이 드는 돌 성소, 꽂힌 검에서 푸른 빛기둥이 솟아오른다",
+    description:
+      "빛이 드는 돌 성소의 제단, 바위에 꽂힌 검에서 푸른 빛기둥이 솟고 수정 조각이 맴돈다",
     price: 900,
     rarity: "PREMIUM",
     className: "bg-slate-400/80",

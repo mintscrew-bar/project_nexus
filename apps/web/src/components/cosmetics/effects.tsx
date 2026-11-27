@@ -214,7 +214,7 @@ const CARD_SHEETS = {
   slime: { frames: 72, columns: 8, src: "slime", bg: "slime" },
   ghost: { frames: 96, columns: 9, src: "ghost", bg: "ghost" },
   bats: { frames: 96, columns: 9, src: "bats", bg: "bats" },
-  sword: { frames: 60, columns: 8, src: "sword", bg: "sword" },
+  sword: { frames: 80, columns: 9, src: "sword", bg: "sword" },
   storm: { frames: 120, columns: 11, src: "storm", bg: "storm" },
 } as const;
 
@@ -344,7 +344,10 @@ function BatsFx() {
 
 /* ───────── 전설의 검 ───────── */
 
-/** 초상화 옆 바위에 꽂힌 큰 검 — 뒤로 푸른 빛기둥이 솟고, 칼날을 따라 반짝임이 흐른다 */
+/**
+ * 돌 성소의 제단, 바위에 꽂힌 큰 검 — 날개 코등이·보석 자루끝, 뒤로 푸른 빛기둥이 솟고
+ * 바닥 룬 고리가 돌며 수정 조각이 검을 맴돈다. 파란 촛불, 아치 창에서 드는 빛줄기, 기둥·깃발.
+ */
 function SwordFx() {
   return <CardSheet name="sword" />;
 }
