@@ -1,7 +1,8 @@
 // Nexus card "통통 슬라임" backdrop: a forest clearing at sunset. A warm sky (purple to pink to gold) so the green
 // slimes stand out against it, a low sun on the left, warm-lit clouds, violet mountains, a dark pine line,
 // then the clearing: a sunlit grass rim, red spotted mushrooms, flowers, mossy stones, ferns framing the corners.
-import { sky, halo, ridge, heapCloud, W } from "./_bg.js";
+import { sky, halo, ridge, W } from "./_bg.js";
+import { libCloud } from "./_libcloud.js";
 import { CARD } from "./_card.js";
 import { hex, rand } from "../../core/index.js";
 export const meta = { name: "Card bg: slime", desc: "Forest clearing at sunset: warm sky, mountains, pines, mushrooms, ferns.", tags: ["card", "bg"], ...CARD, duration: 0.05, loop: true, fps: 20, bg: "dark", options: { seed: 1 } };
@@ -53,12 +54,12 @@ export function draw(p) {
   p.circle(18, 44, 7, hex("#ffd27a"));
   p.circle(18, 44, 6, hex("#ffe6a8"));
   p.circle(17, 43, 4, hex("#fff6dc"));
-  // clouds lit by the low sun, in all sizes: stacked billows, a plum outline
-  const DUSK = ["#6a2c58", "#a0486a", "#d87078", "#f4a088", "#ffcfa8", "#ffe8cc"], DO = "#4a1e44";
-  heapCloud(p, 86, 32, 40, 22, 5, DUSK, DO);   // a big heap top right
-  heapCloud(p, 20, 22, 28, 9, 3, DUSK, DO);    // a long low one top left
-  heapCloud(p, 48, 36, 12, 4, 9, DUSK, DO);    // scraps
-  heapCloud(p, 60, 12, 10, 4, 13, DUSK, DO);
+  // clouds lit by the low sun, drawn the weather/clouds way, in all sizes: [belly, body, upper, top]
+  const DUSK = ["#8a3a66", "#c45a74", "#f09080", "#ffd8b0"];
+  libCloud(p, 84, 30, 34, 11, DUSK, 5);   // a big heap top right
+  libCloud(p, 22, 20, 26, 6, DUSK, 3);    // a long low one top left
+  libCloud(p, 48, 34, 10, 3, DUSK, 9);    // scraps
+  libCloud(p, 62, 12, 8, 3, DUSK, 13);
   // two birds far off
   for (const [x, y] of [[84, 34], [90, 38]]) { p.px(x - 1, y - 1, INK); p.px(x, y, INK); p.px(x + 1, y - 1, INK); }
 

@@ -1,7 +1,7 @@
-// Nexus card "천둥번개" backdrop: a storm at sea. A ceiling of storm cloud over the sea, a dark heaving sea to the
+// Nexus card "천둥번개" backdrop: a storm at sea. The sky and sea under weather/storm's cloud deck (drawn in card-storm), a dark heaving sea to the
 // horizon with whitecaps, a black cliff on the right with a lighthouse (its lamp and sweeping beam are animated in
 // card-storm), rocks and spray on the left.
-import { sky, cloudCeiling, W } from "./_bg.js";
+import { sky, W } from "./_bg.js";
 import { CARD } from "./_card.js";
 import { hex, rand, noise } from "../../core/index.js";
 export const meta = { name: "Card bg: storm", desc: "Storm at sea: piled clouds, heaving sea, cliff with a lighthouse.", tags: ["card", "bg"], ...CARD, duration: 0.05, loop: true, fps: 20, bg: "dark", options: { seed: 1 } };
@@ -10,10 +10,10 @@ export const LIGHTHOUSE = { x: 97, top: 30 };
 
 export function draw(p) {
   sky(p, ["#080c1c", "#0c1228", "#111a36", "#172344", "#1e2c54"], 0, 58, 1, 0.55);
-  // a ceiling of storm cloud filling the top of the card; only its billowy underside shows
-  const STORM = ["#070a16", "#0e1428", "#18203c", "#243256", "#34467a", "#4a5e94"];
-  cloudCeiling(p, 40, 5, STORM, "#020409");
+  seaAndCoast(p);
+}
 
+export function seaAndCoast(p) {
   // the sea from the horizon down: rows darker toward the viewer, swells and whitecaps
   const HZ = 52;
   p.rect(0, HZ, W, 1, hex("#3a4a7a")); // a pale line where sky meets sea

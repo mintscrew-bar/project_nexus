@@ -215,7 +215,8 @@ const CARD_SHEETS = {
   ghost: { frames: 96, columns: 9, src: "ghost", bg: "ghost" },
   bats: { frames: 96, columns: 9, src: "bats", bg: "bats" },
   sword: { frames: 80, columns: 9, src: "sword", bg: "sword" },
-  storm: { frames: 120, columns: 11, src: "storm", bg: "storm" },
+  // pixelfx weather/storm(구름 천장·비·번개) 위에 바다·등대 — 10초 반복이라 15fps
+  storm: { frames: 150, columns: 12, src: "storm", bg: "storm", fps: 15 },
 } as const;
 
 function CardSheet({ name }: { name: keyof typeof CARD_SHEETS }) {
@@ -239,7 +240,7 @@ function CardSheet({ name }: { name: keyof typeof CARD_SHEETS }) {
         frameH={92}
         frames={s.frames}
         columns={s.columns}
-        fps={20}
+        fps={"fps" in s ? s.fps : 20}
         className="absolute inset-x-0 bottom-0"
       />
     </>
