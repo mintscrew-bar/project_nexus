@@ -1,32 +1,12 @@
 // Nexus card "통통 슬라임" backdrop: a forest clearing at sunset. A warm sky (purple to pink to gold) so the green
-// slimes stand out against it, a low sun on the left with streaky lit clouds, violet mountains, a dark pine line,
+// slimes stand out against it, a low sun on the left, warm-lit clouds, violet mountains, a dark pine line,
 // then the clearing: a sunlit grass rim, red spotted mushrooms, flowers, mossy stones, ferns framing the corners.
-import { sky, halo, ridge, W } from "./_bg.js";
+import { sky, halo, ridge, puffCloud, W } from "./_bg.js";
 import { CARD } from "./_card.js";
 import { hex, rand } from "../../core/index.js";
 export const meta = { name: "Card bg: slime", desc: "Forest clearing at sunset: warm sky, mountains, pines, mushrooms, ferns.", tags: ["card", "bg"], ...CARD, duration: 0.05, loop: true, fps: 20, bg: "dark", options: { seed: 1 } };
 
 const INK = hex("#0c0a14");
-
-/** a sunset cloud: a few overlapping puffs with a flat base, a violet body, a hot coral-gold underside and rim */
-function cloud(p, x0, y, len, seed) {
-  const puffs = [];
-  for (let i = 0; i < Math.max(2, Math.round(len / 7)); i++) {
-    const u = (i + 0.5) / Math.max(2, Math.round(len / 7));
-    puffs.push([x0 + u * len, y - 1 - 2.5 * Math.sin(u * Math.PI) - rand(i, seed) * 1.5, 2 + 2.5 * Math.sin(u * Math.PI) + rand(i, seed + 1)]);
-  }
-  p.shade(x0 - 4, y - 9, x0 + len + 4, y, (x, yy) => {
-    let inside = false, edge = false;
-    for (const [cx, cy, r] of puffs) {
-      const d = Math.hypot((x + 0.5 - cx) / 1.6, yy + 0.5 - cy);
-      if (d <= r) { inside = true; if (d > r - 1) edge = true; }
-    }
-    if (!inside) return;
-    if (yy >= y - 1) return hex("#ffb878"); // the base, lit by the low sun
-    if (yy >= y - 2) return hex("#e07a6a");
-    return edge && yy < y - 3 ? hex("#9a4a6e") : hex("#6e3462");
-  });
-}
 
 /** a pine: a stepped triangle in one colour, tiers wider at the bottom */
 function pine(p, x, base, h, c) {
@@ -73,10 +53,11 @@ export function draw(p) {
   p.circle(18, 44, 7, hex("#ffd27a"));
   p.circle(18, 44, 6, hex("#ffe6a8"));
   p.circle(17, 43, 4, hex("#fff6dc"));
-  // streaky clouds lit from below
-  cloud(p, 4, 18, 26, 3);
-  cloud(p, 72, 14, 30, 5);
-  cloud(p, 86, 28, 20, 9);
+  // clouds lit by the low sun: warm cream tops, rose shadow, a plum outline
+  const DUSK = { out: "#6a2c58", shade: "#c0607a", mid: "#f0a08a", hi: "#ffd8b0" };
+  puffCloud(p, 22, 22, 30, 3, DUSK, 0.45);
+  puffCloud(p, 86, 16, 32, 5, DUSK, 0.3);
+  puffCloud(p, 94, 32, 18, 9, DUSK, 0.2);
   // two birds far off
   for (const [x, y] of [[84, 34], [90, 38]]) { p.px(x - 1, y - 1, INK); p.px(x, y, INK); p.px(x + 1, y - 1, INK); }
 

@@ -143,7 +143,8 @@ const COSMETIC_DEFS: CosmeticItem[] = [
     code: "FX_BATS",
     slot: "CARD_FRAME",
     name: "박쥐 떼",
-    description: "보름달 뜬 고성 위로 붉은 눈 박쥐들이 날개를 퍼덕인다",
+    description:
+      "보름달 아래 바위산 위 고딕 성, 붉은 눈 박쥐들이 날개를 퍼덕인다",
     price: 600,
     rarity: "COMMON",
     className: "bg-[#3b2a57]",
@@ -165,7 +166,8 @@ const COSMETIC_DEFS: CosmeticItem[] = [
     code: "FX_LIGHTNING",
     slot: "CARD_FRAME",
     name: "천둥번개",
-    description: "폭풍 구름 아래 갈래 번개가 초상화 양옆으로 내리꽂힌다",
+    description:
+      "폭풍우 치는 밤바다, 등대 불빛이 돌고 갈래 번개가 바다에 내리꽂힌다",
     price: 1000,
     rarity: "PREMIUM",
     className: "bg-[#1e2f5c]",

@@ -50,12 +50,14 @@ export function moon(p, cx, cy, r, { lit = "#f6e7b8", mid = "#e2c98a", dark = "#
     const dx = x + 0.5 - cx, dy = y + 0.5 - cy, d = Math.hypot(dx, dy);
     if (d > r) return;
     if (crescent && Math.hypot(dx - crescent * r * 0.55, dy - crescent * r * 0.25) < r * 0.92) return S || undefined;
-    const shade = (dx + dy) / (r * 1.4);
-    if (d > r - 1 && shade > 0) return D;
-    return shade > 0.35 ? M : L;
+    // lit from the upper left: a soft shadowed limb on the lower right, a darker rim at the very edge
+    const lit = Math.hypot(dx + r * 0.35, dy + r * 0.35) / r;
+    if (d > r - 1 && lit > 1) return D;
+    return lit > 1.05 ? M : L;
   });
   if (!crescent) {
-    for (const [ox, oy, rr] of [[-0.25, 0.35, 0.14], [0.3, 0.15, 0.1]]) p.disc(cx + ox * r, cy + oy * r, rr * r, M);
+    // faint maria: soft patches in the mid tone, off-centre so they never read as a face
+    for (const [ox, oy, rr] of [[0.2, -0.15, 0.22], [-0.3, 0.3, 0.16], [0.35, 0.4, 0.1]]) p.circle(cx + ox * r, cy + oy * r, rr * r, M);
   }
 }
 
@@ -123,6 +125,57 @@ export function fogBand(p, y, thick, c, k = 0.6, seed = 3) {
     o.l = col;
     o.k = kk * 0.5;
   });
+}
+
+/**
+ * A pixel cumulus cloud in the classic style: a silhouette of many small round bumps on a flat base, a 1 px darker
+ * outline all round it, a light body lit from the upper left, shadow pooling low and to the right, faint arcs where
+ * the bumps overlap, a little dither between light and shadow.
+ * cols = { out, shade, mid, hi } (outline, shadow, mid tone, light). w: width; tall: 0..1, how high it heaps up.
+ */
+export function puffCloud(p, cx, base, w, seed, cols, tall = 0.5) {
+  const C = Object.fromEntries(Object.entries(cols).map(([k, v]) => [k, hex(v)]));
+  const left = cx - w / 2, lobes = [];
+  // bumps along the top: big near the middle (toward the left of it), small at the ends
+  const n = Math.max(5, Math.round(w / 4));
+  for (let i = 0; i < n; i++) {
+    const u = (i + 0.5) / n, mid = Math.max(0, 1 - Math.abs(u - 0.42) * 2.2);
+    const r = 1.8 + (w * 0.08 + w * 0.15 * tall) * mid * (0.7 + 0.6 * rand(i, seed)) + rand(i, seed + 2) * 1.6;
+    lobes.push({ x: left + u * w + (rand(i, seed + 3) - 0.5) * 2, y: base - r * 0.7 - mid * w * 0.08 * tall, r });
+  }
+  // a second, lower row of bumps in front, so the body has overlapping lobes
+  for (let i = 0; i < Math.max(2, Math.round(n / 2)); i++) {
+    const u = (i + 0.7) / (Math.round(n / 2) + 0.4), r = 2 + w * 0.07 * (0.7 + 0.6 * rand(i, seed + 9));
+    lobes.push({ x: left + u * w, y: base - r * 0.5, r, front: true });
+  }
+  const inside = (x, y) => y <= base && (y >= base - 2 && x >= left + 1 && x <= left + w - 2 || lobes.some((L) => Math.hypot(x + 0.5 - L.x, y + 0.5 - L.y) <= L.r));
+  // the lobe a pixel belongs to: the front-most (lowest centre) one covering it
+  const owner = (x, y) => {
+    let best = null;
+    for (const L of lobes) if (Math.hypot(x + 0.5 - L.x, y + 0.5 - L.y) <= L.r && (!best || L.y > best.y)) best = L;
+    return best;
+  };
+  const x0 = Math.floor(left - w * 0.2), x1 = Math.ceil(left + w * 1.2), y0 = Math.floor(base - w * 0.7), y1 = base + 1;
+  const BAY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      if (!inside(x, y)) {
+        // the outline: any empty pixel touching the cloud
+        if (inside(x - 1, y) || inside(x + 1, y) || inside(x, y - 1) || inside(x, y + 1)) p.px(x, y, C.out);
+        continue;
+      }
+      const L = owner(x, y);
+      if (y >= base) { p.px(x, y, C.shade); continue; } // the flat underside
+      if (!L) { p.px(x, y, y >= base - 1 ? C.shade : C.mid); continue; }
+      const nx = (x + 0.5 - L.x) / L.r, ny = (y + 0.5 - L.y) / L.r, d = Math.hypot(nx, ny);
+      // an arc where this lobe's rim sits over a lobe behind it
+      const overlap = d > 0.82 && ny < 0.3 && lobes.some((M) => M !== L && Math.hypot(x + 0.5 - M.x, y + 0.5 - M.y) <= M.r - 0.5);
+      const light = -nx * 0.55 - ny * 0.85; // lit from the upper left
+      const low = (y - (base - 3)) / 3;      // shadow pools along the base
+      const v = light - Math.max(0, low) * 0.9 + (BAY[(y & 3) * 4 + (x & 3)] / 16 - 0.5) * 0.35;
+      p.px(x, y, overlap ? C.mid : v > 0.15 ? C.hi : v > -0.35 ? C.mid : C.shade);
+    }
+  }
 }
 
 export { mix, hex };

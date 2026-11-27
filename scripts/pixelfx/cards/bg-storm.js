@@ -1,21 +1,62 @@
-// Nexus card "천둥번개" backdrop: a dark storm sky with heavy banded clouds, a black sea-cliff horizon.
-import { sky, ridge, W } from "./_bg.js";
+// Nexus card "천둥번개" backdrop: a storm at sea. Dark storm clouds heaped overhead, a dark heaving sea to the
+// horizon with whitecaps, a black cliff on the right with a lighthouse (its lamp and sweeping beam are animated in
+// card-storm), rocks and spray on the left.
+import { sky, puffCloud, W } from "./_bg.js";
 import { CARD } from "./_card.js";
-import { hex, noise } from "../../core/index.js";
-export const meta = { name: "Card bg: storm", desc: "Storm sky with heavy pixel clouds.", tags: ["card", "bg"], ...CARD, duration: 0.05, loop: true, fps: 20, bg: "dark", options: { seed: 1 } };
+import { hex, rand, noise } from "../../core/index.js";
+export const meta = { name: "Card bg: storm", desc: "Storm at sea: piled clouds, heaving sea, cliff with a lighthouse.", tags: ["card", "bg"], ...CARD, duration: 0.05, loop: true, fps: 20, bg: "dark", options: { seed: 1 } };
 
-function cloudBank(p, y, amp, wave, seed, body, lit) {
-  const B = hex(body), L = hex(lit);
-  for (let x = 0; x < W; x++) {
-    const bottom = Math.round(y + amp * (0.5 + 0.5 * noise(x / wave, seed)) + 2 * noise(x / 3, seed + 9));
-    for (let yy = 0; yy <= bottom; yy++) p.px(x, yy, yy >= bottom - 1 ? L : B);
-  }
-}
+export const LIGHTHOUSE = { x: 97, top: 30 };
 
 export function draw(p) {
-  sky(p, ["#0a1024", "#0f1730", "#152040", "#1c2a52", "#243566"], 0, 84, 1);
-  cloudBank(p, 26, 10, 14, 3, "#1d2848", "#2f3e6a");
-  cloudBank(p, 16, 8, 11, 5, "#161f3a", "#283660");
-  cloudBank(p, 6, 6, 8, 8, "#10172c", "#202b4e");
-  ridge(p, 76, 5, 20, 6, "#070b18", { rim: "#1e2a50" });
+  sky(p, ["#080c1c", "#0c1228", "#111a36", "#172344", "#1e2c54"], 0, 58, 1, 0.55);
+  // storm clouds heaped across the top in two banks: dark slate, cold-lit tops, black outline
+  const STORM = { out: "#04060e", shade: "#141a32", mid: "#222c4c", hi: "#3a4a74" };
+  const FAR = { out: "#060914", shade: "#111830", mid: "#1a2442", hi: "#28365c" };
+  puffCloud(p, 18, 30, 34, 3, FAR, 0.5);
+  puffCloud(p, 70, 28, 38, 5, FAR, 0.6);
+  puffCloud(p, 34, 16, 40, 7, STORM, 0.7);
+  puffCloud(p, 92, 18, 34, 9, STORM, 0.6);
+  puffCloud(p, 60, 40, 24, 11, STORM, 0.3);
+
+  // the sea from the horizon down: rows darker toward the viewer, swells and whitecaps
+  const HZ = 52;
+  p.rect(0, HZ, W, 1, hex("#3a4a7a")); // a pale line where sky meets sea
+  p.shade(0, HZ + 1, W - 1, 91, (x, y) => {
+    const d = (y - HZ) / 40, swell = noise(x / (6 + d * 10) + y * 0.7, 13);
+    if (swell > 0.75 - d * 0.2 && rand(x >> 1, y, 5) > 0.55) return hex("#9aaad8"); // whitecaps
+    if (swell > 0.35) return d < 0.3 ? hex("#2a3864") : hex("#1c2648");
+    return d < 0.3 ? hex("#18224a") : d < 0.6 ? hex("#121a38") : hex("#0c1228");
+  });
+
+  // the cliff on the right, black rock with a cold rim, the lighthouse on top
+  const { x: LX, top: LT } = LIGHTHOUSE, cliffTop = 56;
+  p.shade(78, 40, W - 1, 91, (x, y) => {
+    const t = cliffTop + Math.round(Math.max(0, (86 - x)) * 0.9 + 1.5 * Math.sin(x / 3));
+    if (y < t) return;
+    if (y === t) return hex("#2c3a66");
+    return x < 86 + (y - t) * 0.3 ? hex("#141c36") : hex("#090e1e");
+  });
+  // the tower: white with red bands, a dark gallery and the lamp room (the lamp itself is lit in card-storm)
+  const base = cliffTop, w0 = 6, w1 = 4;
+  for (let y = LT + 6; y < base; y++) {
+    const u = (y - LT - 6) / (base - LT - 6), half = Math.round((w1 + (w0 - w1) * u) / 2);
+    const band = Math.floor((y - LT - 6) / 5) % 2 === 1;
+    for (let dx = -half; dx <= half; dx++) p.px(LX + dx, y, dx === half ? hex("#5a6488") : band ? hex("#a83a3a") : hex("#d8dcec"));
+    p.px(LX - half - 1, y, hex("#070a14"));
+  }
+  p.rect(LX - 4, LT + 5, 9, 1, hex("#1a1e2e")); // gallery
+  p.rect(LX - 2, LT + 1, 5, 4, hex("#1a1e2e")); // lamp room frame
+  p.rect(LX - 1, LT + 2, 3, 2, hex("#3a3020")); // the glass, lit by the sheet
+  for (let r = 0; r < 3; r++) p.rect(LX - 2 + r, LT - r, 5 - r * 2, 1, hex("#a83a3a")); // cap
+  p.px(LX, LT - 3, hex("#1a1e2e"));
+
+  // rocks on the left breaking the sea, wet tops catching the light
+  for (const [x, y, w, h] of [[6, 66, 7, 6], [16, 70, 5, 4], [30, 68, 4, 3]]) {
+    p.shade(x - w, y - h, x + w, y + 8, (xx, yy) => {
+      const dx = (xx + 0.5 - x) / w, top = y - h * (1 - dx * dx);
+      if (yy < top) return;
+      return yy < top + 1 ? hex("#3a4a78") : dx < -0.2 ? hex("#1a2244") : hex("#0e1428");
+    });
+  }
 }
