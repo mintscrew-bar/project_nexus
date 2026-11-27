@@ -1235,7 +1235,7 @@ body.scroll-locked {
 }
 .cfx-petal-sway { animation: cfx-petal-sway 2.4s ease-in-out infinite; }
 
-/* 픽셀 화염 — 바닥 열기가 일렁인다 (불길은 pixel-fire.tsx 캔버스) */
+/* 픽셀 화염 — 바닥 열기가 일렁인다 (불길은 effects.tsx CardSheet) */
 /* 불 뒤 그을음 — 사진 위에서도 불길이 또렷하게 보이도록 어둡게 깔고, 붉은 기만 살짝 일렁인다 */
 @keyframes cfx-heat {
   0%, 100% { opacity: 0.9; }

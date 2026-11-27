@@ -39,6 +39,9 @@ export function PixelSheet({
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
+    // 서버가 그린 캔버스 크기가 다르게 남아 있어도(하이드레이션은 속성을 고치지 않는다) 칸 크기로 맞춘다
+    canvas.width = frameW;
+    canvas.height = frameH;
     ctx.imageSmoothingEnabled = false;
 
     const img = new Image();

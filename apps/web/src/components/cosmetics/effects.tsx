@@ -323,8 +323,8 @@ function SakuraFx({ px }: { px: number }) {
  *
  * 그림은 pixelfx(픽셀 효과 라이브러리)로 그려 — 위로 흐르는 노이즈에서 높이를 빼 색 단계를 고른다 —
  * 구운 스프라이트 시트(110×92 칸 60장, 3초 반복) — 원본 효과 파일은
- * scripts/pixelfx/card-blaze.js. 예전 실시간 열 전파 불(pixel-fire.tsx)은
- * 칸이 세로로 늘어나고 자글자글한 잡티가 많았다. 아바타 불꽃은 그대로 그걸 쓴다.
+ * scripts/pixelfx/card-blaze.js. 예전 실시간 열 전파 불은 칸이 세로로 늘어나고
+ * 자글자글한 잡티가 많았다.
  */
 function FireFx() {
   return (

@@ -17,7 +17,7 @@ import { useIsClient } from "@/hooks/useIsClient";
 import { InkDragonVideo } from "./ink-dragon-video";
 import { cn } from "@/lib/utils";
 import { Burst } from "./effects";
-import { PixelFire } from "./pixel-fire";
+import { PixelSheet } from "./pixel-sheet";
 import {
   BatWingsFrame,
   CatEarsFrame,
@@ -76,14 +76,15 @@ function HaloFx({ size }: FxProps) {
 /* ───────── 불꽃 고리 ───────── */
 
 /**
- * 아바타가 이글이글 불타오른다 — 아바타 둘레 원이 불씨가 되어 실시간 픽셀 불길이
- * 위로 솟는다(pixel-fire.tsx). 아래쪽 불은 아바타 뒤에 가려지고, 옆과 머리 위로
- * 불길이 치솟으며 불티가 흩날린다.
+ * 아바타가 이글이글 불타오른다 — 아바타 둘레가 불씨가 되어 머리 위로 가장 높이,
+ * 옆으로는 낮게 불길이 솟고 불티가 흩날린다. 아래쪽 불은 아바타 뒤에 가려진다.
+ *
+ * pixelfx 로 그려 구운 시트(72×72 칸 60장, 3초 반복, public/cosmetics/avatars/fire-ring.png).
+ * 시트 한 칸이 아바타 지름의 1.8배라 그만큼 키워 가운데 맞춘다. 원본은
+ * scripts/pixelfx/cards/avatar-ring.js. 예전 실시간 열 전파 불은 자글자글한 잡티가 많았다.
  */
-function FireRingFx({ px, size }: FxProps) {
-  const cell = px * 1.75;
+function FireRingFx({ size }: FxProps) {
   const box = size * 1.8;
-  const n = Math.round(box / cell);
   return (
     <>
       <EmberRing size={size} />
@@ -91,17 +92,19 @@ function FireRingFx({ px, size }: FxProps) {
         className="cfx-ring-glow absolute inset-0 rounded-full"
         style={BACK}
       />
-      <PixelFire
-        cols={n}
-        rows={n}
-        cell={cell}
-        source={{ kind: "ring", cx: n / 2, cy: n / 2, r: size / 2 / cell }}
-        reach={0.3}
+      <PixelSheet
+        src="/cosmetics/avatars/fire-ring.png"
+        frameW={72}
+        frameH={72}
+        frames={60}
+        columns={8}
+        fps={20}
         className="absolute"
         style={{
           ...BACK,
-          left: size / 2 - (n * cell) / 2,
-          top: size / 2 - (n * cell) / 2,
+          width: box,
+          left: size / 2 - box / 2,
+          top: size / 2 - box / 2,
         }}
       />
     </>
@@ -164,7 +167,10 @@ function DragonOrbitFx({ size }: FxProps) {
           "drop-shadow(0 0 1.5px rgba(236,229,212,0.7)) drop-shadow(0 0 5px rgba(236,229,212,0.25))",
       }}
     >
-      <InkDragonVideo variant="avatar" className="absolute inset-0 h-full w-full" />
+      <InkDragonVideo
+        variant="avatar"
+        className="absolute inset-0 h-full w-full"
+      />
     </div>
   );
 }
