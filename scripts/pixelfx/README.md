@@ -8,14 +8,14 @@
 모든 카드는 **110×92 칸**이다 — 칸 크기가 같아야 로비에 여러 카드가 나란히 있을 때 픽셀 크기가 맞는다.
 카드 하나는 멈춘 배경 한 장(`bg-*.png`) 위에 움직이는 시트(`*.png`)를 겹친 것이다.
 
-| 카드                    | 배경 효과           | 움직이는 효과                                     | 구운 파일 (`apps/web/public/cosmetics/cards/`) |
-| ----------------------- | ------------------- | ------------------------------------------------- | ---------------------------------------------- |
-| 픽셀 화염 `FX_FIRE`     | `cards/bg-fire.js`  | `card-blaze.js` (`fire/` 에 넣는다)               | `bg-fire.png`, `fire-blaze.png`                |
-| 통통 슬라임 `FX_SLIME`  | `cards/bg-slime.js` | `cards/card-slime.js` (critters/slime 두 마리)    | `bg-slime.png`, `slime.png`                    |
-| 꼬마 유령 `FX_GHOST`    | `cards/bg-ghost.js` | `cards/card-ghost.js` (critters/ghost 두 마리)    | `bg-ghost.png`, `ghost.png`                    |
-| 박쥐 떼 `FX_BATS`       | `cards/bg-bats.js`  | `cards/card-bats.js` (critters/bat 세 마리)       | `bg-bats.png`, `bats.png`                      |
-| 전설의 검 `FX_SWORD`    | `cards/bg-sword.js` | `cards/card-sword.js` (바위에 꽂힌 검, 직접 그림) | `bg-sword.png`, `sword.png`                    |
-| 천둥번개 `FX_LIGHTNING` | `cards/bg-storm.js` | `cards/card-storm.js` (lightning/_lib 번개)       | `bg-storm.png`, `storm.png`                    |
+| 카드                    | 배경 효과           | 움직이는 효과                                             | 구운 파일 (`apps/web/public/cosmetics/cards/`) |
+| ----------------------- | ------------------- | --------------------------------------------------------- | ---------------------------------------------- |
+| 픽셀 화염 `FX_FIRE`     | `cards/bg-fire.js`  | `card-blaze.js` (`fire/` 에 넣는다)                       | `bg-fire.png`, `fire-blaze.png`                |
+| 통통 슬라임 `FX_SLIME`  | `cards/bg-slime.js` | `cards/card-slime.js` (critters/slime 두 마리)            | `bg-slime.png`, `slime.png`                    |
+| 꼬마 유령 `FX_GHOST`    | `cards/bg-ghost.js` | `cards/card-ghost.js` (critters/ghost 두 마리 + 도깨비불) | `bg-ghost.png`, `ghost.png`                    |
+| 박쥐 떼 `FX_BATS`       | `cards/bg-bats.js`  | `cards/card-bats.js` (critters/bat 세 마리)               | `bg-bats.png`, `bats.png`                      |
+| 전설의 검 `FX_SWORD`    | `cards/bg-sword.js` | `cards/card-sword.js` (바위에 꽂힌 검, 직접 그림)         | `bg-sword.png`, `sword.png`                    |
+| 천둥번개 `FX_LIGHTNING` | `cards/bg-storm.js` | `cards/card-storm.js` (lightning/_lib 번개)               | `bg-storm.png`, `storm.png`                    |
 
 `cards/_card.js` 는 카드 크기와 라이브러리 효과를 카드 위 자리에 찍는 `stamp`,
 `cards/_bg.js` 는 배경 그리기 도구(띠 하늘·실루엣·달·별·안개)다.

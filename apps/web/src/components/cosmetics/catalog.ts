@@ -110,7 +110,8 @@ const COSMETIC_DEFS: CosmeticItem[] = [
     code: "FX_GHOST",
     slot: "CARD_FRAME",
     name: "꼬마 유령",
-    description: "초승달 뜬 안개 묘지에서 꼬마 유령들이 둥실둥실 떠다닌다",
+    description:
+      "초승달 뜬 안개 묘지, 등불 단 고목 아래 꼬마 유령들이 둥실거리고 도깨비불이 떠돈다",
     price: 250,
     rarity: "STARTER",
     className: "bg-[#5b6478]",
