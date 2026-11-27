@@ -1,7 +1,7 @@
 // Painted pixel backdrops for the Nexus card scenes: banded skies with dithered seams, silhouettes, moons, stars.
 // Every card is 110 x 92, origin top-left. The portrait sits in the middle (about x 34..76, y 12..56) and the
 // player's name covers the bottom 18 px, so the interesting parts go at the sides and the top.
-import { hex, rand, noise, mix } from "../../core/index.js";
+import { hex, rand, noise, mix, fbm } from "../../core/index.js";
 import { CARD } from "./_card.js";
 
 export const [W, H] = CARD.size;
@@ -169,11 +169,41 @@ export function puffCloud(p, cx, base, w, seed, cols, tall = 0.5) {
       if (!L) { p.px(x, y, y >= base - 1 ? C.shade : C.mid); continue; }
       const nx = (x + 0.5 - L.x) / L.r, ny = (y + 0.5 - L.y) / L.r, d = Math.hypot(nx, ny);
       // an arc where this lobe's rim sits over a lobe behind it
-      const overlap = d > 0.82 && ny < 0.3 && lobes.some((M) => M !== L && Math.hypot(x + 0.5 - M.x, y + 0.5 - M.y) <= M.r - 0.5);
+      // only bigger bumps show their overlap arc, and only a thin one, so big clouds don't turn into scales
+      const overlap = L.r > 4 && d > 1 - 1.2 / L.r && ny < 0.1 && lobes.some((M) => M !== L && Math.hypot(x + 0.5 - M.x, y + 0.5 - M.y) <= M.r - 0.5);
       const light = -nx * 0.55 - ny * 0.85; // lit from the upper left
       const low = (y - (base - 3)) / 3;      // shadow pools along the base
       const v = light - Math.max(0, low) * 0.9 + (BAY[(y & 3) * 4 + (x & 3)] / 16 - 0.5) * 0.35;
       p.px(x, y, overlap ? C.mid : v > 0.15 ? C.hi : v > -0.35 ? C.mid : C.shade);
+    }
+  }
+}
+
+/**
+ * A soft pixel cloud with no outline, the painterly kind: a heap whose top edge wanders with noise (ragged, stair-
+ * stepped), a flat base, and tone that climbs from a shaded underside to bright tops in hard steps, broken up by
+ * the cloud's own billows so it doesn't read as a smooth gradient. w wide, h tall at its highest, base at y.
+ * ramp: shadow .. light (4-6 colours). flat (0..1): 0 a round heap, 1 a long low wisp.
+ */
+export function softCloud(p, cx, base, w, h, seed, ramp, flat = 0) {
+  const K = ramp.map(hex), n = K.length;
+  const x0 = Math.floor(cx - w / 2 - 2), x1 = Math.ceil(cx + w / 2 + 2), y0 = Math.floor(base - h - 4);
+  for (let y = y0; y <= base; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const u = (x + 0.5 - cx) / (w / 2);
+      if (Math.abs(u) > 1.15) continue;
+      // the heap's profile: a dome (or a long low wisp), its edge pushed about by two octaves of noise
+      const v = (base - y + 0.5) / h; // 0 at the base .. 1 at the top
+      const prof = Math.pow(Math.max(0, 1 - u * u), 0.6 + flat * 0.8);
+      const ragged = 0.28 * fbm(x * 0.11, y * 0.11, seed, 3) + 0.12 * fbm(x * 0.3, y * 0.3, seed + 7, 2);
+      // less raggedness high up, so the crown is lumpy rather than spiky
+      if (v - ragged * (1 - 0.45 * Math.min(1, v)) > prof) continue;
+      if (v < 0 || (v < 0.12 && Math.abs(u) > 0.95 - ragged)) continue; // the base tucks in at the ends
+      // tone: brighter toward the top, billows lit on their upper side, a shaded band along the base
+      const billow = fbm(x * 0.09 + 3, y * 0.13, seed + 11, 3);
+      let tone = 0.15 + 0.9 * v + 0.75 * billow - 0.25 * Math.max(0, u);
+      if (y >= base - 1) tone -= 0.5;
+      p.px(x, y, K[Math.max(0, Math.min(n - 1, Math.floor(tone * n)))]);
     }
   }
 }

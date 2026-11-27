@@ -1,7 +1,7 @@
 // Nexus card "통통 슬라임" backdrop: a forest clearing at sunset. A warm sky (purple to pink to gold) so the green
 // slimes stand out against it, a low sun on the left, warm-lit clouds, violet mountains, a dark pine line,
 // then the clearing: a sunlit grass rim, red spotted mushrooms, flowers, mossy stones, ferns framing the corners.
-import { sky, halo, ridge, puffCloud, W } from "./_bg.js";
+import { sky, halo, ridge, softCloud, W } from "./_bg.js";
 import { CARD } from "./_card.js";
 import { hex, rand } from "../../core/index.js";
 export const meta = { name: "Card bg: slime", desc: "Forest clearing at sunset: warm sky, mountains, pines, mushrooms, ferns.", tags: ["card", "bg"], ...CARD, duration: 0.05, loop: true, fps: 20, bg: "dark", options: { seed: 1 } };
@@ -53,11 +53,13 @@ export function draw(p) {
   p.circle(18, 44, 7, hex("#ffd27a"));
   p.circle(18, 44, 6, hex("#ffe6a8"));
   p.circle(17, 43, 4, hex("#fff6dc"));
-  // clouds lit by the low sun: warm cream tops, rose shadow, a plum outline
-  const DUSK = { out: "#6a2c58", shade: "#c0607a", mid: "#f0a08a", hi: "#ffd8b0" };
-  puffCloud(p, 22, 22, 30, 3, DUSK, 0.45);
-  puffCloud(p, 86, 16, 32, 5, DUSK, 0.3);
-  puffCloud(p, 94, 32, 18, 9, DUSK, 0.2);
+  // clouds lit by the low sun: rose undersides to cream crowns, in all sizes
+  const DUSK = ["#6a2c58", "#a0486a", "#d87078", "#f4a088", "#ffcfa8", "#ffe8cc"];
+  softCloud(p, 84, 30, 48, 22, 5, DUSK, 0.1);   // a big heap top right
+  softCloud(p, 20, 20, 30, 8, 3, DUSK, 0.6);    // a long one top left
+  softCloud(p, 46, 34, 14, 4, 9, DUSK, 1);      // scraps
+  softCloud(p, 8, 34, 10, 3, 11, DUSK, 1);
+  softCloud(p, 60, 10, 12, 4, 13, DUSK, 0.8);
   // two birds far off
   for (const [x, y] of [[84, 34], [90, 38]]) { p.px(x - 1, y - 1, INK); p.px(x, y, INK); p.px(x + 1, y - 1, INK); }
 

@@ -1,7 +1,7 @@
 // Nexus card "박쥐 떼" backdrop: a purple night over a vampire's castle. A huge full moon top left with moonlit violet
 // clouds, violet peaks, the castle big on a crag on the right (towers, pointed roofs, a flag, warm
 // lit windows), a rocky moor in layers with dead trees, and a gnarled branch reaching in from the bottom left.
-import { sky, halo, ridge, stars, moon, puffCloud, W } from "./_bg.js";
+import { sky, halo, ridge, stars, moon, softCloud, W } from "./_bg.js";
 import { CARD } from "./_card.js";
 import { hex, rand } from "../../core/index.js";
 export const meta = { name: "Card bg: bats", desc: "Purple night, full moon, castle on a crag, rocky moor, dead trees.", tags: ["card", "bg"], ...CARD, duration: 0.05, loop: true, fps: 20, bg: "dark", options: { seed: 1 } };
@@ -67,10 +67,12 @@ export function draw(p) {
   halo(p, 20, 20, 40, "#ffe0a0", 0.42);
   moon(p, 20, 20, 13);
 
-  // moonlit clouds, dim violet, one drifting across the moon's foot
-  const NIGHT = { out: "#1a1030", shade: "#3a2a56", mid: "#5a4678", hi: "#8a74aa" };
-  puffCloud(p, 24, 36, 28, 3, NIGHT, 0.3);
-  puffCloud(p, 62, 14, 22, 7, NIGHT, 0.4);
+  // moonlit clouds, dim violet, in all sizes: a bank across the moon's foot, scraps higher up
+  const NIGHT = ["#1c1230", "#2a1c42", "#3c2a58", "#54406e", "#6e5a8c"];
+  softCloud(p, 24, 42, 38, 12, 3, NIGHT, 0.5);
+  softCloud(p, 64, 14, 18, 5, 7, NIGHT, 0.8);
+  softCloud(p, 48, 28, 10, 3, 13, NIGHT, 1);
+  softCloud(p, 100, 30, 14, 4, 17, NIGHT, 0.9);
   // violet peaks, then the crag the castle stands on
   ridge(p, 54, 10, 16, 4, "#2a1a42");
   ridge(p, 60, 6, 10, 8, "#1f1434");
