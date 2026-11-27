@@ -1,15 +1,15 @@
-// Nexus card "천둥번개": the card's painted backdrop already rains, so this is only the lightning: twice a loop a forked bolt cracks down one side of
+// Nexus card "천둥번개": slanting rain over the whole card, and twice a loop a forked bolt cracks down one side of
 // the portrait, flickering, lighting the sky and throwing sparks where it lands. Bolt shape and inking from
 // lightning/_lib (adapted from Sprite Fusion's open-source lightning, https://www.spritefusion.com/pixel-art-vfx/lightning,
 // MIT License, Copyright (c) 2026 Hugo Duprez).
-import { fit, rng, WHITE, hex } from "../../core/index.js";
+import { fit, rng, cycle, WHITE, hex } from "../../core/index.js";
 import { VOLT, PLASMA, zigzag, stroke, flight, spark } from "../lightning/_lib.js";
 import { CARD } from "./_card.js";
 
 export const meta = {
-  name: "Card: storm", desc: "Twice a loop a forked bolt cracks down one side of the portrait.",
+  name: "Card: storm", desc: "Rain slants down the card; twice a loop a forked bolt cracks down one side of the portrait.",
   tags: ["card", "lightning", "storm", "rain", "loop"], ...CARD, duration: 6, loop: true, fps: 20, bg: "dark",
-  options: { palette: VOLT, sparks: PLASMA, seed: 8 },
+  options: { palette: VOLT, sparks: PLASMA, rain: ["#2b3250", "#46527a", "#6d7cab", "#a5b5e0"], seed: 8 },
 };
 
 const [W, H] = CARD.size, FLOOR = 78, D = meta.duration;
@@ -19,9 +19,17 @@ const BOLTS = [[1.1, 10, 18], [4.2, 102, 93]];
 const BK = [1, 0.55, 0.15, 0.9, 0.45, 0.6, 0.2];
 
 export function draw(p, t, o) {
-  const C = fit(o.palette, 8), S = o.sparks.map(hex);
+  const C = fit(o.palette, 8), RN = fit(o.rain, 4), S = o.sparks.map(hex);
   const steps = BOLTS.map(([bt]) => Math.floor((((t - bt) % D) + D) % D * 20 + 1e-6));
   const flash = BOLTS.reduce((m, _, i) => Math.max(m, BK[steps[i]] ?? 0), 0);
+
+  // rain slanting from above the card to the ground line, lit when the sky flashes
+  cycle(t, D, 420, o.seed + 11, (g) => g.range(0.38, 0.5), (age, life, r) => {
+    const vy = r.range(190, 230), vx = -vy * 0.2, x0 = r.range(-4, W + 18), y = -6 + vy * age, x = x0 + vx * age;
+    if (y > FLOOR + r.range(-8, 4)) return;
+    const l = r.range(4, 6.5);
+    p.line(x - vx * 0.02 * (l / 4), y - l, x, y, (u) => (u > 0.7 ? (flash > 0.5 ? C[5] : RN[3]) : flash > 0.5 ? C[3] : RN[u > 0.35 ? 2 : 1]));
+  });
 
   // the sky lights up behind everything when a bolt strikes
   if (flash > 0.1) p.glow(W / 2, 8, 90, C[3], 0.28 * flash);
