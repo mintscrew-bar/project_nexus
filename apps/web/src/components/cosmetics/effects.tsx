@@ -248,7 +248,10 @@ function CardSheet({ name }: { name: keyof typeof CARD_SHEETS }) {
 
 /* ───────── 슬라임 ───────── */
 
-/** 큰 슬라임이 초상화 오른쪽에서 통통 뛰고, 왼쪽의 작은 슬라임이 반 박자 늦게 따라 뛴다 */
+/**
+ * 노을 진 숲 속 빈터 — 슬라임이 초상화 오른쪽에서 통통 뛰고, 왼쪽 슬라임이 반 박자 늦게 따라 뛴다.
+ * 배경은 보라→금빛 노을 하늘·지는 해·구름·보랏빛 산·전나무 숲·빨간 버섯·고사리.
+ */
 function SlimeFx() {
   return <CardSheet name="slime" />;
 }

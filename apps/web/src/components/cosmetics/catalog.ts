@@ -100,7 +100,7 @@ const COSMETIC_DEFS: CosmeticItem[] = [
     slot: "CARD_FRAME",
     name: "통통 슬라임",
     description:
-      "숲 가장자리에서 슬라임 둘이 번갈아 통통 뛰어오르고 철퍽 내려앉는다",
+      "노을 진 숲 속 빈터, 빨간 버섯 사이로 슬라임 둘이 번갈아 통통 뛰어오른다",
     price: 250,
     rarity: "STARTER",
     className: "bg-[#2f6b3a]",
