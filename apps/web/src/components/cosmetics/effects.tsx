@@ -17,7 +17,7 @@ import { CARD_SCENES } from "./card-scenes";
 import { LiveBanner } from "./live-banner";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
-import { PixelFire } from "./pixel-fire";
+import { PixelSheet } from "./pixel-sheet";
 import {
   BAT,
   BAT_PAL,
@@ -364,21 +364,26 @@ function SakuraFx({ px }: { px: number }) {
 /* ───────── 픽셀 화염 ───────── */
 
 /**
- * 초상화 아래 절반을 실시간 픽셀 불길이 집어삼킨다 (pixel-fire.tsx).
- * 불길이 칸마다 이글이글 갈라지고 불티가 흩날린다.
+ * 초상화 아래를 불길이 집어삼킨다. 양옆 불 혀가 높이 솟아 초상화를 감싸고,
+ * 끝에서 불조각이 찢겨 나가며 불티가 피어오른다.
+ *
+ * 그림은 pixelfx(픽셀 효과 라이브러리)의 불 기법(불 혀·불조각·불티·빛 번짐)으로 그려
+ * 구운 스프라이트 시트(88×74 칸 60장, 3초 반복) — 원본 효과 파일은
+ * scripts/pixelfx/card-blaze.js. 예전 실시간 열 전파 불(pixel-fire.tsx)은
+ * 칸이 세로로 늘어나고 자글자글한 잡티가 많았다. 아바타 불꽃은 그대로 그걸 쓴다.
  */
 function FireFx() {
   return (
     <>
       <div className="cfx-heat absolute inset-x-0 bottom-0 h-3/4" />
-      <PixelFire
-        fill
-        cols={54}
-        rows={26}
-        cell={3}
-        source={{ kind: "bottom" }}
-        reach={0.5}
-        className="absolute inset-0"
+      <PixelSheet
+        src="/cosmetics/cards/fire-blaze.png"
+        frameW={88}
+        frameH={74}
+        frames={60}
+        columns={8}
+        fps={20}
+        className="absolute inset-x-0 bottom-0"
       />
     </>
   );
