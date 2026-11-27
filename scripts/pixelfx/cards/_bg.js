@@ -9,12 +9,12 @@ const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => 
 const dither = (x, y) => BAYER[((y & 3) << 2) | (x & 3)];
 
 /** Vertical sky from y0 to y1 through the ramp (top first): hard bands, a 4x4 ordered dither where they meet. */
-export function sky(p, ramp, y0 = 0, y1 = H, curve = 1) {
+export function sky(p, ramp, y0 = 0, y1 = H, curve = 1, seam = 0.35) {
   const C = ramp.map(hex), n = C.length - 1;
   p.shade(0, y0, W - 1, y1 - 1, (x, y) => {
     const v = Math.pow((y - y0) / Math.max(1, y1 - y0), curve) * n, i = Math.floor(v), f = v - i;
-    // only the last 35% of each band dithers into the next: wide flat bands, short seams
-    const g = (f - 0.65) / 0.35;
+    // only the last `seam` of each band dithers into the next: wide flat bands, short seams (1 = an even ramp)
+    const g = (f - (1 - seam)) / seam;
     return C[Math.min(n, g > dither(x, y) ? i + 1 : i)];
   });
 }
