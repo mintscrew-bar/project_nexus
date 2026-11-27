@@ -1871,8 +1871,8 @@ html.cfx-off .nfx-root::after {
   display: none !important;
 }
 @media (prefers-reduced-motion: reduce) {
-}
   .nfx-root { animation: none !important; }
+}
 /* 효과 끄기 「멈춘 그림」 — 글꼴·색은 두고 움직임만 멈춘다 */
 .cfx-still .nfx-root,
 .nfx-root.cfx-still {
